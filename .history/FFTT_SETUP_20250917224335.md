@@ -1,0 +1,118 @@
+# 🏓 Configuration FFTT - SQY Ping Team Up
+
+## 📋 Informations nécessaires
+
+Pour utiliser les vraies données FFTT, vous devez fournir :
+
+### 1. Identifiants FFTT
+
+- **ID_FFTT** : Votre identifiant FFTT (numéro de licence)
+- **PWD_FFTT** : Votre mot de passe FFTT
+
+### 2. Code du club
+
+- **CLUB_CODE_FFTT** : Le code FFTT de votre club (ex: 7501001)
+
+### 3. Configuration Discord (optionnel)
+
+- **DISCORD_WEBHOOK_TEAM1** : Webhook Discord pour l'équipe 1
+- **DISCORD_WEBHOOK_TEAM2** : Webhook Discord pour l'équipe 2
+- **DISCORD_WEBHOOK_TEAM3** : Webhook Discord pour l'équipe 3
+
+## 🔧 Configuration
+
+### Étape 1: Créer le fichier .env.local
+
+Créez un fichier `.env.local` à la racine du projet avec le contenu suivant :
+
+```env
+# Firebase Configuration (déjà configuré)
+NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyC9fsfuDqF0jjV8ocgCtqMpcPA-E6pZoNg
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=sqyping-teamup.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=sqyping-teamup
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=sqyping-teamup.firebasestorage.app
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=567392028186
+NEXT_PUBLIC_FIREBASE_APP_ID=1:567392028186:web:0fa11cf39ce060931eb3a3
+
+# FFTT API Configuration
+ID_FFTT=votre_identifiant_fftt
+PWD_FFTT=votre_mot_de_passe_fftt
+
+# Discord Webhooks (optionnel)
+DISCORD_WEBHOOK_TEAM1=https://discord.com/api/webhooks/...
+DISCORD_WEBHOOK_TEAM2=https://discord.com/api/webhooks/...
+DISCORD_WEBHOOK_TEAM3=https://discord.com/api/webhooks/...
+
+# Club Configuration
+CLUB_CODE_FFTT=votre_code_club_fftt
+CLUB_NAME=SQY Ping
+```
+
+### Étape 2: Remplacer les valeurs
+
+Remplacez les valeurs suivantes par vos vraies données :
+
+- `votre_identifiant_fftt` → Votre numéro de licence FFTT
+- `votre_mot_de_passe_fftt` → Votre mot de passe FFTT
+- `votre_code_club_fftt` → Le code FFTT de votre club
+
+## 🧪 Test de l'API FFTT
+
+Une fois configuré, vous pouvez tester l'API FFTT :
+
+### Test des joueurs
+
+```bash
+curl http://localhost:3001/api/fftt/player?licence=1234567
+```
+
+### Test des matchs
+
+```bash
+curl http://localhost:3001/api/fftt/matches?club=7501001
+```
+
+## 📊 Données disponibles via l'API FFTT
+
+### Joueurs
+
+- Informations personnelles
+- Classement
+- Historique des matchs
+- Statistiques
+
+### Matchs
+
+- Matchs programmés
+- Résultats des matchs
+- Calendrier des rencontres
+
+### Équipes
+
+- Composition des équipes
+- Classements
+- Historique des saisons
+
+## 🔒 Sécurité
+
+⚠️ **Important** : Ne jamais commiter le fichier `.env.local` dans Git !
+
+Le fichier `.env.local` est déjà dans `.gitignore` pour éviter l'exposition des identifiants.
+
+## 🚀 Prochaines étapes
+
+Une fois l'API FFTT configurée :
+
+1. **Tester la connexion** avec vos identifiants
+2. **Récupérer les données** de votre club
+3. **Créer des données de test** réalistes
+4. **Tester les fonctionnalités** de l'application
+
+## 📞 Support
+
+En cas de problème :
+
+1. Vérifier que vos identifiants FFTT sont corrects
+2. Vérifier que le code du club est correct
+3. Consulter les logs de l'API FFTT
+4. Tester avec l'émulateur Firebase

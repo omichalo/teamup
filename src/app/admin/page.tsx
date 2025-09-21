@@ -1,0 +1,590 @@
+"use client";
+
+import React, { useState } from "react";
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Button,
+  Alert,
+  CircularProgress,
+  Grid,
+  Chip,
+  Divider,
+} from "@mui/material";
+import {
+  Refresh as RefreshIcon,
+  CloudSync as CloudSyncIcon,
+  SportsTennis as TennisIcon,
+  Group as GroupIcon,
+  Schedule as ScheduleIcon,
+  Groups as GroupsIcon,
+  Sports as SportsIcon,
+} from "@mui/icons-material";
+import { useAuth } from "@/hooks/useAuth";
+import { Layout } from "@/components/Layout";
+import { AuthGuard } from "@/components/AuthGuard";
+
+interface SyncStatus {
+  players: {
+    lastSync: string | null;
+    count: number;
+    status: "idle" | "syncing" | "success" | "error";
+    error?: string;
+  };
+  teams: {
+    lastSync: string | null;
+    count: number;
+    status: "idle" | "syncing" | "success" | "error";
+    error?: string;
+  };
+  teamMatches: {
+    lastSync: string | null;
+    count: number;
+    status: "idle" | "syncing" | "success" | "error";
+    error?: string;
+  };
+}
+
+export default function AdminPage() {
+  const { user, firebaseUser } = useAuth();
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>({
+    players: { lastSync: null, count: 0, status: "idle" },
+    teams: { lastSync: null, count: 0, status: "idle" },
+    teamMatches: { lastSync: null, count: 0, status: "idle" },
+  });
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Charger le statut initial au montage du composant
+  React.useEffect(() => {
+    const loadSyncStatus = async () => {
+      if (!user || !firebaseUser) return; // Attendre que l'utilisateur soit connecté
+
+      setIsLoading(true);
+      try {
+        // Récupérer le token d'authentification
+        const token = await firebaseUser.getIdToken();
+
+        const response = await fetch("/api/admin/sync-status", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+          setSyncStatus({
+            players: {
+              lastSync: result.data?.players?.lastSync || null,
+              count: result.data?.players?.count || 0,
+              status: "idle",
+            },
+            teams: {
+              lastSync: result.data?.teams?.lastSync || null,
+              count: result.data?.teams?.count || 0,
+              status: "idle",
+            },
+            teamMatches: {
+              lastSync: result.data?.teamMatches?.lastSync || null,
+              count: result.data?.teamMatches?.count || 0,
+              status: "idle",
+            },
+          });
+        } else {
+          console.error("Erreur API:", result.error || result.message);
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement du statut:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadSyncStatus();
+  }, [user, firebaseUser]);
+
+  // Pour l'instant, tous les utilisateurs connectés peuvent accéder à l'administration
+
+  const handleSyncPlayers = async () => {
+    if (!firebaseUser) {
+      console.error("Utilisateur non connecté");
+      return;
+    }
+
+    setSyncStatus((prev) => ({
+      ...prev,
+      players: { ...prev.players, status: "syncing" },
+    }));
+
+    try {
+      // Récupérer le token d'authentification
+      const token = await firebaseUser.getIdToken();
+
+      const response = await fetch("/api/admin/sync-players", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        setSyncStatus((prev) => ({
+          ...prev,
+          players: {
+            lastSync: new Date().toISOString(),
+            count: result.data?.playersCount || 0,
+            status: "success",
+          },
+        }));
+      } else {
+        setSyncStatus((prev) => ({
+          ...prev,
+          players: {
+            ...prev.players,
+            status: "error",
+            error: result.error || result.message || "Erreur inconnue",
+          },
+        }));
+      }
+    } catch (error) {
+      setSyncStatus((prev) => ({
+        ...prev,
+        players: {
+          ...prev.players,
+          status: "error",
+          error: error instanceof Error ? error.message : "Erreur réseau",
+        },
+      }));
+    }
+  };
+
+  const handleSyncTeams = async () => {
+    if (!firebaseUser) {
+      console.error("Utilisateur non connecté");
+      return;
+    }
+
+    setSyncStatus((prev) => ({
+      ...prev,
+      teams: { ...prev.teams, status: "syncing" },
+    }));
+
+    try {
+      // Récupérer le token d'authentification
+      const token = await firebaseUser.getIdToken();
+
+      const response = await fetch("/api/admin/sync-teams", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        setSyncStatus((prev) => ({
+          ...prev,
+          teams: {
+            lastSync: new Date().toISOString(),
+            count: result.data?.teamsCount || 0,
+            status: "success",
+          },
+        }));
+      } else {
+        setSyncStatus((prev) => ({
+          ...prev,
+          teams: {
+            ...prev.teams,
+            status: "error",
+            error: result.error || result.message || "Erreur inconnue",
+          },
+        }));
+      }
+    } catch (error) {
+      setSyncStatus((prev) => ({
+        ...prev,
+        teams: {
+          ...prev.teams,
+          status: "error",
+          error: error instanceof Error ? error.message : "Erreur réseau",
+        },
+      }));
+    }
+  };
+
+  const handleSyncTeamMatches = async () => {
+    if (!firebaseUser) {
+      console.error("Utilisateur non connecté");
+      return;
+    }
+
+    setSyncStatus((prev) => ({
+      ...prev,
+      teamMatches: { ...prev.teamMatches, status: "syncing" },
+    }));
+
+    try {
+      // Récupérer le token d'authentification
+      const token = await firebaseUser.getIdToken();
+
+      const response = await fetch("/api/admin/sync-team-matches", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        setSyncStatus((prev) => ({
+          ...prev,
+          teamMatches: {
+            lastSync: new Date().toISOString(),
+            count: result.data?.matchesCount || 0,
+            status: "success",
+          },
+        }));
+      } else {
+        setSyncStatus((prev) => ({
+          ...prev,
+          teamMatches: {
+            ...prev.teamMatches,
+            status: "error",
+            error: result.error || result.message || "Erreur inconnue",
+          },
+        }));
+      }
+    } catch (error) {
+      setSyncStatus((prev) => ({
+        ...prev,
+        teamMatches: {
+          ...prev.teamMatches,
+          status: "error",
+          error: error instanceof Error ? error.message : "Erreur réseau",
+        },
+      }));
+    }
+  };
+
+  const getStatusChip = (status: SyncStatus["players"]["status"]) => {
+    switch (status) {
+      case "syncing":
+        return (
+          <Chip
+            icon={<CircularProgress size={16} />}
+            label="Synchronisation en cours..."
+            color="info"
+          />
+        );
+      case "success":
+        return <Chip label="Synchronisé avec succès" color="success" />;
+      case "error":
+        return <Chip label="Erreur de synchronisation" color="error" />;
+      default:
+        return <Chip label="Prêt à synchroniser" color="default" />;
+    }
+  };
+
+  const formatLastSync = (lastSync: string | null) => {
+    if (!lastSync) return "Jamais";
+    return new Date(lastSync).toLocaleString("fr-FR");
+  };
+
+  return (
+    <AuthGuard>
+      <Layout>
+        <Box sx={{ p: 3 }}>
+          <Typography variant="h4" gutterBottom>
+            Administration - Synchronisation des données
+          </Typography>
+
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+            Gérez la synchronisation des données FFTT depuis cette interface
+            d'administration.
+          </Typography>
+
+          {isLoading ? (
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: "30vh",
+                gap: 2,
+              }}
+            >
+              <CircularProgress size={48} />
+              <Typography variant="h6" color="text.secondary">
+                Chargement des données de synchronisation...
+              </Typography>
+            </Box>
+          ) : (
+            <Grid container spacing={3}>
+              {/* Synchronisation des joueurs */}
+              <Grid item xs={12} md={6}>
+                <Card>
+                  <CardContent>
+                    <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                      <GroupIcon sx={{ mr: 1, color: "primary.main" }} />
+                      <Typography variant="h6">
+                        Synchronisation des joueurs
+                      </Typography>
+                    </Box>
+
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mb: 2 }}
+                    >
+                      Synchronise la liste des joueurs du club depuis l'API
+                      FFTT.
+                    </Typography>
+
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="body2">
+                        <strong>Dernière synchronisation :</strong>{" "}
+                        {formatLastSync(syncStatus.players.lastSync)}
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Nombre de joueurs :</strong>{" "}
+                        {syncStatus.players.count}
+                      </Typography>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        <Typography variant="body2" component="span">
+                          <strong>Statut :</strong>
+                        </Typography>
+                        {getStatusChip(syncStatus.players.status)}
+                      </Box>
+                    </Box>
+
+                    {syncStatus.players.error && (
+                      <Alert severity="error" sx={{ mb: 2 }}>
+                        {syncStatus.players.error}
+                      </Alert>
+                    )}
+
+                    <Button
+                      variant="contained"
+                      startIcon={
+                        syncStatus.players.status === "syncing" ? (
+                          <CircularProgress size={20} color="inherit" />
+                        ) : (
+                          <RefreshIcon />
+                        )
+                      }
+                      onClick={handleSyncPlayers}
+                      disabled={syncStatus.players.status === "syncing"}
+                      fullWidth
+                    >
+                      {syncStatus.players.status === "syncing"
+                        ? "Synchronisation en cours..."
+                        : "Synchroniser les joueurs"}
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              {/* Synchronisation des équipes */}
+              <Grid item xs={12} md={6}>
+                <Card>
+                  <CardContent>
+                    <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                      <GroupsIcon sx={{ mr: 1, color: "primary.main" }} />
+                      <Typography variant="h6">
+                        Synchronisation des équipes
+                      </Typography>
+                    </Box>
+
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mb: 2 }}
+                    >
+                      Synchronise la liste des équipes du club depuis l'API
+                      FFTT.
+                    </Typography>
+
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="body2">
+                        <strong>Dernière synchronisation :</strong>{" "}
+                        {formatLastSync(syncStatus.teams.lastSync)}
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Nombre d'équipes :</strong>{" "}
+                        {syncStatus.teams.count}
+                      </Typography>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        <Typography variant="body2" component="span">
+                          <strong>Statut :</strong>
+                        </Typography>
+                        {getStatusChip(syncStatus.teams.status)}
+                      </Box>
+                    </Box>
+
+                    {syncStatus.teams.error && (
+                      <Alert severity="error" sx={{ mb: 2 }}>
+                        {syncStatus.teams.error}
+                      </Alert>
+                    )}
+
+                    <Button
+                      variant="contained"
+                      startIcon={
+                        syncStatus.teams.status === "syncing" ? (
+                          <CircularProgress size={20} color="inherit" />
+                        ) : (
+                          <GroupsIcon />
+                        )
+                      }
+                      onClick={handleSyncTeams}
+                      disabled={syncStatus.teams.status === "syncing"}
+                      fullWidth
+                    >
+                      {syncStatus.teams.status === "syncing"
+                        ? "Synchronisation en cours..."
+                        : "Synchroniser les équipes"}
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              {/* Synchronisation des matchs par équipe */}
+              <Grid item xs={12} md={6}>
+                <Card>
+                  <CardContent>
+                    <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                      <SportsIcon sx={{ mr: 1, color: "primary.main" }} />
+                      <Typography variant="h6">
+                        Synchronisation des matchs par équipe
+                      </Typography>
+                    </Box>
+
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mb: 2 }}
+                    >
+                      Synchronise les matchs organisés par équipe dans des
+                      sous-collections Firestore.
+                    </Typography>
+
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="body2">
+                        <strong>Dernière synchronisation :</strong>{" "}
+                        {formatLastSync(syncStatus.teamMatches.lastSync)}
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Nombre de matchs :</strong>{" "}
+                        {syncStatus.teamMatches.count}
+                      </Typography>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        <Typography variant="body2" component="span">
+                          <strong>Statut :</strong>
+                        </Typography>
+                        {getStatusChip(syncStatus.teamMatches.status)}
+                      </Box>
+                    </Box>
+
+                    {syncStatus.teamMatches.error && (
+                      <Alert severity="error" sx={{ mb: 2 }}>
+                        {syncStatus.teamMatches.error}
+                      </Alert>
+                    )}
+
+                    <Button
+                      variant="contained"
+                      startIcon={
+                        syncStatus.teamMatches.status === "syncing" ? (
+                          <CircularProgress size={20} color="inherit" />
+                        ) : (
+                          <SportsIcon />
+                        )
+                      }
+                      onClick={handleSyncTeamMatches}
+                      disabled={syncStatus.teamMatches.status === "syncing"}
+                      fullWidth
+                    >
+                      {syncStatus.teamMatches.status === "syncing"
+                        ? "Synchronisation en cours..."
+                        : "Synchroniser les matchs par équipe"}
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Grid>
+
+              {/* Informations générales */}
+              <Grid item xs={12}>
+                <Card>
+                  <CardContent>
+                    <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                      <ScheduleIcon sx={{ mr: 1, color: "primary.main" }} />
+                      <Typography variant="h6">
+                        Synchronisation automatique
+                      </Typography>
+                    </Box>
+
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mb: 2 }}
+                    >
+                      Les données sont automatiquement synchronisées en
+                      arrière-plan :
+                    </Typography>
+
+                    <Box sx={{ pl: 2 }}>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        • <strong>Joueurs :</strong> Synchronisation quotidienne
+                        à 6h du matin
+                      </Typography>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        • <strong>Équipes :</strong> Synchronisation quotidienne
+                        à 1h du matin
+                      </Typography>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        • <strong>Matchs par équipe :</strong> Synchronisation
+                        quotidienne à 2h30 du matin
+                      </Typography>
+                      <Typography variant="body2">
+                        • <strong>Détails des matchs :</strong> Récupération
+                        automatique des compositions et résultats
+                      </Typography>
+                    </Box>
+
+                    <Divider sx={{ my: 2 }} />
+
+                    <Alert severity="info">
+                      <Typography variant="body2">
+                        <strong>Note :</strong> La synchronisation manuelle peut
+                        prendre plusieurs minutes selon le nombre de données à
+                        traiter. Les synchronisations automatiques se font en
+                        arrière-plan sans impact sur l'utilisation de
+                        l'application.
+                      </Typography>
+                    </Alert>
+                  </CardContent>
+                </Card>
+              </Grid>
+            </Grid>
+          )}
+        </Box>
+      </Layout>
+    </AuthGuard>
+  );
+}
