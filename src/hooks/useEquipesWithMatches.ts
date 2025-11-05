@@ -65,19 +65,21 @@ export const useEquipesWithMatches = () => {
                     joueursAdversaires: match.joueursAdversaires || [],
                   }));
 
+                  // Extraire le numéro d'équipe depuis le nom (ex: "SQY PING 1" -> 1)
+                  const teamNumberMatch = team.name.match(/SQY PING (\d+)/);
+                  const teamNumber = teamNumberMatch
+                    ? parseInt(teamNumberMatch[1], 10)
+                    : 1;
+
                   return {
                     team: {
                       id: team.id,
-                      number: team.teamNumber || 1,
+                      number: teamNumber,
                       name: team.name,
                       division: team.division || "Division inconnue",
                       players: [],
-                      createdAt: team.createdAt
-                        ? new Date(team.createdAt)
-                        : new Date(),
-                      updatedAt: team.updatedAt
-                        ? new Date(team.updatedAt)
-                        : new Date(),
+                      createdAt: new Date(),
+                      updatedAt: new Date(),
                     },
                     matches: matches,
                   };
@@ -97,12 +99,8 @@ export const useEquipesWithMatches = () => {
                     division: team.division || "Division inconnue",
                     players: [],
                     coach: "",
-                    createdAt: team.createdAt
-                      ? new Date(team.createdAt)
-                      : new Date(),
-                    updatedAt: team.updatedAt
-                      ? new Date(team.updatedAt)
-                      : new Date(),
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
                   },
                   matches: [],
                 };
