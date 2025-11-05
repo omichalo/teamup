@@ -4,8 +4,8 @@ import { getFirestore, Firestore } from "firebase/firestore";
 import { getStorage, FirebaseStorage } from "firebase/storage";
 
 function getFirebaseConfig() {
-  // Firebase App Hosting fournit FIREBASE_WEBAPP_CONFIG
-  if (process.env.FIREBASE_WEBAPP_CONFIG) {
+  // Firebase App Hosting fournit FIREBASE_WEBAPP_CONFIG (disponible au BUILD et RUNTIME côté serveur)
+  if (typeof process !== "undefined" && process.env?.FIREBASE_WEBAPP_CONFIG) {
     try {
       return JSON.parse(process.env.FIREBASE_WEBAPP_CONFIG);
     } catch (e) {
@@ -14,14 +14,30 @@ function getFirebaseConfig() {
   }
 
   // Fallback sur les variables d'environnement individuelles
-  return {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  const config = {
+    apiKey: typeof process !== "undefined" ? process.env?.NEXT_PUBLIC_FIREBASE_API_KEY : undefined,
+    authDomain: typeof process !== "undefined" ? process.env?.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN : undefined,
+    projectId: typeof process !== "undefined" ? process.env?.NEXT_PUBLIC_FIREBASE_PROJECT_ID : undefined,
+    storageBucket: typeof process !== "undefined" ? process.env?.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET : undefined,
+    messagingSenderId: typeof process !== "undefined" ? process.env?.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID : undefined,
+    appId: typeof process !== "undefined" ? process.env?.NEXT_PUBLIC_FIREBASE_APP_ID : undefined,
   };
+
+  // Si aucune variable d'environnement n'est disponible, utiliser les valeurs par défaut
+  // Ces valeurs sont publiques et peuvent être exposées côté client
+  if (!config.apiKey || !config.projectId) {
+    // Configuration Firebase pour sqyping-teamup (valeurs publiques)
+    return {
+      apiKey: "AIzaSyC9fsfuDqF0jjV8ocgCtqMpcPA-E6pZoNg",
+      authDomain: "sqyping-teamup.firebaseapp.com",
+      projectId: "sqyping-teamup",
+      storageBucket: "sqyping-teamup.firebasestorage.app",
+      messagingSenderId: "567392028186",
+      appId: "1:567392028186:web:0fa11cf39ce060931eb3a3",
+    };
+  }
+
+  return config;
 }
 
 let app: FirebaseApp | undefined;
