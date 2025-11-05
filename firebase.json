@@ -32,5 +32,17 @@
       "runCommand": "npm start",
       "framework": "nextjs"
     }
+  },
+  "apphosting": {
+    "backendId": "teamup",
+    "rootDir": "/",
+    "ignore": [
+      "node_modules",
+      ".git",
+      "firebase-debug.log",
+      "firebase-debug.*.log",
+      "functions"
+    ],
+    "alwaysDeployFromSource": false
   }
 }
