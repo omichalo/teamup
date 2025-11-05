@@ -1,5 +1,9 @@
 "use client";
 
+// Force dynamic rendering to avoid static generation errors
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Box,

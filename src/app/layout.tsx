@@ -9,6 +9,10 @@ export const metadata: Metadata = {
   description: "Application de gestion des équipes pour le club SQY Ping",
 };
 
+// Force dynamic rendering to avoid static generation errors
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
 export default function RootLayout({
   children,
 }: {

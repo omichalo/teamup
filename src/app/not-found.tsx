@@ -1,28 +1,31 @@
 "use client";
 
-import { Box, Typography, Button } from "@mui/material";
 import { useRouter } from "next/navigation";
+
+// Force dynamic rendering to avoid static generation errors
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export default function NotFound() {
   const router = useRouter();
 
   return (
-    <Box
-      sx={{
+    <div
+      style={{
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
         minHeight: "100vh",
-        gap: 2,
+        gap: "16px",
       }}
     >
-      <Typography variant="h1">404</Typography>
-      <Typography variant="h5">Page non trouvée</Typography>
-      <Button variant="contained" onClick={() => router.push("/")}>
+      <h1>404</h1>
+      <h2>Page non trouvée</h2>
+      <button onClick={() => router.push("/")}>
         Retour à l&apos;accueil
-      </Button>
-    </Box>
+      </button>
+    </div>
   );
 }
 

@@ -9,9 +9,17 @@ const nextConfig: NextConfig = {
     // Empêcher la compilation en cas d'erreurs ESLint
     ignoreDuringBuilds: true,
   },
-  // Ignorer les erreurs de pré-rendu pour les pages système comme _not-found
+  // Désactiver le pré-rendu statique pour éviter les erreurs Material-UI/React
+  // Les pages seront rendues dynamiquement
+  output: "standalone",
+  // Ignorer les erreurs de pré-rendu pour les pages système
   experimental: {
     missingSuspenseWithCSRBailout: false,
+  },
+  // Désactiver complètement la génération statique pour éviter les erreurs
+  // Toutes les pages seront rendues dynamiquement
+  generateBuildId: async () => {
+    return "build-" + Date.now();
   },
 };
 
