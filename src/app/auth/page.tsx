@@ -102,12 +102,21 @@ export default function AuthPage() {
       await signUp(formData.email, formData.password, formData.displayName);
     } catch (error: unknown) {
       console.error("Erreur d&apos;inscription:", error);
-      if (error.code === "auth/email-already-in-use") {
-        setError("Un compte existe déjà avec cet email");
-      } else if (error.code === "auth/invalid-email") {
-        setError("Email invalide");
-      } else if (error.code === "auth/weak-password") {
-        setError("Le mot de passe est trop faible");
+      if (
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        typeof error.code === "string"
+      ) {
+        if (error.code === "auth/email-already-in-use") {
+          setError("Un compte existe déjà avec cet email");
+        } else if (error.code === "auth/invalid-email") {
+          setError("Email invalide");
+        } else if (error.code === "auth/weak-password") {
+          setError("Le mot de passe est trop faible");
+        } else {
+          setError("Erreur d&apos;inscription. Veuillez réessayer.");
+        }
       } else {
         setError("Erreur d&apos;inscription. Veuillez réessayer.");
       }
