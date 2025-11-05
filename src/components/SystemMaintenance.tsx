@@ -259,11 +259,6 @@ export function SystemMaintenance({
     { value: "yearly", label: "Annuel" },
   ];
 
-  useEffect(() => {
-    loadSystemHealth();
-    loadMaintenanceLogs();
-  }, [loadSystemHealth, loadMaintenanceLogs]);
-
   const loadSystemHealth = useCallback(async () => {
     try {
       const health = await onGetSystemHealth();
@@ -284,6 +279,11 @@ export function SystemMaintenance({
       console.error("Erreur lors du chargement des logs de maintenance:", err);
     }
   }, [onGetMaintenanceLogs]);
+
+  useEffect(() => {
+    loadSystemHealth();
+    loadMaintenanceLogs();
+  }, [loadSystemHealth, loadMaintenanceLogs]);
 
   const handleRunTask = async (taskId: string) => {
     try {

@@ -1095,7 +1095,9 @@ export function ReportsManager({
                     {reportData.rows.slice(0, 100).map((row, index) => (
                       <TableRow key={index}>
                         {row.map((cell, cellIndex) => (
-                          <TableCell key={cellIndex}>{cell}</TableCell>
+                          <TableCell key={cellIndex}>
+                            {String(cell ?? "")}
+                          </TableCell>
                         ))}
                       </TableRow>
                     ))}

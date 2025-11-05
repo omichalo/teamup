@@ -279,10 +279,10 @@ export function BurnoutRulesManager({
                     setEditingRule({
                       ...editingRule,
                       type: e.target.value as
-                        | "team"
-                        | "player"
-                        | "match"
-                        | "general",
+                        | "PLAYER_LIMIT"
+                        | "TEAM_LIMIT"
+                        | "FOREIGN_LIMIT"
+                        | "MUTATION_LIMIT",
                     })
                   }
                 >
@@ -317,11 +317,9 @@ export function BurnoutRulesManager({
                     setEditingRule({
                       ...editingRule,
                       period: e.target.value as
-                        | "match"
-                        | "day"
-                        | "week"
-                        | "month"
-                        | "season",
+                        | "SEASON"
+                        | "MATCH_DAY"
+                        | "CUSTOM",
                     })
                   }
                 >

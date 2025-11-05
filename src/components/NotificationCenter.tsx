@@ -267,10 +267,6 @@ export function NotificationCenter({
     { value: "archived", label: "Archivé", color: "secondary" },
   ];
 
-  useEffect(() => {
-    loadSettings();
-  }, [loadSettings]);
-
   const loadSettings = useCallback(async () => {
     try {
       const notificationSettings = await onGetNotificationSettings();
@@ -279,6 +275,10 @@ export function NotificationCenter({
       console.error("Erreur lors du chargement des paramètres:", err);
     }
   }, [onGetNotificationSettings]);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   const handleMarkAsRead = async (id: string) => {
     try {

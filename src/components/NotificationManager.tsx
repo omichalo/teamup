@@ -205,10 +205,6 @@ export function NotificationManager({
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
 
-  useEffect(() => {
-    loadSettings();
-  }, [loadSettings]);
-
   const loadSettings = useCallback(async () => {
     try {
       const notificationSettings = await onGetNotificationSettings();
@@ -217,6 +213,10 @@ export function NotificationManager({
       console.error("Erreur lors du chargement des paramètres:", err);
     }
   }, [onGetNotificationSettings]);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   const handleCreateNotification = async () => {
     try {

@@ -123,13 +123,20 @@ export const useAuthState = () => {
           console.error("Hook useAuth: Error fetching user data:", error);
           console.error("Hook useAuth: Détails de l&apos;erreur:", error);
 
-          // Si c&apos;est une erreur de permissions, essayer de créer l&apos;utilisateur quand même
+          // Si c'est une erreur de permissions, essayer de créer l'utilisateur quand même
           if (
-            error.code === "permission-denied" ||
-            error.message?.includes("Missing or insufficient permissions")
+            (error &&
+              typeof error === "object" &&
+              "code" in error &&
+              error.code === "permission-denied") ||
+            (error &&
+              typeof error === "object" &&
+              "message" in error &&
+              typeof error.message === "string" &&
+              error.message.includes("Missing or insufficient permissions"))
           ) {
             console.log(
-              "Hook useAuth: Erreur de permissions détectée, tentative de création d&apos;utilisateur..."
+              "Hook useAuth: Erreur de permissions détectée, tentative de création d'utilisateur..."
             );
             try {
               const newUser: Omit<User, "id" | "createdAt" | "updatedAt"> = {
@@ -241,13 +248,20 @@ export const useAuthState = () => {
         } catch (error: unknown) {
           console.error("Hook useAuth: Error fetching user data:", error);
 
-          // Si c&apos;est une erreur de permissions, essayer de créer l&apos;utilisateur quand même
+          // Si c'est une erreur de permissions, essayer de créer l'utilisateur quand même
           if (
-            error.code === "permission-denied" ||
-            error.message?.includes("Missing or insufficient permissions")
+            (error &&
+              typeof error === "object" &&
+              "code" in error &&
+              error.code === "permission-denied") ||
+            (error &&
+              typeof error === "object" &&
+              "message" in error &&
+              typeof error.message === "string" &&
+              error.message.includes("Missing or insufficient permissions"))
           ) {
             console.log(
-              "Hook useAuth: Erreur de permissions détectée dans signIn, tentative de création d&apos;utilisateur..."
+              "Hook useAuth: Erreur de permissions détectée dans signIn, tentative de création d'utilisateur..."
             );
             try {
               const newUser: Omit<User, "id" | "createdAt" | "updatedAt"> = {
@@ -283,11 +297,20 @@ export const useAuthState = () => {
       return { success: true };
     } catch (error: unknown) {
       console.error("Hook useAuth: Sign in error:", error);
-      console.error("Hook useAuth: Error code:", error.code);
-      console.error("Hook useAuth: Error message:", error.message);
+      const errorCode =
+        error && typeof error === "object" && "code" in error
+          ? (error.code as string)
+          : undefined;
+      const errorMessage =
+        error && typeof error === "object" && "message" in error
+          ? (error.message as string)
+          : undefined;
 
-      // Gérer les erreurs d&apos;authentification spécifiques
-      if (error.code === "auth/invalid-credential") {
+      console.error("Hook useAuth: Error code:", errorCode);
+      console.error("Hook useAuth: Error message:", errorMessage);
+
+      // Gérer les erreurs d'authentification spécifiques
+      if (errorCode === "auth/invalid-credential") {
         console.log(
           "Hook useAuth: Identifiants invalides - retour d&apos;erreur contrôlée"
         );
@@ -296,7 +319,7 @@ export const useAuthState = () => {
         return { success: false, error: "Email ou mot de passe incorrect" };
       }
 
-      if (error.code === "auth/user-not-found") {
+      if (errorCode === "auth/user-not-found") {
         console.log(
           "Hook useAuth: Utilisateur non trouvé - retour d&apos;erreur contrôlée"
         );
@@ -305,7 +328,7 @@ export const useAuthState = () => {
         return { success: false, error: "Aucun compte trouvé avec cet email" };
       }
 
-      if (error.code === "auth/wrong-password") {
+      if (errorCode === "auth/wrong-password") {
         console.log(
           "Hook useAuth: Mot de passe incorrect - retour d&apos;erreur contrôlée"
         );
@@ -314,12 +337,12 @@ export const useAuthState = () => {
         return { success: false, error: "Mot de passe incorrect" };
       }
 
-      if (error.code === "auth/invalid-email") {
+      if (errorCode === "auth/invalid-email") {
         return { success: false, error: "Email invalide" };
       }
 
       // Pour les autres erreurs, retourner une erreur générique
-      console.log("Hook useAuth: Erreur non gérée:", error.code);
+      console.log("Hook useAuth: Erreur non gérée:", errorCode);
       return {
         success: false,
         error: "Erreur de connexion. Veuillez réessayer.",
