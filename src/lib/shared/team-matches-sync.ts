@@ -207,17 +207,19 @@ export class TeamMatchesSyncService {
       }
 
       // S'assurer que isFemale est défini en utilisant toutes les informations disponibles
+      const isFemaleValue =
+        "isFemale" in equipeFound && equipeFound.isFemale !== undefined
+          ? Boolean(equipeFound.isFemale)
+          : isFemaleTeam(
+              equipeFound.libelle,
+              equipeFound.division,
+              equipeFound.libelleEpreuve,
+              equipeFound.idEpreuve
+            );
+
       const equipe: FFTTEquipe = {
         ...equipeFound,
-        isFemale:
-          equipeFound.isFemale !== undefined
-            ? equipeFound.isFemale
-            : isFemaleTeam(
-                equipeFound.libelle,
-                equipeFound.division,
-                equipeFound.libelleEpreuve,
-                equipeFound.idEpreuve
-              ),
+        isFemale: isFemaleValue,
       };
 
       // Récupérer les matchs de cette équipe
@@ -394,15 +396,18 @@ export class TeamMatchesSyncService {
           // S'assurer que isFemale est défini en utilisant toutes les informations disponibles
           return {
             ...equipe,
-            isFemale:
-              equipe.isFemale !== undefined
-                ? equipe.isFemale
-                : isFemaleTeam(
-                    equipe.libelle,
-                    equipe.division,
-                    equipe.libelleEpreuve,
-                    equipe.idEpreuve
-                  ),
+            isFemale: (() => {
+              const isFemaleValue =
+                "isFemale" in equipe && equipe.isFemale !== undefined
+                  ? Boolean(equipe.isFemale)
+                  : isFemaleTeam(
+                      equipe.libelle,
+                      equipe.division,
+                      equipe.libelleEpreuve,
+                      equipe.idEpreuve
+                    );
+              return isFemaleValue;
+            })(),
           };
         });
 
@@ -474,9 +479,8 @@ export class TeamMatchesSyncService {
             equipe.libelleEpreuve,
             equipe.idEpreuve
           );
-      const DEBUG_LICENCE_FOR_TEAM = "7872755"; // Licence à suivre pour les équipes féminines
       
-      console.log(`Récupération des matchs pour l&apos;équipe: ${equipe.libelle} (ID: ${equipe.idEquipe}, Féminin: ${isFemaleForDebug})`);
+      console.log(`Récupération des matchs pour l'équipe: ${equipe.libelle} (ID: ${equipe.idEquipe}, Féminin: ${isFemaleForDebug})`);
       try {
         const rencontres = await this.ffttApi.getRencontrePouleByLienDivision(
           equipe.lienDivision
@@ -1220,12 +1224,14 @@ export class TeamMatchesSyncService {
 
               // Mettre à jour pour chaque phase
               for (const [phase, burnedTeam] of highestMasculineBurnedTeamByPhase) {
-                const currentHighest = currentHighestByPhase[phase] ?? null;
+                if (phase === "aller" || phase === "retour") {
+                  const currentHighest = currentHighestByPhase[phase] ?? null;
 
-                // Mettre à jour uniquement si la nouvelle valeur est plus restrictive
-                // (équipe plus basse, donc numéro plus élevé) ou si la valeur actuelle est absente
-                if (currentHighest === null || burnedTeam > currentHighest) {
-                  newHighestByPhase[phase] = burnedTeam;
+                  // Mettre à jour uniquement si la nouvelle valeur est plus restrictive
+                  // (équipe plus basse, donc numéro plus élevé) ou si la valeur actuelle est absente
+                  if (currentHighest === null || burnedTeam > currentHighest) {
+                    newHighestByPhase[phase] = burnedTeam;
+                  }
                 }
               }
 
@@ -1265,12 +1271,14 @@ export class TeamMatchesSyncService {
 
               // Mettre à jour pour chaque phase
               for (const [phase, burnedTeam] of highestFeminineBurnedTeamByPhase) {
-                const currentHighest = currentHighestByPhase[phase] ?? null;
+                if (phase === "aller" || phase === "retour") {
+                  const currentHighest = currentHighestByPhase[phase] ?? null;
 
-                // Mettre à jour uniquement si la nouvelle valeur est plus restrictive
-                // (équipe plus basse, donc numéro plus élevé) ou si la valeur actuelle est absente
-                if (currentHighest === null || burnedTeam > currentHighest) {
-                  newHighestByPhase[phase] = burnedTeam;
+                  // Mettre à jour uniquement si la nouvelle valeur est plus restrictive
+                  // (équipe plus basse, donc numéro plus élevé) ou si la valeur actuelle est absente
+                  if (currentHighest === null || burnedTeam > currentHighest) {
+                    newHighestByPhase[phase] = burnedTeam;
+                  }
                 }
               }
 
@@ -1539,7 +1547,7 @@ export class TeamMatchesSyncService {
     // Pour chaque équipe, recalculer les journées
     const recalculatedMatches: MatchData[] = [];
     
-    matchesByTeam.forEach((teamMatches, teamKey) => {
+    matchesByTeam.forEach((teamMatches) => {
       // Trier par date
       const sortedMatches = [...teamMatches].sort((a, b) => {
         const dateA = new Date(a.date).getTime();

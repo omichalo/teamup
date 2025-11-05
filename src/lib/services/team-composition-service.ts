@@ -38,7 +38,7 @@ export class TeamCompositionService {
       const isAvailable = await this.availabilityService.isPlayerAvailable(
         playerId,
         date,
-        player.gender
+        player.gender === "M" ? "masculin" : "feminin"
       );
 
       if (!isAvailable) {
@@ -193,7 +193,7 @@ export class TeamCompositionService {
       const isAvailable = await this.availabilityService.isPlayerAvailable(
         player.id,
         _date,
-        player.gender
+        player.gender === "M" ? "masculin" : "feminin"
       );
       if (isAvailable) {
         availableForDate.push(player);

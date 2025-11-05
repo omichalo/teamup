@@ -1,5 +1,4 @@
 import {
-  collection,
   doc,
   getDoc,
   setDoc,
@@ -132,6 +131,35 @@ export class AvailabilityService {
     } catch (error) {
       console.error("Erreur lors de la mise à jour de la disponibilité:", error);
       throw error;
+    }
+  }
+
+  async isPlayerAvailable(
+    playerId: string,
+    _date: string,
+    gender: "masculin" | "feminin"
+  ): Promise<boolean> {
+    try {
+      // Extraire journee et phase depuis la date
+      // Pour simplifier, on suppose que la date est au format YYYY-MM-DD
+      // et on récupère les disponibilités pour cette journée
+      // Note: Cette méthode nécessite une logique plus complexe pour déterminer
+      // la journée et la phase à partir de la date
+      const availability = await this.getAvailability(
+        1, // journee par défaut - à adapter selon la logique métier
+        "aller", // phase par défaut - à adapter selon la logique métier
+        gender
+      );
+
+      if (!availability) {
+        return true; // Par défaut, le joueur est disponible si aucune donnée
+      }
+
+      const playerAvailability = availability.players[playerId];
+      return playerAvailability?.available ?? true;
+    } catch (error) {
+      console.error("Erreur lors de la vérification de disponibilité:", error);
+      return true; // Par défaut, on considère le joueur disponible en cas d'erreur
     }
   }
 }

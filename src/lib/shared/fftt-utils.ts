@@ -528,7 +528,9 @@ export const validateFFTTRules = (
       
       // Compter les joueuses avec < 900 pts dans l'équipe (en excluant la dernière joueuse qu'on essaie d'ajouter)
       // La dernière joueuse dans la liste est celle qu'on essaie d'ajouter
-      const playersWithoutLast = players.slice(0, -1);
+      // Note: playersWithoutLast pourrait être utilisé pour filtrer les joueuses existantes
+      // Pour l'instant, on compte toutes les joueuses dans players
+      // const playersWithoutLast = players.slice(0, -1);
       const pointsWithoutLast = playerPoints.slice(0, -1);
       const playersBelowMinWithoutLast = pointsWithoutLast.filter((pts) => pts < minPoints);
       
