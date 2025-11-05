@@ -594,19 +594,9 @@ export default function DemoThemePage() {
                       id="combo-box-demo"
                       options={top100Films}
                       sx={{ width: 300 }}
-                      renderInput={(params: {
-                        InputProps: object;
-                        inputProps: object;
-                        InputLabelProps: object;
-                        disabled: boolean;
-                        fullWidth: boolean;
-                        id: string;
-                        label: string;
-                        placeholder: string;
-                        required: boolean;
-                        size: "small" | "medium";
-                        variant: "standard" | "outlined" | "filled";
-                      }) => <TextField {...params} label="Film" />}
+                      renderInput={(params) => (
+                        <TextField {...(params as any)} label="Film" variant="outlined" />
+                      )}
                     />
                   </Box>
                 </Box>

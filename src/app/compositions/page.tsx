@@ -325,7 +325,7 @@ export default function CompositionsPage() {
 
   // Fonction pour trouver le match correspondant à une équipe pour la journée et phase sélectionnées
   const getMatchForTeam = useCallback(
-    (equipe: { team: { id: string }; matches: any[] }) => {
+    (equipe: { team: { id: string; name: string }; matches: any[] }) => {
       if (selectedJournee === null || selectedPhase === null) {
         return null;
       }
@@ -359,7 +359,7 @@ export default function CompositionsPage() {
   // Fonction pour trouver le match d'une équipe pour une journée et phase spécifiques
   const getMatchForTeamAndJournee = useCallback(
     (
-      equipe: { team: { id: string }; matches: any[] },
+      equipe: { team: { id: string; name: string }; matches: any[] },
       journee: number,
       phase: string
     ) => {
@@ -470,11 +470,11 @@ export default function CompositionsPage() {
       }
       // Trouver les joueurs par leur licence
       return match.joueursSQY
-        .map((joueurSQY: any) => {
+        .map((joueurSQY: any): Player | null => {
           if (!joueurSQY.licence) return null;
-          return players.find((p) => p.license === joueurSQY.licence);
+          return players.find((p) => p.license === joueurSQY.licence) || null;
         })
-        .filter((p): p is Player => p !== undefined && p !== null);
+        .filter((p: Player | null): p is Player => p !== null && p !== undefined);
     },
     [players]
   );
@@ -1622,7 +1622,6 @@ export default function CompositionsPage() {
                           const canDrop = matchPlayed
                             ? false
                             : dropCheck.canDrop;
-                          const isFull = teamPlayersData.length >= 4;
 
                           return (
                             <Card
@@ -1792,7 +1791,6 @@ export default function CompositionsPage() {
                                     }}
                                   >
                                     {teamPlayersData.map((player) => {
-                                      const championshipType = "masculin";
                                       const phase = selectedPhase || "aller";
                                       const burnedTeam =
                                         player
@@ -2001,7 +1999,6 @@ export default function CompositionsPage() {
                           const canDrop = matchPlayed
                             ? false
                             : dropCheck.canDrop;
-                          const isFull = teamPlayersData.length >= 4;
 
                           return (
                             <Card
@@ -2143,7 +2140,6 @@ export default function CompositionsPage() {
                                     }}
                                   >
                                     {teamPlayersData.map((player) => {
-                                      const championshipType = "feminin";
                                       const phase = selectedPhase || "aller";
                                       const burnedTeam =
                                         player
