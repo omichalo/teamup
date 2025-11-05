@@ -62,8 +62,14 @@ export const useFFTTData = () => {
             isHome: ffttMatch.isHome,
             isExempt: ffttMatch.isExempt,
             isForfeit: ffttMatch.isForfeit,
-            phase: ffttMatch.phase,
-            journee: ffttMatch.journee,
+            phase:
+              "phase" in ffttMatch && typeof ffttMatch.phase === "string"
+                ? (ffttMatch.phase as "aller" | "retour")
+                : "aller",
+            journee:
+              "journee" in ffttMatch && typeof ffttMatch.journee === "number"
+                ? ffttMatch.journee
+                : 1,
             createdAt: new Date(),
             updatedAt: new Date(),
           })
