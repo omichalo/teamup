@@ -46,6 +46,11 @@ export const useAuthState = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Ne pas initialiser Firebase pendant le build statique
+    if (typeof window === "undefined") {
+      setLoading(false);
+      return;
+    }
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       console.log(
         "Hook useAuth: État d&apos;authentification changé:",
