@@ -90,6 +90,7 @@ dist/
 **/dist/
 lib/
 **/lib/
+!src/lib/
 functions/lib/
 functions/**/*.js
 functions/**/*.js.map
