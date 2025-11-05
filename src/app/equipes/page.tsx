@@ -34,20 +34,14 @@ import {
   Info,
 } from "@mui/icons-material";
 import { useEquipesWithMatches } from "@/hooks/useEquipesWithMatches";
+import { Match } from "@/types";
 import { Layout } from "@/components/Layout";
 import { AuthGuard } from "@/components/AuthGuard";
 
 export default function EquipesPage() {
   const { equipes, loading, error } = useEquipesWithMatches();
   const [tabValue, setTabValue] = React.useState(0);
-  const [selectedMatch, setSelectedMatch] = React.useState<{
-    id: string;
-    team: string;
-    opponent: string;
-    date: string;
-    result?: string;
-    status: string;
-  } | null>(null);
+  const [selectedMatch, setSelectedMatch] = React.useState<Match | null>(null);
   const [modalOpen, setModalOpen] = React.useState(false);
 
   // Grouper les équipes par épreuve en utilisant le vrai libellé de l&apos;API
@@ -75,24 +69,7 @@ export default function EquipesPage() {
     setTabValue(newValue);
   };
 
-  const handleMatchClick = (match: {
-    id: string;
-    team: string;
-    opponent: string;
-    date: string;
-    result?: string;
-    status: string;
-    resultatsIndividuels?: {
-      joueursA: Record<string, { nom: string; prenom: string; points: number }>;
-      joueursB: Record<string, { nom: string; prenom: string; points: number }>;
-      parties: Array<{
-        joueurA: string;
-        joueurB: string;
-        scoreA: number;
-        scoreB: number;
-      }>;
-    };
-  }) => {
+  const handleMatchClick = (match: Match) => {
     if (match.resultatsIndividuels) {
       setSelectedMatch(match);
       setModalOpen(true);
@@ -125,7 +102,7 @@ export default function EquipesPage() {
     }).format(dateObj);
   };
 
-  const getMatchStatusChip = (match: { result?: string; status: string }) => {
+  const getMatchStatusChip = (match: Match) => {
     // Utiliser le résultat déterminé par l&apos;API plutôt que la date
     if (match.result === "EXEMPT") {
       return <Chip label="EXEMPT" color="info" size="small" />;
@@ -363,14 +340,23 @@ export default function EquipesPage() {
                                                     match.joueursSQY.forEach((joueur) => {
                                                       const key = joueur.licence || `${joueur.nom}_${joueur.prenom}`;
                                                       if (!joueursUniques.has(key)) {
-                                                        joueursUniques.set(key, {
-                                                          licence: joueur.licence,
-                                                          nom: joueur.nom,
-                                                          prenom: joueur.prenom,
-                                                          points: joueur.points,
-                                                          sexe: joueur.sexe,
+                                                        const joueurData: {
+                                                          licence?: string;
+                                                          nom?: string;
+                                                          prenom?: string;
+                                                          points?: number | null;
+                                                          sexe?: string;
+                                                          matches: number;
+                                                          status?: "nouveau" | "retire" | "present";
+                                                        } = {
                                                           matches: 0,
-                                                        });
+                                                        };
+                                                        if (joueur.licence !== undefined) joueurData.licence = joueur.licence;
+                                                        if (joueur.nom !== undefined) joueurData.nom = joueur.nom;
+                                                        if (joueur.prenom !== undefined) joueurData.prenom = joueur.prenom;
+                                                        if (joueur.points !== undefined) joueurData.points = joueur.points;
+                                                        if (joueur.sexe !== undefined) joueurData.sexe = joueur.sexe;
+                                                        joueursUniques.set(key, joueurData);
                                                       }
                                                       const existing = joueursUniques.get(key)!;
                                                       existing.matches += 1;
@@ -828,14 +814,14 @@ export default function EquipesPage() {
                               Object.entries(
                                 selectedMatch.resultatsIndividuels.joueursA
                               ).map(
-                                ([nomComplet, joueur]: [
-                                  string,
-                                  {
+                                ([nomComplet, joueur]) => {
+                                  const typedJoueur = joueur as {
                                     nom: string;
                                     prenom: string;
                                     points: number;
-                                  }
-                                ]) => (
+                                    licence?: string;
+                                  };
+                                  return (
                                   <Box
                                     key={nomComplet}
                                     sx={{
@@ -849,17 +835,18 @@ export default function EquipesPage() {
                                       variant="body1"
                                       sx={{ fontWeight: "bold" }}
                                     >
-                                      {joueur.prenom} {joueur.nom}
+                                      {typedJoueur.prenom} {typedJoueur.nom}
                                     </Typography>
                                     <Typography
                                       variant="body2"
                                       color="text.secondary"
                                     >
-                                      Licence: {joueur.licence} • Points:{" "}
-                                      {joueur.points}
+                                      {typedJoueur.licence ? `Licence: ${typedJoueur.licence} • ` : ""}Points:{" "}
+                                      {typedJoueur.points}
                                     </Typography>
                                   </Box>
-                                )
+                                  );
+                                }
                               )}
                           </Box>
                         </Box>
@@ -884,14 +871,14 @@ export default function EquipesPage() {
                               Object.entries(
                                 selectedMatch.resultatsIndividuels.joueursB
                               ).map(
-                                ([nomComplet, joueur]: [
-                                  string,
-                                  {
+                                ([nomComplet, joueur]) => {
+                                  const typedJoueur = joueur as {
                                     nom: string;
                                     prenom: string;
                                     points: number;
-                                  }
-                                ]) => (
+                                    licence?: string;
+                                  };
+                                  return (
                                   <Box
                                     key={nomComplet}
                                     sx={{
@@ -905,17 +892,18 @@ export default function EquipesPage() {
                                       variant="body1"
                                       sx={{ fontWeight: "bold" }}
                                     >
-                                      {joueur.prenom} {joueur.nom}
+                                      {typedJoueur.prenom} {typedJoueur.nom}
                                     </Typography>
                                     <Typography
                                       variant="body2"
                                       color="text.secondary"
                                     >
-                                      Licence: {joueur.licence} • Points:{" "}
-                                      {joueur.points}
+                                      Licence: {typedJoueur.licence || "N/A"} • Points:{" "}
+                                      {typedJoueur.points}
                                     </Typography>
                                   </Box>
-                                )
+                                  );
+                                }
                               )}
                           </Box>
                         </Box>
@@ -933,14 +921,19 @@ export default function EquipesPage() {
                       {selectedMatch.resultatsIndividuels.parties &&
                         selectedMatch.resultatsIndividuels.parties.map(
                           (
-                            partie: {
+                            partie: any,
+                            index: number
+                          ) => {
+                            const typedPartie = partie as {
                               joueurA: string;
                               joueurB: string;
                               scoreA: number;
                               scoreB: number;
-                            },
-                            index: number
-                          ) => (
+                              adversaireA?: string;
+                              adversaireB?: string;
+                              setDetails?: string[];
+                            };
+                            return (
                             <Box
                               key={index}
                               sx={{
@@ -973,7 +966,7 @@ export default function EquipesPage() {
                                       textAlign: "right",
                                     }}
                                   >
-                                    {partie.adversaireA}
+                                    {typedPartie.adversaireA || typedPartie.joueurA}
                                   </Typography>
                                 </Box>
                                 <Box sx={{ width: "16.67%" }}>
@@ -984,7 +977,7 @@ export default function EquipesPage() {
                                       fontWeight: "bold",
                                     }}
                                   >
-                                    {partie.scoreA} - {partie.scoreB}
+                                    {typedPartie.scoreA} - {typedPartie.scoreB}
                                   </Typography>
                                 </Box>
                                 <Box sx={{ width: "41.67%" }}>
@@ -992,23 +985,24 @@ export default function EquipesPage() {
                                     variant="body1"
                                     sx={{ fontWeight: "bold" }}
                                   >
-                                    {partie.adversaireB}
+                                    {typedPartie.adversaireB || typedPartie.joueurB}
                                   </Typography>
                                 </Box>
                               </Box>
-                              {partie.setDetails &&
-                                partie.setDetails.length > 0 && (
+                              {typedPartie.setDetails &&
+                                typedPartie.setDetails.length > 0 && (
                                   <Box sx={{ mt: 2, textAlign: "center" }}>
                                     <Typography
                                       variant="body2"
                                       color="text.secondary"
                                     >
-                                      Sets: {partie.setDetails.join(" - ")}
+                                      Sets: {typedPartie.setDetails.join(" - ")}
                                     </Typography>
                                   </Box>
                                 )}
                             </Box>
-                          )
+                            );
+                          }
                         )}
                       {!selectedMatch.resultatsIndividuels.parties && (
                         <Typography

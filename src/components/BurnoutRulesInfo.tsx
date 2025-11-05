@@ -161,15 +161,15 @@ export function BurnoutRulesInfo({
                         </Typography>
                       }
                       secondary={
-                        violation.details && (
+                        (violation as any).details && (
                           <Box sx={{ mt: 1 }}>
                             <Typography
                               variant="caption"
                               color="text.secondary"
                             >
-                              Détails: {violation.details.currentCount}/
-                              {violation.details.maxCount}(
-                              {violation.details.period})
+                              Détails: {(violation as any).details.currentCount}/
+                              {(violation as any).details.maxCount}(
+                              {(violation as any).details.period})
                             </Typography>
                           </Box>
                         )

@@ -207,10 +207,6 @@ export function AuditLogs({
   //   "report",
   // ];
 
-  useEffect(() => {
-    handleSearch();
-  }, [page, handleSearch]);
-
   const handleSearch = useCallback(async () => {
     try {
       setProcessing(true);
@@ -224,6 +220,10 @@ export function AuditLogs({
       setProcessing(false);
     }
   }, [filters, onSearch]);
+
+  useEffect(() => {
+    handleSearch();
+  }, [page, handleSearch]);
 
   const handleExport = async (format: "csv" | "pdf" | "excel") => {
     try {
