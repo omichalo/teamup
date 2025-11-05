@@ -29,3 +29,22 @@ body {
 .MuiButton-contained:hover {
   background-color: #c2410c !important;
 }
+
+/* Curseur pendant le drag */
+html.dragging {
+  cursor: grabbing !important;
+}
+
+/* Laisse les enfants changer localement (not-allowed, etc.) */
+html.dragging * {
+  user-select: none !important;
+}
+
+/* États des zones de drop */
+.droppable--blocked {
+  cursor: not-allowed !important;
+}
+
+.droppable--over {
+  cursor: grabbing !important;
+}

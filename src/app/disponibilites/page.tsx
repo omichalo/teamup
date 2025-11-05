@@ -1,420 +1,990 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Box,
   Typography,
   Card,
   CardContent,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
+  Button,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
   Switch,
   FormControlLabel,
-  Button,
-  Chip,
-  Alert,
-  CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   TextField,
+  Chip,
+  Tabs,
+  Tab,
+  Alert,
+  InputAdornment,
 } from "@mui/material";
+import {
+  CheckCircle,
+  Cancel,
+  HourglassEmpty,
+  Search as SearchIcon,
+} from "@mui/icons-material";
+import { useEquipesWithMatches } from "@/hooks/useEquipesWithMatches";
+import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
+import { AvailabilityService } from "@/lib/services/availability-service";
+import { Player } from "@/types/team-management";
 import { Layout } from "@/components/Layout";
-import { useAuth } from "@/hooks/useAuth";
-import { useFirestorePlayers } from "@/hooks/useFirestorePlayers";
-import { useJournees } from "@/hooks/useJournees";
-import { Player, Availability } from "@/types";
-import { useRouter } from "next/navigation";
+import { AuthGuard } from "@/components/AuthGuard";
+import { getCurrentPhase } from "@/lib/shared/phase-utils";
 
-interface PlayerAvailability {
-  playerId: string;
-  player: Player;
-  availabilities: { [journee: number]: boolean };
-  reasons: { [journee: number]: string };
+interface AvailabilityResponse {
+  available: boolean;
+  comment?: string;
 }
 
 export default function DisponibilitesPage() {
-  const { user, isCoach } = useAuth();
-  const router = useRouter();
-  const { players, loading, error } = useFirestorePlayers(100); // Récupérer les 100 meilleurs joueurs
-  const {
-    journees,
-    loading: journeesLoading,
-    error: journeesError,
-  } = useJournees();
-  const [playerAvailabilities, setPlayerAvailabilities] = useState<
-    PlayerAvailability[]
-  >([]);
+  const { equipes, loading: loadingEquipes } = useEquipesWithMatches();
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [loadingPlayers, setLoadingPlayers] = useState(true);
   const [selectedJournee, setSelectedJournee] = useState<number | null>(null);
-  const [showReasonDialog, setShowReasonDialog] = useState(false);
-  const [selectedPlayer, setSelectedPlayer] =
-    useState<PlayerAvailability | null>(null);
-  const [reasonText, setReasonText] = useState("");
+  const [selectedPhase, setSelectedPhase] = useState<"aller" | "retour" | null>(
+    null
+  );
+  const [showAllPlayers, setShowAllPlayers] = useState(false);
+  // Structure: { playerId: { masculin?: AvailabilityResponse, feminin?: AvailabilityResponse } }
+  const [availabilities, setAvailabilities] = useState<
+    Record<
+      string,
+      {
+        masculin?: AvailabilityResponse;
+        feminin?: AvailabilityResponse;
+      }
+    >
+  >({});
+  const [searchQuery, setSearchQuery] = useState("");
+  const commentSaveTimeoutRef = React.useRef<
+    Record<string, { masculin?: NodeJS.Timeout; feminin?: NodeJS.Timeout }>
+  >({});
+  const availabilitiesRef = React.useRef<
+    Record<
+      string,
+      {
+        masculin?: AvailabilityResponse;
+        feminin?: AvailabilityResponse;
+      }
+    >
+  >({});
 
+  const playerService = useMemo(() => new FirestorePlayerService(), []);
+  const availabilityService = useMemo(() => new AvailabilityService(), []);
+
+  // Mettre à jour la ref quand availabilities change
   useEffect(() => {
-    if (!user) {
-      router.push("/auth");
-      return;
+    availabilitiesRef.current = availabilities;
+  }, [availabilities]);
+
+  // Déterminer la phase en cours
+  const currentPhase = useMemo(() => {
+    if (loadingEquipes || equipes.length === 0) {
+      return "aller" as const;
     }
-  }, [user, router]);
+    return getCurrentPhase(equipes);
+  }, [equipes, loadingEquipes]);
 
-  // Initialiser les disponibilités quand les joueurs sont chargés
+  // Extraire les journées depuis les matchs, groupées par phase avec leurs dates
+  const journeesByPhase = useMemo(() => {
+    const journeesMap = new Map<
+      "aller" | "retour",
+      Map<number, { journee: number; phase: "aller" | "retour"; dates: Date[] }>
+    >();
+
+    equipes.forEach((equipe) => {
+      equipe.matches.forEach((match) => {
+        if (match.journee && match.phase) {
+          const phase = match.phase.toLowerCase() as "aller" | "retour";
+          if (phase === "aller" || phase === "retour") {
+            if (!journeesMap.has(phase)) {
+              journeesMap.set(phase, new Map());
+            }
+            const phaseMap = journeesMap.get(phase)!;
+            const matchDate =
+              match.date instanceof Date ? match.date : new Date(match.date);
+
+            if (!phaseMap.has(match.journee)) {
+              phaseMap.set(match.journee, {
+                journee: match.journee,
+                phase,
+                dates: [matchDate],
+              });
+            } else {
+              const journeeData = phaseMap.get(match.journee)!;
+              // Ajouter la date si elle n'existe pas déjà (même jour)
+              const dateStr = matchDate.toDateString();
+              const exists = journeeData.dates.some(
+                (d) => d.toDateString() === dateStr
+              );
+              if (!exists) {
+                journeeData.dates.push(matchDate);
+              }
+            }
+          }
+        }
+      });
+    });
+
+    // Trier les dates pour chaque journée
+    journeesMap.forEach((phaseMap) => {
+      phaseMap.forEach((journeeData) => {
+        journeeData.dates.sort((a, b) => a.getTime() - b.getTime());
+      });
+    });
+
+    return journeesMap;
+  }, [equipes]);
+
+  // Initialiser selectedPhase avec la phase en cours
   useEffect(() => {
-    if (players.length > 0) {
-      const initialAvailabilities: PlayerAvailability[] = players.map(
-        (player) => ({
-          playerId: player.id,
-          player,
-          availabilities: {},
-          reasons: {},
-        })
+    if (selectedPhase === null && currentPhase) {
+      setSelectedPhase(currentPhase);
+    }
+  }, [currentPhase, selectedPhase]);
+
+  // Initialiser selectedJournee avec la première journée dont la fin est après aujourd'hui
+  useEffect(() => {
+    if (
+      selectedPhase !== null &&
+      selectedJournee === null &&
+      journeesByPhase.has(selectedPhase)
+    ) {
+      const now = new Date();
+      now.setHours(0, 0, 0, 0); // Réinitialiser l'heure pour comparer uniquement les dates
+
+      const journees = Array.from(
+        journeesByPhase.get(selectedPhase)?.values() || []
       );
-      setPlayerAvailabilities(initialAvailabilities);
-    }
-  }, [players]);
 
-  // Sélectionner automatiquement la première journée disponible
-  useEffect(() => {
-    if (journees.length > 0 && selectedJournee === null) {
-      setSelectedJournee(journees[0].number);
+      // Trouver la première journée dont la fin (date maximale) est après aujourd'hui
+      const nextJournee = journees
+        .sort((a, b) => a.journee - b.journee) // Trier par numéro de journée
+        .find(({ dates }) => {
+          if (dates.length === 0) return false;
+          // La fin de la journée = date maximale
+          const finJournee = new Date(
+            Math.max(...dates.map((d) => d.getTime()))
+          );
+          finJournee.setHours(0, 0, 0, 0);
+          return finJournee >= now;
+        });
+
+      if (nextJournee) {
+        setSelectedJournee(nextJournee.journee);
+      } else if (journees.length > 0) {
+        // Si aucune journée future, sélectionner la dernière
+        const lastJournee = journees.sort((a, b) => b.journee - a.journee)[0];
+        setSelectedJournee(lastJournee.journee);
+      }
     }
-  }, [journees, selectedJournee]);
+  }, [selectedPhase, selectedJournee, journeesByPhase]);
+
+  // Filtrer les joueurs selon les critères
+  const filteredPlayers = useMemo(() => {
+    let filtered = players;
+
+    // Par défaut, seuls les joueurs participant au championnat
+    if (!showAllPlayers) {
+      filtered = filtered.filter((p) => p.participation?.championnat === true);
+    }
+
+    // Filtre de recherche
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (p) =>
+          p.name.toLowerCase().includes(query) ||
+          p.firstName.toLowerCase().includes(query) ||
+          (p.license && p.license.includes(query))
+      );
+    }
+
+    return filtered;
+  }, [players, showAllPlayers, searchQuery]);
+
+  // Séparer les joueurs ayant répondu et ceux en attente
+  const { respondedPlayers, pendingPlayers } = useMemo(() => {
+    const responded: Player[] = [];
+    const pending: Player[] = [];
+
+    filteredPlayers.forEach((player) => {
+      const playerAvailabilities = availabilities[player.id];
+
+      // Pour les hommes : vérifier uniquement masculin
+      // Pour les femmes : vérifier masculin ET féminin
+      if (player.gender === "M") {
+        if (playerAvailabilities?.masculin !== undefined) {
+          responded.push(player);
+        } else {
+          pending.push(player);
+        }
+      } else {
+        // Femmes : doivent avoir répondu aux deux
+        if (
+          playerAvailabilities?.masculin !== undefined &&
+          playerAvailabilities?.feminin !== undefined
+        ) {
+          responded.push(player);
+        } else {
+          pending.push(player);
+        }
+      }
+    });
+
+    return {
+      respondedPlayers: responded,
+      pendingPlayers: pending,
+    };
+  }, [filteredPlayers, availabilities]);
+
+  const loadPlayers = useCallback(async () => {
+    try {
+      setLoadingPlayers(true);
+      const allPlayers = await playerService.getAllPlayers();
+      setPlayers(allPlayers);
+    } catch (error) {
+      console.error("Erreur lors du chargement des joueurs:", error);
+    } finally {
+      setLoadingPlayers(false);
+    }
+  }, [playerService]);
+
+  useEffect(() => {
+    loadPlayers();
+  }, [loadPlayers]);
+
+  // Charger les disponibilités existantes pour la journée sélectionnée (masculin ET féminin)
+  useEffect(() => {
+    if (selectedJournee !== null && selectedPhase !== null) {
+      const loadAvailability = async () => {
+        try {
+          const [masculineAvailability, feminineAvailability] =
+            await Promise.all([
+              availabilityService.getAvailability(
+                selectedJournee,
+                selectedPhase,
+                "masculin"
+              ),
+              availabilityService.getAvailability(
+                selectedJournee,
+                selectedPhase,
+                "feminin"
+              ),
+            ]);
+
+          // Fusionner les deux types de disponibilités
+          const mergedAvailabilities: Record<
+            string,
+            {
+              masculin?: AvailabilityResponse;
+              feminin?: AvailabilityResponse;
+            }
+          > = {};
+
+          // Ajouter les disponibilités masculines
+          if (masculineAvailability) {
+            Object.entries(masculineAvailability.players).forEach(
+              ([playerId, response]) => {
+                if (!mergedAvailabilities[playerId]) {
+                  mergedAvailabilities[playerId] = {};
+                }
+                mergedAvailabilities[playerId].masculin = response;
+              }
+            );
+          }
+
+          // Ajouter les disponibilités féminines
+          if (feminineAvailability) {
+            Object.entries(feminineAvailability.players).forEach(
+              ([playerId, response]) => {
+                if (!mergedAvailabilities[playerId]) {
+                  mergedAvailabilities[playerId] = {};
+                }
+                mergedAvailabilities[playerId].feminin = response;
+              }
+            );
+          }
+
+          setAvailabilities(mergedAvailabilities);
+        } catch (error) {
+          console.error("Erreur lors du chargement des disponibilités:", error);
+          setAvailabilities({});
+        }
+      };
+      loadAvailability();
+    }
+  }, [selectedJournee, selectedPhase, availabilityService]);
 
   const handleAvailabilityChange = (
     playerId: string,
-    journee: number,
-    isAvailable: boolean
+    championshipType: "masculin" | "feminin",
+    available: boolean
   ) => {
-    setPlayerAvailabilities((prev) =>
-      prev.map((pa) =>
-        pa.playerId === playerId
-          ? {
-              ...pa,
-              availabilities: {
-                ...pa.availabilities,
-                [journee]: isAvailable,
-              },
-              reasons: isAvailable
-                ? { ...pa.reasons, [journee]: "" }
-                : pa.reasons,
+    if (selectedJournee === null || selectedPhase === null) return;
+
+    setAvailabilities((prev) => {
+      const playerAvailabilities = prev[playerId] || {};
+      const updatedAvailabilities = {
+        ...prev,
+        [playerId]: {
+          ...playerAvailabilities,
+          [championshipType]: {
+            ...playerAvailabilities[championshipType],
+            available,
+          },
+        },
+      };
+
+      // Sauvegarde automatique pour le type de championnat spécifique
+      // Récupérer d'abord les données existantes pour préserver les autres joueurs
+      availabilityService
+        .getAvailability(selectedJournee, selectedPhase, championshipType)
+        .then((existingAvailability) => {
+          const playersForChampionship: Record<string, AvailabilityResponse> = {
+            ...(existingAvailability?.players || {}),
+          };
+
+          // Mettre à jour avec les nouvelles disponibilités
+          Object.entries(updatedAvailabilities).forEach(([pid, avail]) => {
+            const response = avail[championshipType];
+            if (response) {
+              playersForChampionship[pid] = response;
             }
-          : pa
-      )
-    );
+          });
 
-    // Si le joueur devient indisponible, ouvrir le dialog pour la raison
-    if (!isAvailable) {
-      const player = playerAvailabilities.find(
-        (pa) => pa.playerId === playerId
-      );
-      if (player) {
-        setSelectedPlayer(player);
-        setSelectedJournee(journee);
-        setReasonText(player.reasons[journee] || "");
-        setShowReasonDialog(true);
-      }
+          return availabilityService.saveAvailability({
+            journee: selectedJournee,
+            phase: selectedPhase,
+            championshipType,
+            players: playersForChampionship,
+          });
+        })
+        .catch((error) => {
+          console.error("Erreur lors de la sauvegarde automatique:", error);
+        });
+
+      return updatedAvailabilities;
+    });
+  };
+
+  const handleCommentChange = (
+    playerId: string,
+    championshipType: "masculin" | "feminin",
+    comment: string
+  ) => {
+    if (selectedJournee === null || selectedPhase === null) return;
+
+    // Annuler le timeout précédent pour ce joueur et ce type de championnat
+    if (commentSaveTimeoutRef.current[playerId]?.[championshipType]) {
+      clearTimeout(commentSaveTimeoutRef.current[playerId][championshipType]!);
     }
-  };
 
-  const handleReasonSave = () => {
-    if (!selectedPlayer) return;
+    setAvailabilities((prev) => {
+      const playerAvailabilities = prev[playerId] || {};
+      const existingResponse = playerAvailabilities[championshipType] || {
+        available: true,
+      };
 
-    setPlayerAvailabilities((prev) =>
-      prev.map((pa) =>
-        pa.playerId === selectedPlayer.playerId
-          ? {
-              ...pa,
-              reasons: {
-                ...pa.reasons,
-                [selectedJournee]: reasonText,
-              },
-            }
-          : pa
-      )
-    );
-
-    setShowReasonDialog(false);
-    setSelectedPlayer(null);
-    setReasonText("");
-  };
-
-  const saveAvailabilities = async () => {
-    try {
-      // Ici vous feriez l'appel API pour sauvegarder les disponibilités
-      console.log("Saving availabilities:", playerAvailabilities);
-
-      // Afficher un message de succès
-      alert("Disponibilités sauvegardées avec succès !");
-    } catch (error) {
-      console.error("Save error:", error);
-      alert("Erreur lors de la sauvegarde");
-    }
-  };
-
-  const getAvailabilityStats = () => {
-    const stats: { [journee: number]: { available: number; total: number } } =
-      {};
-
-    journees.forEach((journee) => {
-      const available = playerAvailabilities.filter(
-        (pa) => pa.availabilities[journee] === true
-      ).length;
-
-      stats[journee] = {
-        available,
-        total: players.length,
+      return {
+        ...prev,
+        [playerId]: {
+          ...playerAvailabilities,
+          [championshipType]: {
+            ...existingResponse,
+            comment: comment || undefined,
+          },
+        },
       };
     });
 
-    return stats;
+    // Sauvegarde automatique après un délai (debounce)
+    if (!commentSaveTimeoutRef.current[playerId]) {
+      commentSaveTimeoutRef.current[playerId] = {};
+    }
+
+    commentSaveTimeoutRef.current[playerId][championshipType] = setTimeout(
+      async () => {
+        try {
+          // Récupérer d'abord les données existantes pour préserver les autres joueurs
+          const existingAvailability =
+            await availabilityService.getAvailability(
+              selectedJournee,
+              selectedPhase,
+              championshipType
+            );
+
+          const playersForChampionship: Record<string, AvailabilityResponse> = {
+            ...(existingAvailability?.players || {}),
+          };
+
+          // Mettre à jour avec les nouvelles disponibilités
+          Object.entries(availabilitiesRef.current).forEach(([pid, avail]) => {
+            const response = avail[championshipType];
+            if (response) {
+              playersForChampionship[pid] = response;
+            }
+          });
+
+          await availabilityService.saveAvailability({
+            journee: selectedJournee,
+            phase: selectedPhase,
+            championshipType,
+            players: playersForChampionship,
+          });
+        } catch (error) {
+          console.error("Erreur lors de la sauvegarde automatique:", error);
+        }
+        if (commentSaveTimeoutRef.current[playerId]) {
+          delete commentSaveTimeoutRef.current[playerId][championshipType];
+        }
+      },
+      1500
+    );
   };
 
-  const getAvailabilityColor = (isAvailable: boolean | undefined) => {
-    if (isAvailable === undefined) return "default";
-    return isAvailable ? "success" : "error";
-  };
+  const [tabValue, setTabValue] = useState(0);
 
-  const totalLoading = loading || journeesLoading;
-
-  if (totalLoading) {
+  if (loadingEquipes || loadingPlayers) {
     return (
       <Layout>
         <Box
-          sx={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            minHeight: "50vh",
-          }}
+          display="flex"
+          justifyContent="center"
+          alignItems="center"
+          minHeight="400px"
         >
           <CircularProgress />
-          <Typography variant="h6" sx={{ ml: 2 }}>
-            Chargement des données...
-          </Typography>
         </Box>
       </Layout>
     );
   }
-
-  if (error || journeesError) {
-    return (
-      <Layout>
-        <Box sx={{ p: 3 }}>
-          <Alert severity="error">
-            Erreur lors du chargement des données : {error || journeesError}
-          </Alert>
-        </Box>
-      </Layout>
-    );
-  }
-
-  if (players.length === 0) {
-    return (
-      <Layout>
-        <Box sx={{ p: 3 }}>
-          <Alert severity="info">
-            Aucun joueur trouvé. Vérifiez que la synchronisation FFTT a bien été
-            effectuée.
-          </Alert>
-        </Box>
-      </Layout>
-    );
-  }
-
-  const stats = getAvailabilityStats();
 
   return (
-    <Layout>
-      <Box>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Gestion des disponibilités
-        </Typography>
-        <Typography variant="subtitle1" color="text.secondary" gutterBottom>
-          {players.length} joueurs et {journees.length} journées chargés depuis
-          FFTT
-        </Typography>
+    <AuthGuard>
+      <Layout>
+        <Box sx={{ p: 3 }}>
+          <Typography variant="h4" gutterBottom>
+            Disponibilités des Joueurs
+          </Typography>
 
-        {/* Statistiques par journée */}
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Statistiques par journée
-            </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+            Saisissez la disponibilité des joueurs pour une journée de
+            championnat. Par défaut, seuls les joueurs participant au
+            championnat sont affichés.
+          </Typography>
 
-            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-              {journees.map((journee) => (
-                <Chip
-                  key={`${journee.phase}_${journee.number}`}
-                  label={`${journee.name}: ${
-                    stats[journee.number]?.available || 0
-                  }/${stats[journee.number]?.total || 0}`}
-                  color={
-                    (stats[journee.number]?.available || 0) >=
-                    (stats[journee.number]?.total || 0) * 0.8
-                      ? "success"
-                      : "warning"
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
+                <FormControl size="small" sx={{ minWidth: 150 }}>
+                  <InputLabel>Phase</InputLabel>
+                  <Select
+                    value={selectedPhase || ""}
+                    label="Phase"
+                    onChange={(e) => {
+                      const phase = e.target.value as "aller" | "retour";
+                      setSelectedPhase(phase);
+                      setSelectedJournee(null); // Réinitialiser la journée lors du changement de phase
+                    }}
+                  >
+                    <MenuItem value="aller">Phase Aller</MenuItem>
+                    <MenuItem value="retour">Phase Retour</MenuItem>
+                  </Select>
+                </FormControl>
+                <FormControl size="small" sx={{ minWidth: 150 }}>
+                  <InputLabel>Journée</InputLabel>
+                  <Select
+                    value={selectedJournee || ""}
+                    label="Journée"
+                    onChange={(e) =>
+                      setSelectedJournee(
+                        e.target.value ? Number(e.target.value) : null
+                      )
+                    }
+                    disabled={selectedPhase === null}
+                  >
+                    {selectedPhase &&
+                      Array.from(
+                        journeesByPhase.get(selectedPhase)?.values() || []
+                      )
+                        .sort((a, b) => a.journee - b.journee)
+                        .map(({ journee, dates }) => {
+                          // Formater les dates pour l'affichage
+                          const datesFormatted = dates
+                            .map((date) => {
+                              return new Intl.DateTimeFormat("fr-FR", {
+                                day: "2-digit",
+                                month: "2-digit",
+                              }).format(date);
+                            })
+                            .join(", ");
+                          return (
+                            <MenuItem key={journee} value={journee}>
+                              Journée {journee} - {datesFormatted}
+                            </MenuItem>
+                          );
+                        })}
+                  </Select>
+                </FormControl>
+
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={showAllPlayers}
+                      onChange={(e) => setShowAllPlayers(e.target.checked)}
+                    />
                   }
-                  variant="outlined"
+                  label="Afficher tous les joueurs"
                 />
-              ))}
-            </Box>
-          </CardContent>
-        </Card>
+              </Box>
 
-        {/* Tableau des disponibilités */}
-        <Card>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Disponibilités des joueurs
-            </Typography>
+              {selectedJournee && (
+                <Box sx={{ mt: 2 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    placeholder="Rechercher un joueur..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon />
+                        </InputAdornment>
+                      ),
+                    }}
+                    sx={{ mb: 2 }}
+                  />
+                  <Alert severity="info">
+                    {filteredPlayers.length} joueur
+                    {filteredPlayers.length > 1 ? "s" : ""} à gérer
+                    {" • "}
+                    {respondedPlayers.length} réponse
+                    {respondedPlayers.length > 1 ? "s" : ""}
+                    {" • "}
+                    {pendingPlayers.length} en attente
+                  </Alert>
+                </Box>
+              )}
+            </CardContent>
+          </Card>
 
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Joueur</TableCell>
-                    <TableCell>Équipe</TableCell>
-                    <TableCell>Points</TableCell>
-                    {journees.map((journee) => (
-                      <TableCell
-                        key={`${journee.phase}_${journee.number}`}
-                        align="center"
+          {selectedJournee === null ? (
+            <Alert severity="warning">
+              Veuillez sélectionner une journée pour commencer la saisie.
+            </Alert>
+          ) : (
+            <>
+              <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
+                <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)}>
+                  <Tab
+                    label={`Tous (${filteredPlayers.length})`}
+                    icon={
+                      <Chip
+                        label={respondedPlayers.length}
+                        size="small"
+                        color="success"
+                        sx={{ ml: 1 }}
+                      />
+                    }
+                    iconPosition="end"
+                  />
+                  <Tab
+                    label={`Réponses (${respondedPlayers.length})`}
+                    icon={<CheckCircle color="success" />}
+                  />
+                  <Tab
+                    label={`En attente (${pendingPlayers.length})`}
+                    icon={<HourglassEmpty color="warning" />}
+                  />
+                </Tabs>
+              </Box>
+
+              {tabValue === 0 && (
+                <Box>
+                  <Typography variant="h6" gutterBottom>
+                    Liste complète des joueurs
+                  </Typography>
+                  <PlayerList
+                    players={filteredPlayers}
+                    availabilities={availabilities}
+                    onAvailabilityChange={handleAvailabilityChange}
+                    onCommentChange={handleCommentChange}
+                  />
+                </Box>
+              )}
+
+              {tabValue === 1 && (
+                <Box>
+                  <Typography variant="h6" gutterBottom>
+                    Joueurs ayant répondu
+                  </Typography>
+                  <PlayerList
+                    players={respondedPlayers}
+                    availabilities={availabilities}
+                    onAvailabilityChange={handleAvailabilityChange}
+                    onCommentChange={handleCommentChange}
+                  />
+                </Box>
+              )}
+
+              {tabValue === 2 && (
+                <Box>
+                  <Typography variant="h6" gutterBottom>
+                    Joueurs en attente de réponse
+                  </Typography>
+                  {pendingPlayers.length === 0 ? (
+                    <Alert severity="success">
+                      Tous les joueurs ont répondu !
+                    </Alert>
+                  ) : (
+                    <PlayerList
+                      players={pendingPlayers}
+                      availabilities={availabilities}
+                      onAvailabilityChange={handleAvailabilityChange}
+                      onCommentChange={handleCommentChange}
+                    />
+                  )}
+                </Box>
+              )}
+            </>
+          )}
+        </Box>
+      </Layout>
+    </AuthGuard>
+  );
+}
+
+interface PlayerListProps {
+  players: Player[];
+  availabilities: Record<
+    string,
+    {
+      masculin?: AvailabilityResponse;
+      feminin?: AvailabilityResponse;
+    }
+  >;
+  onAvailabilityChange: (
+    playerId: string,
+    championshipType: "masculin" | "feminin",
+    available: boolean
+  ) => void;
+  onCommentChange: (
+    playerId: string,
+    championshipType: "masculin" | "feminin",
+    comment: string
+  ) => void;
+}
+
+function PlayerList({
+  players,
+  availabilities,
+  onAvailabilityChange,
+  onCommentChange,
+}: PlayerListProps) {
+  const [expandedPlayer, setExpandedPlayer] = useState<{
+    id: string;
+    type: "masculin" | "feminin" | "both";
+  } | null>(null);
+
+  return (
+    <Box>
+      {players.map((player) => {
+        const playerAvailabilities = availabilities[player.id] || {};
+        const masculinAvailability = playerAvailabilities.masculin;
+        const femininAvailability = playerAvailabilities.feminin;
+        const isFemale = player.gender === "F";
+
+        // Pour les hommes : vérifier uniquement masculin
+        // Pour les femmes : vérifier masculin ET féminin
+        const hasRespondedMasculin = masculinAvailability !== undefined;
+        const hasRespondedFeminin = isFemale
+          ? femininAvailability !== undefined
+          : true; // Les hommes n'ont pas de championnat féminin
+
+        const isExpanded = expandedPlayer?.id === player.id;
+
+        return (
+          <Card
+            key={player.id}
+            sx={{
+              mb: 1,
+              borderLeft:
+                hasRespondedMasculin && (isFemale ? hasRespondedFeminin : true)
+                  ? `4px solid ${
+                      masculinAvailability?.available ? "#4caf50" : "#f44336"
+                    }`
+                  : "4px solid transparent",
+            }}
+          >
+            <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
+              <Box display="flex" alignItems="flex-start" gap={2}>
+                <Box
+                  display="flex"
+                  alignItems="center"
+                  gap={1}
+                  flexGrow={1}
+                  minWidth={0}
+                  sx={{
+                    flexDirection: { xs: "column", sm: "row" },
+                    alignItems: { xs: "flex-start", sm: "center" },
+                  }}
+                >
+                  <Typography
+                    variant="body1"
+                    fontWeight="medium"
+                    sx={{
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {player.firstName} {player.name}
+                  </Typography>
+                  <Chip
+                    label={player.gender === "M" ? "M" : "F"}
+                    size="small"
+                    color={player.gender === "M" ? "primary" : "secondary"}
+                    sx={{ height: 20, fontSize: "0.7rem" }}
+                  />
+                  {player.license && (
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ whiteSpace: "nowrap" }}
+                    >
+                      {player.license}
+                    </Typography>
+                  )}
+                </Box>
+
+                <Box
+                  display="flex"
+                  flexDirection="column"
+                  gap={1}
+                  sx={{ minWidth: { xs: "100%", sm: 280 } }}
+                >
+                  {/* Disponibilité Masculine */}
+                  <Box
+                    display="flex"
+                    alignItems="center"
+                    gap={1}
+                    sx={{ flexWrap: "wrap" }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{ minWidth: 80, fontWeight: "medium" }}
+                    >
+                      Masculin:
+                    </Typography>
+                    <Button
+                      variant={
+                        masculinAvailability?.available === true
+                          ? "contained"
+                          : "outlined"
+                      }
+                      color="success"
+                      size="small"
+                      onClick={() =>
+                        onAvailabilityChange(player.id, "masculin", true)
+                      }
+                      sx={{ minWidth: 70, flexGrow: { xs: 1, sm: 0 } }}
+                    >
+                      <CheckCircle fontSize="small" sx={{ mr: 0.5 }} />
+                      Oui
+                    </Button>
+                    <Button
+                      variant={
+                        masculinAvailability?.available === false
+                          ? "contained"
+                          : "outlined"
+                      }
+                      color="error"
+                      size="small"
+                      onClick={() =>
+                        onAvailabilityChange(player.id, "masculin", false)
+                      }
+                      sx={{ minWidth: 70, flexGrow: { xs: 1, sm: 0 } }}
+                    >
+                      <Cancel fontSize="small" sx={{ mr: 0.5 }} />
+                      Non
+                    </Button>
+                    <Button
+                      size="small"
+                      onClick={() =>
+                        setExpandedPlayer(
+                          isExpanded && expandedPlayer?.type === "masculin"
+                            ? null
+                            : { id: player.id, type: "masculin" }
+                        )
+                      }
+                      sx={{ minWidth: 40 }}
+                    >
+                      💬
+                    </Button>
+                  </Box>
+
+                  {/* Disponibilité Féminine (uniquement pour les femmes) */}
+                  {isFemale && (
+                    <Box
+                      display="flex"
+                      alignItems="center"
+                      gap={1}
+                      sx={{ flexWrap: "wrap" }}
+                    >
+                      <Typography
+                        variant="caption"
+                        sx={{ minWidth: 80, fontWeight: "medium" }}
                       >
-                        <Box>
-                          <Typography variant="body2">
-                            {journee.name}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {journee.dates
-                              .map((date) =>
-                                date.toLocaleDateString("fr-FR", {
-                                  day: "numeric",
-                                  month: "short",
-                                })
-                              )
-                              .join(", ")}
-                          </Typography>
-                        </Box>
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {playerAvailabilities.map((pa) => (
-                    <TableRow key={pa.playerId}>
-                      <TableCell>
-                        <Box
-                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                        >
-                          <Typography>
-                            {pa.player.firstName} {pa.player.lastName}
-                          </Typography>
-                          {pa.player.isFemale && (
-                            <Chip label="F" size="small" color="secondary" />
-                          )}
-                          {pa.player.isForeign && (
-                            <Chip
-                              label="Étranger"
-                              size="small"
-                              color="warning"
-                            />
-                          )}
-                        </Box>
-                      </TableCell>
-                      <TableCell>Équipe {pa.player.teamNumber}</TableCell>
-                      <TableCell>{pa.player.points}</TableCell>
-                      {journees.map((journee) => (
-                        <TableCell
-                          key={`${journee.phase}_${journee.number}`}
-                          align="center"
-                        >
-                          <FormControlLabel
-                            control={
-                              <Switch
-                                checked={
-                                  pa.availabilities[journee.number] === true
-                                }
-                                onChange={(e) =>
-                                  handleAvailabilityChange(
-                                    pa.playerId,
-                                    journee.number,
-                                    e.target.checked
-                                  )
-                                }
-                                color={getAvailabilityColor(
-                                  pa.availabilities[journee.number]
-                                )}
-                              />
-                            }
-                            label=""
-                          />
-                          {pa.availabilities[journee.number] === false &&
-                            pa.reasons[journee.number] && (
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                                display="block"
-                              >
-                                {pa.reasons[journee.number]}
-                              </Typography>
-                            )}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                        Féminin:
+                      </Typography>
+                      <Button
+                        variant={
+                          femininAvailability?.available === true
+                            ? "contained"
+                            : "outlined"
+                        }
+                        color="success"
+                        size="small"
+                        onClick={() =>
+                          onAvailabilityChange(player.id, "feminin", true)
+                        }
+                        sx={{ minWidth: 70, flexGrow: { xs: 1, sm: 0 } }}
+                      >
+                        <CheckCircle fontSize="small" sx={{ mr: 0.5 }} />
+                        Oui
+                      </Button>
+                      <Button
+                        variant={
+                          femininAvailability?.available === false
+                            ? "contained"
+                            : "outlined"
+                        }
+                        color="error"
+                        size="small"
+                        onClick={() =>
+                          onAvailabilityChange(player.id, "feminin", false)
+                        }
+                        sx={{ minWidth: 70, flexGrow: { xs: 1, sm: 0 } }}
+                      >
+                        <Cancel fontSize="small" sx={{ mr: 0.5 }} />
+                        Non
+                      </Button>
+                      <Button
+                        size="small"
+                        onClick={() =>
+                          setExpandedPlayer(
+                            isExpanded && expandedPlayer?.type === "feminin"
+                              ? null
+                              : { id: player.id, type: "feminin" }
+                          )
+                        }
+                        sx={{ minWidth: 40 }}
+                      >
+                        💬
+                      </Button>
+                    </Box>
+                  )}
+                </Box>
+              </Box>
 
-            <Box sx={{ mt: 3, display: "flex", justifyContent: "flex-end" }}>
-              <Button
-                variant="contained"
-                onClick={saveAvailabilities}
-                disabled={!isCoach}
-              >
-                Sauvegarder les disponibilités
-              </Button>
-            </Box>
-          </CardContent>
-        </Card>
+              {/* Commentaires */}
+              {isExpanded && (
+                <Box
+                  sx={{
+                    mt: 2,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 1,
+                  }}
+                >
+                  {/* Commentaire Masculin */}
+                  <Box>
+                    <Typography
+                      variant="caption"
+                      sx={{ mb: 0.5, display: "block" }}
+                    >
+                      Commentaire Masculin:
+                    </Typography>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      placeholder="Commentaire (optionnel)"
+                      value={masculinAvailability?.comment || ""}
+                      onChange={(e) =>
+                        onCommentChange(player.id, "masculin", e.target.value)
+                      }
+                      multiline
+                      rows={2}
+                    />
+                  </Box>
 
-        {/* Dialog pour saisir la raison d'indisponibilité */}
-        <Dialog
-          open={showReasonDialog}
-          onClose={() => setShowReasonDialog(false)}
-        >
-          <DialogTitle>
-            Raison d'indisponibilité - {selectedPlayer?.player.firstName}{" "}
-            {selectedPlayer?.player.lastName}
-          </DialogTitle>
-          <DialogContent>
-            <TextField
-              autoFocus
-              margin="dense"
-              label="Raison de l'indisponibilité"
-              fullWidth
-              variant="outlined"
-              multiline
-              rows={3}
-              value={reasonText}
-              onChange={(e) => setReasonText(e.target.value)}
-              placeholder="Ex: Blessure, travail, famille..."
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setShowReasonDialog(false)}>Annuler</Button>
-            <Button onClick={handleReasonSave} variant="contained">
-              Enregistrer
-            </Button>
-          </DialogActions>
-        </Dialog>
-      </Box>
-    </Layout>
+                  {/* Commentaire Féminin (uniquement pour les femmes) */}
+                  {isFemale && (
+                    <Box>
+                      <Typography
+                        variant="caption"
+                        sx={{ mb: 0.5, display: "block" }}
+                      >
+                        Commentaire Féminin:
+                      </Typography>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        placeholder="Commentaire (optionnel)"
+                        value={femininAvailability?.comment || ""}
+                        onChange={(e) =>
+                          onCommentChange(player.id, "feminin", e.target.value)
+                        }
+                        multiline
+                        rows={2}
+                      />
+                    </Box>
+                  )}
+                </Box>
+              )}
+
+              {/* Afficher les commentaires existants s'il y en a (même si pas expanded) */}
+              {(masculinAvailability?.comment ||
+                (isFemale && femininAvailability?.comment)) &&
+                !isExpanded && (
+                  <Box
+                    sx={{
+                      mt: 1,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 0.5,
+                    }}
+                  >
+                    {masculinAvailability?.comment && (
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ fontStyle: "italic" }}
+                      >
+                        <strong>Masc:</strong> {masculinAvailability.comment}
+                      </Typography>
+                    )}
+                    {isFemale && femininAvailability?.comment && (
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ fontStyle: "italic" }}
+                      >
+                        <strong>Fém:</strong> {femininAvailability.comment}
+                      </Typography>
+                    )}
+                  </Box>
+                )}
+            </CardContent>
+          </Card>
+        );
+      })}
+    </Box>
   );
 }

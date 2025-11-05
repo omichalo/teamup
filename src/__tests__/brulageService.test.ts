@@ -78,13 +78,6 @@ describe("BrulageService", () => {
     });
 
     it("should reject composition with too many female players", () => {
-      const composition = {
-        A: "2", // Marie (female)
-        B: "2", // Marie (female) - duplicate for test
-        C: "1",
-        D: "3",
-      };
-
       // Créer une joueuse supplémentaire pour le test
       const femalePlayer: Player = {
         ...mockPlayers[1],

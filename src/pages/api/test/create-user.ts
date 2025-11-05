@@ -1,7 +1,8 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import {
   initializeFirebaseAdmin,
-  getFirebaseAdmin,
+  adminAuth,
+  adminDb,
 } from "@/lib/firebase-admin";
 
 export default async function handler(
@@ -20,10 +21,9 @@ export default async function handler(
     }
 
     await initializeFirebaseAdmin();
-    const admin = getFirebaseAdmin();
 
-    // Créer l'utilisateur dans Firebase Auth
-    const userRecord = await admin.auth().createUser({
+    // Créer l&apos;utilisateur dans Firebase Auth
+    const userRecord = await adminAuth.createUser({
       email,
       password,
       displayName,
@@ -31,8 +31,8 @@ export default async function handler(
 
     console.log("✅ Utilisateur créé dans Firebase Auth:", userRecord.uid);
 
-    // Créer l'utilisateur dans Firestore
-    const db = admin.firestore();
+    // Créer l&apos;utilisateur dans Firestore
+    const db = adminDb;
     const userData = {
       email,
       displayName,
@@ -52,7 +52,7 @@ export default async function handler(
       displayName: userRecord.displayName,
     });
   } catch (error) {
-    console.error("❌ Erreur lors de la création de l'utilisateur:", error);
+    console.error("❌ Erreur lors de la création de l&apos;utilisateur:", error);
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",

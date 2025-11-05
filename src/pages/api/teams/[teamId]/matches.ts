@@ -20,7 +20,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     await initializeFirebaseAdmin();
     const firestore = getFirestoreAdmin();
 
-    // Récupérer les matchs de l'équipe depuis la sous-collection
+    // Récupérer les matchs de l&apos;équipe depuis la sous-collection
     const matchesSnapshot = await firestore
       .collection("teams")
       .doc(teamId)
@@ -53,6 +53,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         equipeIds: data.equipeIds,
         lienDetails: data.lienDetails,
         resultatsIndividuels: data.resultatsIndividuels,
+        joueursSQY: data.joueursSQY || [],
+        joueursAdversaires: data.joueursAdversaires || [],
         createdAt: data.createdAt?.toDate() || new Date(),
         updatedAt: data.updatedAt?.toDate() || new Date(),
       });
@@ -64,7 +66,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     );
 
     console.log(
-      `📊 ${matches.length} matchs récupérés pour l'équipe ${teamId}`
+      `📊 ${matches.length} matchs récupérés pour l&apos;équipe ${teamId}`
     );
 
     res.status(200).json({
@@ -82,3 +84,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 }
 
 export default withOptionalAuth(handler);
+

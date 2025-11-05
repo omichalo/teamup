@@ -39,3 +39,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 }
 
 export default withOptionalAuth(handler);
+

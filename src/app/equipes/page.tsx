@@ -12,7 +12,7 @@ import {
   AccordionSummary,
   AccordionDetails,
   Chip,
-  Grid,
+  // Grid,
   Tabs,
   Tab,
   Dialog,
@@ -21,9 +21,9 @@ import {
   DialogActions,
   Button,
   Divider,
-  List,
-  ListItem,
-  ListItemText,
+  // List,
+  // ListItem,
+  // ListItemText,
 } from "@mui/material";
 import {
   ExpandMore,
@@ -33,20 +33,27 @@ import {
   Close,
   Info,
 } from "@mui/icons-material";
-import { useEquipesWithMatchesTest as useEquipesWithMatches } from "@/hooks/useEquipesWithMatchesTest";
+import { useEquipesWithMatches } from "@/hooks/useEquipesWithMatches";
 import { Layout } from "@/components/Layout";
 import { AuthGuard } from "@/components/AuthGuard";
 
 export default function EquipesPage() {
   const { equipes, loading, error } = useEquipesWithMatches();
   const [tabValue, setTabValue] = React.useState(0);
-  const [selectedMatch, setSelectedMatch] = React.useState<Match | null>(null);
+  const [selectedMatch, setSelectedMatch] = React.useState<{
+    id: string;
+    team: string;
+    opponent: string;
+    date: string;
+    result?: string;
+    status: string;
+  } | null>(null);
   const [modalOpen, setModalOpen] = React.useState(false);
 
-  // Grouper les équipes par épreuve en utilisant le vrai libellé de l'API
+  // Grouper les équipes par épreuve en utilisant le vrai libellé de l&apos;API
   const equipesByEpreuve = equipes.reduce((acc, equipe) => {
     if (equipe.matches.length > 0) {
-      // Utiliser le libellé d'épreuve réel de l'API FFTT
+      // Utiliser le libellé d&apos;épreuve réel de l&apos;API FFTT
       const epreuve =
         equipe.matches[0].epreuve ||
         (equipe.matches[0].division?.includes("Féminin") ||
@@ -64,11 +71,28 @@ export default function EquipesPage() {
 
   const epreuves = Object.keys(equipesByEpreuve);
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
 
-  const handleMatchClick = (match: Match) => {
+  const handleMatchClick = (match: {
+    id: string;
+    team: string;
+    opponent: string;
+    date: string;
+    result?: string;
+    status: string;
+    resultatsIndividuels?: {
+      joueursA: Record<string, { nom: string; prenom: string; points: number }>;
+      joueursB: Record<string, { nom: string; prenom: string; points: number }>;
+      parties: Array<{
+        joueurA: string;
+        joueurB: string;
+        scoreA: number;
+        scoreB: number;
+      }>;
+    };
+  }) => {
     if (match.resultatsIndividuels) {
       setSelectedMatch(match);
       setModalOpen(true);
@@ -91,7 +115,7 @@ export default function EquipesPage() {
 
   const formatTime = (date: string | Date) => {
     const dateObj = new Date(date);
-    // Ne pas afficher l'heure si elle est à minuit (pas d'heure disponible)
+    // Ne pas afficher l&apos;heure si elle est à minuit (pas d&apos;heure disponible)
     if (dateObj.getHours() === 0 && dateObj.getMinutes() === 0) {
       return "";
     }
@@ -101,8 +125,8 @@ export default function EquipesPage() {
     }).format(dateObj);
   };
 
-  const getMatchStatusChip = (match: Match) => {
-    // Utiliser le résultat déterminé par l'API plutôt que la date
+  const getMatchStatusChip = (match: { result?: string; status: string }) => {
+    // Utiliser le résultat déterminé par l&apos;API plutôt que la date
     if (match.result === "EXEMPT") {
       return <Chip label="EXEMPT" color="info" size="small" />;
     }
@@ -122,7 +146,7 @@ export default function EquipesPage() {
       return <Chip label="À VENIR" color="warning" size="small" />;
     }
 
-    // Fallback sur l'ancienne logique si pas de résultat
+    // Fallback sur l&apos;ancienne logique si pas de résultat
     return <Chip label="À VENIR" color="warning" size="small" />;
   };
 
@@ -178,7 +202,7 @@ export default function EquipesPage() {
           ) : (
             <Box sx={{ mt: 3 }}>
               <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 3 }}>
-                {epreuves.map((epreuve, index) => (
+                {epreuves.map((epreuve) => (
                   <Tab
                     key={epreuve}
                     label={`${epreuve} (${equipesByEpreuve[epreuve].length})`}
@@ -275,7 +299,184 @@ export default function EquipesPage() {
                                       Aucun match trouvé pour cette équipe.
                                     </Alert>
                                   ) : (
-                                    <Grid container spacing={2}>
+                                    <>
+                                      {/* Section : Joueurs par journée */}
+                                      <Box sx={{ mb: 4 }}>
+                                        <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+                                          👥 Joueurs par journée
+                                        </Typography>
+                                        <Divider sx={{ mb: 2 }} />
+                                        {(() => {
+                                          // Grouper les matchs par journée
+                                          const matchesByJournee = equipeWithMatches.matches.reduce(
+                                            (acc, match) => {
+                                              const journee = match.journee || 0;
+                                              if (!acc[journee]) {
+                                                acc[journee] = [];
+                                              }
+                                              acc[journee].push(match);
+                                              return acc;
+                                            },
+                                            {} as Record<number, typeof equipeWithMatches.matches>
+                                          );
+
+                                          const journees = Object.keys(matchesByJournee)
+                                            .map(Number)
+                                            .sort((a, b) => a - b);
+
+                                          // Préparer les listes de joueurs par journée pour la comparaison
+                                          const joueursParJournee = new Map<number, Set<string>>();
+                                          
+                                          journees.forEach((journee) => {
+                                            const matchesJournee = matchesByJournee[journee];
+                                            const joueursSet = new Set<string>();
+                                            
+                                            matchesJournee.forEach((match) => {
+                                              if (match.joueursSQY && Array.isArray(match.joueursSQY)) {
+                                                match.joueursSQY.forEach((joueur) => {
+                                                  const key = joueur.licence || `${joueur.nom}_${joueur.prenom}`;
+                                                  joueursSet.add(key);
+                                                });
+                                              }
+                                            });
+                                            
+                                            joueursParJournee.set(journee, joueursSet);
+                                          });
+
+                                          return (
+                                            <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                                              {journees.map((journee, journeeIndex) => {
+                                                const matchesJournee = matchesByJournee[journee];
+                                                // Collecter tous les joueurs uniques de cette journée
+                                                const joueursUniques = new Map<string, {
+                                                  licence?: string;
+                                                  nom?: string;
+                                                  prenom?: string;
+                                                  points?: number | null;
+                                                  sexe?: string;
+                                                  matches: number;
+                                                  status?: "nouveau" | "retire" | "present";
+                                                }>();
+
+                                                matchesJournee.forEach((match) => {
+                                                  if (match.joueursSQY && Array.isArray(match.joueursSQY)) {
+                                                    match.joueursSQY.forEach((joueur) => {
+                                                      const key = joueur.licence || `${joueur.nom}_${joueur.prenom}`;
+                                                      if (!joueursUniques.has(key)) {
+                                                        joueursUniques.set(key, {
+                                                          licence: joueur.licence,
+                                                          nom: joueur.nom,
+                                                          prenom: joueur.prenom,
+                                                          points: joueur.points,
+                                                          sexe: joueur.sexe,
+                                                          matches: 0,
+                                                        });
+                                                      }
+                                                      const existing = joueursUniques.get(key)!;
+                                                      existing.matches += 1;
+                                                    });
+                                                  }
+                                                });
+
+                                                // Déterminer le statut de chaque joueur par rapport à la journée précédente
+                                                const journeePrecedente = journeeIndex > 0 ? journees[journeeIndex - 1] : null;
+                                                const joueursJourneeActuelle = joueursParJournee.get(journee) || new Set<string>();
+                                                const joueursJourneePrecedente = journeePrecedente ? joueursParJournee.get(journeePrecedente) || new Set<string>() : new Set<string>();
+
+                                                joueursUniques.forEach((joueur) => {
+                                                  const key = joueur.licence || `${joueur.nom}_${joueur.prenom}`;
+                                                  
+                                                  if (!journeePrecedente) {
+                                                    // Première journée : tous les joueurs sont nouveaux
+                                                    joueur.status = "nouveau";
+                                                  } else {
+                                                    const presentActuel = joueursJourneeActuelle.has(key);
+                                                    const presentPrecedent = joueursJourneePrecedente.has(key);
+                                                    
+                                                    if (presentActuel && !presentPrecedent) {
+                                                      joueur.status = "nouveau";
+                                                    } else if (presentActuel && presentPrecedent) {
+                                                      joueur.status = "present";
+                                                    } else {
+                                                      joueur.status = "present"; // Par défaut si présent actuellement
+                                                    }
+                                                  }
+                                                });
+
+
+                                                const getChipColor = (joueur: { status?: "nouveau" | "retire" | "present"; licence?: string }) => {
+                                                  if (!joueur.status) return joueur.licence ? "primary.main" : "warning.main";
+                                                  
+                                                  switch (joueur.status) {
+                                                    case "nouveau":
+                                                      return "success.main"; // Vert pour les nouveaux joueurs
+                                                    case "retire":
+                                                      return "error.main"; // Rouge pour les joueurs retirés
+                                                    case "present":
+                                                    default:
+                                                      return joueur.licence ? "primary.main" : "warning.main"; // Bleu par défaut pour les joueurs présents
+                                                  }
+                                                };
+
+                                                return (
+                                                  <Card key={journee} variant="outlined" sx={{ p: 2 }}>
+                                                    <Typography variant="subtitle1" sx={{ fontWeight: "bold", mb: 1 }}>
+                                                      Journée {journee}
+                                                    </Typography>
+                                                    {joueursUniques.size === 0 ? (
+                                                      <Typography variant="body2" color="text.secondary">
+                                                        Aucun joueur trouvé pour cette journée
+                                                      </Typography>
+                                                    ) : (
+                                                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                                                        {Array.from(joueursUniques.values())
+                                                          .sort((a, b) => {
+                                                            // Trier par nom puis prénom
+                                                            const nomA = (a.nom || "").toLowerCase();
+                                                            const nomB = (b.nom || "").toLowerCase();
+                                                            if (nomA !== nomB) return nomA.localeCompare(nomB);
+                                                            const prenomA = (a.prenom || "").toLowerCase();
+                                                            const prenomB = (b.prenom || "").toLowerCase();
+                                                            return prenomA.localeCompare(prenomB);
+                                                          })
+                                                          .map((joueur, idx) => (
+                                                            <Chip
+                                                              key={idx}
+                                                              label={`${joueur.prenom || ""} ${joueur.nom || ""}${
+                                                                joueur.licence ? ` (${joueur.licence})` : ""
+                                                              }`}
+                                                              variant="outlined"
+                                                              size="small"
+                                                              sx={{
+                                                                borderColor: getChipColor(joueur),
+                                                                bgcolor: joueur.status === "nouveau" ? "success.light" : joueur.status === "present" ? "transparent" : "transparent",
+                                                                fontWeight: joueur.status === "nouveau" ? "bold" : "normal",
+                                                              }}
+                                                            />
+                                                          ))}
+                                                      </Box>
+                                                    )}
+                                                  </Card>
+                                                );
+                                              })}
+                                            </Box>
+                                          );
+                                        })()}
+                                      </Box>
+
+                                      <Divider sx={{ my: 3 }} />
+
+                                      {/* Section : Liste des matchs */}
+                                      <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+                                        📅 Matchs
+                                      </Typography>
+                                      <Box
+                                        sx={{
+                                          display: "flex",
+                                          flexWrap: "wrap",
+                                          gap: 2,
+                                        }}
+                                      >
                                       {equipeWithMatches.matches
                                         .sort(
                                           (a, b) =>
@@ -283,10 +484,10 @@ export default function EquipesPage() {
                                             new Date(b.date).getTime()
                                         )
                                         .map((match, index) => (
-                                          <Grid
-                                            item
-                                            xs={12}
-                                            md={6}
+                                          <Box
+                                            sx={{
+                                              width: { xs: "100%", md: "50%" },
+                                            }}
                                             key={`${match.ffttId}_${index}`}
                                           >
                                             <Card
@@ -481,9 +682,10 @@ export default function EquipesPage() {
                                                 )}
                                               </CardContent>
                                             </Card>
-                                          </Grid>
+                                          </Box>
                                         ))}
-                                    </Grid>
+                                      </Box>
+                                    </>
                                   )}
                                 </Box>
                               </AccordionDetails>
@@ -538,34 +740,34 @@ export default function EquipesPage() {
                       Informations générales
                     </Typography>
                     <Divider sx={{ mb: 2 }} />
-                    <Grid container spacing={2}>
-                      <Grid item xs={6}>
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
+                      <Box sx={{ width: "50%" }}>
                         <Typography variant="body2" color="text.secondary">
                           <strong>Journée:</strong> {selectedMatch.journee}
                         </Typography>
-                      </Grid>
-                      <Grid item xs={6}>
+                      </Box>
+                      <Box sx={{ width: "50%" }}>
                         <Typography variant="body2" color="text.secondary">
                           <strong>Phase:</strong> {selectedMatch.phase}
                         </Typography>
-                      </Grid>
-                      <Grid item xs={6}>
+                      </Box>
+                      <Box sx={{ width: "50%" }}>
                         <Typography variant="body2" color="text.secondary">
                           <strong>Date:</strong>{" "}
                           {formatDate(selectedMatch.date)}
                         </Typography>
-                      </Grid>
-                      <Grid item xs={6}>
+                      </Box>
+                      <Box sx={{ width: "50%" }}>
                         <Typography variant="body2" color="text.secondary">
                           <strong>Lieu:</strong> {selectedMatch.location}
                         </Typography>
-                      </Grid>
-                      <Grid item xs={12}>
+                      </Box>
+                      <Box sx={{ width: "100%" }}>
                         <Typography variant="body2" color="text.secondary">
                           <strong>Adversaire:</strong> {selectedMatch.opponent}
                         </Typography>
-                      </Grid>
-                    </Grid>
+                      </Box>
+                    </Box>
                   </Box>
 
                   {/* Résultat */}
@@ -605,9 +807,9 @@ export default function EquipesPage() {
                         Compositions des équipes
                       </Typography>
                       <Divider sx={{ mb: 2 }} />
-                      <Grid container spacing={3}>
+                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
                         {/* Équipe A */}
-                        <Grid item xs={12} md={6}>
+                        <Box sx={{ width: { xs: "100%", md: "50%" } }}>
                           <Box
                             sx={{
                               p: 2,
@@ -625,36 +827,45 @@ export default function EquipesPage() {
                             {selectedMatch.resultatsIndividuels.joueursA &&
                               Object.entries(
                                 selectedMatch.resultatsIndividuels.joueursA
-                              ).map(([nomComplet, joueur]) => (
-                                <Box
-                                  key={nomComplet}
-                                  sx={{
-                                    mb: 1,
-                                    p: 1,
-                                    bgcolor: "white",
-                                    borderRadius: 1,
-                                  }}
-                                >
-                                  <Typography
-                                    variant="body1"
-                                    sx={{ fontWeight: "bold" }}
+                              ).map(
+                                ([nomComplet, joueur]: [
+                                  string,
+                                  {
+                                    nom: string;
+                                    prenom: string;
+                                    points: number;
+                                  }
+                                ]) => (
+                                  <Box
+                                    key={nomComplet}
+                                    sx={{
+                                      mb: 1,
+                                      p: 1,
+                                      bgcolor: "white",
+                                      borderRadius: 1,
+                                    }}
                                   >
-                                    {joueur.prenom} {joueur.nom}
-                                  </Typography>
-                                  <Typography
-                                    variant="body2"
-                                    color="text.secondary"
-                                  >
-                                    Licence: {joueur.licence} • Points:{" "}
-                                    {joueur.points}
-                                  </Typography>
-                                </Box>
-                              ))}
+                                    <Typography
+                                      variant="body1"
+                                      sx={{ fontWeight: "bold" }}
+                                    >
+                                      {joueur.prenom} {joueur.nom}
+                                    </Typography>
+                                    <Typography
+                                      variant="body2"
+                                      color="text.secondary"
+                                    >
+                                      Licence: {joueur.licence} • Points:{" "}
+                                      {joueur.points}
+                                    </Typography>
+                                  </Box>
+                                )
+                              )}
                           </Box>
-                        </Grid>
+                        </Box>
 
                         {/* Équipe B */}
-                        <Grid item xs={12} md={6}>
+                        <Box sx={{ width: { xs: "100%", md: "50%" } }}>
                           <Box
                             sx={{
                               p: 2,
@@ -672,34 +883,43 @@ export default function EquipesPage() {
                             {selectedMatch.resultatsIndividuels.joueursB &&
                               Object.entries(
                                 selectedMatch.resultatsIndividuels.joueursB
-                              ).map(([nomComplet, joueur]) => (
-                                <Box
-                                  key={nomComplet}
-                                  sx={{
-                                    mb: 1,
-                                    p: 1,
-                                    bgcolor: "white",
-                                    borderRadius: 1,
-                                  }}
-                                >
-                                  <Typography
-                                    variant="body1"
-                                    sx={{ fontWeight: "bold" }}
+                              ).map(
+                                ([nomComplet, joueur]: [
+                                  string,
+                                  {
+                                    nom: string;
+                                    prenom: string;
+                                    points: number;
+                                  }
+                                ]) => (
+                                  <Box
+                                    key={nomComplet}
+                                    sx={{
+                                      mb: 1,
+                                      p: 1,
+                                      bgcolor: "white",
+                                      borderRadius: 1,
+                                    }}
                                   >
-                                    {joueur.prenom} {joueur.nom}
-                                  </Typography>
-                                  <Typography
-                                    variant="body2"
-                                    color="text.secondary"
-                                  >
-                                    Licence: {joueur.licence} • Points:{" "}
-                                    {joueur.points}
-                                  </Typography>
-                                </Box>
-                              ))}
+                                    <Typography
+                                      variant="body1"
+                                      sx={{ fontWeight: "bold" }}
+                                    >
+                                      {joueur.prenom} {joueur.nom}
+                                    </Typography>
+                                    <Typography
+                                      variant="body2"
+                                      color="text.secondary"
+                                    >
+                                      Licence: {joueur.licence} • Points:{" "}
+                                      {joueur.points}
+                                    </Typography>
+                                  </Box>
+                                )
+                              )}
                           </Box>
-                        </Grid>
-                      </Grid>
+                        </Box>
+                      </Box>
                     </Box>
                   )}
 
@@ -712,7 +932,15 @@ export default function EquipesPage() {
                       <Divider sx={{ mb: 2 }} />
                       {selectedMatch.resultatsIndividuels.parties &&
                         selectedMatch.resultatsIndividuels.parties.map(
-                          (partie, index) => (
+                          (
+                            partie: {
+                              joueurA: string;
+                              joueurB: string;
+                              scoreA: number;
+                              scoreB: number;
+                            },
+                            index: number
+                          ) => (
                             <Box
                               key={index}
                               sx={{
@@ -729,8 +957,15 @@ export default function EquipesPage() {
                               >
                                 Partie {index + 1}
                               </Typography>
-                              <Grid container spacing={2} alignItems="center">
-                                <Grid item xs={5}>
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  flexWrap: "wrap",
+                                  gap: 2,
+                                  alignItems: "center",
+                                }}
+                              >
+                                <Box sx={{ width: "41.67%" }}>
                                   <Typography
                                     variant="body1"
                                     sx={{
@@ -740,8 +975,8 @@ export default function EquipesPage() {
                                   >
                                     {partie.adversaireA}
                                   </Typography>
-                                </Grid>
-                                <Grid item xs={2}>
+                                </Box>
+                                <Box sx={{ width: "16.67%" }}>
                                   <Typography
                                     variant="h5"
                                     sx={{
@@ -751,16 +986,16 @@ export default function EquipesPage() {
                                   >
                                     {partie.scoreA} - {partie.scoreB}
                                   </Typography>
-                                </Grid>
-                                <Grid item xs={5}>
+                                </Box>
+                                <Box sx={{ width: "41.67%" }}>
                                   <Typography
                                     variant="body1"
                                     sx={{ fontWeight: "bold" }}
                                   >
                                     {partie.adversaireB}
                                   </Typography>
-                                </Grid>
-                              </Grid>
+                                </Box>
+                              </Box>
                               {partie.setDetails &&
                                 partie.setDetails.length > 0 && (
                                   <Box sx={{ mt: 2, textAlign: "center" }}>
@@ -807,8 +1042,8 @@ export default function EquipesPage() {
               équipes SQY Ping.
             </Typography>
 
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={6}>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+              <Box sx={{ width: { xs: "100%", md: "50%" } }}>
                 <Card>
                   <CardContent>
                     <Typography variant="h6" gutterBottom>
@@ -837,9 +1072,9 @@ export default function EquipesPage() {
                     </Typography>
                   </CardContent>
                 </Card>
-              </Grid>
+              </Box>
 
-              <Grid item xs={12} md={6}>
+              <Box sx={{ width: { xs: "100%", md: "50%" } }}>
                 <Card>
                   <CardContent>
                     <Typography variant="h6" gutterBottom>
@@ -859,12 +1094,12 @@ export default function EquipesPage() {
                     <Alert severity="info" sx={{ mt: 2 }}>
                       Les conditions de brûlage sont calculées automatiquement
                       pour chaque joueur en fonction de sa participation aux
-                      matchs de l'équipe.
+                      matchs de l&apos;équipe.
                     </Alert>
                   </CardContent>
                 </Card>
-              </Grid>
-            </Grid>
+              </Box>
+            </Box>
           </Box>
         </Box>
       </Layout>

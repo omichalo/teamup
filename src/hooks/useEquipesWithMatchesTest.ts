@@ -12,7 +12,7 @@ interface EquipesWithMatchesData {
   error: string | null;
 }
 
-export const useEquipesWithMatchesTest = (clubCode: string = "08781477") => {
+export const useEquipesWithMatchesTest = () => {
   const [data, setData] = useState<EquipesWithMatchesData>({
     equipes: [],
     loading: true,
@@ -30,10 +30,11 @@ export const useEquipesWithMatchesTest = (clubCode: string = "08781477") => {
           {
             team: {
               id: "test_team_1",
+              number: 1,
               name: "SQY PING 1 - Phase 1",
               division: "Test Division",
               players: [],
-              coach: "",
+              // coach: "", // Propriété non définie dans l&apos;interface Team
               createdAt: new Date(),
               updatedAt: new Date(),
             },
@@ -51,7 +52,7 @@ export const useEquipesWithMatchesTest = (clubCode: string = "08781477") => {
                 isExempt: false,
                 isForfeit: false,
                 phase: "aller",
-                journee: "1",
+                journee: 1,
                 isFemale: false,
                 division: "Test Division",
                 epreuve: "Test Epreuve",

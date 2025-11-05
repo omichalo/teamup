@@ -36,11 +36,11 @@ export class PlayerSyncService {
   }
 
   /**
-   * Synchronise les joueurs depuis l'API FFTT avec enrichissement des détails
+   * Synchronise les joueurs depuis l&apos;API FFTT avec enrichissement des détails
    */
   async syncPlayers(): Promise<PlayerSyncResult> {
     try {
-      console.log("🔄 Initialisation de l'API FFTT...");
+      console.log("🔄 Initialisation de l&apos;API FFTT...");
       await this.ffttApi.initialize();
 
       console.log(
@@ -48,7 +48,7 @@ export class PlayerSyncService {
       );
       const joueurs = await this.ffttApi.getJoueursByClub(this.clubCode);
 
-      console.log(`✅ ${joueurs.length} joueurs récupérés depuis l'API FFTT`);
+      console.log(`✅ ${joueurs.length} joueurs récupérés depuis l&apos;API FFTT`);
 
       // Enrichir les données des joueurs avec getJoueurDetailsByLicence
       console.log("🔍 Enrichissement des données des joueurs...");
@@ -75,7 +75,7 @@ export class PlayerSyncService {
 
   /**
    * Enrichit les données des joueurs avec un pool de requêtes concurrentes
-   * Maintient toujours 50 requêtes en cours jusqu'à ce que tous les joueurs soient traités
+   * Maintient toujours 50 requêtes en cours jusqu&apos;à ce que tous les joueurs soient traités
    */
   private async enrichPlayersData(
     joueurs: FFTTJoueur[]
@@ -101,7 +101,7 @@ export class PlayerSyncService {
           `⚠️ Erreur enrichissement joueur ${joueur.licence}:`,
           error
         );
-        // Retourner les données de base si l'enrichissement échoue
+        // Retourner les données de base si l&apos;enrichissement échoue
         return this.mergePlayerData(joueur, null);
       }
     };
@@ -144,7 +144,7 @@ export class PlayerSyncService {
 
     // Traiter les résultats et maintenir le pool
     while (activePromises.length > 0) {
-      // Attendre qu'au moins une requête se termine
+      // Attendre qu&apos;au moins une requête se termine
       const completedIndex = await Promise.race(
         activePromises.map((item, index) => item.promise.then(() => index))
       );
@@ -178,12 +178,14 @@ export class PlayerSyncService {
   }
 
   /**
-   * Récupère les détails d'un joueur via getJoueurDetailsByLicence
+   * Récupère les détails d&apos;un joueur via getJoueurDetailsByLicence
    */
-  private async getPlayerDetails(licence: string): Promise<any> {
+  private async getPlayerDetails(
+    licence: string
+  ): Promise<Record<string, unknown> | null> {
     try {
       const details = await this.ffttApi.getJoueurDetailsByLicence(licence);
-      return details;
+      return details as unknown as Record<string, unknown>;
     } catch (error) {
       console.warn(
         `⚠️ Impossible de récupérer les détails pour la licence ${licence}:`,
@@ -198,14 +200,24 @@ export class PlayerSyncService {
    */
   private mergePlayerData(
     baseJoueur: FFTTJoueur,
-    details: any | null
+    details: Record<string, unknown> | null
   ): FFTTJoueurDetails {
+    // Déterminer le sexe correctement
+    let sexe = "M"; // Par défaut masculin
+    if (details && details.isHomme !== undefined) {
+      // Si isHomme est true, alors c&apos;est un homme (M), sinon c&apos;est une femme (F)
+      sexe = details.isHomme ? "M" : "F";
+    } else if (baseJoueur.sexe) {
+      // Fallback sur le champ sexe si disponible
+      sexe = baseJoueur.sexe;
+    }
+
     const enrichedPlayer: FFTTJoueurDetails = {
       licence: baseJoueur.licence,
       nom: baseJoueur.nom,
       prenom: baseJoueur.prenom,
       points: baseJoueur.points || 0,
-      sexe: baseJoueur.sexe || "M",
+      sexe: sexe,
       club: baseJoueur.club || "",
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -214,23 +226,29 @@ export class PlayerSyncService {
     // Ajouter les détails enrichis si disponibles
     if (details) {
       enrichedPlayer.classement = String(
-        details.classement || details.classementGlobal || ""
+        (details.classement as string) ||
+          (details.classementGlobal as string) ||
+          ""
       );
-      enrichedPlayer.categorie = String(details.categorie || details.cat || "");
+      enrichedPlayer.categorie = String(
+        (details.categorie as string) || (details.cat as string) || ""
+      );
       enrichedPlayer.nationalite = String(
-        details.natio || details.nationalite || ""
+        (details.natio as string) || (details.nationalite as string) || ""
       );
       enrichedPlayer.dateNaissance = String(
-        details.dateNaissance || details.dateNais || ""
+        (details.dateNaissance as string) || (details.dateNais as string) || ""
       );
       enrichedPlayer.lieuNaissance = String(
-        details.lieuNaissance || details.lieuNais || ""
+        (details.lieuNaissance as string) || (details.lieuNais as string) || ""
       );
       enrichedPlayer.datePremiereLicence = String(
-        details.datePremiereLicence || details.datePremiereLic || ""
+        (details.datePremiereLicence as string) ||
+          (details.datePremiereLic as string) ||
+          ""
       );
       enrichedPlayer.clubPrecedent = String(
-        details.clubPrecedent || details.clubPrec || ""
+        (details.clubPrecedent as string) || (details.clubPrec as string) || ""
       );
 
       // Ajouter tous les autres champs disponibles
@@ -273,10 +291,35 @@ export class PlayerSyncService {
           const player = players[j];
           const docRef = db.collection("players").doc(player.licence);
 
+          // Récupérer les données existantes pour préserver les champs de gestion
+          const existingDoc = await docRef.get();
+          const existingData = existingDoc.exists ? existingDoc.data() : {};
+
           // Filtrer les valeurs undefined et préparer les données pour Firestore
           const playerData = Object.fromEntries(
             Object.entries(player).filter(([, value]) => value !== undefined)
           );
+
+          // Préserver UNIQUEMENT les champs de gestion qui ne viennent pas de l&apos;API FFTT
+          // Ces champs sont gérés manuellement par l&apos;utilisateur et ne doivent pas être écrasés
+          // Les autres champs (points, classement, etc.) peuvent changer entre 2 synchronisations
+          // et c&apos;est normal - ils reflètent l&apos;état actuel de l&apos;API FFTT
+          const userManagedFields = [
+            "participation",
+            "preferredTeams",
+            "isTemporary",
+            "hasPlayedAtLeastOneMatch", // Préservé car géré par la synchro des matchs
+            "highestMasculineTeamNumberByPhase", // Préservé car géré par la synchro des matchs (règles de brûlage par phase)
+            "highestFeminineTeamNumberByPhase", // Préservé car géré par la synchro des matchs (règles de brûlage par phase)
+            "masculineMatchesByTeamByPhase", // Préservé car géré par la synchro des matchs (affichage du brûlage par phase)
+            "feminineMatchesByTeamByPhase", // Préservé car géré par la synchro des matchs (affichage du brûlage par phase)
+          ];
+
+          userManagedFields.forEach((field) => {
+            if (existingData && existingData[field]) {
+              playerData[field] = existingData[field];
+            }
+          });
 
           // Convertir les dates en Timestamp Firestore
           if (playerData.createdAt) {

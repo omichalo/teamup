@@ -12,7 +12,7 @@ interface EquipesWithMatchesData {
   error: string | null;
 }
 
-export const useEquipesWithMatches = (clubCode: string = "08781477") => {
+export const useEquipesWithMatches = () => {
   const [data, setData] = useState<EquipesWithMatchesData>({
     equipes: [],
     loading: true,
@@ -32,8 +32,8 @@ export const useEquipesWithMatches = (clubCode: string = "08781477") => {
         const teamsData = await teamsResponse.json();
         const allTeams = teamsData.teams || teamsData.data || [];
 
-        // Limiter à 5 équipes pour le test
-        const teams = allTeams.slice(0, 5);
+        // Utiliser toutes les équipes
+        const teams = allTeams;
 
         // Récupérer les matchs pour chaque équipe (en parallèle avec limitation)
         const equipesWithMatches: EquipeWithMatches[] = [];
@@ -41,16 +41,55 @@ export const useEquipesWithMatches = (clubCode: string = "08781477") => {
 
         for (let i = 0; i < teams.length; i += batchSize) {
           const batch = teams.slice(i, i + batchSize);
-          const batchPromises = batch.map(async (team) => {
-            try {
-              const matchesResponse = await fetch(
-                `/api/teams/${team.id}/matches`
-              );
-              if (matchesResponse.ok) {
-                const matchesData = await matchesResponse.json();
-                const matches: Match[] =
-                  matchesData.matches || matchesData.data || [];
+          const batchPromises = batch.map(
+            async (team: { id: string; name: string; division: string }) => {
+              try {
+                const matchesResponse = await fetch(
+                  `/api/teams/${team.id}/matches`
+                );
+                if (matchesResponse.ok) {
+                  const matchesData = await matchesResponse.json();
+                  const matches: Match[] = (
+                    matchesData.matches || matchesData.data || []
+                  ).map((match: any) => ({
+                    ...match,
+                    date: match.date ? new Date(match.date) : new Date(),
+                    createdAt: match.createdAt
+                      ? new Date(match.createdAt)
+                      : new Date(),
+                    updatedAt: match.updatedAt
+                      ? new Date(match.updatedAt)
+                      : new Date(),
+                    // Conserver joueursSQY et joueursAdversaires si présents
+                    joueursSQY: match.joueursSQY || [],
+                    joueursAdversaires: match.joueursAdversaires || [],
+                  }));
 
+                  return {
+                    team: {
+                      id: team.id,
+                      number: team.teamNumber || 1,
+                      name: team.name,
+                      division: team.division || "Division inconnue",
+                      players: [],
+                      createdAt: team.createdAt
+                        ? new Date(team.createdAt)
+                        : new Date(),
+                      updatedAt: team.updatedAt
+                        ? new Date(team.updatedAt)
+                        : new Date(),
+                    },
+                    matches: matches,
+                  };
+                } else {
+                  throw new Error(`HTTP ${matchesResponse.status}`);
+                }
+              } catch (error) {
+                console.warn(
+                  `Failed to fetch matches for team ${team.id}:`,
+                  error
+                );
+                // Retourner l&apos;équipe même sans matchs
                 return {
                   team: {
                     id: team.id,
@@ -65,41 +104,17 @@ export const useEquipesWithMatches = (clubCode: string = "08781477") => {
                       ? new Date(team.updatedAt)
                       : new Date(),
                   },
-                  matches: matches,
+                  matches: [],
                 };
-              } else {
-                throw new Error(`HTTP ${matchesResponse.status}`);
               }
-            } catch (error) {
-              console.warn(
-                `Failed to fetch matches for team ${team.id}:`,
-                error
-              );
-              // Retourner l'équipe même sans matchs
-              return {
-                team: {
-                  id: team.id,
-                  name: team.name,
-                  division: team.division || "Division inconnue",
-                  players: [],
-                  coach: "",
-                  createdAt: team.createdAt
-                    ? new Date(team.createdAt)
-                    : new Date(),
-                  updatedAt: team.updatedAt
-                    ? new Date(team.updatedAt)
-                    : new Date(),
-                },
-                matches: [],
-              };
             }
-          });
+          );
 
           const batchResults = await Promise.all(batchPromises);
           equipesWithMatches.push(...batchResults);
         }
 
-        // Trier par numéro d'équipe (numérique)
+        // Trier par numéro d&apos;équipe (numérique)
         const sortedEquipes = equipesWithMatches.sort((a, b) => {
           const numA = parseInt(
             a.team.name.match(/SQY PING (\d+)/)?.[1] || "0"

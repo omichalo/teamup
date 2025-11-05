@@ -1,6 +1,6 @@
 import { NextApiResponse } from "next";
 import { withAuth, AuthenticatedRequest } from "@/lib/auth-middleware";
-import { TeamSyncService } from "@/lib/shared/team-sync";
+// import { syncTeams } from "@/lib/shared/sync-utils";
 import {
   initializeFirebaseAdmin,
   getFirestoreAdmin,
@@ -11,10 +11,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // Vérification d'authentification manuelle
+  // Vérification d&apos;authentification manuelle
   if (!req.user) {
     return res.status(401).json({
-      error: "Token d'authentification requis",
+      error: "Token d&apos;authentification requis",
       message: "Cette API nécessite une authentification valide",
     });
   }
@@ -27,6 +27,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const db = getFirestoreAdmin();
 
     // Utiliser le service partagé
+    const { TeamSyncService } = await import("@/lib/shared/team-sync");
     const teamSyncService = new TeamSyncService();
     const syncResult = await teamSyncService.syncTeamsAndMatches();
 

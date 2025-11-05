@@ -28,7 +28,7 @@ export default async function handler(
     await initializeFirebaseAdmin();
     const firestore = getFirestoreAdmin();
 
-    // Récupérer l'équipe
+    // Récupérer l&apos;équipe
     const teamDoc = await firestore.collection("teams").doc(teamId).get();
     if (!teamDoc.exists) {
       return res.status(404).json({ error: "Team not found" });
@@ -37,7 +37,7 @@ export default async function handler(
     const teamData = teamDoc.data();
     const teamName = teamData?.name || "Équipe inconnue";
 
-    // Récupérer tous les matchs de l'équipe
+    // Récupérer tous les matchs de l&apos;équipe
     const matchesSnapshot = await firestore
       .collection("teams")
       .doc(teamId)

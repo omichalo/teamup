@@ -13,4 +13,5 @@ const NoSSR = ({ children }: NoSSRProps) => {
 
 export default dynamic(() => Promise.resolve(NoSSR), {
   ssr: false,
+  loading: () => null,
 });

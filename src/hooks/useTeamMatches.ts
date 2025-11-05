@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { collection, getDocs, query, orderBy, where } from "firebase/firestore";
+import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Match } from "@/types";
 
@@ -50,7 +50,7 @@ export const useTeamMatches = (teamId: string) => {
 
         setMatches(matchesData);
         console.log(
-          `${matchesData.length} matchs chargés pour l'équipe ${teamId}`
+          `${matchesData.length} matchs chargés pour l&apos;équipe ${teamId}`
         );
       } catch (error) {
         console.error("Erreur chargement matchs équipe:", error);

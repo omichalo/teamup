@@ -20,7 +20,7 @@ export class BrulageService {
   validateComposition(
     composition: { A?: string; B?: string; C?: string; D?: string },
     teamNumber: number,
-    journee: number,
+    _journee: number,
     phase: string
   ): CompositionValidation {
     const errors: ValidationError[] = [];
@@ -31,7 +31,7 @@ export class BrulageService {
     if (players.length !== playerIds.length) {
       errors.push({
         type: "burn",
-        message: "Un ou plusieurs joueurs n'existent pas",
+        message: "Un ou plusieurs joueurs n&apos;existent pas",
       });
       return { isValid: false, errors };
     }
@@ -40,7 +40,7 @@ export class BrulageService {
     const burnErrors = this.validateBurnRules(
       players,
       teamNumber,
-      journee,
+      _journee,
       phase
     );
     errors.push(...burnErrors);
@@ -53,12 +53,12 @@ export class BrulageService {
     const foreignErrors = this.validateForeignQuota(players);
     errors.push(...foreignErrors);
 
-    // 4. Vérifier l'ordre des points (décroissant)
+    // 4. Vérifier l&apos;ordre des points (décroissant)
     const rankingErrors = this.validateRankingOrder(players, composition);
     errors.push(...rankingErrors);
 
-    // 5. Vérifier les quotas jour 2 (joueurs d'équipes inférieures)
-    if (journee === 2) {
+    // 5. Vérifier les quotas jour 2 (joueurs d&apos;équipes inférieures)
+    if (_journee === 2) {
       const day2Errors = this.validateDay2Quota(players, teamNumber);
       errors.push(...day2Errors);
     }
@@ -75,7 +75,7 @@ export class BrulageService {
   private validateBurnRules(
     players: Player[],
     teamNumber: number,
-    journee: number,
+    _journee: number,
     phase: string
   ): ValidationError[] {
     const errors: ValidationError[] = [];
@@ -83,7 +83,7 @@ export class BrulageService {
     for (const player of players) {
       const burnCount = this.getBurnCount(player.id, phase);
 
-      // Un joueur ne peut pas jouer s'il a déjà 2 rencontres dans la phase
+      // Un joueur ne peut pas jouer s&apos;il a déjà 2 rencontres dans la phase
       if (burnCount >= 2) {
         errors.push({
           type: "burn",
@@ -93,7 +93,7 @@ export class BrulageService {
         continue;
       }
 
-      // Vérifier qu'un joueur brûlé ne peut pas descendre dans une équipe supérieure
+      // Vérifier qu&apos;un joueur brûlé ne peut pas descendre dans une équipe supérieure
       if (burnCount > 0) {
         const hasPlayedInLowerTeam = this.hasPlayedInLowerTeam(
           player.id,
@@ -124,7 +124,7 @@ export class BrulageService {
       return [
         {
           type: "quota_female",
-          message: `Trop de joueuses dans l'équipe (${femaleCount}/2 maximum)`,
+          message: `Trop de joueuses dans l&apos;équipe (${femaleCount}/2 maximum)`,
         },
       ];
     }
@@ -142,7 +142,7 @@ export class BrulageService {
       return [
         {
           type: "quota_foreign",
-          message: `Trop de joueurs étrangers dans l'équipe (${foreignCount}/1 maximum)`,
+          message: `Trop de joueurs étrangers dans l&apos;équipe (${foreignCount}/1 maximum)`,
         },
       ];
     }
@@ -151,7 +151,7 @@ export class BrulageService {
   }
 
   /**
-   * Vérifie l'ordre des points (décroissant)
+   * Vérifie l&apos;ordre des points (décroissant)
    */
   private validateRankingOrder(
     players: Player[],
@@ -160,9 +160,9 @@ export class BrulageService {
     const errors: ValidationError[] = [];
 
     // Trier les joueurs par points décroissants
-    const sortedPlayers = [...players].sort((a, b) => b.points - a.points);
+    // const sortedPlayers = [...players].sort((a, b) => b.points - a.points);
 
-    // Vérifier l'ordre dans la composition
+    // Vérifier l&apos;ordre dans la composition
     const positions = ["A", "B", "C", "D"] as const;
     for (let i = 0; i < positions.length - 1; i++) {
       const posA = positions[i];
@@ -177,7 +177,7 @@ export class BrulageService {
         if (playerA && playerB && playerA.points < playerB.points) {
           errors.push({
             type: "ranking_order",
-            message: `L'ordre des points n'est pas respecté: ${playerA.firstName} ${playerA.lastName} (${playerA.points} pts) devrait être après ${playerB.firstName} ${playerB.lastName} (${playerB.points} pts)`,
+            message: `L&apos;ordre des points n&apos;est pas respecté: ${playerA.firstName} ${playerA.lastName} (${playerA.points} pts) devrait être après ${playerB.firstName} ${playerB.lastName} (${playerB.points} pts)`,
           });
         }
       }
@@ -187,7 +187,7 @@ export class BrulageService {
   }
 
   /**
-   * Vérifie les quotas jour 2 (joueurs d'équipes inférieures)
+   * Vérifie les quotas jour 2 (joueurs d&apos;équipes inférieures)
    */
   private validateDay2Quota(
     players: Player[],
@@ -195,7 +195,7 @@ export class BrulageService {
   ): ValidationError[] {
     const errors: ValidationError[] = [];
 
-    // Compter les joueurs venant d'équipes inférieures
+    // Compter les joueurs venant d&apos;équipes inférieures
     const playersFromLowerTeams = players.filter((player) => {
       if (!player.teamNumber) return false;
       return player.teamNumber < teamNumber;
@@ -206,7 +206,7 @@ export class BrulageService {
     if (playersFromLowerTeams.length > quota) {
       errors.push({
         type: "day2_quota",
-        message: `Trop de joueurs d'équipes inférieures (${playersFromLowerTeams.length}/${quota} maximum pour l'équipe ${teamNumber})`,
+        message: `Trop de joueurs d&apos;équipes inférieures (${playersFromLowerTeams.length}/${quota} maximum pour l&apos;équipe ${teamNumber})`,
       });
     }
 
@@ -244,7 +244,7 @@ export class BrulageService {
    */
   getAvailablePlayers(
     teamNumber: number,
-    journee: number,
+    _journee: number,
     phase: string,
     unavailablePlayerIds: string[] = []
   ): Player[] {
@@ -261,7 +261,7 @@ export class BrulageService {
           return false;
         }
 
-        // Vérifier qu'un joueur brûlé ne peut pas descendre
+        // Vérifier qu&apos;un joueur brûlé ne peut pas descendre
         if (burnCount > 0) {
           const hasPlayedInLowerTeam = this.hasPlayedInLowerTeam(
             player.id,
@@ -284,14 +284,14 @@ export class BrulageService {
   addBurnRecord(
     playerId: string,
     teamNumber: number,
-    journee: number,
+    _journee: number,
     phase: string,
     matchId: string
   ): BurnRecord {
     const burnRecord: Omit<BurnRecord, "id" | "createdAt"> = {
       playerId,
       teamNumber,
-      journee,
+      journee: _journee,
       phase,
       matchId,
     };
@@ -327,12 +327,12 @@ export class BrulageService {
     const allMatches = this.burnRecords.filter(
       (record) => record.playerId === playerId
     );
-    const currentPhaseMatches = allMatches.length; // Simplification pour l'exemple
+    const currentPhaseMatches = allMatches.length; // Simplification pour l&apos;exemple
 
     return {
       totalMatches: allMatches.length,
       currentPhaseMatches,
-      canPlayInTeam: (teamNumber: number) => {
+      canPlayInTeam: (_teamNumber: number) => {
         const burnCount = this.getBurnCount(playerId, "current"); // Simplification
         return burnCount < 2;
       },

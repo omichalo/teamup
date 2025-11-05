@@ -1,268 +1,194 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import {
-  Box,
-  Grid,
-  Card,
-  CardContent,
-  Typography,
-  Button,
-  Chip,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  CircularProgress,
-  Alert,
-} from "@mui/material";
-import {
-  SportsTennis as PingPongIcon,
-  Event as EventIcon,
-  Group as GroupIcon,
-  TrendingUp as TrendingUpIcon,
-  Warning as WarningIcon,
-} from "@mui/icons-material";
-import { useAuth } from "@/hooks/useAuth";
-import { useFFTTData } from "@/hooks/useFFTTData";
-import { usePlayers } from "@/hooks/usePlayers";
+import React from "react";
 import { Layout } from "@/components/Layout";
-import { AuthGuard } from "@/components/AuthGuard";
-import { Match, Player, Team } from "@/types";
+import { RedirectToAuth } from "@/components/RedirectToAuth";
+import { useAuth } from "@/hooks/useAuth";
+import { Box, Typography, Card, CardContent } from "@mui/material";
+import {
+  // SportsTennis as PingPongIcon,
+  // Group,
+  // Event,
+  Sports,
+  Person as PersonIcon,
+  CalendarToday as CalendarIcon,
+  Assignment as AssignmentIcon,
+  AdminPanelSettings as AdminIcon,
+} from "@mui/icons-material";
+import { Button } from "@mui/material";
 import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
-  const { user, isCoach } = useAuth();
-  const { matches: upcomingMatches, teams, loading, error } = useFFTTData();
-  const { players, loading: playersLoading } = usePlayers();
+  const { user, loading } = useAuth();
   const router = useRouter();
 
-  if (loading || playersLoading) {
+  // Si pas d&apos;utilisateur connecté, rediriger vers /auth
+  if (!loading && !user) {
+    return <RedirectToAuth />;
+  }
+
+  // Pendant le chargement, afficher un loader
+  if (loading) {
     return (
-      <AuthGuard>
-        <Layout>
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              minHeight: "50vh",
-            }}
-          >
-            <CircularProgress />
-          </Box>
-        </Layout>
-      </AuthGuard>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "100vh",
+          gap: 2,
+        }}
+      >
+        <Typography variant="h6" color="text.secondary">
+          Chargement...
+        </Typography>
+      </Box>
     );
   }
 
   return (
-    <AuthGuard>
-      <Layout>
-        <Box>
-          <Typography variant="h4" component="h1" gutterBottom>
-            Tableau de bord
-          </Typography>
+    <Layout>
+      <Box sx={{ p: 3 }}>
+        <Typography variant="h4" gutterBottom>
+          SQY Ping TeamUp
+        </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+          Bienvenue sur l&apos;application de gestion des équipes SQY Ping
+        </Typography>
 
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            Bienvenue {user?.displayName} ! Voici un aperçu de votre club SQY
-            Ping.
-          </Typography>
-
-          {/* Informations du club */}
-          <Card sx={{ mb: 3, bgcolor: "primary.main", color: "white" }}>
-            <CardContent>
-              <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                <PingPongIcon sx={{ mr: 1, fontSize: 32 }} />
-                <Box>
-                  <Typography variant="h5" component="h2">
-                    SQY PING
-                  </Typography>
-                  <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                    Gymnase des Pyramides • Voisins-le-Bretonneux
-                  </Typography>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "1fr",
+              sm: "repeat(2, 1fr)",
+              md: "repeat(4, 1fr)",
+            },
+            gap: 3,
+          }}
+        >
+          <Box>
+            <Card
+              sx={{ height: "100%", cursor: "pointer" }}
+              onClick={() => router.push("/joueurs")}
+            >
+              <CardContent>
+                <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                  <PersonIcon sx={{ mr: 1, color: "primary.main" }} />
+                  <Typography variant="h6">Joueurs</Typography>
                 </Box>
-              </Box>
-              <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                Coordinateur: Joffrey NIZAN • {teams.length} équipes actives
-              </Typography>
-            </CardContent>
-          </Card>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 2 }}
+                >
+                  Gérer les joueurs, participations et équipes préférées
+                </Typography>
+                <Button variant="outlined" size="small" fullWidth>
+                  Gérer les joueurs
+                </Button>
+              </CardContent>
+            </Card>
+          </Box>
 
-          {error && (
-            <Alert severity="error" sx={{ mb: 3 }}>
-              {error}
-            </Alert>
-          )}
+          <Box>
+            <Card
+              sx={{ height: "100%", cursor: "pointer" }}
+              onClick={() => router.push("/disponibilites")}
+            >
+              <CardContent>
+                <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                  <CalendarIcon sx={{ mr: 1, color: "primary.main" }} />
+                  <Typography variant="h6">Disponibilités</Typography>
+                </Box>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 2 }}
+                >
+                  Saisir les disponibilités par journée
+                </Typography>
+                <Button variant="outlined" size="small" fullWidth>
+                  Gérer les disponibilités
+                </Button>
+              </CardContent>
+            </Card>
+          </Box>
 
-          <Grid container spacing={3}>
-            {/* Prochains matches */}
-            <Grid xs={12} md={6}>
-              <Card>
-                <CardContent>
-                  <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                    <EventIcon sx={{ mr: 1, color: "primary.main" }} />
-                    <Typography variant="h6">Prochains matches</Typography>
-                  </Box>
+          <Box>
+            <Card
+              sx={{ height: "100%", cursor: "pointer" }}
+              onClick={() => router.push("/compositions")}
+            >
+              <CardContent>
+                <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                  <AssignmentIcon sx={{ mr: 1, color: "primary.main" }} />
+                  <Typography variant="h6">Compositions</Typography>
+                </Box>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 2 }}
+                >
+                  Composer les équipes avec règles de brûlage
+                </Typography>
+                <Button variant="outlined" size="small" fullWidth>
+                  Composer les équipes
+                </Button>
+              </CardContent>
+            </Card>
+          </Box>
 
-                  {upcomingMatches.length > 0 ? (
-                    <List>
-                      {upcomingMatches.slice(0, 3).map((match) => (
-                        <ListItem key={match.id} divider>
-                          <ListItemIcon>
-                            <PingPongIcon color="primary" />
-                          </ListItemIcon>
-                          <ListItemText
-                            primary={`Équipe ${match.teamNumber} vs ${match.opponent}`}
-                            secondary={`${match.date.toLocaleDateString(
-                              "fr-FR"
-                            )} - ${match.location}`}
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  ) : (
-                    <Typography color="text.secondary">
-                      Aucun match prévu
-                    </Typography>
-                  )}
+          <Box>
+            <Card
+              sx={{ height: "100%", cursor: "pointer" }}
+              onClick={() => router.push("/equipes")}
+            >
+              <CardContent>
+                <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                  <Sports sx={{ mr: 1, color: "primary.main" }} />
+                  <Typography variant="h6">Équipes</Typography>
+                </Box>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 2 }}
+                >
+                  Consulter les équipes et matchs
+                </Typography>
+                <Button variant="outlined" size="small" fullWidth>
+                  Voir les équipes
+                </Button>
+              </CardContent>
+            </Card>
+          </Box>
 
-                  <Button
-                    variant="outlined"
-                    fullWidth
-                    sx={{ mt: 2 }}
-                    onClick={() => router.push("/compositions")}
-                  >
-                    Voir toutes les compositions
-                  </Button>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Disponibilités */}
-            <Grid xs={12} md={6}>
-              <Card>
-                <CardContent>
-                  <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                    <GroupIcon sx={{ mr: 1, color: "secondary.main" }} />
-                    <Typography variant="h6">Disponibilités</Typography>
-                  </Box>
-
-                  <Box sx={{ mb: 2 }}>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      gutterBottom
-                    >
-                      Joueurs disponibles cette semaine:
-                    </Typography>
-                    <Chip
-                      label={`${players.length} joueurs`}
-                      color="success"
-                      size="small"
-                    />
-                  </Box>
-
-                  <Button
-                    variant="outlined"
-                    fullWidth
-                    sx={{ mt: 2 }}
-                    onClick={() => router.push("/disponibilites")}
-                  >
-                    Gérer les disponibilités
-                  </Button>
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Classement des équipes */}
-            <Grid xs={12} md={6}>
-              <Card>
-                <CardContent>
-                  <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                    <TrendingUpIcon sx={{ mr: 1, color: "success.main" }} />
-                    <Typography variant="h6">Classement des équipes</Typography>
-                  </Box>
-
-                  {teams.length > 0 ? (
-                    <List>
-                      {teams.map((team) => (
-                        <ListItem key={team.id} divider>
-                          <ListItemText
-                            primary={team.name}
-                            secondary={`Division: ${team.division}`}
-                          />
-                          <Chip
-                            label={`Équipe ${team.number}`}
-                            size="small"
-                            color="primary"
-                            variant="outlined"
-                          />
-                        </ListItem>
-                      ))}
-                      {teams.length > 10 && (
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          sx={{ mt: 1 }}
-                        >
-                          ... et {teams.length - 10} autres équipes
-                        </Typography>
-                      )}
-                    </List>
-                  ) : (
-                    <Typography color="text.secondary">
-                      Aucune équipe configurée
-                    </Typography>
-                  )}
-                </CardContent>
-              </Card>
-            </Grid>
-
-            {/* Actions rapides */}
-            <Grid xs={12} md={6}>
-              <Card>
-                <CardContent>
-                  <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                    <WarningIcon sx={{ mr: 1, color: "warning.main" }} />
-                    <Typography variant="h6">Actions rapides</Typography>
-                  </Box>
-
-                  <Box
-                    sx={{ display: "flex", flexDirection: "column", gap: 1 }}
-                  >
-                    <Button
-                      variant="contained"
-                      fullWidth
-                      onClick={() => router.push("/compositions")}
-                    >
-                      Créer une composition
-                    </Button>
-
-                    <Button
-                      variant="outlined"
-                      fullWidth
-                      onClick={() => router.push("/disponibilites")}
-                    >
-                      Vérifier les disponibilités
-                    </Button>
-
-                    {isCoach && (
-                      <Button
-                        variant="outlined"
-                        fullWidth
-                        onClick={() => router.push("/settings")}
-                      >
-                        Paramètres du club
-                      </Button>
-                    )}
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          </Grid>
+          <Box>
+            <Card
+              sx={{ height: "100%", cursor: "pointer" }}
+              onClick={() => router.push("/admin")}
+            >
+              <CardContent>
+                <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                  <AdminIcon sx={{ mr: 1, color: "primary.main" }} />
+                  <Typography variant="h6">Administration</Typography>
+                </Box>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 2 }}
+                >
+                  Synchronisation des données FFTT
+                </Typography>
+                <Button variant="outlined" size="small" fullWidth>
+                  Administration
+                </Button>
+              </CardContent>
+            </Card>
+          </Box>
         </Box>
-      </Layout>
-    </AuthGuard>
+      </Box>
+    </Layout>
   );
 }

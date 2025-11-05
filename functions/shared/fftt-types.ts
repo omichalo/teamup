@@ -44,3 +44,4 @@ export interface FFTTDetailsRencontre {
   expectedScoreEquipeA?: number;
   expectedScoreEquipeB?: number;
 }
+

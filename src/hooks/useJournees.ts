@@ -28,7 +28,7 @@ export const useJournees = (clubCode: string = "08781477") => {
         console.log("🔄 useJournees: Début du chargement des journées...");
         setData((prev) => ({ ...prev, loading: true, error: null }));
 
-        // Récupérer les matches depuis l'API FFTT
+        // Récupérer les matches depuis l&apos;API FFTT
         const response = await fetch(
           `/api/fftt/real-matches?clubCode=${clubCode}`
         );
@@ -98,7 +98,7 @@ function calculateJournees(matches: Match[]): Journee[] {
     journee.matches.push(match);
 
     // Ajouter la date de ce match
-    // Convertir en Date si c'est une chaîne
+    // Convertir en Date si c&apos;est une chaîne
     const matchDate =
       typeof match.date === "string" ? new Date(match.date) : match.date;
     const dateKey = matchDate.toISOString().split("T")[0]; // YYYY-MM-DD
@@ -121,7 +121,7 @@ function calculateJournees(matches: Match[]): Journee[] {
       }),
     }))
     .sort((a, b) => {
-      // Trier d'abord par phase, puis par numéro de journée
+      // Trier d&apos;abord par phase, puis par numéro de journée
       const phaseOrder = { aller: 1, retour: 2, playoffs: 3 };
       const aPhaseOrder = phaseOrder[a.phase as keyof typeof phaseOrder] || 4;
       const bPhaseOrder = phaseOrder[b.phase as keyof typeof phaseOrder] || 4;

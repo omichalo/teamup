@@ -1,6 +1,6 @@
 import { NextApiResponse } from "next";
 import { withAuth, AuthenticatedRequest } from "@/lib/auth-middleware";
-import { TeamMatchesSyncService } from "@/lib/shared/team-matches-sync";
+// import { syncTeamMatches } from "@/lib/shared/sync-utils";
 import {
   initializeFirebaseAdmin,
   getFirestoreAdmin,
@@ -12,10 +12,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // Vérification d'authentification manuelle
+  // Vérification d&apos;authentification manuelle
   if (!req.user) {
     return res.status(401).json({
-      error: "Token d'authentification requis",
+      error: "Token d&apos;authentification requis",
       message: "Cette API nécessite une authentification valide",
     });
   }
@@ -28,8 +28,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const db = getFirestoreAdmin();
 
     // Utiliser le service partagé
+    const { TeamMatchesSyncService } = await import(
+      "@/lib/shared/team-matches-sync"
+    );
     const teamMatchesSyncService = new TeamMatchesSyncService();
-    const syncResult = await teamMatchesSyncService.syncMatchesForAllTeams();
+    const syncResult = await teamMatchesSyncService.syncMatchesForAllTeams(db);
 
     if (!syncResult.success || !syncResult.processedMatches) {
       return res.status(500).json({
@@ -53,6 +56,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .set(
         {
           teamMatches: Timestamp.fromDate(new Date()),
+          teamMatchesCount: saveResult.saved, // Sauvegarder le count pour éviter de le recalculer
         },
         { merge: true }
       );

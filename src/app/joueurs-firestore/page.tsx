@@ -17,7 +17,6 @@ import {
   TableRow,
   Paper,
   Chip,
-  Grid,
   TextField,
   InputAdornment,
 } from "@mui/material";
@@ -137,8 +136,15 @@ export default function JoueursFirestorePage() {
         Joueurs SQY Ping - Firestore
       </Typography>
 
-      <Grid container spacing={3} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={8}>
+      <Box
+        sx={{
+          display: "flex",
+          gap: 2,
+          mb: 3,
+          flexDirection: { xs: "column", md: "row" },
+        }}
+      >
+        <Box sx={{ flex: 1 }}>
           <TextField
             fullWidth
             placeholder="Rechercher un joueur..."
@@ -152,8 +158,8 @@ export default function JoueursFirestorePage() {
               ),
             }}
           />
-        </Grid>
-        <Grid item xs={12} md={4}>
+        </Box>
+        <Box>
           <Button
             variant="contained"
             startIcon={<Refresh />}
@@ -163,8 +169,8 @@ export default function JoueursFirestorePage() {
           >
             Actualiser
           </Button>
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
 
       <Card>
         <CardContent>

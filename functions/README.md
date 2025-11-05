@@ -118,3 +118,4 @@ curl -X POST https://us-central1-sqyping-teamup.cloudfunctions.net/triggerMatchS
 - **Firebase Console** : Functions > Monitoring
 - **Cloud Logging** : Logs détaillés de chaque exécution
 - **Métriques** : Temps d'exécution, erreurs, invocations
+

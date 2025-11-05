@@ -13,7 +13,7 @@ import {
   limit,
   Timestamp,
   DocumentData,
-  QueryDocumentSnapshot,
+  // QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
@@ -398,7 +398,7 @@ export const addUser = async (
   };
 
   if (id) {
-    // Utiliser l'ID spécifié (comme l'UID Firebase)
+    // Utiliser l&apos;ID spécifié (comme l&apos;UID Firebase)
     const docRef = doc(usersCollection, id);
     await setDoc(docRef, userData);
     return id;

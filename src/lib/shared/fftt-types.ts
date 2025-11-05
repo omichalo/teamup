@@ -7,6 +7,7 @@ export interface FFTTEquipe {
   idEquipe: number;
   idEpreuve: number;
   libelleEpreuve: string;
+  isFemale?: boolean; // Indique si c'est une équipe féminine (peut être défini par l'API ou calculé)
 }
 
 export interface FFTTJoueur {
@@ -62,4 +63,6 @@ export interface FFTTDetailsRencontre {
   }>;
   expectedScoreEquipeA?: number;
   expectedScoreEquipeB?: number;
+  scoreEquipeA?: number | null; // Peut être présent dans certains cas
+  scoreEquipeB?: number | null; // Peut être présent dans certains cas
 }

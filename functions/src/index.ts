@@ -1,11 +1,15 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-import { PlayerSyncService } from "../shared/player-sync";
-import { TeamSyncService } from "../../src/lib/shared/team-sync";
-import { TeamMatchesSyncService } from "../../src/lib/shared/team-matches-sync";
 
 // Initialiser Firebase Admin
 admin.initializeApp();
+
+// Importer les wrappers de synchronisation
+import {
+  syncPlayersWrapper,
+  syncTeamsWrapper,
+  syncTeamMatchesWrapper,
+} from "./sync-wrappers";
 
 /**
  * 🔄 Synchronisation quotidienne des joueurs SQY Ping
@@ -54,10 +58,10 @@ export const syncPlayersManual = functions.https.onRequest(async (req, res) => {
 
 /**
  * 🏆 Synchronisation quotidienne des équipes SQY Ping
- * Se déclenche tous les jours à 1h00 (Europe/Paris)
+ * Se déclenche tous les jours à 6h05 (Europe/Paris) - 5 minutes après les joueurs
  */
 export const syncTeamsDaily = functions.pubsub
-  .schedule("0 1 * * *")
+  .schedule("5 6 * * *")
   .timeZone("Europe/Paris")
   .onRun(async () => {
     console.log("🏆 Synchronisation quotidienne des équipes SQY Ping démarrée");
@@ -99,10 +103,10 @@ export const syncTeamsManual = functions.https.onRequest(async (req, res) => {
 
 /**
  * 🏆 Synchronisation quotidienne des matchs par équipe SQY Ping
- * Se déclenche tous les jours à 2h30 (Europe/Paris)
+ * Se déclenche tous les jours à 6h10 (Europe/Paris) - 10 minutes après les joueurs
  */
 export const syncTeamMatchesDaily = functions.pubsub
-  .schedule("30 2 * * *")
+  .schedule("10 6 * * *")
   .timeZone("Europe/Paris")
   .onRun(async () => {
     console.log(
@@ -356,113 +360,19 @@ export const cleanupDuplicatePlayers = functions.https.onRequest(
  * Fonction principale de synchronisation des équipes
  */
 async function syncTeamsFunction() {
-  try {
-    const teamSyncService = new TeamSyncService();
-    const db = admin.firestore();
-
-    // Synchroniser les équipes depuis l'API FFTT
-    const syncResult = await teamSyncService.syncTeamsAndMatches();
-
-    if (!syncResult.success || !syncResult.processedTeams) {
-      return syncResult;
-    }
-
-    // Sauvegarder dans Firestore
-    const saveResult = await teamSyncService.saveTeamsAndMatchesToFirestore(
-      syncResult.processedTeams,
-      db
-    );
-
-    return {
-      success: true,
-      teamsCount: saveResult.saved,
-      message: `Synchronisation réussie: ${saveResult.saved} équipes sauvegardées`,
-    };
-  } catch (error) {
-    console.error("❌ Erreur lors de la synchronisation des équipes:", error);
-    return {
-      success: false,
-      teamsCount: 0,
-      message: "Erreur lors de la synchronisation",
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
-  }
+  return await syncTeamsWrapper();
 }
 
 /**
  * Fonction principale de synchronisation des matchs par équipe
  */
 async function syncTeamMatchesFunction() {
-  try {
-    const teamMatchesSyncService = new TeamMatchesSyncService();
-    const db = admin.firestore();
-
-    // Synchroniser les matchs depuis l'API FFTT
-    const syncResult = await teamMatchesSyncService.syncMatchesForAllTeams();
-
-    if (!syncResult.success || !syncResult.processedMatches) {
-      return syncResult;
-    }
-
-    // Sauvegarder dans les sous-collections des équipes
-    const saveResult =
-      await teamMatchesSyncService.saveMatchesToTeamSubcollections(
-        syncResult.processedMatches,
-        db
-      );
-
-    return {
-      success: true,
-      matchesCount: saveResult.saved,
-      message: `Synchronisation réussie: ${saveResult.saved} matchs sauvegardés dans les sous-collections`,
-    };
-  } catch (error) {
-    console.error(
-      "❌ Erreur lors de la synchronisation des matchs par équipe:",
-      error
-    );
-    return {
-      success: false,
-      matchesCount: 0,
-      message: "Erreur lors de la synchronisation",
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
-  }
+  return await syncTeamMatchesWrapper();
 }
 
 /**
  * Fonction principale de synchronisation des joueurs
  */
 async function syncPlayers() {
-  try {
-    const playerSyncService = new PlayerSyncService();
-    const db = admin.firestore();
-
-    // Synchroniser les joueurs depuis l'API FFTT
-    const syncResult = await playerSyncService.syncPlayers();
-
-    if (!syncResult.success || !syncResult.processedPlayers) {
-      return syncResult;
-    }
-
-    // Sauvegarder dans Firestore
-    const saveResult = await playerSyncService.savePlayersToFirestore(
-      syncResult.processedPlayers,
-      db
-    );
-
-    return {
-      success: true,
-      playersCount: saveResult.saved,
-      message: `Synchronisation réussie: ${saveResult.saved} joueurs sauvegardés`,
-    };
-  } catch (error) {
-    console.error("❌ Erreur lors de la synchronisation des joueurs:", error);
-    return {
-      success: false,
-      playersCount: 0,
-      message: "Erreur lors de la synchronisation",
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
-  }
+  return await syncPlayersWrapper();
 }

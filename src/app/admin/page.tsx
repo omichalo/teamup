@@ -9,14 +9,13 @@ import {
   Button,
   Alert,
   CircularProgress,
-  Grid,
   Chip,
   Divider,
 } from "@mui/material";
 import {
   Refresh as RefreshIcon,
-  CloudSync as CloudSyncIcon,
-  SportsTennis as TennisIcon,
+  // CloudSync as CloudSyncIcon,
+  // SportsTennis as TennisIcon,
   Group as GroupIcon,
   Schedule as ScheduleIcon,
   Groups as GroupsIcon,
@@ -24,7 +23,7 @@ import {
 } from "@mui/icons-material";
 import { useAuth } from "@/hooks/useAuth";
 import { Layout } from "@/components/Layout";
-import { AuthGuard } from "@/components/AuthGuard";
+import { RedirectToAuth } from "@/components/RedirectToAuth";
 
 interface SyncStatus {
   players: {
@@ -48,22 +47,24 @@ interface SyncStatus {
 }
 
 export default function AdminPage() {
-  const { user, firebaseUser } = useAuth();
+  const { user, firebaseUser, loading } = useAuth();
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
     players: { lastSync: null, count: 0, status: "idle" },
     teams: { lastSync: null, count: 0, status: "idle" },
     teamMatches: { lastSync: null, count: 0, status: "idle" },
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Charger le statut initial au montage du composant
   React.useEffect(() => {
     const loadSyncStatus = async () => {
-      if (!user || !firebaseUser) return; // Attendre que l'utilisateur soit connecté
+      if (!user || !firebaseUser) return; // Attendre que l&apos;utilisateur soit connecté
 
       setIsLoading(true);
+      setError(null);
       try {
-        // Récupérer le token d'authentification
+        // Récupérer le token d&apos;authentification
         const token = await firebaseUser.getIdToken();
 
         const response = await fetch("/api/admin/sync-status", {
@@ -93,10 +94,16 @@ export default function AdminPage() {
             },
           });
         } else {
-          console.error("Erreur API:", result.error || result.message);
+          const errorMessage =
+            result.error || result.message || "Erreur inconnue";
+          console.error("Erreur API:", errorMessage);
+          setError(`Erreur lors du chargement des données: ${errorMessage}`);
         }
       } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Erreur réseau";
         console.error("Erreur lors du chargement du statut:", error);
+        setError(`Erreur de connexion: ${errorMessage}`);
       } finally {
         setIsLoading(false);
       }
@@ -105,7 +112,7 @@ export default function AdminPage() {
     loadSyncStatus();
   }, [user, firebaseUser]);
 
-  // Pour l'instant, tous les utilisateurs connectés peuvent accéder à l'administration
+  // Pour l&apos;instant, tous les utilisateurs connectés peuvent accéder à l&apos;administration
 
   const handleSyncPlayers = async () => {
     if (!firebaseUser) {
@@ -119,7 +126,7 @@ export default function AdminPage() {
     }));
 
     try {
-      // Récupérer le token d'authentification
+      // Récupérer le token d&apos;authentification
       const token = await firebaseUser.getIdToken();
 
       const response = await fetch("/api/admin/sync-players", {
@@ -175,7 +182,7 @@ export default function AdminPage() {
     }));
 
     try {
-      // Récupérer le token d'authentification
+      // Récupérer le token d&apos;authentification
       const token = await firebaseUser.getIdToken();
 
       const response = await fetch("/api/admin/sync-teams", {
@@ -231,7 +238,7 @@ export default function AdminPage() {
     }));
 
     try {
-      // Récupérer le token d'authentification
+      // Récupérer le token d&apos;authentification
       const token = await firebaseUser.getIdToken();
 
       const response = await fetch("/api/admin/sync-team-matches", {
@@ -299,292 +306,313 @@ export default function AdminPage() {
     return new Date(lastSync).toLocaleString("fr-FR");
   };
 
+  // Si pas d&apos;utilisateur connecté, rediriger vers /auth
+  if (!loading && !user) {
+    return <RedirectToAuth />;
+  }
+
+  // Pendant le chargement de l&apos;auth, afficher un loader
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "100vh",
+          gap: 2,
+        }}
+      >
+        <Typography variant="h6" color="text.secondary">
+          Chargement...
+        </Typography>
+      </Box>
+    );
+  }
+
   return (
-    <AuthGuard>
-      <Layout>
-        <Box sx={{ p: 3 }}>
-          <Typography variant="h4" gutterBottom>
-            Administration - Synchronisation des données
-          </Typography>
+    <Layout>
+      <Box sx={{ p: 3 }}>
+        <Typography variant="h4" gutterBottom>
+          Administration - Synchronisation des données
+        </Typography>
 
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            Gérez la synchronisation des données FFTT depuis cette interface
-            d'administration.
-          </Typography>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+          Gérez la synchronisation des données FFTT depuis cette interface
+          d&apos;administration.
+        </Typography>
 
-          {isLoading ? (
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                minHeight: "30vh",
-                gap: 2,
-              }}
-            >
-              <CircularProgress size={48} />
-              <Typography variant="h6" color="text.secondary">
-                Chargement des données de synchronisation...
-              </Typography>
-            </Box>
-          ) : (
-            <Grid container spacing={3}>
-              {/* Synchronisation des joueurs */}
-              <Grid item xs={12} md={6}>
-                <Card>
-                  <CardContent>
-                    <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                      <GroupIcon sx={{ mr: 1, color: "primary.main" }} />
-                      <Typography variant="h6">
-                        Synchronisation des joueurs
-                      </Typography>
-                    </Box>
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
 
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mb: 2 }}
-                    >
-                      Synchronise la liste des joueurs du club depuis l'API
-                      FFTT.
+        {isLoading ? (
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              minHeight: "30vh",
+              gap: 2,
+            }}
+          >
+            <CircularProgress size={48} />
+            <Typography variant="h6" color="text.secondary">
+              Chargement des données de synchronisation...
+            </Typography>
+          </Box>
+        ) : (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            {/* Synchronisation des joueurs */}
+            <Box sx={{ width: "100%" }}>
+              <Card>
+                <CardContent>
+                  <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                    <GroupIcon sx={{ mr: 1, color: "primary.main" }} />
+                    <Typography variant="h6">
+                      Synchronisation des joueurs
                     </Typography>
+                  </Box>
 
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="body2">
-                        <strong>Dernière synchronisation :</strong>{" "}
-                        {formatLastSync(syncStatus.players.lastSync)}
-                      </Typography>
-                      <Typography variant="body2">
-                        <strong>Nombre de joueurs :</strong>{" "}
-                        {syncStatus.players.count}
-                      </Typography>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <Typography variant="body2" component="span">
-                          <strong>Statut :</strong>
-                        </Typography>
-                        {getStatusChip(syncStatus.players.status)}
-                      </Box>
-                    </Box>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mb: 2 }}
+                  >
+                    Synchronise la liste des joueurs du club depuis l&apos;API FFTT.
+                  </Typography>
 
-                    {syncStatus.players.error && (
-                      <Alert severity="error" sx={{ mb: 2 }}>
-                        {syncStatus.players.error}
-                      </Alert>
-                    )}
-
-                    <Button
-                      variant="contained"
-                      startIcon={
-                        syncStatus.players.status === "syncing" ? (
-                          <CircularProgress size={20} color="inherit" />
-                        ) : (
-                          <RefreshIcon />
-                        )
-                      }
-                      onClick={handleSyncPlayers}
-                      disabled={syncStatus.players.status === "syncing"}
-                      fullWidth
-                    >
-                      {syncStatus.players.status === "syncing"
-                        ? "Synchronisation en cours..."
-                        : "Synchroniser les joueurs"}
-                    </Button>
-                  </CardContent>
-                </Card>
-              </Grid>
-
-              {/* Synchronisation des équipes */}
-              <Grid item xs={12} md={6}>
-                <Card>
-                  <CardContent>
-                    <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                      <GroupsIcon sx={{ mr: 1, color: "primary.main" }} />
-                      <Typography variant="h6">
-                        Synchronisation des équipes
-                      </Typography>
-                    </Box>
-
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mb: 2 }}
-                    >
-                      Synchronise la liste des équipes du club depuis l'API
-                      FFTT.
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2">
+                      <strong>Dernière synchronisation :</strong>{" "}
+                      {formatLastSync(syncStatus.players.lastSync)}
                     </Typography>
-
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="body2">
-                        <strong>Dernière synchronisation :</strong>{" "}
-                        {formatLastSync(syncStatus.teams.lastSync)}
-                      </Typography>
-                      <Typography variant="body2">
-                        <strong>Nombre d'équipes :</strong>{" "}
-                        {syncStatus.teams.count}
-                      </Typography>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <Typography variant="body2" component="span">
-                          <strong>Statut :</strong>
-                        </Typography>
-                        {getStatusChip(syncStatus.teams.status)}
-                      </Box>
-                    </Box>
-
-                    {syncStatus.teams.error && (
-                      <Alert severity="error" sx={{ mb: 2 }}>
-                        {syncStatus.teams.error}
-                      </Alert>
-                    )}
-
-                    <Button
-                      variant="contained"
-                      startIcon={
-                        syncStatus.teams.status === "syncing" ? (
-                          <CircularProgress size={20} color="inherit" />
-                        ) : (
-                          <GroupsIcon />
-                        )
-                      }
-                      onClick={handleSyncTeams}
-                      disabled={syncStatus.teams.status === "syncing"}
-                      fullWidth
-                    >
-                      {syncStatus.teams.status === "syncing"
-                        ? "Synchronisation en cours..."
-                        : "Synchroniser les équipes"}
-                    </Button>
-                  </CardContent>
-                </Card>
-              </Grid>
-
-              {/* Synchronisation des matchs par équipe */}
-              <Grid item xs={12} md={6}>
-                <Card>
-                  <CardContent>
-                    <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                      <SportsIcon sx={{ mr: 1, color: "primary.main" }} />
-                      <Typography variant="h6">
-                        Synchronisation des matchs par équipe
-                      </Typography>
-                    </Box>
-
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mb: 2 }}
-                    >
-                      Synchronise les matchs organisés par équipe dans des
-                      sous-collections Firestore.
+                    <Typography variant="body2">
+                      <strong>Nombre de joueurs :</strong>{" "}
+                      {syncStatus.players.count}
                     </Typography>
-
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="body2">
-                        <strong>Dernière synchronisation :</strong>{" "}
-                        {formatLastSync(syncStatus.teamMatches.lastSync)}
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Typography variant="body2" component="span">
+                        <strong>Statut :</strong>
                       </Typography>
-                      <Typography variant="body2">
-                        <strong>Nombre de matchs :</strong>{" "}
-                        {syncStatus.teamMatches.count}
-                      </Typography>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <Typography variant="body2" component="span">
-                          <strong>Statut :</strong>
-                        </Typography>
-                        {getStatusChip(syncStatus.teamMatches.status)}
-                      </Box>
+                      {getStatusChip(syncStatus.players.status)}
                     </Box>
+                  </Box>
 
-                    {syncStatus.teamMatches.error && (
-                      <Alert severity="error" sx={{ mb: 2 }}>
-                        {syncStatus.teamMatches.error}
-                      </Alert>
-                    )}
-
-                    <Button
-                      variant="contained"
-                      startIcon={
-                        syncStatus.teamMatches.status === "syncing" ? (
-                          <CircularProgress size={20} color="inherit" />
-                        ) : (
-                          <SportsIcon />
-                        )
-                      }
-                      onClick={handleSyncTeamMatches}
-                      disabled={syncStatus.teamMatches.status === "syncing"}
-                      fullWidth
-                    >
-                      {syncStatus.teamMatches.status === "syncing"
-                        ? "Synchronisation en cours..."
-                        : "Synchroniser les matchs par équipe"}
-                    </Button>
-                  </CardContent>
-                </Card>
-              </Grid>
-
-              {/* Informations générales */}
-              <Grid item xs={12}>
-                <Card>
-                  <CardContent>
-                    <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                      <ScheduleIcon sx={{ mr: 1, color: "primary.main" }} />
-                      <Typography variant="h6">
-                        Synchronisation automatique
-                      </Typography>
-                    </Box>
-
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mb: 2 }}
-                    >
-                      Les données sont automatiquement synchronisées en
-                      arrière-plan :
-                    </Typography>
-
-                    <Box sx={{ pl: 2 }}>
-                      <Typography variant="body2" sx={{ mb: 1 }}>
-                        • <strong>Joueurs :</strong> Synchronisation quotidienne
-                        à 6h du matin
-                      </Typography>
-                      <Typography variant="body2" sx={{ mb: 1 }}>
-                        • <strong>Équipes :</strong> Synchronisation quotidienne
-                        à 1h du matin
-                      </Typography>
-                      <Typography variant="body2" sx={{ mb: 1 }}>
-                        • <strong>Matchs par équipe :</strong> Synchronisation
-                        quotidienne à 2h30 du matin
-                      </Typography>
-                      <Typography variant="body2">
-                        • <strong>Détails des matchs :</strong> Récupération
-                        automatique des compositions et résultats
-                      </Typography>
-                    </Box>
-
-                    <Divider sx={{ my: 2 }} />
-
-                    <Alert severity="info">
-                      <Typography variant="body2">
-                        <strong>Note :</strong> La synchronisation manuelle peut
-                        prendre plusieurs minutes selon le nombre de données à
-                        traiter. Les synchronisations automatiques se font en
-                        arrière-plan sans impact sur l'utilisation de
-                        l'application.
-                      </Typography>
+                  {syncStatus.players.error && (
+                    <Alert severity="error" sx={{ mb: 2 }}>
+                      {syncStatus.players.error}
                     </Alert>
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
-          )}
-        </Box>
-      </Layout>
-    </AuthGuard>
+                  )}
+
+                  <Button
+                    variant="contained"
+                    startIcon={
+                      syncStatus.players.status === "syncing" ? (
+                        <CircularProgress size={20} color="inherit" />
+                      ) : (
+                        <RefreshIcon />
+                      )
+                    }
+                    onClick={handleSyncPlayers}
+                    disabled={syncStatus.players.status === "syncing"}
+                    fullWidth
+                  >
+                    {syncStatus.players.status === "syncing"
+                      ? "Synchronisation en cours..."
+                      : "Synchroniser les joueurs"}
+                  </Button>
+                </CardContent>
+              </Card>
+            </Box>
+
+            {/* Synchronisation des équipes */}
+            <Box sx={{ width: "100%" }}>
+              <Card>
+                <CardContent>
+                  <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                    <GroupsIcon sx={{ mr: 1, color: "primary.main" }} />
+                    <Typography variant="h6">
+                      Synchronisation des équipes
+                    </Typography>
+                  </Box>
+
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mb: 2 }}
+                  >
+                    Synchronise la liste des équipes du club depuis l&apos;API FFTT.
+                  </Typography>
+
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2">
+                      <strong>Dernière synchronisation :</strong>{" "}
+                      {formatLastSync(syncStatus.teams.lastSync)}
+                    </Typography>
+                    <Typography variant="body2">
+                      <strong>Nombre d&apos;équipes :</strong>{" "}
+                      {syncStatus.teams.count}
+                    </Typography>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Typography variant="body2" component="span">
+                        <strong>Statut :</strong>
+                      </Typography>
+                      {getStatusChip(syncStatus.teams.status)}
+                    </Box>
+                  </Box>
+
+                  {syncStatus.teams.error && (
+                    <Alert severity="error" sx={{ mb: 2 }}>
+                      {syncStatus.teams.error}
+                    </Alert>
+                  )}
+
+                  <Button
+                    variant="contained"
+                    startIcon={
+                      syncStatus.teams.status === "syncing" ? (
+                        <CircularProgress size={20} color="inherit" />
+                      ) : (
+                        <GroupsIcon />
+                      )
+                    }
+                    onClick={handleSyncTeams}
+                    disabled={syncStatus.teams.status === "syncing"}
+                    fullWidth
+                  >
+                    {syncStatus.teams.status === "syncing"
+                      ? "Synchronisation en cours..."
+                      : "Synchroniser les équipes"}
+                  </Button>
+                </CardContent>
+              </Card>
+            </Box>
+
+            {/* Synchronisation des matchs par équipe */}
+            <Box sx={{ width: "100%" }}>
+              <Card>
+                <CardContent>
+                  <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                    <SportsIcon sx={{ mr: 1, color: "primary.main" }} />
+                    <Typography variant="h6">
+                      Synchronisation des matchs par équipe
+                    </Typography>
+                  </Box>
+
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mb: 2 }}
+                  >
+                    Synchronise les matchs organisés par équipe dans des
+                    sous-collections Firestore.
+                  </Typography>
+
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2">
+                      <strong>Dernière synchronisation :</strong>{" "}
+                      {formatLastSync(syncStatus.teamMatches.lastSync)}
+                    </Typography>
+                    <Typography variant="body2">
+                      <strong>Nombre de matchs :</strong>{" "}
+                      {syncStatus.teamMatches.count}
+                    </Typography>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Typography variant="body2" component="span">
+                        <strong>Statut :</strong>
+                      </Typography>
+                      {getStatusChip(syncStatus.teamMatches.status)}
+                    </Box>
+                  </Box>
+
+                  {syncStatus.teamMatches.error && (
+                    <Alert severity="error" sx={{ mb: 2 }}>
+                      {syncStatus.teamMatches.error}
+                    </Alert>
+                  )}
+
+                  <Button
+                    variant="contained"
+                    startIcon={
+                      syncStatus.teamMatches.status === "syncing" ? (
+                        <CircularProgress size={20} color="inherit" />
+                      ) : (
+                        <SportsIcon />
+                      )
+                    }
+                    onClick={handleSyncTeamMatches}
+                    disabled={syncStatus.teamMatches.status === "syncing"}
+                    fullWidth
+                  >
+                    {syncStatus.teamMatches.status === "syncing"
+                      ? "Synchronisation en cours..."
+                      : "Synchroniser les matchs par équipe"}
+                  </Button>
+                </CardContent>
+              </Card>
+            </Box>
+
+            {/* Informations générales */}
+            <Box sx={{ width: "100%" }}>
+              <Card>
+                <CardContent>
+                  <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                    <ScheduleIcon sx={{ mr: 1, color: "primary.main" }} />
+                    <Typography variant="h6">
+                      Synchronisation automatique
+                    </Typography>
+                  </Box>
+
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mb: 2 }}
+                  >
+                    Les données sont automatiquement synchronisées en
+                    arrière-plan :
+                  </Typography>
+
+                  <Box sx={{ pl: 2 }}>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      • <strong>Joueurs :</strong> Synchronisation quotidienne à
+                      6h du matin
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      • <strong>Équipes :</strong> Synchronisation quotidienne à
+                      1h du matin
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                      • <strong>Matchs par équipe :</strong> Synchronisation
+                      quotidienne à 2h30 du matin
+                    </Typography>
+                    <Typography variant="body2">
+                      • <strong>Détails des matchs :</strong> Récupération
+                      automatique des compositions et résultats
+                    </Typography>
+                  </Box>
+
+                  <Divider sx={{ my: 2 }} />
+
+                  <Alert severity="info">
+                    <Typography variant="body2">
+                      <strong>Note :</strong> La synchronisation manuelle peut
+                      prendre plusieurs minutes selon le nombre de données à
+                      traiter. Les synchronisations automatiques se font en
+                      arrière-plan sans impact sur l&apos;utilisation de
+                      l&apos;application.
+                    </Typography>
+                  </Alert>
+                </CardContent>
+              </Card>
+            </Box>
+          </Box>
+        )}
+      </Box>
+    </Layout>
   );
 }

@@ -37,7 +37,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         return;
       }
 
-      // Si l'ID du document est le numéro de licence, c'est correct
+      // Si l&apos;ID du document est le numéro de licence, c&apos;est correct
       if (doc.id === licence) {
         if (playersByLicence.has(licence)) {
           console.log(
@@ -48,7 +48,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           playersByLicence.set(licence, doc);
         }
       } else {
-        // Si l'ID n'est pas la licence, c'est probablement un doublon
+        // Si l&apos;ID n&apos;est pas la licence, c&apos;est probablement un doublon
         if (playersByLicence.has(licence)) {
           console.log(
             `⚠️ Doublon trouvé pour licence ${licence}, document ${doc.id} à supprimer`

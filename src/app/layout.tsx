@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ClientThemeProvider } from "@/components/ClientThemeProvider";
 import { AuthProvider } from "@/hooks/useAuth";
 import "./globals.css";
+import "@fontsource-variable/figtree";
 
 export const metadata: Metadata = {
   title: "SQY Ping - Team Up",

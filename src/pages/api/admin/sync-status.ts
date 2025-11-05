@@ -19,29 +19,21 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Initialiser Firestore
     const db = getFirestoreAdmin();
 
-    // Récupérer les métadonnées de synchronisation
-    const metadataDoc = await db.collection("metadata").doc("lastSync").get();
+    // Exécuter toutes les requêtes en parallèle pour optimiser les performances
+    const [metadataDoc, playersSnapshot, teamsSnapshot] = await Promise.all([
+      db.collection("metadata").doc("lastSync").get(),
+      db.collection("players").get(),
+      db.collection("teams").get(),
+    ]);
+
     const metadata = metadataDoc.exists ? metadataDoc.data() : {};
-
-    // Récupérer le nombre de joueurs
-    const playersSnapshot = await db.collection("players").get();
     const playersCount = playersSnapshot.size;
-
-    // Récupérer le nombre d'équipes
-    const teamsSnapshot = await db.collection("teams").get();
     const teamsCount = teamsSnapshot.size;
 
-    // Récupérer le nombre de matchs par équipe (compter dans toutes les sous-collections)
-    let teamMatchesCount = 0;
-    const teams = await db.collection("teams").get();
-    for (const teamDoc of teams.docs) {
-      const matchesSnapshot = await db
-        .collection("teams")
-        .doc(teamDoc.id)
-        .collection("matches")
-        .get();
-      teamMatchesCount += matchesSnapshot.size;
-    }
+    // Pour les matchs, on utilise une approche plus rapide :
+    // On récupère seulement les métadonnées de synchronisation qui contiennent déjà le count
+    // Au lieu de compter tous les matchs individuellement
+    const teamMatchesCount = metadata?.teamMatchesCount || 0;
 
     console.log(
       `✅ Statut récupéré: ${playersCount} joueurs, ${teamsCount} équipes, ${teamMatchesCount} matchs par équipe`

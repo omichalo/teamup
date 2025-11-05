@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   Box,
   Card,
@@ -16,7 +16,7 @@ import {
 } from "@mui/material";
 import { SportsTennis as PingPongIcon } from "@mui/icons-material";
 import { useAuth } from "@/hooks/useAuth";
-import { useRouter } from "next/navigation";
+// import { useRouter } from "next/navigation";
 import { AuthGuard } from "@/components/AuthGuard";
 
 interface TabPanelProps {
@@ -61,8 +61,8 @@ export default function AuthPage() {
     setError(null);
   };
 
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSignIn = async (_e: React.FormEvent) => {
+    _e.preventDefault();
     if (!formData.email || !formData.password) {
       setError("Veuillez remplir tous les champs");
       return;
@@ -100,8 +100,8 @@ export default function AuthPage() {
       setSignInLoading(true);
       setError(null);
       await signUp(formData.email, formData.password, formData.displayName);
-    } catch (error: any) {
-      console.error("Erreur d'inscription:", error);
+    } catch (error: unknown) {
+      console.error("Erreur d&apos;inscription:", error);
       if (error.code === "auth/email-already-in-use") {
         setError("Un compte existe déjà avec cet email");
       } else if (error.code === "auth/invalid-email") {
@@ -109,14 +109,14 @@ export default function AuthPage() {
       } else if (error.code === "auth/weak-password") {
         setError("Le mot de passe est trop faible");
       } else {
-        setError("Erreur d'inscription. Veuillez réessayer.");
+        setError("Erreur d&apos;inscription. Veuillez réessayer.");
       }
     } finally {
       setSignInLoading(false);
     }
   };
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
     setError(null);
     setFormData({ email: "", password: "", displayName: "" });

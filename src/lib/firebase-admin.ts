@@ -2,83 +2,41 @@ import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 
-let admin: any = null;
+// Configuration Firebase Admin
+const firebaseAdminConfig = {
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
+  clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
+  privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n") || "",
+};
 
-export async function initializeFirebaseAdmin() {
-  if (admin) {
-    return admin;
-  }
+// Initialiser Firebase Admin (une seule fois)
+const app =
+  getApps().length === 0
+    ? initializeApp({
+        credential: cert(firebaseAdminConfig),
+        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
+      })
+    : getApps()[0];
 
-  try {
-    // Vérifier si Firebase Admin est déjà initialisé
-    if (getApps().length === 0) {
-      // Configuration Firebase Admin
-      const serviceAccount = {
-        type: "service_account",
-        project_id: process.env.FIREBASE_PROJECT_ID || "sqyping-teamup",
-        private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-        private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-        client_email: process.env.FIREBASE_CLIENT_EMAIL,
-        client_id: process.env.FIREBASE_CLIENT_ID,
-        auth_uri: "https://accounts.google.com/o/oauth2/auth",
-        token_uri: "https://oauth2.googleapis.com/token",
-        auth_provider_x509_cert_url:
-          "https://www.googleapis.com/oauth2/v1/certs",
-        client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/${process.env.FIREBASE_CLIENT_EMAIL}`,
-      };
+// Exporter l&apos;instance Firebase Admin
+export const adminApp = app;
 
-      // Vérifier si la clé privée est valide
-      if (
-        !serviceAccount.private_key ||
-        serviceAccount.private_key.includes("...")
-      ) {
-        console.log(
-          "⚠️ Clé privée Firebase tronquée, utilisation de la configuration par défaut"
-        );
+// Exporter l&apos;instance Firestore
+export const adminDb = getFirestore(app);
 
-        // Configuration par défaut pour le développement local
-        admin = initializeApp({
-          projectId: process.env.FIREBASE_PROJECT_ID || "sqyping-teamup",
-        });
-      } else {
-        // Configuration avec credentials Firebase
-        admin = initializeApp({
-          credential: cert(serviceAccount as any),
-          projectId: process.env.FIREBASE_PROJECT_ID || "sqyping-teamup",
-        });
-      }
-    } else {
-      admin = getApps()[0];
-    }
+// Exporter l&apos;instance Auth
+export const adminAuth = getAuth(app);
 
-    return admin;
-  } catch (error) {
-    console.error(
-      "❌ Erreur lors de l'initialisation de Firebase Admin:",
-      error
-    );
-    throw error;
-  }
-}
+// Fonctions d&apos;initialisation pour compatibilité avec l&apos;ancien code
+export const initializeFirebaseAdmin = async () => {
+  // Firebase Admin est déjà initialisé
+  return Promise.resolve();
+};
 
-export function getFirebaseAdmin() {
-  if (!admin) {
-    throw new Error(
-      "Firebase Admin n'est pas initialisé. Appelez initializeFirebaseAdmin() d'abord."
-    );
-  }
-  return {
-    auth: () => getAuth(admin),
-    firestore: () => getFirestore(admin),
-    app: admin,
-  };
-}
+export const getFirestoreAdmin = () => {
+  return adminDb;
+};
 
-export function getFirestoreAdmin() {
-  if (!admin) {
-    throw new Error(
-      "Firebase Admin n'est pas initialisé. Appelez initializeFirebaseAdmin() d'abord."
-    );
-  }
-  return getFirestore(admin);
-}
+export const getFirebaseAdmin = () => {
+  return adminApp;
+};

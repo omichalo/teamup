@@ -10,12 +10,14 @@ interface AuthGuardProps {
   children: React.ReactNode;
   requireAuth?: boolean;
   redirectTo?: string;
+  fallback?: React.ReactNode;
 }
 
 export const AuthGuard: React.FC<AuthGuardProps> = ({
   children,
   requireAuth = true,
   redirectTo = "/auth",
+  fallback,
 }) => {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -30,8 +32,13 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
     }
   }, [user, loading, requireAuth, redirectTo, router]);
 
+  // Si on attend une authentification et qu&apos;il n&apos;y a pas d&apos;utilisateur, afficher le fallback
+  if (requireAuth && !user) {
+    return fallback || null;
+  }
+
   // Pendant le chargement, afficher un loader seulement si on est sur une page protégée
-  // Sur la page d'auth, on laisse le Layout gérer le chargement
+  // Sur la page d&apos;auth, on laisse le Layout gérer le chargement
   if (loading && requireAuth) {
     return (
       <Box
@@ -52,13 +59,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
     );
   }
 
-  // Si on attend une authentification et qu'il n'y a pas d'utilisateur, ne rien afficher
-  // (la redirection va se faire)
-  if (requireAuth && !user) {
-    return null;
-  }
-
-  // Si on n'attend pas d'authentification et qu'il y a un utilisateur, ne rien afficher
+  // Si on n&apos;attend pas d&apos;authentification et qu&apos;il y a un utilisateur, ne rien afficher
   // (la redirection va se faire)
   if (!requireAuth && user) {
     return null;

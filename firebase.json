@@ -20,5 +20,17 @@
         "destination": "/index.html"
       }
     ]
+  },
+  "appHosting": {
+    "preview": {
+      "buildCommand": "npm run build",
+      "runCommand": "npm start",
+      "framework": "nextjs"
+    },
+    "production": {
+      "buildCommand": "npm run build",
+      "runCommand": "npm start",
+      "framework": "nextjs"
+    }
   }
 }

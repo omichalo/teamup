@@ -32,3 +32,4 @@ try {
   console.error("❌ Erreur lors de la configuration :", error.message);
   process.exit(1);
 }
+

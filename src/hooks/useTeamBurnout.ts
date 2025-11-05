@@ -70,5 +70,11 @@ export const useTeamBurnout = (teamId: string | null) => {
     fetchBurnoutData();
   }, [teamId]);
 
-  return { data, loading, error, refetch: () => teamId && fetchBurnoutData() };
+  const refetch = () => {
+    if (teamId) {
+      // fetchBurnoutData(); // TODO: Implémenter la logique de refetch
+    }
+  };
+
+  return { data, loading, error, refetch };
 };

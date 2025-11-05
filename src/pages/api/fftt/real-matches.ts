@@ -20,7 +20,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const teams = teamsSnapshot.docs.map((doc) => ({
       id: doc.id,
       ...doc.data(),
-    }));
+    })) as Array<{ id: string; name: string; [key: string]: any }>;
 
     // Récupérer tous les matchs de toutes les équipes
     const allMatches = [];

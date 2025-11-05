@@ -1,6 +1,5 @@
 import { FFTTAPI } from "@omichalo/ffttapi-node";
-import { getFFTTConfig } from "./fftt-utils";
-import { FFTTRencontre } from "./fftt-types";
+import { getFFTTConfig, isFemaleTeam } from "./fftt-utils";
 import type { Firestore } from "firebase-admin/firestore";
 import { Timestamp } from "firebase-admin/firestore";
 
@@ -74,11 +73,11 @@ export class TeamSyncService {
   }
 
   /**
-   * Synchronise les équipes et leurs matchs depuis l'API FFTT
+   * Synchronise les équipes et leurs matchs depuis l&apos;API FFTT
    */
   async syncTeamsAndMatches(): Promise<TeamSyncResult> {
     try {
-      console.log("🔄 Initialisation de l'API FFTT...");
+      console.log("🔄 Initialisation de l&apos;API FFTT...");
       await this.ffttApi.initialize();
 
       console.log(
@@ -86,7 +85,7 @@ export class TeamSyncService {
       );
       const equipes = await this.ffttApi.getEquipesByClub(this.clubCode);
 
-      console.log(`✅ ${equipes.length} équipes récupérées depuis l'API FFTT`);
+      console.log(`✅ ${equipes.length} équipes récupérées depuis l&apos;API FFTT`);
 
       // Filtrer les équipes pour les épreuves spécifiques
       const filteredEquipes = equipes.filter(
@@ -101,15 +100,20 @@ export class TeamSyncService {
       const processedTeams: TeamData[] = [];
 
       for (const equipe of filteredEquipes) {
-        console.log(`🏆 Traitement de l'équipe ${equipe.libelle}...`);
+        console.log(`🏆 Traitement de l&apos;équipe ${equipe.libelle}...`);
 
-        // Créer l'équipe
+        // Créer l&apos;équipe
         const teamData: TeamData = {
-          id: equipe.idEquipe.toString(), // Utiliser directement l'ID FFTT comme clé
+          id: equipe.idEquipe.toString(), // Utiliser directement l&apos;ID FFTT comme clé
           ffttId: equipe.idEquipe.toString(),
           name: equipe.libelle,
           division: equipe.division,
-          isFemale: equipe.libelle.includes("(DAMES)"),
+          isFemale: isFemaleTeam(
+            equipe.libelle,
+            equipe.division,
+            equipe.libelleEpreuve,
+            equipe.idEpreuve
+          ),
           teamNumber: this.extractTeamNumber(equipe.libelle),
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -198,7 +202,7 @@ export class TeamSyncService {
   }
 
   /**
-   * Extrait le numéro d'équipe depuis le libellé
+   * Extrait le numéro d&apos;équipe depuis le libellé
    */
   private extractTeamNumber(libelle: string): number {
     const match = libelle.match(/SQY PING (\d+)/);

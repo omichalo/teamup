@@ -2,9 +2,15 @@ import { NextApiRequest, NextApiResponse } from "next";
 import { FFTTAPI } from "@omichalo/ffttapi-node";
 import { Match } from "@/types";
 
+if (!process.env.ID_FFTT || !process.env.PWD_FFTT) {
+  throw new Error(
+    "FFTT credentials (ID_FFTT and PWD_FFTT) are required as environment variables"
+  );
+}
+
 const ffttApi = new FFTTAPI(
-  process.env.ID_FFTT || "SW251",
-  process.env.PWD_FFTT || "XpZ31v56Jr"
+  process.env.ID_FFTT,
+  process.env.PWD_FFTT
 );
 
 export default async function handler(
@@ -22,7 +28,7 @@ export default async function handler(
   }
 
   try {
-    // Initialiser l'API FFTT
+    // Initialiser l&apos;API FFTT
     await ffttApi.initialize();
 
     // Récupérer les détails du club
@@ -59,7 +65,7 @@ export default async function handler(
       equipesFiltered.map(async (equipe) => {
         try {
           console.log(
-            `Récupération des matchs pour l'équipe: ${equipe.libelle}`
+            `Récupération des matchs pour l&apos;équipe: ${equipe.libelle}`
           );
 
           // Récupérer les matchs de la poule
@@ -73,7 +79,7 @@ export default async function handler(
 
           return { equipe, rencontres };
         } catch (error) {
-          console.error(`Erreur pour l'équipe ${equipe.libelle}:`, error);
+          console.error(`Erreur pour l&apos;équipe ${equipe.libelle}:`, error);
           return { equipe, rencontres: [] };
         }
       })
@@ -117,12 +123,14 @@ export default async function handler(
             });
           }
 
-          // Créer le match de base (sans détails pour l'instant)
+          // Créer le match de base (sans détails pour l&apos;instant)
           const match = createBaseMatch(equipe, rencontre, teamNumber, phase);
-          allMatches.push(match);
+          if (match) {
+            allMatches.push(match);
+          }
         }
       } catch (equipeError) {
-        console.error(`Erreur pour l'équipe ${equipe.libelle}:`, equipeError);
+        console.error(`Erreur pour l&apos;équipe ${equipe.libelle}:`, equipeError);
         // Continuer avec les autres équipes
       }
     }
@@ -135,10 +143,16 @@ export default async function handler(
 
       const detailsResults = await Promise.all(
         matchesToProcess.map(
-          async ({ equipe, rencontre, index, teamNumber, phase }) => {
+          async ({
+            equipe,
+            rencontre,
+            index,
+            teamNumber: _teamNumber,
+            phase: _phase,
+          }) => {
             try {
               const equipeIds = extractEquipeIds(rencontre.lien);
-              if (!equipeIds) {
+              if (!equipeIds.equipe1 || !equipeIds.equipe2) {
                 return { index, detailsRencontre: null };
               }
 
@@ -146,7 +160,7 @@ export default async function handler(
                 `Récupération des détails pour match terminé: ${equipeIds.equipe1} vs ${equipeIds.equipe2}`
               );
 
-              // Essayer de récupérer les vrais détails avec l'API FFTT
+              // Essayer de récupérer les vrais détails avec l&apos;API FFTT
               try {
                 // Extraire les numéros de club depuis le lien
                 const clubnum1Match = rencontre.lien.match(/clubnum_1=([^&]+)/);
@@ -169,18 +183,18 @@ export default async function handler(
                     clubEquipeA = clubnum2Match[1];
                     clubEquipeB = clubnum1Match[1];
                   } else {
-                    // Fallback: utiliser les IDs d'équipe comme clubs
+                    // Fallback: utiliser les IDs d&apos;équipe comme clubs
                     clubEquipeA = equipeIds.equipe1;
                     clubEquipeB = equipeIds.equipe2;
                   }
                 } else {
-                  // Fallback: utiliser les IDs d'équipe comme clubs
+                  // Fallback: utiliser les IDs d&apos;équipe comme clubs
                   clubEquipeA = equipeIds.equipe1;
                   clubEquipeB = equipeIds.equipe2;
                 }
 
                 console.log(
-                  `Tentative d'appel API avec clubs: ${clubEquipeA} vs ${clubEquipeB}`
+                  `Tentative d&apos;appel API avec clubs: ${clubEquipeA} vs ${clubEquipeB}`
                 );
 
                 // Appeler la vraie API FFTT pour récupérer les détails
@@ -320,24 +334,19 @@ function determineMatchResult(
   }
 }
 
-function extractRencontreId(lien: string): string | undefined {
+function extractRencontreId(lien: string): string {
   const match = lien.match(/renc_id=([^&]+)/);
-  return match ? match[1] : undefined;
+  return match ? match[1] : "";
 }
 
-function extractEquipeIds(
-  lien: string
-): { equipe1: string; equipe2: string } | undefined {
+function extractEquipeIds(lien: string): { equipe1: string; equipe2: string } {
   const match1 = lien.match(/equip_id1=([^&]+)/);
   const match2 = lien.match(/equip_id2=([^&]+)/);
 
-  if (match1 && match2) {
-    return {
-      equipe1: match1[1],
-      equipe2: match2[1],
-    };
-  }
-  return undefined;
+  return {
+    equipe1: match1 ? match1[1] : "",
+    equipe2: match2 ? match2[1] : "",
+  };
 }
 
 function createBaseMatch(
@@ -345,8 +354,8 @@ function createBaseMatch(
   rencontre: any,
   teamNumber: number,
   phase: string
-): Match {
-  // Utiliser les vraies données des équipes de l'API FFTT
+): Match | null {
+  // Utiliser les vraies données des équipes de l&apos;API FFTT
   const equip1 = rencontre.nomEquipeA || "";
   const equip2 = rencontre.nomEquipeB || "";
 
@@ -357,10 +366,10 @@ function createBaseMatch(
     return null; // Sera filtré plus tard
   }
 
-  // Déterminer si c'est un match à domicile ou extérieur
+  // Déterminer si c&apos;est un match à domicile ou extérieur
   const isHome = equip1.includes("SQY PING");
 
-  // Déterminer l'adversaire
+  // Déterminer l&apos;adversaire
   const opponent = isHome ? equip2 : equip1;
 
   // Extraire le nom du club adverse
@@ -373,10 +382,10 @@ function createBaseMatch(
     journee = parseInt(tourMatch[1]);
   }
 
-  // Parser la date - utiliser les propriétés correctes de l'API FFTT
+  // Parser la date - utiliser les propriétés correctes de l&apos;API FFTT
   let matchDate: Date;
 
-  // Utiliser les vraies dates de l'API FFTT
+  // Utiliser les vraies dates de l&apos;API FFTT
   if (
     rencontre.dateReelle &&
     rencontre.dateReelle instanceof Date &&
@@ -390,14 +399,14 @@ function createBaseMatch(
   ) {
     matchDate = rencontre.datePrevue;
   } else {
-    // Fallback si aucune date n'est disponible
+    // Fallback si aucune date n&apos;est disponible
     const currentYear = new Date().getFullYear();
     const seasonStart = new Date(currentYear, 8, 1); // 1er septembre
     const journeeOffset = (journee - 1) * 7; // 7 jours entre chaque journée
     matchDate = new Date(
       seasonStart.getTime() + journeeOffset * 24 * 60 * 60 * 1000
     );
-    // Pas d'heure si pas de données réelles
+    // Pas d&apos;heure si pas de données réelles
     matchDate.setHours(0, 0, 0, 0);
   }
 
@@ -417,23 +426,23 @@ function createBaseMatch(
     // Ajouter des métadonnées pour distinguer les équipes
     isFemale: isFemaleTeam(equipe.division),
     division: equipe.division,
-    // Créer un identifiant unique pour l'équipe (numéro + genre)
+    // Créer un identifiant unique pour l&apos;équipe (numéro + genre)
     teamId: `${teamNumber}_${isFemaleTeam(equipe.division) ? "F" : "M"}`,
-    // Ajouter le libellé d'épreuve pour le groupement
+    // Ajouter le libellé d&apos;épreuve pour le groupement
     epreuve: equipe.libelleEpreuve,
     // Ajouter les résultats et compositions
-    score: (() => {
-      // Essayer d'abord les propriétés directes
+    ...(() => {
+      // Essayer d&apos;abord les propriétés directes
       if (rencontre.scoreEquipeA && rencontre.scoreEquipeB) {
-        return `${rencontre.scoreEquipeA}-${rencontre.scoreEquipeB}`;
+        return { score: `${rencontre.scoreEquipeA}-${rencontre.scoreEquipeB}` };
       }
-      // Sinon, essayer d'extraire du lien
+      // Sinon, essayer d&apos;extraire du lien
       const res1Match = rencontre.lien.match(/res_1=([^&]+)/);
       const res2Match = rencontre.lien.match(/res_2=([^&]+)/);
       if (res1Match && res2Match && res1Match[1] && res2Match[1]) {
-        return `${res1Match[1]}-${res2Match[1]}`;
+        return { score: `${res1Match[1]}-${res2Match[1]}` };
       }
-      return undefined;
+      return {};
     })(),
     result: determineMatchResult(rencontre, isHome),
     // Extraire les informations détaillées du lien

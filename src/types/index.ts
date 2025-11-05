@@ -1,4 +1,4 @@
-// Types de base pour l'application SQY Ping
+// Types de base pour l&apos;application SQY Ping
 
 export interface Player {
   id: string;
@@ -14,6 +14,22 @@ export interface Player {
   isTransferred: boolean;
   isFemale: boolean;
   teamNumber?: number; // Équipe actuelle (1, 2, 3...)
+  highestMasculineTeamNumberByPhase?: { 
+    aller?: number; 
+    retour?: number; 
+  }; // Numéro de l'équipe masculine la plus basse (numéro le plus élevé) dans laquelle le joueur est brûlé par phase (>= 2 matchs dans la phase). Exemple: { aller: 8, retour: 5 } signifie brûlé dans l'équipe 8 en phase aller et équipe 5 en phase retour
+  highestFeminineTeamNumberByPhase?: { 
+    aller?: number; 
+    retour?: number; 
+  }; // Numéro de l'équipe féminine la plus basse (numéro le plus élevé) dans laquelle le joueur est brûlé par phase (>= 2 matchs dans la phase)
+  masculineMatchesByTeamByPhase?: {
+    aller?: { [teamNumber: number]: number };
+    retour?: { [teamNumber: number]: number };
+  }; // Nombre de matchs joués par équipe masculine et par phase (pour affichage dans le tooltip de brûlage)
+  feminineMatchesByTeamByPhase?: {
+    aller?: { [teamNumber: number]: number };
+    retour?: { [teamNumber: number]: number };
+  }; // Nombre de matchs joués par équipe féminine et par phase (pour affichage dans le tooltip de brûlage)
   createdAt: Date;
   updatedAt: Date;
 }
@@ -47,14 +63,28 @@ export interface Match {
   isFemale?: boolean; // true pour les équipes féminines
   division?: string; // Division FFTT complète
   teamId?: string; // Identifiant unique équipe (ex: "1_M", "2_F")
-  epreuve?: string; // Libellé de l'épreuve FFTT
+  epreuve?: string; // Libellé de l&apos;épreuve FFTT
   score?: string; // Score du match (ex: "4-2")
   result?: string; // Résultat (VICTOIRE, DEFAITE, EXEMPT, W.O.)
-  composition?: string; // Composition de l'équipe pour ce match
+  compositionString?: string; // Composition de l&apos;équipe pour ce match
   rencontreId?: string; // ID de la rencontre FFTT
   equipeIds?: { equipe1: string; equipe2: string }; // IDs des équipes
   lienDetails?: string; // Lien complet vers les détails
   resultatsIndividuels?: any; // Résultats individuels des joueurs
+  joueursSQY?: Array<{
+    licence?: string;
+    nom?: string;
+    prenom?: string;
+    points?: number | null;
+    sexe?: string;
+  }>; // Liste des joueurs SQY Ping ayant participé au match
+  joueursAdversaires?: Array<{
+    licence?: string;
+    nom?: string;
+    prenom?: string;
+    points?: number | null;
+    sexe?: string;
+  }>; // Liste des joueurs adversaires
   createdAt: Date;
   updatedAt: Date;
 }
@@ -81,7 +111,7 @@ export interface Availability {
   playerId: string;
   journee: number;
   isAvailable: boolean;
-  reason?: string; // Raison de l'indisponibilité
+  reason?: string; // Raison de l&apos;indisponibilité
   createdAt: Date;
   updatedAt: Date;
 }
@@ -115,7 +145,7 @@ export interface User {
   displayName: string;
   photoURL?: string;
   role: "coach" | "player";
-  playerId?: string; // Si c'est un joueur
+  playerId?: string; // Si c&apos;est un joueur
   createdAt: Date;
   updatedAt: Date;
 }
@@ -138,7 +168,7 @@ export interface CompositionValidation {
   errors: ValidationError[];
 }
 
-// Types pour l'API FFTT
+// Types pour l&apos;API FFTT
 export interface FFTTPlayer {
   licencie: string;
   nom: string;

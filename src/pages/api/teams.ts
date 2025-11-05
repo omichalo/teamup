@@ -31,7 +31,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       });
     });
 
-    // Trier par numéro d'équipe
+    // Trier par numéro d&apos;équipe
     teams.sort((a, b) => a.teamNumber - b.teamNumber);
 
     console.log(`📊 ${teams.length} équipes récupérées depuis Firestore`);
@@ -50,3 +50,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 }
 
 export default withOptionalAuth(handler);
+

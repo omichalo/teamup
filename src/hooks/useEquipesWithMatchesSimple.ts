@@ -12,7 +12,7 @@ interface EquipesWithMatchesData {
   error: string | null;
 }
 
-export const useEquipesWithMatchesSimple = (clubCode: string = "08781477") => {
+export const useEquipesWithMatchesSimple = () => {
   const [data, setData] = useState<EquipesWithMatchesData>({
     equipes: [],
     loading: true,
@@ -28,17 +28,19 @@ export const useEquipesWithMatchesSimple = (clubCode: string = "08781477") => {
         // Test simple avec une seule équipe
         const teamId = "8551"; // SQY PING 16
 
-        // Récupérer l'équipe
+        // Récupérer l&apos;équipe
         const teamResponse = await fetch(`http://localhost:3000/api/teams`);
         console.log("✅ Équipes récupérées");
         const teamsData = await teamResponse.json();
-        const team = teamsData.teams.find((t: any) => t.id === teamId);
+        const team = teamsData.teams.find(
+          (t: { id: string; name: string; division: string }) => t.id === teamId
+        );
 
         if (!team) {
           throw new Error("Team not found");
         }
 
-        // Récupérer les matchs de l'équipe
+        // Récupérer les matchs de l&apos;équipe
         const matchesResponse = await fetch(
           `http://localhost:3000/api/teams/${teamId}/matches`
         );
@@ -49,10 +51,11 @@ export const useEquipesWithMatchesSimple = (clubCode: string = "08781477") => {
         const equipeWithMatches: EquipeWithMatches = {
           team: {
             id: team.id,
+            number: team.number || 1,
             name: team.name,
             division: team.division || "Division inconnue",
             players: [],
-            coach: "",
+            // coach: "", // Propriété non définie dans l&apos;interface Team
             createdAt: team.createdAt ? new Date(team.createdAt) : new Date(),
             updatedAt: team.updatedAt ? new Date(team.updatedAt) : new Date(),
           },

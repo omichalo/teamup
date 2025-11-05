@@ -13,7 +13,6 @@ import {
   Avatar,
   Switch,
   FormControlLabel,
-  CircularProgress,
 } from "@mui/material";
 import {
   SportsTennis as PingPongIcon,
@@ -27,19 +26,18 @@ import {
   AdminPanelSettings,
 } from "@mui/icons-material";
 import { useAuth } from "@/hooks/useAuth";
-import { useColorMode } from "@omichalo/sqyping-mui-theme";
+import { useColorMode } from "./ClientThemeProvider";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import NoSSR from "./NoSSR";
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { user, signOut, isCoach, loading } = useAuth();
+  const { user, signOut, isCoach } = useAuth();
 
-  // Pour l'instant, tous les utilisateurs connectés peuvent accéder à l'administration
+  // Pour l&apos;instant, tous les utilisateurs connectés peuvent accéder à l&apos;administration
   const isAdmin = !!user;
   const { mode, toggleColorMode } = useColorMode();
   const router = useRouter();
@@ -56,7 +54,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const handleSignOut = async () => {
     try {
       await signOut();
-      router.push("/");
+      router.push("/auth");
     } catch (error) {
       console.error("Sign out error:", error);
     }
@@ -82,26 +80,27 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       : []),
   ];
 
-  // Si l'authentification est en cours de chargement, afficher un loader centré
-  if (loading) {
-    return (
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "100vh",
-          gap: 2,
-        }}
-      >
-        <CircularProgress size={48} />
-        <Typography variant="h6" color="text.secondary">
-          Chargement...
-        </Typography>
-      </Box>
-    );
-  }
+  // Si l&apos;authentification est en cours de chargement, afficher un loader centré
+  // Temporairement désactivé pour le debug
+  // if (loading) {
+  //   return (
+  //     <Box
+  //       sx={{
+  //         display: "flex",
+  //         flexDirection: "column",
+  //         justifyContent: "center",
+  //         alignItems: "center",
+  //         minHeight: "100vh",
+  //         gap: 2,
+  //       }}
+  //     >
+  //       <CircularProgress size={48} />
+  //       <Typography variant="h6" color="text.secondary">
+  //         Chargement...
+  //       </Typography>
+  //     </Box>
+  //   );
+  // }
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
@@ -129,72 +128,68 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           </Box>
 
           {/* Dark mode toggle */}
-          <NoSSR>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={mode === "dark"}
-                  onChange={toggleColorMode}
-                  size="small"
-                  sx={{ ml: 1 }}
-                />
-              }
-              label=""
-              sx={{ mr: 2 }}
-            />
-          </NoSSR>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={mode === "dark"}
+                onChange={toggleColorMode}
+                size="small"
+                sx={{ ml: 1 }}
+              />
+            }
+            label=""
+            sx={{ mr: 2 }}
+          />
 
           {/* User menu */}
-          <NoSSR>
-            {user ? (
-              <>
-                <IconButton
-                  size="large"
-                  aria-label="account of current user"
-                  aria-controls="menu-appbar"
-                  aria-haspopup="true"
-                  onClick={handleMenu}
-                  color="inherit"
+          {user ? (
+            <>
+              <IconButton
+                size="large"
+                aria-label="account of current user"
+                aria-controls="menu-appbar"
+                aria-haspopup="true"
+                onClick={handleMenu}
+                color="inherit"
+              >
+                <Avatar
+                  {...(user.photoURL && { src: user.photoURL })}
+                  alt={user.displayName}
+                  sx={{ width: 32, height: 32 }}
                 >
-                  <Avatar
-                    src={user.photoURL}
-                    alt={user.displayName}
-                    sx={{ width: 32, height: 32 }}
-                  >
-                    {user.displayName?.charAt(0)}
-                  </Avatar>
-                </IconButton>
-                <Menu
-                  id="menu-appbar"
-                  anchorEl={anchorEl}
-                  anchorOrigin={{
-                    vertical: "top",
-                    horizontal: "right",
-                  }}
-                  keepMounted
-                  transformOrigin={{
-                    vertical: "top",
-                    horizontal: "right",
-                  }}
-                  open={Boolean(anchorEl)}
-                  onClose={handleClose}
-                >
-                  <MenuItem onClick={handleClose}>
-                    <AccountCircle sx={{ mr: 1 }} />
-                    {user.displayName}
-                  </MenuItem>
-                  <MenuItem onClick={handleSignOut}>
-                    <Logout sx={{ mr: 1 }} />
-                    Déconnexion
-                  </MenuItem>
-                </Menu>
-              </>
-            ) : (
-              <Button color="inherit" onClick={() => router.push("/auth")}>
-                Connexion
-              </Button>
-            )}
-          </NoSSR>
+                  {user.displayName?.charAt(0)}
+                </Avatar>
+              </IconButton>
+              <Menu
+                id="menu-appbar"
+                anchorEl={anchorEl}
+                anchorOrigin={{
+                  vertical: "top",
+                  horizontal: "right",
+                }}
+                keepMounted
+                transformOrigin={{
+                  vertical: "top",
+                  horizontal: "right",
+                }}
+                open={Boolean(anchorEl)}
+                onClose={handleClose}
+              >
+                <MenuItem onClick={handleClose}>
+                  <AccountCircle sx={{ mr: 1 }} />
+                  {user.displayName}
+                </MenuItem>
+                <MenuItem onClick={handleSignOut}>
+                  <Logout sx={{ mr: 1 }} />
+                  Déconnexion
+                </MenuItem>
+              </Menu>
+            </>
+          ) : (
+            <Button color="inherit" onClick={() => router.push("/auth")}>
+              Connexion
+            </Button>
+          )}
         </Toolbar>
       </AppBar>
 

@@ -26,6 +26,7 @@ export const useTeams = () => {
           const data = doc.data();
           teamsData.push({
             id: doc.id,
+            number: data.number || 1, // Valeur par défaut si non définie
             name: data.name,
             division: data.division,
             players: [], // Les joueurs seront ajoutés par le système asynchrone

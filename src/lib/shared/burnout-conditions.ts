@@ -90,12 +90,12 @@ export const calculatePlayerBurnout = (
     matchesPlayed,
     lastMatchDate,
     isAtRisk,
-    riskReason,
+    ...(isAtRisk && riskReason && { riskReason }),
   };
 };
 
 /**
- * Calcule les informations de brûlage pour tous les joueurs d'une équipe
+ * Calcule les informations de brûlage pour tous les joueurs d&apos;une équipe
  */
 export const calculateTeamBurnout = (
   teamId: string,

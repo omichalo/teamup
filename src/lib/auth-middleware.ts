@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from "next";
-import { initializeFirebaseAdmin, getFirebaseAdmin } from "./firebase-admin";
+import { initializeFirebaseAdmin, adminAuth } from "./firebase-admin";
 
 export interface AuthenticatedRequest extends NextApiRequest {
   user?: {
@@ -13,11 +13,11 @@ export function withAuth(
 ) {
   return async (req: NextApiRequest, res: NextApiResponse) => {
     try {
-      // Vérifier l'authentification via le header Authorization
+      // Vérifier l&apos;authentification via le header Authorization
       const authHeader = req.headers.authorization;
       if (!authHeader || !authHeader.startsWith("Bearer ")) {
         return res.status(401).json({
-          error: "Token d'authentification requis",
+          error: "Token d&apos;authentification requis",
           message: "Cette API nécessite une authentification valide",
         });
       }
@@ -28,8 +28,7 @@ export function withAuth(
       await initializeFirebaseAdmin();
 
       // Vérifier le token Firebase
-      const admin = getFirebaseAdmin();
-      const decodedToken = await admin.auth().verifyIdToken(token);
+      const decodedToken = await adminAuth.verifyIdToken(token);
 
       // Ajouter les informations utilisateur à la requête
       (req as AuthenticatedRequest).user = {
@@ -40,18 +39,18 @@ export function withAuth(
       // Appeler le handler original
       await handler(req as AuthenticatedRequest, res);
     } catch (error) {
-      console.error("❌ Erreur d'authentification:", error);
+      console.error("❌ Erreur d&apos;authentification:", error);
 
-      // Si c'est une erreur d'authentification
+      // Si c&apos;est une erreur d&apos;authentification
       if (error instanceof Error && error.message.includes("auth")) {
         return res.status(401).json({
-          error: "Token d'authentification invalide",
+          error: "Token d&apos;authentification invalide",
           details: error.message,
         });
       }
 
       return res.status(500).json({
-        error: "Erreur d'authentification",
+        error: "Erreur d&apos;authentification",
         details: error instanceof Error ? error.message : "Unknown error",
       });
     }
@@ -63,7 +62,7 @@ export function withOptionalAuth(
 ) {
   return async (req: NextApiRequest, res: NextApiResponse) => {
     try {
-      // Vérifier l'authentification via le header Authorization
+      // Vérifier l&apos;authentification via le header Authorization
       const authHeader = req.headers.authorization;
 
       if (authHeader && authHeader.startsWith("Bearer ")) {
@@ -73,8 +72,7 @@ export function withOptionalAuth(
         await initializeFirebaseAdmin();
 
         // Vérifier le token Firebase
-        const admin = getFirebaseAdmin();
-        const decodedToken = await admin.auth().verifyIdToken(token);
+        const decodedToken = await adminAuth.verifyIdToken(token);
 
         // Ajouter les informations utilisateur à la requête
         (req as AuthenticatedRequest).user = {
@@ -86,9 +84,9 @@ export function withOptionalAuth(
       // Appeler le handler original (avec ou sans authentification)
       await handler(req as AuthenticatedRequest, res);
     } catch (error) {
-      console.error("❌ Erreur d'authentification optionnelle:", error);
+      console.error("❌ Erreur d&apos;authentification optionnelle:", error);
 
-      // En cas d'erreur, continuer sans authentification
+      // En cas d&apos;erreur, continuer sans authentification
       await handler(req as AuthenticatedRequest, res);
     }
   };

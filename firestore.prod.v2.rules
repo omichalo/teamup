@@ -15,12 +15,6 @@ service cloud.firestore {
         exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
     
-    // Fonction helper pour vérifier si l'utilisateur peut écrire ses propres disponibilités
-    function canWriteOwnAvailability() {
-      return request.auth != null && 
-        request.auth.uid == resource.data.playerId;
-    }
-    
     // Règles pour les utilisateurs
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
@@ -47,16 +41,14 @@ service cloud.firestore {
     // Règles pour les compositions
     match /compositions/{compositionId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && isCoach();
+      allow write: if request.auth != null;
     }
     
     // Règles pour les disponibilités
     match /availabilities/{availabilityId} {
       allow read: if request.auth != null;
-      // Les joueurs peuvent écrire leurs propres disponibilités
-      // Les coaches peuvent écrire toutes les disponibilités
-      allow write: if request.auth != null && 
-        (isCoach() || canWriteOwnAvailability());
+      // Pour l'instant, toute personne connectée peut mettre à jour les disponibilités
+      allow write: if request.auth != null;
     }
     
     // Règles pour les enregistrements de brûlage

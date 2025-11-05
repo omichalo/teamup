@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, createContext, useContext } from "react";
+import React, { useState, useEffect, createContext, useContext } from "react";
 import {
   User as FirebaseUser,
   signInWithEmailAndPassword,
@@ -48,13 +48,13 @@ export const useAuthState = () => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       console.log(
-        "Hook useAuth: État d'authentification changé:",
+        "Hook useAuth: État d&apos;authentification changé:",
         firebaseUser?.email || "Non connecté"
       );
       console.log("Hook useAuth: FirebaseUser object:", firebaseUser);
       setFirebaseUser(firebaseUser);
 
-      // Attendre un peu pour s'assurer que l'authentification est complète
+      // Attendre un peu pour s&apos;assurer que l&apos;authentification est complète
       if (firebaseUser) {
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
@@ -64,7 +64,7 @@ export const useAuthState = () => {
           console.log(
             "Hook useAuth: Utilisateur Firebase trouvé, recherche dans Firestore..."
           );
-          // Récupérer ou créer l'utilisateur dans Firestore
+          // Récupérer ou créer l&apos;utilisateur dans Firestore
           let userData = await getUser(firebaseUser.uid);
 
           if (!userData) {
@@ -75,7 +75,7 @@ export const useAuthState = () => {
             const newUser: Omit<User, "id" | "createdAt" | "updatedAt"> = {
               email: firebaseUser.email!,
               displayName: firebaseUser.displayName || "",
-              photoURL: firebaseUser.photoURL || undefined,
+              ...(firebaseUser.photoURL && { photoURL: firebaseUser.photoURL }),
               role: "player", // Par défaut, tous les utilisateurs sont des joueurs
             };
 
@@ -100,7 +100,11 @@ export const useAuthState = () => {
             }
 
             if (userData.photoURL !== firebaseUser.photoURL) {
-              updates.photoURL = firebaseUser.photoURL || undefined;
+              if (firebaseUser.photoURL) {
+                updates.photoURL = firebaseUser.photoURL;
+              } else {
+                delete updates.photoURL;
+              }
               needsUpdate = true;
             }
 
@@ -110,25 +114,30 @@ export const useAuthState = () => {
             }
           }
 
-          console.log("Hook useAuth: Définition de l'utilisateur:", userData);
+          console.log(
+            "Hook useAuth: Définition de l&apos;utilisateur:",
+            userData
+          );
           setUser(userData);
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error("Hook useAuth: Error fetching user data:", error);
-          console.error("Hook useAuth: Détails de l'erreur:", error);
+          console.error("Hook useAuth: Détails de l&apos;erreur:", error);
 
-          // Si c'est une erreur de permissions, essayer de créer l'utilisateur quand même
+          // Si c&apos;est une erreur de permissions, essayer de créer l&apos;utilisateur quand même
           if (
             error.code === "permission-denied" ||
             error.message?.includes("Missing or insufficient permissions")
           ) {
             console.log(
-              "Hook useAuth: Erreur de permissions détectée, tentative de création d'utilisateur..."
+              "Hook useAuth: Erreur de permissions détectée, tentative de création d&apos;utilisateur..."
             );
             try {
               const newUser: Omit<User, "id" | "createdAt" | "updatedAt"> = {
                 email: firebaseUser.email!,
                 displayName: firebaseUser.displayName || "",
-                photoURL: firebaseUser.photoURL || undefined,
+                ...(firebaseUser.photoURL && {
+                  photoURL: firebaseUser.photoURL,
+                }),
                 role: "player",
               };
 
@@ -148,7 +157,7 @@ export const useAuthState = () => {
             }
           }
 
-          // En cas d'erreur, définir l'utilisateur comme null mais ne pas bloquer l'interface
+          // En cas d&apos;erreur, définir l&apos;utilisateur comme null mais ne pas bloquer l&apos;interface
           setUser(null);
         }
       } else {
@@ -177,7 +186,7 @@ export const useAuthState = () => {
       console.log("Hook useAuth: Connexion Firebase réussie");
       console.log("Hook useAuth: UserCredential:", userCredential);
 
-      // Forcer la mise à jour de l'état utilisateur
+      // Forcer la mise à jour de l&apos;état utilisateur
       const firebaseUser = userCredential.user;
       console.log("Hook useAuth: Firebase User après connexion:", firebaseUser);
 
@@ -185,7 +194,7 @@ export const useAuthState = () => {
       if (firebaseUser) {
         try {
           console.log(
-            "Hook useAuth: Recherche de l'utilisateur dans Firestore..."
+            "Hook useAuth: Recherche de l&apos;utilisateur dans Firestore..."
           );
           let userData = await getUser(firebaseUser.uid);
 
@@ -196,7 +205,7 @@ export const useAuthState = () => {
             const newUser: Omit<User, "id" | "createdAt" | "updatedAt"> = {
               email: firebaseUser.email!,
               displayName: firebaseUser.displayName || "",
-              photoURL: firebaseUser.photoURL || undefined,
+              ...(firebaseUser.photoURL && { photoURL: firebaseUser.photoURL }),
               role: "player",
             };
 
@@ -223,25 +232,30 @@ export const useAuthState = () => {
             );
           }
 
-          console.log("Hook useAuth: Définition de l'utilisateur:", userData);
+          console.log(
+            "Hook useAuth: Définition de l&apos;utilisateur:",
+            userData
+          );
           setUser(userData);
           setFirebaseUser(firebaseUser);
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error("Hook useAuth: Error fetching user data:", error);
 
-          // Si c'est une erreur de permissions, essayer de créer l'utilisateur quand même
+          // Si c&apos;est une erreur de permissions, essayer de créer l&apos;utilisateur quand même
           if (
             error.code === "permission-denied" ||
             error.message?.includes("Missing or insufficient permissions")
           ) {
             console.log(
-              "Hook useAuth: Erreur de permissions détectée dans signIn, tentative de création d'utilisateur..."
+              "Hook useAuth: Erreur de permissions détectée dans signIn, tentative de création d&apos;utilisateur..."
             );
             try {
               const newUser: Omit<User, "id" | "createdAt" | "updatedAt"> = {
                 email: firebaseUser.email!,
                 displayName: firebaseUser.displayName || "",
-                photoURL: firebaseUser.photoURL || undefined,
+                ...(firebaseUser.photoURL && {
+                  photoURL: firebaseUser.photoURL,
+                }),
                 role: "player",
               };
 
@@ -253,7 +267,7 @@ export const useAuthState = () => {
               );
               setUser(userData);
               setFirebaseUser(firebaseUser);
-              return;
+              return { success: true }; // Return success after handling permission error
             } catch (createError) {
               console.error(
                 "Hook useAuth: Erreur lors de la création après permissions dans signIn:",
@@ -267,15 +281,15 @@ export const useAuthState = () => {
       }
 
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Hook useAuth: Sign in error:", error);
       console.error("Hook useAuth: Error code:", error.code);
       console.error("Hook useAuth: Error message:", error.message);
 
-      // Gérer les erreurs d'authentification spécifiques
+      // Gérer les erreurs d&apos;authentification spécifiques
       if (error.code === "auth/invalid-credential") {
         console.log(
-          "Hook useAuth: Identifiants invalides - retour d'erreur contrôlée"
+          "Hook useAuth: Identifiants invalides - retour d&apos;erreur contrôlée"
         );
         setUser(null);
         setFirebaseUser(null);
@@ -284,7 +298,7 @@ export const useAuthState = () => {
 
       if (error.code === "auth/user-not-found") {
         console.log(
-          "Hook useAuth: Utilisateur non trouvé - retour d'erreur contrôlée"
+          "Hook useAuth: Utilisateur non trouvé - retour d&apos;erreur contrôlée"
         );
         setUser(null);
         setFirebaseUser(null);
@@ -293,7 +307,7 @@ export const useAuthState = () => {
 
       if (error.code === "auth/wrong-password") {
         console.log(
-          "Hook useAuth: Mot de passe incorrect - retour d'erreur contrôlée"
+          "Hook useAuth: Mot de passe incorrect - retour d&apos;erreur contrôlée"
         );
         setUser(null);
         setFirebaseUser(null);
@@ -328,12 +342,12 @@ export const useAuthState = () => {
         password
       );
 
-      // Créer l'utilisateur dans Firestore
+      // Créer l&apos;utilisateur dans Firestore
       const newUser: Omit<User, "id" | "createdAt" | "updatedAt"> = {
         email: email,
         displayName: displayName,
         role: "player", // Par défaut, tous les nouveaux utilisateurs sont des joueurs
-        // photoURL est optionnel et sera undefined, donc on ne l'inclut pas
+        // photoURL est optionnel et sera undefined, donc on ne l&apos;inclut pas
       };
 
       await addUser(newUser, userCredential.user.uid);

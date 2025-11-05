@@ -5,24 +5,24 @@ import {
   Box,
   Typography,
   Card,
-  CardContent,
-  Grid,
+  // CardContent,
+  // Grid,
   TextField,
   Button,
   Alert,
   CircularProgress,
   Tabs,
   Tab,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
+  // FormControl,
+  // InputLabel,
+  // Select,
+  // MenuItem,
   Chip,
   IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
+  // Dialog,
+  // DialogTitle,
+  // DialogContent,
+  // DialogActions,
   List,
   ListItem,
   ListItemText,
@@ -40,7 +40,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useFirestorePlayers } from "@/hooks/useFirestorePlayers";
 import { useFirestoreTeams } from "@/hooks/useFirestoreTeams";
 import { useFirestoreSettings } from "@/hooks/useFirestoreSettings";
-import { Player, Team, ClubSettings } from "@/types";
+// import { Player } from "@/types";
 import { useRouter } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 
@@ -99,8 +99,8 @@ export default function SettingsPage() {
   } = useFirestoreSettings();
   const [saving, setSaving] = useState(false);
   const [tabValue, setTabValue] = useState(0);
-  const [showPlayerDialog, setShowPlayerDialog] = useState(false);
-  const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
+  // const [showPlayerDialog, setShowPlayerDialog] = useState(false);
+  // const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -151,7 +151,7 @@ export default function SettingsPage() {
     }
   }, [clubSettings, settingsLoading, clubForm, discordForm]);
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
 
@@ -160,7 +160,7 @@ export default function SettingsPage() {
       setSaving(true);
       setError(null);
 
-      // Ici vous feriez l'appel API pour sauvegarder les paramètres du club
+      // Ici vous feriez l&apos;appel API pour sauvegarder les paramètres du club
       console.log("Saving club settings:", data);
 
       setSuccess("Paramètres du club sauvegardés avec succès !");
@@ -177,7 +177,7 @@ export default function SettingsPage() {
       setSaving(true);
       setError(null);
 
-      // Ici vous feriez l'appel API pour sauvegarder les webhooks Discord
+      // Ici vous feriez l&apos;appel API pour sauvegarder les webhooks Discord
       console.log("Saving Discord settings:", data);
 
       setSuccess("Paramètres Discord sauvegardés avec succès !");
@@ -189,20 +189,20 @@ export default function SettingsPage() {
     }
   };
 
-  const addPlayer = () => {
-    setEditingPlayer(null);
-    setShowPlayerDialog(true);
-  };
+  // const addPlayer = () => {
+  //   setEditingPlayer(null);
+  //   setShowPlayerDialog(true);
+  // };
 
-  const editPlayer = (player: Player) => {
-    setEditingPlayer(player);
-    setShowPlayerDialog(true);
-  };
+  // const editPlayer = (player: Player) => {
+  //   setEditingPlayer(player);
+  //   setShowPlayerDialog(true);
+  // };
 
   const deletePlayer = async (playerId: string) => {
     if (window.confirm("Êtes-vous sûr de vouloir supprimer ce joueur ?")) {
       try {
-        // Ici vous feriez l'appel API pour supprimer le joueur
+        // Ici vous feriez l&apos;appel API pour supprimer le joueur
         console.log("Deleting player:", playerId);
         setSuccess("Joueur supprimé avec succès !");
       } catch (error) {
@@ -288,8 +288,8 @@ export default function SettingsPage() {
           {/* Informations du club */}
           <TabPanel value={tabValue} index={0}>
             <form onSubmit={clubForm.handleSubmit(saveClubSettings)}>
-              <Grid container spacing={3}>
-                <Grid xs={12} md={6}>
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+                <Box sx={{ width: { xs: "100%", md: "50%" } }}>
                   <Controller
                     name="name"
                     control={clubForm.control}
@@ -304,9 +304,9 @@ export default function SettingsPage() {
                       />
                     )}
                   />
-                </Grid>
+                </Box>
 
-                <Grid xs={12} md={6}>
+                <Box sx={{ width: { xs: "100%", md: "50%" } }}>
                   <Controller
                     name="ffttCode"
                     control={clubForm.control}
@@ -321,9 +321,9 @@ export default function SettingsPage() {
                       />
                     )}
                   />
-                </Grid>
+                </Box>
 
-                <Grid xs={12}>
+                <Box sx={{ width: "100%" }}>
                   <Button
                     type="submit"
                     variant="contained"
@@ -332,16 +332,16 @@ export default function SettingsPage() {
                   >
                     {saving ? "Sauvegarde..." : "Sauvegarder"}
                   </Button>
-                </Grid>
-              </Grid>
+                </Box>
+              </Box>
             </form>
           </TabPanel>
 
           {/* API FFTT */}
           <TabPanel value={tabValue} index={1}>
             <form onSubmit={clubForm.handleSubmit(saveClubSettings)}>
-              <Grid container spacing={3}>
-                <Grid xs={12} md={6}>
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+                <Box sx={{ width: { xs: "100%", md: "50%" } }}>
                   <Controller
                     name="ffttId"
                     control={clubForm.control}
@@ -351,13 +351,13 @@ export default function SettingsPage() {
                         label="Identifiant FFTT"
                         fullWidth
                         type="password"
-                        helperText="Identifiant pour l'API FFTT"
+                        helperText="Identifiant pour l&apos;API FFTT"
                       />
                     )}
                   />
-                </Grid>
+                </Box>
 
-                <Grid xs={12} md={6}>
+                <Box sx={{ width: { xs: "100%", md: "50%" } }}>
                   <Controller
                     name="ffttPassword"
                     control={clubForm.control}
@@ -367,21 +367,21 @@ export default function SettingsPage() {
                         label="Mot de passe FFTT"
                         fullWidth
                         type="password"
-                        helperText="Mot de passe pour l'API FFTT"
+                        helperText="Mot de passe pour l&apos;API FFTT"
                       />
                     )}
                   />
-                </Grid>
+                </Box>
 
-                <Grid xs={12}>
+                <Box sx={{ width: "100%" }}>
                   <Alert severity="info">
                     Ces identifiants sont utilisés pour récupérer
                     automatiquement les données des joueurs et des matches
-                    depuis l'API officielle de la FFTT.
+                    depuis l&apos;API officielle de la FFTT.
                   </Alert>
-                </Grid>
+                </Box>
 
-                <Grid xs={12}>
+                <Box sx={{ width: "100%" }}>
                   <Button
                     type="submit"
                     variant="contained"
@@ -390,17 +390,17 @@ export default function SettingsPage() {
                   >
                     {saving ? "Sauvegarde..." : "Sauvegarder"}
                   </Button>
-                </Grid>
-              </Grid>
+                </Box>
+              </Box>
             </form>
           </TabPanel>
 
           {/* Discord */}
           <TabPanel value={tabValue} index={2}>
             <form onSubmit={discordForm.handleSubmit(saveDiscordSettings)}>
-              <Grid container spacing={3}>
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
                 {teams.map((team) => (
-                  <Grid item xs={12} md={6} key={team.id}>
+                  <Box sx={{ width: { xs: "100%", md: "50%" } }} key={team.id}>
                     <Controller
                       name={`team${team.number}` as keyof DiscordFormData}
                       control={discordForm.control}
@@ -410,21 +410,21 @@ export default function SettingsPage() {
                           label={`Webhook Discord - ${team.name}`}
                           fullWidth
                           placeholder="https://discord.com/api/webhooks/..."
-                          helperText={`URL du webhook pour l'équipe ${team.number}`}
+                          helperText={`URL du webhook pour l&apos;équipe ${team.number}`}
                         />
                       )}
                     />
-                  </Grid>
+                  </Box>
                 ))}
 
-                <Grid xs={12}>
+                <Box sx={{ width: "100%" }}>
                   <Alert severity="info">
                     Configurez les webhooks Discord pour chaque équipe afin
-                    d'envoyer automatiquement les convocations aux joueurs.
+                    d&apos;envoyer automatiquement les convocations aux joueurs.
                   </Alert>
-                </Grid>
+                </Box>
 
-                <Grid xs={12}>
+                <Box sx={{ width: "100%" }}>
                   <Button
                     type="submit"
                     variant="contained"
@@ -433,8 +433,8 @@ export default function SettingsPage() {
                   >
                     {saving ? "Sauvegarde..." : "Sauvegarder"}
                   </Button>
-                </Grid>
-              </Grid>
+                </Box>
+              </Box>
             </form>
           </TabPanel>
 
@@ -452,7 +452,7 @@ export default function SettingsPage() {
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
-                onClick={addPlayer}
+                onClick={() => {}}
               >
                 Ajouter un joueur
               </Button>
@@ -494,7 +494,7 @@ export default function SettingsPage() {
                       }
                     />
                     <ListItemSecondaryAction>
-                      <IconButton onClick={() => editPlayer(player)}>
+                      <IconButton onClick={() => {}}>
                         <EditIcon />
                       </IconButton>
                       <IconButton
