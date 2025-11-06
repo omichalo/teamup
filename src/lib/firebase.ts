@@ -36,7 +36,12 @@ function getFirebaseConfig() {
 
   // Si aucune variable d'environnement n'est disponible (undefined ou vide), utiliser les valeurs par défaut
   // Ces valeurs sont publiques et peuvent être exposées côté client
-  if (!config.apiKey || !config.projectId || config.apiKey.trim() === "" || config.projectId.trim() === "") {
+  if (
+    !config.apiKey ||
+    !config.projectId ||
+    config.apiKey.trim() === "" ||
+    config.projectId.trim() === ""
+  ) {
     // Configuration Firebase pour sqyping-teamup (valeurs publiques)
     return {
       apiKey: "AIzaSyC9fsfuDqF0jjV8ocgCtqMpcPA-E6pZoNg",
@@ -185,7 +190,9 @@ export const auth = new Proxy({} as Auth, {
 export const db = new Proxy({} as Firestore, {
   get(_target, prop) {
     if (isStaticBuild()) {
-      throw new Error("Firebase Firestore cannot be accessed during static build");
+      throw new Error(
+        "Firebase Firestore cannot be accessed during static build"
+      );
     }
     try {
       const instance = getDbInstance();
