@@ -15,7 +15,7 @@ import {
   DocumentData,
   // QueryDocumentSnapshot,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getDbInstanceDirect } from "@/lib/firebase";
 import {
   Player,
   Team,
@@ -38,8 +38,13 @@ const convertTimestamps = (data: DocumentData): any => {
   return converted;
 };
 
-// Players Collection
-export const playersCollection = collection(db, "players");
+// Players Collection - Lazy getter utilisant l'instance réelle
+export function getPlayersCollection() {
+  return collection(getDbInstanceDirect(), "players");
+}
+// Pour compatibilité avec le code existant, on exporte aussi une constante
+// mais elle sera recréée à chaque accès via le getter
+export const playersCollection = getPlayersCollection();
 
 export const getPlayers = async (): Promise<Player[]> => {
   const snapshot = await getDocs(query(playersCollection, orderBy("lastName")));
@@ -89,8 +94,11 @@ export const deletePlayer = async (id: string): Promise<void> => {
   await deleteDoc(docRef);
 };
 
-// Teams Collection
-export const teamsCollection = collection(db, "teams");
+// Teams Collection - Lazy getter utilisant l'instance réelle
+function getTeamsCollection() {
+  return collection(getDbInstanceDirect(), "teams");
+}
+export const teamsCollection = getTeamsCollection();
 
 export const getTeams = async (): Promise<Team[]> => {
   const snapshot = await getDocs(query(teamsCollection, orderBy("number")));
@@ -135,8 +143,11 @@ export const updateTeam = async (
   });
 };
 
-// Matches Collection
-export const matchesCollection = collection(db, "matches");
+// Matches Collection - Lazy getter utilisant l'instance réelle
+function getMatchesCollection() {
+  return collection(getDbInstanceDirect(), "matches");
+}
+export const matchesCollection = getMatchesCollection();
 
 export const getMatches = async (): Promise<Match[]> => {
   const snapshot = await getDocs(query(matchesCollection, orderBy("date")));
@@ -202,7 +213,11 @@ export const updateMatch = async (
 };
 
 // Compositions Collection
-export const compositionsCollection = collection(db, "compositions");
+// Compositions Collection - Lazy getter utilisant l'instance réelle
+function getCompositionsCollection() {
+  return collection(getDbInstanceDirect(), "compositions");
+}
+export const compositionsCollection = getCompositionsCollection();
 
 export const getCompositions = async (): Promise<Composition[]> => {
   const snapshot = await getDocs(
@@ -253,7 +268,11 @@ export const updateComposition = async (
 };
 
 // Availabilities Collection
-export const availabilitiesCollection = collection(db, "availabilities");
+// Availabilities Collection - Lazy getter utilisant l'instance réelle
+function getAvailabilitiesCollection() {
+  return collection(getDbInstanceDirect(), "availabilities");
+}
+export const availabilitiesCollection = getAvailabilitiesCollection();
 
 export const getAvailabilities = async (): Promise<Availability[]> => {
   const snapshot = await getDocs(availabilitiesCollection);
@@ -298,7 +317,11 @@ export const updateAvailability = async (
 };
 
 // Burn Records Collection
-export const burnRecordsCollection = collection(db, "burnRecords");
+// Burn Records Collection - Lazy getter utilisant l'instance réelle
+function getBurnRecordsCollection() {
+  return collection(getDbInstanceDirect(), "burnRecords");
+}
+export const burnRecordsCollection = getBurnRecordsCollection();
 
 export const getBurnRecords = async (): Promise<BurnRecord[]> => {
   const snapshot = await getDocs(burnRecordsCollection);
@@ -330,7 +353,11 @@ export const addBurnRecord = async (
 };
 
 // Club Settings Collection
-export const clubSettingsCollection = collection(db, "clubSettings");
+// Club Settings Collection - Lazy getter utilisant l'instance réelle
+function getClubSettingsCollection() {
+  return collection(getDbInstanceDirect(), "clubSettings");
+}
+export const clubSettingsCollection = getClubSettingsCollection();
 
 export const getClubSettings = async (): Promise<ClubSettings | null> => {
   const snapshot = await getDocs(clubSettingsCollection);
@@ -365,8 +392,11 @@ export const updateClubSettings = async (
   }
 };
 
-// Users Collection
-export const usersCollection = collection(db, "users");
+// Users Collection - Lazy getter utilisant l'instance réelle
+function getUsersCollection() {
+  return collection(getDbInstanceDirect(), "users");
+}
+export const usersCollection = getUsersCollection();
 
 export const getUser = async (id: string): Promise<User | null> => {
   const docRef = doc(usersCollection, id);

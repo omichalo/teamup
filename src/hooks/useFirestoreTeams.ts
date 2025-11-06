@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getDbInstanceDirect } from "@/lib/firebase";
 import { Team } from "@/types";
 
 interface FirestoreTeamsData {
@@ -26,7 +26,7 @@ export const useFirestoreTeams = (maxTeams: number = 50) => {
         console.log(
           "🔄 useFirestoreTeams: Création de la référence collection..."
         );
-        const teamsRef = collection(db, "teams");
+        const teamsRef = collection(getDbInstanceDirect(), "teams");
         const q = query(teamsRef, orderBy("number", "asc"), limit(maxTeams));
 
         console.log(

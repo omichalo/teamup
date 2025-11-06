@@ -4,7 +4,7 @@ import {
   setDoc,
   Timestamp,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getDbInstanceDirect } from "@/lib/firebase";
 
 export interface DayComposition {
   journee: number;
@@ -35,7 +35,7 @@ export class CompositionService {
   ): Promise<DayComposition | null> {
     try {
       const docId = this.getDocumentId(journee, phase, championshipType);
-      const docRef = doc(db, this.collectionName, docId);
+      const docRef = doc(getDbInstanceDirect(), this.collectionName, docId);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
@@ -70,7 +70,7 @@ export class CompositionService {
         composition.phase,
         composition.championshipType
       );
-      const docRef = doc(db, this.collectionName, docId);
+      const docRef = doc(getDbInstanceDirect(), this.collectionName, docId);
 
       const dataToSave: Record<string, any> = {
         journee: composition.journee,

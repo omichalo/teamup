@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { collection, getDocs, query, limit } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getDbInstanceDirect } from "@/lib/firebase";
 import { ClubSettings } from "@/types";
 
 interface FirestoreSettingsData {
@@ -26,7 +26,7 @@ export const useFirestoreSettings = () => {
         console.log(
           "🔄 useFirestoreSettings: Création de la référence collection..."
         );
-        const settingsRef = collection(db, "club_settings");
+        const settingsRef = collection(getDbInstanceDirect(), "club_settings");
         const q = query(settingsRef, limit(1));
 
         console.log(

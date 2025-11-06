@@ -26,7 +26,7 @@ import {
 } from "@mui/material";
 import { Search, Refresh, Person, SportsTennis } from "@mui/icons-material";
 import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getDbInstanceDirect } from "@/lib/firebase";
 
 interface Player {
   id: string;
@@ -58,7 +58,7 @@ export default function JoueursFirestorePage() {
       console.log("🔍 Récupération des joueurs depuis Firestore...");
 
       // Récupérer les joueurs depuis Firestore
-      const playersRef = collection(db, "players");
+      const playersRef = collection(getDbInstanceDirect(), "players");
       const q = query(playersRef, orderBy("points", "desc"), limit(100));
 
       const querySnapshot = await getDocs(q);

@@ -7,7 +7,7 @@ import {
   query,
   orderBy,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getDbInstanceDirect } from "@/lib/firebase";
 import { Player } from "@/types/team-management";
 
 export class FirestorePlayerService {
@@ -87,7 +87,7 @@ export class FirestorePlayerService {
   async getAllPlayers(): Promise<Player[]> {
     try {
       console.log("🔍 Récupération de tous les joueurs...");
-      const playersRef = collection(db, this.collectionName);
+      const playersRef = collection(getDbInstanceDirect(), this.collectionName);
       const q = query(playersRef, orderBy("nom", "asc"));
       const querySnapshot = await getDocs(q);
 
@@ -156,7 +156,7 @@ export class FirestorePlayerService {
     updates: Partial<Player>
   ): Promise<void> {
     try {
-      const playerRef = doc(db, this.collectionName, playerId);
+      const playerRef = doc(getDbInstanceDirect(), this.collectionName, playerId);
       await updateDoc(playerRef, updates);
     } catch (error) {
       console.error("Erreur lors de la mise à jour du joueur:", error);
@@ -170,7 +170,7 @@ export class FirestorePlayerService {
     isParticipating: boolean
   ): Promise<void> {
     try {
-      const playerRef = doc(db, this.collectionName, playerId);
+      const playerRef = doc(getDbInstanceDirect(), this.collectionName, playerId);
       const updateData = {
         [`participations.${teamId}`]: isParticipating,
       };
@@ -267,7 +267,7 @@ export class FirestorePlayerService {
   ): Promise<string> {
     try {
       console.log("🔍 Création d&apos;un joueur temporaire...");
-      const playersRef = collection(db, this.collectionName);
+      const playersRef = collection(getDbInstanceDirect(), this.collectionName);
 
       const newPlayer = {
         nom: playerData.name,

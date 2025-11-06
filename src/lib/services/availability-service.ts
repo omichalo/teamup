@@ -4,7 +4,7 @@ import {
   setDoc,
   Timestamp,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getDbInstanceDirect } from "@/lib/firebase";
 
 export interface AvailabilityResponse {
   available: boolean;
@@ -43,7 +43,7 @@ export class AvailabilityService {
   ): Promise<DayAvailability | null> {
     try {
       const docId = this.getDocumentId(journee, phase, championshipType);
-      const docRef = doc(db, this.collectionName, docId);
+      const docRef = doc(getDbInstanceDirect(), this.collectionName, docId);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
@@ -79,7 +79,7 @@ export class AvailabilityService {
         availability.phase,
         availability.championshipType
       );
-      const docRef = doc(db, this.collectionName, docId);
+      const docRef = doc(getDbInstanceDirect(), this.collectionName, docId);
 
       const dataToSave: Record<string, any> = {
         journee: availability.journee,

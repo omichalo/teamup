@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getDbInstanceDirect } from "@/lib/firebase";
 import { Team } from "@/types";
 
 export const useTeams = () => {
@@ -15,7 +15,7 @@ export const useTeams = () => {
         setError(null);
 
         const teamsQuery = query(
-          collection(db, "teams"),
+          collection(getDbInstanceDirect(), "teams"),
           orderBy("teamNumber", "asc")
         );
 

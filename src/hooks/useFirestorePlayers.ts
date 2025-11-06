@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { collection, getDocs, query, limit } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { getDbInstanceDirect } from "@/lib/firebase";
 import { Player } from "@/types";
 
 interface FirestorePlayersData {
@@ -28,7 +28,7 @@ export const useFirestorePlayers = (maxPlayers: number = 50) => {
         console.log(
           "🔄 useFirestorePlayers: Création de la référence collection..."
         );
-        const playersRef = collection(db, "players");
+        const playersRef = collection(getDbInstanceDirect(), "players");
         const q = query(playersRef, limit(maxPlayers));
 
         console.log(

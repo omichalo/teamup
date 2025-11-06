@@ -201,47 +201,54 @@ export const auth = new Proxy({} as Auth, {
   },
 }) as Auth;
 
-// Export direct de l'instance Firestore réelle
-// Côté client : initialiser immédiatement
-// Côté serveur : initialiser au premier accès
-export const db: Firestore = (() => {
-  if (typeof window !== "undefined" && !isStaticBuild()) {
-    // Côté client : retourner l'instance réelle directement
-    try {
-      return getDbInstance();
-    } catch (error) {
-      console.error("Error getting Firestore instance:", error);
-      // Retourner un Proxy qui initialisera au premier accès
-      return new Proxy({} as Firestore, {
-        get(_target, prop) {
-          const instance = getDbInstance();
-          const value = instance[prop as keyof Firestore];
-          if (typeof value === "function") {
-            return value.bind(instance);
-          }
-          return value;
-        },
-      });
-    }
-  }
+// Export de l'instance Firestore
+// IMPORTANT: collection() nécessite une vraie instance Firestore, pas un Proxy
+// On utilise un getter qui retourne toujours l'instance réelle
+let _dbInstance: Firestore | null = null;
 
-  // Côté serveur : utiliser un Proxy qui initialisera au besoin
-  return new Proxy({} as Firestore, {
-    get(_target, prop) {
-      if (isStaticBuild()) {
-        throw new Error(
-          "Firebase Firestore cannot be accessed during static build"
-        );
-      }
-      const instance = getDbInstance();
-      const value = instance[prop as keyof Firestore];
-      if (typeof value === "function") {
-        return value.bind(instance);
-      }
-      return value;
-    },
-  });
-})();
+function getDb(): Firestore {
+  if (isStaticBuild()) {
+    throw new Error("Firebase Firestore cannot be accessed during static build");
+  }
+  
+  // Initialiser si nécessaire
+  if (!_dbInstance) {
+    _dbInstance = getDbInstance();
+  }
+  
+  return _dbInstance;
+}
+
+// Export comme objet avec getter pour compatibilité
+// Mais aussi exporter une fonction pour un accès direct
+export const db = new Proxy({} as Firestore, {
+  get(_target, prop) {
+    const instance = getDb();
+    const value = instance[prop as keyof Firestore];
+    if (typeof value === "function") {
+      return value.bind(instance);
+    }
+    return value;
+  },
+  // Pour que collection() fonctionne, on doit aussi implémenter les vérifications internes
+  has(_target, prop) {
+    const instance = getDb();
+    return prop in instance;
+  },
+  ownKeys(_target) {
+    const instance = getDb();
+    return Object.keys(instance);
+  },
+  getOwnPropertyDescriptor(_target, prop) {
+    const instance = getDb();
+    return Object.getOwnPropertyDescriptor(instance, prop);
+  },
+}) as Firestore;
+
+// Export également une fonction pour accès direct à l'instance
+export function getDbInstanceDirect(): Firestore {
+  return getDb();
+}
 
 export const storage = new Proxy({} as FirebaseStorage, {
   get(_target, prop) {
