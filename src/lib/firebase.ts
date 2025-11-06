@@ -208,14 +208,16 @@ let _dbInstance: Firestore | null = null;
 
 function getDb(): Firestore {
   if (isStaticBuild()) {
-    throw new Error("Firebase Firestore cannot be accessed during static build");
+    throw new Error(
+      "Firebase Firestore cannot be accessed during static build"
+    );
   }
-  
+
   // Initialiser si nécessaire
   if (!_dbInstance) {
     _dbInstance = getDbInstance();
   }
-  
+
   return _dbInstance;
 }
 
