@@ -1,22 +1,55 @@
-import { initializeApp, getApps, cert } from "firebase-admin/app";
+import { initializeApp, getApps, cert, applicationDefault } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 
-// Configuration Firebase Admin
-const firebaseAdminConfig = {
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
-  clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
-  privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n") || "",
-};
+// Détecter si on est sur Google Cloud (App Hosting, Cloud Run, etc.)
+// Sur Google Cloud, on utilise les Application Default Credentials
+const isGoogleCloud = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || 
+  process.env.K_SERVICE || process.env.FUNCTION_TARGET || 
+  process.env.FIREBASE_CONFIG || process.env.FIREBASE_WEBAPP_CONFIG;
 
 // Initialiser Firebase Admin (une seule fois)
-const app =
-  getApps().length === 0
-    ? initializeApp({
-        credential: cert(firebaseAdminConfig),
+const app = (() => {
+  if (getApps().length > 0) {
+    return getApps()[0];
+  }
+
+  // Sur Google Cloud (App Hosting), utiliser les credentials par défaut
+  if (isGoogleCloud) {
+    const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 
+      process.env.GCLOUD_PROJECT || 
+      process.env.GOOGLE_CLOUD_PROJECT || 
+      "sqyping-teamup";
+    console.log("🔥 Initialisation Firebase Admin avec Application Default Credentials (Google Cloud)");
+    return initializeApp({
+      credential: applicationDefault(),
+      projectId,
+    });
+  }
+
+  // Sinon, utiliser les credentials explicites si disponibles
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+
+  if (privateKey && clientEmail) {
+    console.log("🔥 Initialisation Firebase Admin avec credentials explicites");
+    return initializeApp({
+      credential: cert({
         projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
-      })
-    : getApps()[0];
+        clientEmail,
+        privateKey,
+      }),
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
+    });
+  }
+
+  // Fallback: utiliser les credentials par défaut même en local
+  console.log("⚠️ Aucune credential explicite trouvée, utilisation des Application Default Credentials");
+  return initializeApp({
+    credential: applicationDefault(),
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "sqyping-teamup",
+  });
+})();
 
 // Exporter l&apos;instance Firebase Admin
 export const adminApp = app;
