@@ -7,25 +7,36 @@ function getFirebaseConfig() {
   // Firebase App Hosting fournit FIREBASE_WEBAPP_CONFIG (disponible au BUILD et RUNTIME côté serveur)
   if (typeof process !== "undefined" && process.env?.FIREBASE_WEBAPP_CONFIG) {
     try {
-      return JSON.parse(process.env.FIREBASE_WEBAPP_CONFIG);
+      const parsed = JSON.parse(process.env.FIREBASE_WEBAPP_CONFIG);
+      if (parsed && parsed.apiKey && parsed.projectId) {
+        return parsed;
+      }
     } catch (e) {
       console.error("Error parsing FIREBASE_WEBAPP_CONFIG:", e);
     }
   }
 
   // Fallback sur les variables d'environnement individuelles
-  const config = {
-    apiKey: typeof process !== "undefined" ? process.env?.NEXT_PUBLIC_FIREBASE_API_KEY : undefined,
-    authDomain: typeof process !== "undefined" ? process.env?.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN : undefined,
-    projectId: typeof process !== "undefined" ? process.env?.NEXT_PUBLIC_FIREBASE_PROJECT_ID : undefined,
-    storageBucket: typeof process !== "undefined" ? process.env?.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET : undefined,
-    messagingSenderId: typeof process !== "undefined" ? process.env?.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID : undefined,
-    appId: typeof process !== "undefined" ? process.env?.NEXT_PUBLIC_FIREBASE_APP_ID : undefined,
+  // Note: Next.js remplace process.env.NEXT_PUBLIC_* au build, mais peut être undefined
+  const getEnvVar = (key: string): string | undefined => {
+    if (typeof process === "undefined") return undefined;
+    // Next.js injecte process.env même côté client, mais les valeurs peuvent être undefined ou vides
+    const value = process.env?.[key];
+    return value && value.trim() !== "" ? value : undefined;
   };
 
-  // Si aucune variable d'environnement n'est disponible, utiliser les valeurs par défaut
+  const config = {
+    apiKey: getEnvVar("NEXT_PUBLIC_FIREBASE_API_KEY"),
+    authDomain: getEnvVar("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN"),
+    projectId: getEnvVar("NEXT_PUBLIC_FIREBASE_PROJECT_ID"),
+    storageBucket: getEnvVar("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET"),
+    messagingSenderId: getEnvVar("NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID"),
+    appId: getEnvVar("NEXT_PUBLIC_FIREBASE_APP_ID"),
+  };
+
+  // Si aucune variable d'environnement n'est disponible (undefined ou vide), utiliser les valeurs par défaut
   // Ces valeurs sont publiques et peuvent être exposées côté client
-  if (!config.apiKey || !config.projectId) {
+  if (!config.apiKey || !config.projectId || config.apiKey.trim() === "" || config.projectId.trim() === "") {
     // Configuration Firebase pour sqyping-teamup (valeurs publiques)
     return {
       apiKey: "AIzaSyC9fsfuDqF0jjV8ocgCtqMpcPA-E6pZoNg",
@@ -47,7 +58,12 @@ let storageInstance: FirebaseStorage | undefined;
 
 function initializeFirebase() {
   if (app) {
-    return { app, auth: authInstance!, db: dbInstance!, storage: storageInstance! };
+    return {
+      app,
+      auth: authInstance!,
+      db: dbInstance!,
+      storage: storageInstance!,
+    };
   }
 
   const firebaseConfig = getFirebaseConfig();
@@ -110,7 +126,9 @@ function getAuthInstance(): Auth {
 
 function getDbInstance(): Firestore {
   if (isStaticBuild()) {
-    throw new Error("Firebase Firestore cannot be accessed during static build");
+    throw new Error(
+      "Firebase Firestore cannot be accessed during static build"
+    );
   }
   if (!dbInstance) {
     const initialized = initializeFirebase();
@@ -182,11 +200,13 @@ export const storage = new Proxy({} as FirebaseStorage, {
   },
 }) as FirebaseStorage;
 
-// Configuration Firestore
+// Configuration Firestore - Log de debug côté client
 if (typeof window !== "undefined") {
+  const config = getFirebaseConfig();
   console.log("🔥 Configuration Firebase:", {
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || process.env.FIREBASE_WEBAPP_CONFIG ? JSON.parse(process.env.FIREBASE_WEBAPP_CONFIG || "{}").projectId : undefined,
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || process.env.FIREBASE_WEBAPP_CONFIG ? JSON.parse(process.env.FIREBASE_WEBAPP_CONFIG || "{}").authDomain : undefined,
+    projectId: config.projectId,
+    authDomain: config.authDomain,
+    apiKey: config.apiKey ? `${config.apiKey.substring(0, 10)}...` : undefined,
   });
 }
 
