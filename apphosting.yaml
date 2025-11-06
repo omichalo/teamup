@@ -8,16 +8,54 @@ runConfig:
   # memoryMiB: 512
 
 # Environment variables and secrets.
-# env:
-  # Configure environment variables.
-  # See https://firebase.google.com/docs/app-hosting/configure#user-defined-environment
-  # - variable: MESSAGE
-  #   value: Hello world!
-  #   availability:
-  #     - BUILD
-  #     - RUNTIME
+env:
+  # Firebase Configuration (publiques, côté client)
+  # Ces variables sont injectées dans le bundle JavaScript
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: AIzaSyC9fsfuDqF0jjV8ocgCtqMpcPA-E6pZoNg
+    availability:
+      - BUILD
+      - RUNTIME
 
-  # Grant access to secrets in Cloud Secret Manager.
-  # See https://firebase.google.com/docs/app-hosting/configure#secret-parameters
-  # - variable: MY_SECRET
-  #   secret: mySecretRef
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: sqyping-teamup.firebaseapp.com
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: sqyping-teamup
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: sqyping-teamup.firebasestorage.app
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "567392028186"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: 1:567392028186:web:0fa11cf39ce060931eb3a3
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # FFTT API Configuration (privées, côté serveur uniquement)
+  # Utilisation de Cloud Secret Manager pour la sécurité
+  # Voir CONFIG_SECRETS_FFTT.md pour la configuration
+  - variable: ID_FFTT
+    secret: fftt-id-secret
+    availability:
+      - RUNTIME
+
+  - variable: PWD_FFTT
+    secret: fftt-pwd-secret
+    availability:
+      - RUNTIME
