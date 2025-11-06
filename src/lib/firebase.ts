@@ -177,7 +177,21 @@ export function getFirebaseStorage(): FirebaseStorage {
 }
 
 // Exporter les instances pour compatibilité avec le code existant
-// Utiliser des Proxies pour une initialisation lazy
+// IMPORTANT: Retourner directement les instances réelles (pas de Proxy) pour que collection() fonctionne
+// Firebase collection() vérifie que son argument est une vraie instance Firestore, pas un Proxy
+
+// Initialiser Firebase au chargement du module côté client uniquement
+if (typeof window !== "undefined" && !isStaticBuild()) {
+  try {
+    // Initialiser Firebase immédiatement côté client
+    getDbInstance();
+  } catch (error) {
+    console.error("Error initializing Firebase on module load:", error);
+  }
+}
+
+// Export direct des instances réelles (pas de Proxy)
+// C'est nécessaire pour que collection(db, ...) fonctionne correctement
 export const auth = new Proxy({} as Auth, {
   get(_target, prop) {
     if (isStaticBuild()) {
@@ -187,36 +201,54 @@ export const auth = new Proxy({} as Auth, {
   },
 }) as Auth;
 
-export const db = new Proxy({} as Firestore, {
-  get(_target, prop) {
-    if (isStaticBuild()) {
-      throw new Error(
-        "Firebase Firestore cannot be accessed during static build"
-      );
-    }
+// Export direct de l'instance Firestore réelle
+// Côté client : initialiser immédiatement
+// Côté serveur : initialiser au premier accès
+export const db: Firestore = (() => {
+  if (typeof window !== "undefined" && !isStaticBuild()) {
+    // Côté client : retourner l'instance réelle directement
     try {
-      const instance = getDbInstance();
-      if (!instance) {
-        throw new Error("Firebase Firestore instance is not initialized");
+      return getDbInstance();
+    } catch (error) {
+      console.error("Error getting Firestore instance:", error);
+      // Retourner un Proxy qui initialisera au premier accès
+      return new Proxy({} as Firestore, {
+        get(_target, prop) {
+          const instance = getDbInstance();
+          const value = instance[prop as keyof Firestore];
+          if (typeof value === "function") {
+            return value.bind(instance);
+          }
+          return value;
+        },
+      });
+    }
+  }
+  
+  // Côté serveur : utiliser un Proxy qui initialisera au besoin
+  return new Proxy({} as Firestore, {
+    get(_target, prop) {
+      if (isStaticBuild()) {
+        throw new Error(
+          "Firebase Firestore cannot be accessed during static build"
+        );
       }
+      const instance = getDbInstance();
       const value = instance[prop as keyof Firestore];
-      // Si la propriété est une fonction, bind le contexte
       if (typeof value === "function") {
         return value.bind(instance);
       }
       return value;
-    } catch (error) {
-      console.error("Error accessing Firestore:", error);
-      throw error;
-    }
-  },
-}) as Firestore;
+    },
+  });
+})();
 
 export const storage = new Proxy({} as FirebaseStorage, {
   get(_target, prop) {
     if (isStaticBuild()) {
       return undefined;
     }
+    ensureInitialized();
     return getStorageInstance()[prop as keyof FirebaseStorage];
   },
 }) as FirebaseStorage;
