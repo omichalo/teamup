@@ -237,7 +237,7 @@ export const db = new Proxy({} as Firestore, {
     const instance = getDb();
     return prop in instance;
   },
-  ownKeys(_target) {
+  ownKeys() {
     const instance = getDb();
     return Object.keys(instance);
   },
