@@ -224,7 +224,7 @@ export const db: Firestore = (() => {
       });
     }
   }
-  
+
   // Côté serveur : utiliser un Proxy qui initialisera au besoin
   return new Proxy({} as Firestore, {
     get(_target, prop) {
@@ -248,7 +248,6 @@ export const storage = new Proxy({} as FirebaseStorage, {
     if (isStaticBuild()) {
       return undefined;
     }
-    ensureInitialized();
     return getStorageInstance()[prop as keyof FirebaseStorage];
   },
 }) as FirebaseStorage;
