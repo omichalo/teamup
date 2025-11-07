@@ -61,8 +61,8 @@ export default function AuthPage() {
     setError(null);
   };
 
-  const handleSignIn = async (_e: React.FormEvent) => {
-    _e.preventDefault();
+  const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     if (!formData.email || !formData.password) {
       setError("Veuillez remplir tous les champs");
       return;
@@ -70,18 +70,24 @@ export default function AuthPage() {
 
     setSignInLoading(true);
     setError(null);
-    console.log("Tentative de connexion avec:", formData.email);
 
-    const result = await signIn(formData.email, formData.password);
+    try {
+      const result = await signIn(formData.email, formData.password);
 
-    if (result.success) {
-      console.log("Connexion réussie");
-    } else {
-      console.log("Erreur de connexion:", result.error);
-      setError(result.error || "Erreur de connexion. Veuillez réessayer.");
+      if (result.success) {
+        // router.push("/"); // This line was removed as per the edit hint
+      } else {
+        setError(result.error || "Identifiants incorrects");
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Une erreur inattendue est survenue"
+      );
+    } finally {
+      setSignInLoading(false);
     }
-
-    setSignInLoading(false);
   };
 
   const handleSignUp = async (e: React.FormEvent) => {

@@ -1,6 +1,4 @@
-import { useState, useEffect } from "react";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
-import { getDbInstanceDirect } from "@/lib/firebase";
+import { useEffect, useState } from "react";
 import { Team } from "@/types";
 
 export const useTeams = () => {
@@ -12,34 +10,24 @@ export const useTeams = () => {
     const fetchTeams = async () => {
       try {
         setLoading(true);
-        setError(null);
 
-        const teamsQuery = query(
-          collection(getDbInstanceDirect(), "teams"),
-          orderBy("teamNumber", "asc")
+        const response = await fetch("/api/teams");
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const teamsData = data.teams || [];
+
+        setTeams(
+          teamsData.map((team: any) => ({
+            ...team,
+            createdAt: team.createdAt ? new Date(team.createdAt) : new Date(),
+            updatedAt: team.updatedAt ? new Date(team.updatedAt) : new Date(),
+          }))
         );
-
-        const snapshot = await getDocs(teamsQuery);
-        const teamsData: Team[] = [];
-
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          teamsData.push({
-            id: doc.id,
-            number: data.number || 1, // Valeur par défaut si non définie
-            name: data.name,
-            division: data.division,
-            players: [], // Les joueurs seront ajoutés par le système asynchrone
-            createdAt: data.createdAt?.toDate() || new Date(),
-            updatedAt: data.updatedAt?.toDate() || new Date(),
-          } as Team);
-        });
-
-        setTeams(teamsData);
-        console.log(`${teamsData.length} équipes chargées depuis Firestore`);
-      } catch (error) {
-        console.error("Erreur chargement équipes:", error);
-        setError(error instanceof Error ? error.message : "Erreur inconnue");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Unknown error");
       } finally {
         setLoading(false);
       }

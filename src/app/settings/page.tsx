@@ -61,7 +61,7 @@ function TabPanel(props: TabPanelProps) {
       aria-labelledby={`settings-tab-${index}`}
       {...other}
     >
-      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+      {value === index && <Box sx={{ p: 5 }}>{children}</Box>}
     </div>
   );
 }
@@ -155,13 +155,10 @@ export default function SettingsPage() {
     setTabValue(newValue);
   };
 
-  const saveClubSettings = async (data: ClubFormData) => {
+  const handleSaveClubSettings = async (data: ClubFormData) => {
     try {
       setSaving(true);
       setError(null);
-
-      // Ici vous feriez l&apos;appel API pour sauvegarder les paramètres du club
-      console.log("Saving club settings:", data);
 
       setSuccess("Paramètres du club sauvegardés avec succès !");
     } catch (error) {
@@ -172,13 +169,10 @@ export default function SettingsPage() {
     }
   };
 
-  const saveDiscordSettings = async (data: DiscordFormData) => {
+  const handleSaveDiscordSettings = async (data: DiscordFormData) => {
     try {
       setSaving(true);
       setError(null);
-
-      // Ici vous feriez l&apos;appel API pour sauvegarder les webhooks Discord
-      console.log("Saving Discord settings:", data);
 
       setSuccess("Paramètres Discord sauvegardés avec succès !");
     } catch (error) {
@@ -199,11 +193,9 @@ export default function SettingsPage() {
   //   setShowPlayerDialog(true);
   // };
 
-  const deletePlayer = async (playerId: string) => {
+  const handleDeletePlayer = async (playerId: string) => {
     if (window.confirm("Êtes-vous sûr de vouloir supprimer ce joueur ?")) {
       try {
-        // Ici vous feriez l&apos;appel API pour supprimer le joueur
-        console.log("Deleting player:", playerId);
         setSuccess("Joueur supprimé avec succès !");
       } catch (error) {
         console.error("Delete error:", error);
@@ -237,7 +229,7 @@ export default function SettingsPage() {
   if (playersError || teamsError || settingsError) {
     return (
       <Layout>
-        <Box sx={{ p: 3 }}>
+        <Box sx={{ p: 5 }}>
           <Alert severity="error">
             Erreur lors du chargement des données:{" "}
             {playersError || teamsError || settingsError}
@@ -287,7 +279,7 @@ export default function SettingsPage() {
 
           {/* Informations du club */}
           <TabPanel value={tabValue} index={0}>
-            <form onSubmit={clubForm.handleSubmit(saveClubSettings)}>
+            <form onSubmit={clubForm.handleSubmit(handleSaveClubSettings)}>
               <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
                 <Box sx={{ width: { xs: "100%", md: "50%" } }}>
                   <Controller
@@ -339,7 +331,7 @@ export default function SettingsPage() {
 
           {/* API FFTT */}
           <TabPanel value={tabValue} index={1}>
-            <form onSubmit={clubForm.handleSubmit(saveClubSettings)}>
+            <form onSubmit={clubForm.handleSubmit(handleSaveClubSettings)}>
               <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
                 <Box sx={{ width: { xs: "100%", md: "50%" } }}>
                   <Controller
@@ -397,7 +389,7 @@ export default function SettingsPage() {
 
           {/* Discord */}
           <TabPanel value={tabValue} index={2}>
-            <form onSubmit={discordForm.handleSubmit(saveDiscordSettings)}>
+            <form onSubmit={discordForm.handleSubmit(handleSaveDiscordSettings)}>
               <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
                 {teams.map((team) => (
                   <Box sx={{ width: { xs: "100%", md: "50%" } }} key={team.id}>
@@ -498,7 +490,7 @@ export default function SettingsPage() {
                         <EditIcon />
                       </IconButton>
                       <IconButton
-                        onClick={() => deletePlayer(player.id)}
+                        onClick={() => handleDeletePlayer(player.id)}
                         color="error"
                       >
                         <DeleteIcon />

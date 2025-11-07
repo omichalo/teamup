@@ -63,7 +63,18 @@ export default function EquipesPage() {
     return acc;
   }, {} as Record<string, typeof equipes>);
 
-  const epreuves = Object.keys(equipesByEpreuve);
+  const epreuves = React.useMemo(() => {
+    return Object.keys(equipesByEpreuve).sort((a, b) => {
+      const femA = a.toLowerCase().includes("féminin") || a.toLowerCase().includes("dames");
+      const femB = b.toLowerCase().includes("féminin") || b.toLowerCase().includes("dames");
+
+      if (femA !== femB) {
+        return femA ? -1 : 1;
+      }
+
+      return a.localeCompare(b);
+    });
+  }, [equipesByEpreuve]);
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -166,7 +177,7 @@ export default function EquipesPage() {
   return (
     <AuthGuard>
       <Layout>
-        <Box sx={{ p: 3 }}>
+        <Box sx={{ p: 5 }}>
           <Typography variant="h4" component="h1" gutterBottom>
             Équipes SQY Ping
           </Typography>
@@ -1025,76 +1036,6 @@ export default function EquipesPage() {
               </Button>
             </DialogActions>
           </Dialog>
-
-          {/* Section Conditions de Brûlage */}
-          <Box sx={{ mt: 4 }}>
-            <Typography variant="h4" gutterBottom>
-              Conditions de Brûlage
-            </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-              Vérification des conditions de brûlage pour les joueurs des
-              équipes SQY Ping.
-            </Typography>
-
-            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
-              <Box sx={{ width: { xs: "100%", md: "50%" } }}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Test avec Données Simulées
-                    </Typography>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mb: 2 }}
-                    >
-                      Test des conditions de brûlage avec des données simulées
-                      pour vérifier le fonctionnement.
-                    </Typography>
-                    <Button
-                      variant="contained"
-                      onClick={() => {
-                        window.open("/api/test-burnout", "_blank");
-                      }}
-                      sx={{ mb: 2 }}
-                    >
-                      Tester les Conditions de Brûlage
-                    </Button>
-                    <Typography variant="body2" color="text.secondary">
-                      Cliquez sur le bouton pour ouvrir le test dans un nouvel
-                      onglet et voir les résultats.
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Box>
-
-              <Box sx={{ width: { xs: "100%", md: "50%" } }}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Conditions Actuelles
-                    </Typography>
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        <strong>Maximum de matchs par joueur:</strong> 7
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        <strong>Maximum de matchs consécutifs:</strong> 3
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        <strong>Minimum de jours entre les matchs:</strong> 1
-                      </Typography>
-                    </Box>
-                    <Alert severity="info" sx={{ mt: 2 }}>
-                      Les conditions de brûlage sont calculées automatiquement
-                      pour chaque joueur en fonction de sa participation aux
-                      matchs de l&apos;équipe.
-                    </Alert>
-                  </CardContent>
-                </Card>
-              </Box>
-            </Box>
-          </Box>
         </Box>
       </Layout>
     </AuthGuard>

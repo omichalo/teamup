@@ -164,7 +164,7 @@ export default function DemoThemePage() {
 
   return (
     <Layout>
-      <Box sx={{ p: 3 }}>
+      <Box sx={{ p: 5 }}>
         <Typography variant="h1" gutterBottom>
           SQY Ping Theme Showcase
         </Typography>

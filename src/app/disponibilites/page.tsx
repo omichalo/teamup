@@ -30,6 +30,7 @@ import {
   Cancel,
   HourglassEmpty,
   Search as SearchIcon,
+  Group as GroupIcon,
 } from "@mui/icons-material";
 import { useEquipesWithMatches } from "@/hooks/useEquipesWithMatches";
 import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
@@ -471,7 +472,7 @@ export default function DisponibilitesPage() {
   return (
     <AuthGuard>
       <Layout>
-        <Box sx={{ p: 3 }}>
+        <Box sx={{ p: 5 }}>
           <Typography variant="h4" gutterBottom>
             Disponibilités des Joueurs
           </Typography>
@@ -482,12 +483,14 @@ export default function DisponibilitesPage() {
             championnat sont affichés.
           </Typography>
 
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
+          <Card sx={{ mb: 1 }}>
+            <CardContent sx={{ pt: 2.5, pb: 1.5 }}>
               <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
                 <FormControl size="small" sx={{ minWidth: 150 }}>
-                  <InputLabel>Phase</InputLabel>
+                  <InputLabel id="phase-select-label">Phase</InputLabel>
                   <Select
+                    labelId="phase-select-label"
+                    id="phase-select"
                     value={selectedPhase || ""}
                     label="Phase"
                     onChange={(e) => {
@@ -501,8 +504,10 @@ export default function DisponibilitesPage() {
                   </Select>
                 </FormControl>
                 <FormControl size="small" sx={{ minWidth: 150 }}>
-                  <InputLabel>Journée</InputLabel>
+                  <InputLabel id="journee-select-label">Journée</InputLabel>
                   <Select
+                    labelId="journee-select-label"
+                    id="journee-select"
                     value={selectedJournee || ""}
                     label="Journée"
                     onChange={(e) =>
@@ -548,32 +553,25 @@ export default function DisponibilitesPage() {
               </Box>
 
               {selectedJournee && (
-                <Box sx={{ mt: 2 }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    placeholder="Rechercher un joueur..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <SearchIcon />
-                        </InputAdornment>
-                      ),
-                    }}
-                    sx={{ mb: 2 }}
-                  />
-                  <Alert severity="info">
-                    {filteredPlayers.length} joueur
-                    {filteredPlayers.length > 1 ? "s" : ""} à gérer
-                    {" • "}
-                    {respondedPlayers.length} réponse
-                    {respondedPlayers.length > 1 ? "s" : ""}
-                    {" • "}
-                    {pendingPlayers.length} en attente
-                  </Alert>
-                </Box>
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder="Rechercher un joueur..."
+                  id="player-search"
+                  name="player-search"
+                  aria-label="Rechercher un joueur"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon />
+                      </InputAdornment>
+                    ),
+                  }}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{ mt: 2.5, mb: 0.75 }}
+                />
               )}
             </CardContent>
           </Card>
@@ -584,36 +582,51 @@ export default function DisponibilitesPage() {
             </Alert>
           ) : (
             <>
-              <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
-                <Tabs value={tabValue} onChange={(_, v) => setTabValue(v)}>
+              <Box
+                sx={{
+                  position: "sticky",
+                  top: 0,
+                  zIndex: 5,
+                  backgroundColor: "background.paper",
+                  borderBottom: 1,
+                  borderColor: "divider",
+                  mb: 2,
+                  pt: 1,
+                  pb: 1,
+                }}
+              >
+                <Tabs
+                  value={tabValue}
+                  onChange={(_, v) => setTabValue(v)}
+                  sx={{
+                    minHeight: 40,
+                    "& .MuiTab-root": {
+                      minHeight: 38,
+                      paddingTop: 0.5,
+                      paddingBottom: 0.5,
+                    },
+                  }}
+                >
                   <Tab
                     label={`Tous (${filteredPlayers.length})`}
-                    icon={
-                      <Chip
-                        label={respondedPlayers.length}
-                        size="small"
-                        color="success"
-                        sx={{ ml: 1 }}
-                      />
-                    }
-                    iconPosition="end"
+                    icon={<GroupIcon fontSize="small" />}
+                    iconPosition="start"
                   />
                   <Tab
                     label={`Réponses (${respondedPlayers.length})`}
-                    icon={<CheckCircle color="success" />}
+                    icon={<CheckCircle fontSize="small" color="success" />}
+                    iconPosition="start"
                   />
                   <Tab
                     label={`En attente (${pendingPlayers.length})`}
-                    icon={<HourglassEmpty color="warning" />}
+                    icon={<HourglassEmpty fontSize="small" color="warning" />}
+                    iconPosition="start"
                   />
                 </Tabs>
               </Box>
 
               {tabValue === 0 && (
                 <Box>
-                  <Typography variant="h6" gutterBottom>
-                    Liste complète des joueurs
-                  </Typography>
                   <PlayerList
                     players={filteredPlayers}
                     availabilities={availabilities}
@@ -827,7 +840,26 @@ function PlayerList({
                             : { id: player.id, type: "masculin" }
                         )
                       }
-                      sx={{ minWidth: 40 }}
+                      sx={{
+                        minWidth: 40,
+                        position: masculinAvailability?.comment
+                          ? "relative"
+                          : undefined,
+                        ...(masculinAvailability?.comment
+                          ? {
+                              "&::after": {
+                                content: "''",
+                                position: "absolute",
+                                top: 4,
+                                right: 6,
+                                width: 6,
+                                height: 6,
+                                borderRadius: "50%",
+                                bgcolor: "info.main",
+                              },
+                            }
+                          : {}),
+                      }}
                     >
                       💬
                     </Button>
@@ -888,7 +920,26 @@ function PlayerList({
                               : { id: player.id, type: "feminin" }
                           )
                         }
-                        sx={{ minWidth: 40 }}
+                        sx={{
+                          minWidth: 40,
+                          position: femininAvailability?.comment
+                            ? "relative"
+                            : undefined,
+                          ...(femininAvailability?.comment
+                            ? {
+                                "&::after": {
+                                  content: "''",
+                                  position: "absolute",
+                                  top: 4,
+                                  right: 6,
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: "50%",
+                                  bgcolor: "info.main",
+                                },
+                              }
+                            : {}),
+                        }}
                       >
                         💬
                       </Button>
@@ -910,6 +961,7 @@ function PlayerList({
                   {/* Commentaire Masculin */}
                   <Box>
                     <Typography
+                      id={`comment-label-${player.id}-masculin`}
                       variant="caption"
                       sx={{ mb: 0.5, display: "block" }}
                     >
@@ -919,12 +971,17 @@ function PlayerList({
                       fullWidth
                       size="small"
                       placeholder="Commentaire (optionnel)"
+                      id={`comment-${player.id}-masculin`}
+                      name={`comment-${player.id}-masculin`}
                       value={masculinAvailability?.comment || ""}
                       onChange={(e) =>
                         onCommentChange(player.id, "masculin", e.target.value)
                       }
                       multiline
                       rows={2}
+                      inputProps={{
+                        "aria-labelledby": `comment-label-${player.id}-masculin`,
+                      }}
                     />
                   </Box>
 
@@ -932,6 +989,7 @@ function PlayerList({
                   {isFemale && (
                     <Box>
                       <Typography
+                        id={`comment-label-${player.id}-feminin`}
                         variant="caption"
                         sx={{ mb: 0.5, display: "block" }}
                       >
@@ -941,12 +999,17 @@ function PlayerList({
                         fullWidth
                         size="small"
                         placeholder="Commentaire (optionnel)"
+                        id={`comment-${player.id}-feminin`}
+                        name={`comment-${player.id}-feminin`}
                         value={femininAvailability?.comment || ""}
                         onChange={(e) =>
                           onCommentChange(player.id, "feminin", e.target.value)
                         }
                         multiline
                         rows={2}
+                        inputProps={{
+                          "aria-labelledby": `comment-label-${player.id}-feminin`,
+                        }}
                       />
                     </Box>
                   )}

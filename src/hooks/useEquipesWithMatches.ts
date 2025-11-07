@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Match, Team } from "@/types";
+import { transformAggregatedTeamEntry } from "@/lib/client/team-match-transform";
 
 interface EquipeWithMatches {
   team: Team;
@@ -24,102 +25,22 @@ export const useEquipesWithMatches = () => {
       try {
         setData((prev) => ({ ...prev, loading: true, error: null }));
 
-        // Récupérer les équipes depuis Firestore
-        const teamsResponse = await fetch("/api/teams");
-        if (!teamsResponse.ok) {
-          throw new Error(`HTTP error! status: ${teamsResponse.status}`);
-        }
-        const teamsData = await teamsResponse.json();
-        const allTeams = teamsData.teams || teamsData.data || [];
-
-        // Utiliser toutes les équipes
-        const teams = allTeams;
-
-        // Récupérer les matchs pour chaque équipe (en parallèle avec limitation)
-        const equipesWithMatches: EquipeWithMatches[] = [];
-        const batchSize = 5; // Limiter à 5 appels simultanés
-
-        for (let i = 0; i < teams.length; i += batchSize) {
-          const batch = teams.slice(i, i + batchSize);
-          const batchPromises = batch.map(
-            async (team: { id: string; name: string; division: string }) => {
-              try {
-                const matchesResponse = await fetch(
-                  `/api/teams/${team.id}/matches`
-                );
-                if (matchesResponse.ok) {
-                  const matchesData = await matchesResponse.json();
-                  const matches: Match[] = (
-                    matchesData.matches || matchesData.data || []
-                  ).map((match: any) => ({
-                    ...match,
-                    date: match.date ? new Date(match.date) : new Date(),
-                    createdAt: match.createdAt
-                      ? new Date(match.createdAt)
-                      : new Date(),
-                    updatedAt: match.updatedAt
-                      ? new Date(match.updatedAt)
-                      : new Date(),
-                    // Conserver joueursSQY et joueursAdversaires si présents
-                    joueursSQY: match.joueursSQY || [],
-                    joueursAdversaires: match.joueursAdversaires || [],
-                  }));
-
-                  // Extraire le numéro d'équipe depuis le nom (ex: "SQY PING 1" -> 1)
-                  const teamNumberMatch = team.name.match(/SQY PING (\d+)/);
-                  const teamNumber = teamNumberMatch
-                    ? parseInt(teamNumberMatch[1], 10)
-                    : 1;
-
-                  return {
-                    team: {
-                      id: team.id,
-                      number: teamNumber,
-                      name: team.name,
-                      division: team.division || "Division inconnue",
-                      players: [],
-                      createdAt: new Date(),
-                      updatedAt: new Date(),
-                    },
-                    matches: matches,
-                  };
-                } else {
-                  throw new Error(`HTTP ${matchesResponse.status}`);
-                }
-              } catch (error) {
-                console.warn(
-                  `Failed to fetch matches for team ${team.id}:`,
-                  error
-                );
-                // Retourner l&apos;équipe même sans matchs
-                return {
-                  team: {
-                    id: team.id,
-                    name: team.name,
-                    division: team.division || "Division inconnue",
-                    players: [],
-                    coach: "",
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                  },
-                  matches: [],
-                };
-              }
-            }
-          );
-
-          const batchResults = await Promise.all(batchPromises);
-          equipesWithMatches.push(...batchResults);
+        const response = await fetch("/api/teams/matches");
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        // Trier par numéro d&apos;équipe (numérique)
+        const result = await response.json();
+        const aggregated = Array.isArray(result.teams) ? result.teams : [];
+
+        const equipesWithMatches: EquipeWithMatches[] = aggregated.map(
+          (entry: { team: unknown; matches: unknown[] }) =>
+            transformAggregatedTeamEntry(entry as any)
+        );
+
         const sortedEquipes = equipesWithMatches.sort((a, b) => {
-          const numA = parseInt(
-            a.team.name.match(/SQY PING (\d+)/)?.[1] || "0"
-          );
-          const numB = parseInt(
-            b.team.name.match(/SQY PING (\d+)/)?.[1] || "0"
-          );
+          const numA = a.team.number || 0;
+          const numB = b.team.number || 0;
           return numA - numB;
         });
 

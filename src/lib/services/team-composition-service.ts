@@ -167,7 +167,6 @@ export class TeamCompositionService {
     composition: TeamComposition
   ): Promise<void> {
     // TODO: Implémenter la sauvegarde dans Firestore
-    console.log("Sauvegarde composition:", composition);
   }
 
   /**

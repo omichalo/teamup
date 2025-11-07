@@ -6,6 +6,8 @@ import {
   addDoc,
   query,
   orderBy,
+  where,
+  Timestamp,
 } from "firebase/firestore";
 import { getDbInstanceDirect } from "@/lib/firebase";
 import { Player } from "@/types/team-management";
@@ -86,7 +88,6 @@ export class FirestorePlayerService {
 
   async getAllPlayers(): Promise<Player[]> {
     try {
-      console.log("🔍 Récupération de tous les joueurs...");
       const playersRef = collection(getDbInstanceDirect(), this.collectionName);
       const q = query(playersRef, orderBy("nom", "asc"));
       const querySnapshot = await getDocs(q);
@@ -105,7 +106,6 @@ export class FirestorePlayerService {
         return a.name.localeCompare(b.name); // Croissant par nom
       });
 
-      console.log(`✅ ${players.length} joueurs récupérés`);
       return players;
     } catch (error) {
       console.error("Erreur lors de la récupération des joueurs:", error);
@@ -115,15 +115,9 @@ export class FirestorePlayerService {
 
   async getActivePlayers(): Promise<Player[]> {
     try {
-      console.log("🔍 Récupération des joueurs actifs...");
-      // Récupérer tous les joueurs et filtrer côté client
-      // car on ne peut pas filtrer sur un champ calculé
       const allPlayers = await this.getAllPlayers();
       const activePlayers = allPlayers.filter((player) => player.isActive);
 
-      console.log(
-        `✅ ${activePlayers.length} joueurs actifs trouvés sur ${allPlayers.length} total`
-      );
       return activePlayers;
     } catch (error) {
       console.error(
@@ -204,15 +198,11 @@ export class FirestorePlayerService {
   // Récupérer les joueurs sans licence (pour recherche et ajout)
   async getPlayersWithoutLicense(): Promise<Player[]> {
     try {
-      console.log("🔍 Récupération des joueurs sans licence...");
       const allPlayers = await this.getAllPlayers();
       const playersWithoutLicense = allPlayers.filter(
         (player) => !player.isActive && !player.isTemporary
       );
 
-      console.log(
-        `✅ ${playersWithoutLicense.length} joueurs sans licence trouvés`
-      );
       return playersWithoutLicense;
     } catch (error) {
       console.error(
@@ -226,13 +216,11 @@ export class FirestorePlayerService {
   // Récupérer les joueurs temporaires
   async getTemporaryPlayers(): Promise<Player[]> {
     try {
-      console.log("🔍 Récupération des joueurs temporaires...");
       const allPlayers = await this.getAllPlayers();
       const temporaryPlayers = allPlayers.filter(
         (player) => player.isTemporary
       );
 
-      console.log(`✅ ${temporaryPlayers.length} joueurs temporaires trouvés`);
       return temporaryPlayers;
     } catch (error) {
       console.error(
@@ -266,7 +254,6 @@ export class FirestorePlayerService {
     playerData: Omit<Player, "id" | "createdAt" | "updatedAt">
   ): Promise<string> {
     try {
-      console.log("🔍 Création d&apos;un joueur temporaire...");
       const playersRef = collection(getDbInstanceDirect(), this.collectionName);
 
       const newPlayer = {
@@ -299,7 +286,6 @@ export class FirestorePlayerService {
       };
 
       const docRef = await addDoc(playersRef, newPlayer);
-      console.log(`✅ Joueur temporaire créé avec l&apos;ID: ${docRef.id}`);
       return docRef.id;
     } catch (error) {
       console.error("Erreur lors de la création du joueur temporaire:", error);

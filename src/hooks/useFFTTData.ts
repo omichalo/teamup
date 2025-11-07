@@ -32,7 +32,6 @@ export const useFFTTData = () => {
 
         const data = await response.json();
         const ffttMatches = data.matches || [];
-        console.log(`${ffttMatches.length} matchs récupérés depuis Firestore`);
 
         // Transformer les données FFTT en format interne
         const transformedMatches: Match[] = ffttMatches.map(

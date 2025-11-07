@@ -337,7 +337,7 @@ export default function AdminPage() {
 
   return (
     <Layout>
-      <Box sx={{ p: 3 }}>
+      <Box sx={{ p: 5 }}>
         <Typography variant="h4" gutterBottom>
           Administration - Synchronisation des données
         </Typography>

@@ -70,9 +70,6 @@ export class PlayerService {
     isParticipating: boolean
   ): Promise<void> {
     // TODO: Implémenter la mise à jour dans Firestore
-    console.log(
-      `Mise à jour participation: ${playerId} - ${teamId} - ${isParticipating}`
-    );
   }
 
   /**
@@ -83,7 +80,6 @@ export class PlayerService {
     preferredTeams: { masculine: string[]; feminine: string[] }
   ): Promise<void> {
     // TODO: Implémenter la mise à jour dans Firestore
-    console.log(`Mise à jour équipes préférées: ${playerId}`, preferredTeams);
   }
 
   /**

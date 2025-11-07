@@ -1,6 +1,4 @@
-import { useState, useEffect } from "react";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
-import { getDbInstanceDirect } from "@/lib/firebase";
+import { useEffect, useState } from "react";
 import { Player } from "@/types";
 
 export const usePlayers = () => {
@@ -12,31 +10,28 @@ export const usePlayers = () => {
     const fetchPlayers = async () => {
       try {
         setLoading(true);
-        setError(null);
 
-        const playersQuery = query(
-          collection(getDbInstanceDirect(), "players"),
-          orderBy("lastName", "asc")
+        const response = await fetch("/api/players");
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const playersData = data.players || [];
+
+        setPlayers(
+          playersData.map((player: any) => ({
+            ...player,
+            createdAt: player.createdAt
+              ? new Date(player.createdAt)
+              : new Date(),
+            updatedAt: player.updatedAt
+              ? new Date(player.updatedAt)
+              : new Date(),
+          }))
         );
-
-        const snapshot = await getDocs(playersQuery);
-        const playersData: Player[] = [];
-
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          playersData.push({
-            id: doc.id,
-            ...data,
-            createdAt: data.createdAt?.toDate() || new Date(),
-            updatedAt: data.updatedAt?.toDate() || new Date(),
-          } as Player);
-        });
-
-        setPlayers(playersData);
-        console.log(`${playersData.length} joueurs chargés depuis Firestore`);
-      } catch (error) {
-        console.error("Erreur chargement joueurs:", error);
-        setError(error instanceof Error ? error.message : "Erreur inconnue");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Unknown error");
       } finally {
         setLoading(false);
       }

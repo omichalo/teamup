@@ -11,23 +11,20 @@ import {
   Menu,
   MenuItem,
   Avatar,
-  Switch,
-  FormControlLabel,
 } from "@mui/material";
 import {
-  SportsTennis as PingPongIcon,
   AccountCircle,
   Logout,
   Settings,
-  Dashboard,
-  Group,
   Event,
-  Sports,
   AdminPanelSettings,
+  Person,
+  Groups,
+  Assignment,
 } from "@mui/icons-material";
 import { useAuth } from "@/hooks/useAuth";
-import { useColorMode } from "./ClientThemeProvider";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 interface LayoutProps {
@@ -37,9 +34,7 @@ interface LayoutProps {
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, signOut, isCoach } = useAuth();
 
-  // Pour l&apos;instant, tous les utilisateurs connectés peuvent accéder à l&apos;administration
   const isAdmin = !!user;
-  const { mode, toggleColorMode } = useColorMode();
   const router = useRouter();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
 
@@ -62,57 +57,77 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   };
 
   const navigationItems = [
-    { label: "Tableau de bord", href: "/", icon: <Dashboard /> },
-    { label: "Équipes", href: "/equipes", icon: <Sports /> },
-    { label: "Compositions", href: "/compositions", icon: <Group /> },
+    { label: "Joueurs", href: "/joueurs", icon: <Person /> },
+    { label: "Équipes", href: "/equipes", icon: <Groups /> },
     { label: "Disponibilités", href: "/disponibilites", icon: <Event /> },
-    ...(isCoach
-      ? [{ label: "Paramètres", href: "/settings", icon: <Settings /> }]
-      : []),
+    { label: "Compositions", href: "/compositions", icon: <Assignment /> },
     ...(isAdmin
       ? [
           {
-            label: "Administration",
+            label: "Admin",
             href: "/admin",
             icon: <AdminPanelSettings />,
           },
         ]
       : []),
+    ...(isCoach
+      ? [{ label: "Paramètres", href: "/settings", icon: <Settings /> }]
+      : []),
   ];
-
-  // Si l&apos;authentification est en cours de chargement, afficher un loader centré
-  // Temporairement désactivé pour le debug
-  // if (loading) {
-  //   return (
-  //     <Box
-  //       sx={{
-  //         display: "flex",
-  //         flexDirection: "column",
-  //         justifyContent: "center",
-  //         alignItems: "center",
-  //         minHeight: "100vh",
-  //         gap: 2,
-  //       }}
-  //     >
-  //       <CircularProgress size={48} />
-  //       <Typography variant="h6" color="text.secondary">
-  //         Chargement...
-  //       </Typography>
-  //     </Box>
-  //   );
-  // }
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
       <AppBar position="static" elevation={0}>
-        <Toolbar>
-          <PingPongIcon sx={{ mr: 2 }} />
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            SQY Ping - Team Up
-          </Typography>
+        <Toolbar sx={{ px: { xs: 2, md: 3 } }}>
+          <Box
+            component={Link}
+            href="/"
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              color: "inherit",
+              textDecoration: "none",
+              flexGrow: 1,
+              gap: 1,
+            }}
+          >
+            <Box
+              sx={{
+                width: 44,
+                height: 44,
+                borderRadius: 2,
+                backgroundColor: "rgba(255, 255, 255, 0.95)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                overflow: "hidden",
+                px: 0.5,
+                py: 0.5,
+              }}
+            >
+              <Image
+                src="/icon.png"
+                alt="SQY Ping"
+                width={40}
+                height={40}
+                priority
+              />
+            </Box>
+            <Typography
+              variant="h6"
+              component="span"
+              sx={{
+                fontWeight: 600,
+                letterSpacing: 0.5,
+                whiteSpace: "nowrap",
+              }}
+            >
+              Team Up
+            </Typography>
+          </Box>
 
-          {/* Navigation */}
-          <Box sx={{ display: "flex", gap: 1, mr: 2 }}>
+          <Box sx={{ display: "flex", gap: 1 }}>
             {navigationItems.map((item) => (
               <Button
                 key={item.href}
@@ -120,28 +135,20 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 startIcon={item.icon}
                 component={Link}
                 href={item.href}
-                sx={{ textTransform: "none" }}
+                sx={{
+                  textTransform: "none",
+                  px: 1,
+                  minWidth: "auto",
+                  "& .MuiButton-startIcon": {
+                    marginRight: 0.5,
+                  },
+                }}
               >
                 {item.label}
               </Button>
             ))}
           </Box>
 
-          {/* Dark mode toggle */}
-          <FormControlLabel
-            control={
-              <Switch
-                checked={mode === "dark"}
-                onChange={toggleColorMode}
-                size="small"
-                sx={{ ml: 1 }}
-              />
-            }
-            label=""
-            sx={{ mr: 2 }}
-          />
-
-          {/* User menu */}
           {user ? (
             <>
               <IconButton
@@ -193,7 +200,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         </Toolbar>
       </AppBar>
 
-      <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
+      <Box component="main" sx={{ flexGrow: 1 }}>
         {children}
       </Box>
     </Box>

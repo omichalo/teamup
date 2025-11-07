@@ -1,66 +1,45 @@
-import { useState, useEffect } from "react";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
-import { getDbInstanceDirect } from "@/lib/firebase";
+import { useEffect, useState } from "react";
 import { Match } from "@/types";
 
-export const useTeamMatches = (teamId: string) => {
+export const useTeamMatches = (teamId: string | null) => {
   const [matches, setMatches] = useState<Match[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!teamId) {
       setMatches([]);
-      setLoading(false);
       return;
     }
 
-    const fetchTeamMatches = async () => {
+    const fetchMatches = async () => {
+      setLoading(true);
+      setError(null);
+
       try {
-        setLoading(true);
-        setError(null);
+        const response = await fetch(`/api/teams/${teamId}/matches`);
 
-        const matchesQuery = query(
-          collection(getDbInstanceDirect(), "teams", teamId, "matches"),
-          orderBy("date", "asc")
-        );
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-        const snapshot = await getDocs(matchesQuery);
-        const matchesData: Match[] = [];
+        const data = await response.json();
+        const matchesData = data.matches || [];
 
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          matchesData.push({
-            id: doc.id,
-            ffttId: data.ffttId,
-            teamNumber: data.teamNumber,
-            opponent: data.opponent,
-            opponentClub: data.opponentClub,
-            date: data.date?.toDate() || new Date(),
-            location: data.location,
-            isHome: data.isHome,
-            isExempt: data.isExempt,
-            isForfeit: data.isForfeit,
-            phase: data.phase,
-            journee: data.journee,
-            createdAt: data.createdAt?.toDate() || new Date(),
-            updatedAt: data.updatedAt?.toDate() || new Date(),
-          } as Match);
-        });
+        const formattedMatches: Match[] = matchesData.map((match: any) => ({
+          ...match,
+          date: match.date ? new Date(match.date) : new Date(),
+        }));
 
-        setMatches(matchesData);
-        console.log(
-          `${matchesData.length} matchs chargés pour l&apos;équipe ${teamId}`
-        );
-      } catch (error) {
-        console.error("Erreur chargement matchs équipe:", error);
-        setError(error instanceof Error ? error.message : "Erreur inconnue");
+        setMatches(formattedMatches);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Unknown error");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchTeamMatches();
+    fetchMatches();
   }, [teamId]);
 
   return { matches, loading, error };

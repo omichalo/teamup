@@ -55,8 +55,6 @@ export default function JoueursFirestorePage() {
       setLoading(true);
       setError(null);
 
-      console.log("🔍 Récupération des joueurs depuis Firestore...");
-
       // Récupérer les joueurs depuis Firestore
       const playersRef = collection(getDbInstanceDirect(), "players");
       const q = query(playersRef, orderBy("points", "desc"), limit(100));
@@ -82,9 +80,6 @@ export default function JoueursFirestorePage() {
         });
       });
 
-      console.log(
-        `✅ ${playersData.length} joueurs récupérés depuis Firestore`
-      );
       setPlayers(playersData);
       setTotalCount(playersData.length);
     } catch (error) {
@@ -126,7 +121,7 @@ export default function JoueursFirestorePage() {
 
   if (error) {
     return (
-      <Box sx={{ p: 3 }}>
+      <Box sx={{ p: 5 }}>
         <Alert severity="error">
           Erreur lors du chargement des joueurs : {error}
         </Alert>
@@ -135,7 +130,7 @@ export default function JoueursFirestorePage() {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 5 }}>
       <Typography variant="h4" component="h1" gutterBottom>
         Joueurs SQY Ping - Firestore
       </Typography>

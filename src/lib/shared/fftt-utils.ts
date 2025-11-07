@@ -175,15 +175,8 @@ export const enrichPlayerData = async (
   ffttApi: FFTTAPI
 ): Promise<FFTTDetailsRencontre> => {
   try {
-    console.log(
-      `🔍 Enrichissement des données joueurs pour le club ${_clubCode}`
-    );
-
     // Récupérer tous les joueurs du club
     const joueursClub = await ffttApi.getJoueursByClub(_clubCode);
-    console.log(
-      `📋 ${joueursClub.length} joueurs trouvés pour le club ${_clubCode}`
-    );
 
     // Créer une map pour un accès rapide
     const joueursMap = new Map<string, FFTTJoueur>();
@@ -197,9 +190,6 @@ export const enrichPlayerData = async (
     detailsRencontre.joueursA = detailsRencontre.joueursA.map((joueur) => {
       const joueurClub = joueursMap.get(joueur.licence);
       if (joueurClub) {
-        console.log(
-          `✅ Enrichissement: ${joueur.prenom} ${joueur.nom} -> licence: ${joueurClub.licence}, points: ${joueurClub.points}`
-        );
         return {
           ...joueur,
           licence: joueurClub.licence,
@@ -214,9 +204,6 @@ export const enrichPlayerData = async (
     detailsRencontre.joueursB = detailsRencontre.joueursB.map((joueur) => {
       const joueurClub = joueursMap.get(joueur.licence);
       if (joueurClub) {
-        console.log(
-          `✅ Enrichissement: ${joueur.prenom} ${joueur.nom} -> licence: ${joueurClub.licence}, points: ${joueurClub.points}`
-        );
         return {
           ...joueur,
           licence: joueurClub.licence,

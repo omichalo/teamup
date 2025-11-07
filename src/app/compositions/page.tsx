@@ -58,7 +58,7 @@ function TabPanel(props: TabPanelProps) {
       aria-labelledby={`compositions-tab-${index}`}
       {...other}
     >
-      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+      {value === index && <Box sx={{ p: 5 }}>{children}</Box>}
     </div>
   );
 }
@@ -338,23 +338,6 @@ export default function CompositionsPage() {
           match.journee === selectedJournee &&
           match.phase?.toLowerCase() === selectedPhase.toLowerCase()
       );
-      if (match) {
-        console.log(
-          `🔍 Match trouvé pour ${equipe.team.name} (Journée ${selectedJournee}, Phase ${selectedPhase}):`,
-          {
-            matchId: match.id,
-            score: match.score,
-            result: match.result,
-            journee: match.journee,
-            phase: match.phase,
-            date: match.date,
-          }
-        );
-      } else {
-        console.log(
-          `⚠️ Aucun match trouvé pour ${equipe.team.name} (Journée ${selectedJournee}, Phase ${selectedPhase})`
-        );
-      }
       return match;
     },
     [selectedJournee, selectedPhase]
@@ -377,9 +360,8 @@ export default function CompositionsPage() {
   );
 
   // Fonction pour vérifier si un match est déjà joué
-  const isMatchPlayed = (match: any): boolean => {
+  const isMatchPlayed = (match: Match | null): boolean => {
     if (!match) {
-      console.log("🔍 isMatchPlayed: pas de match fourni, retourne false");
       return false;
     }
 
@@ -438,31 +420,6 @@ export default function CompositionsPage() {
 
     const isPlayed = hasPlayers || hasValidScore || hasValidResult;
 
-    // Log détaillé pour debug
-    console.log(`🔍 isMatchPlayed pour match ${match.id || "unknown"}:`, {
-      hasPlayers: hasPlayers,
-      joueursSQYCount: match.joueursSQY?.length || 0,
-      score: {
-        value: scoreValue,
-        type: scoreType,
-        isString: scoreIsString,
-        notEmpty: scoreNotEmpty,
-        notAVenir: scoreNotAVenir,
-        notZeroZero: scoreNotZeroZero,
-        hasValidFormat: hasValidScore,
-      },
-      result: {
-        value: resultValue,
-        type: resultType,
-        isString: resultIsString,
-        notAVenir: resultNotAVenir,
-        inValidList: resultInValidList,
-        hasValidResult: hasValidResult,
-      },
-      isPlayed: isPlayed,
-    });
-
-    // Un match est joué si on a des joueurs OU un résultat valide OU un score valide
     return isPlayed;
   };
 
@@ -622,6 +579,19 @@ export default function CompositionsPage() {
       player, // Ajouter le joueur dragué
     ];
 
+    if (!isFemaleTeam) {
+      const femalePlayersCount = simulatedTeamPlayers.filter(
+        (p) => p.gender === "F"
+      ).length;
+      if (femalePlayersCount > 2) {
+        return {
+          canDrop: false,
+          reason:
+            "Une équipe masculine ne peut comporter plus de deux joueuses",
+        };
+      }
+    }
+
     // Vérifier les règles FFTT uniquement si l'équipe est complète (4 joueurs) ou si c'est une règle qui s'applique avant complétion
     const division = equipe.team.division || "";
     const { valid, reason } = validateFFTTRules(
@@ -654,16 +624,6 @@ export default function CompositionsPage() {
       );
 
       if (playerFromLowerTeam && playersFromLowerTeams.length > 1) {
-        // Log pour analyse : afficher les joueurs concernés
-        const playersInfo = playersFromLowerTeams.map((p) => {
-          const j1Team = getTeamNumberForPlayerJournee1(p.id, phase);
-          return `${p.firstName} ${p.name} (J1: Éq.${j1Team})`;
-        });
-        console.log(
-          `❌ Règle J${JOURNEE_CONCERNEE_PAR_REGLE}: Éq.${teamNumber} aurait ${playersFromLowerTeams.length} joueurs ayant joué J1 dans une équipe inférieure:`,
-          playersInfo
-        );
-
         return {
           canDrop: false,
           reason: `Lors de la ${JOURNEE_CONCERNEE_PAR_REGLE}ème journée, une équipe ne peut comporter qu'un seul joueur ayant joué la 1ère journée dans une équipe de numéro inférieur`,
@@ -967,13 +927,6 @@ export default function CompositionsPage() {
     // Extraire le numéro de l'équipe depuis son nom
     const teamNumber = extractTeamNumber(equipe.team.name);
 
-    // Debug: log pour vérifier l'extraction
-    console.log("🔍 DEBUG Drop:", {
-      teamName: equipe.team.name,
-      extractedTeamNumber: teamNumber,
-      playerName: `${player.firstName} ${player.name}`,
-    });
-
     // Déterminer le type de championnat (masculin ou féminin)
     const isFemaleTeam = equipe.matches.some(
       (match) => match.isFemale === true
@@ -986,16 +939,6 @@ export default function CompositionsPage() {
       championshipType === "masculin"
         ? player.highestMasculineTeamNumberByPhase?.[phase]
         : player.highestFeminineTeamNumberByPhase?.[phase];
-
-    console.log("🔍 DEBUG Burnout:", {
-      burnedTeam,
-      teamNumber,
-      championshipType,
-      phase,
-      highestMasculineTeamNumberByPhase:
-        player.highestMasculineTeamNumberByPhase,
-      highestFeminineTeamNumberByPhase: player.highestFeminineTeamNumberByPhase,
-    });
 
     // Vérifier que le numéro d'équipe a été extrait correctement
     if (teamNumber === 0) {
@@ -1104,9 +1047,10 @@ export default function CompositionsPage() {
         );
 
         if (playerFromLowerTeam && playersFromLowerTeams.length > 1) {
-          // Il y a déjà au moins un joueur qui a joué J1 dans une équipe inférieure
-          // Ne pas ajouter le joueur
-          return prev;
+          return {
+            canDrop: false,
+            reason: `Lors de la ${JOURNEE_CONCERNEE_PAR_REGLE}ème journée, une équipe ne peut comporter qu'un seul joueur ayant joué la 1ère journée dans une équipe de numéro inférieur`,
+          };
         }
       }
 
@@ -1194,7 +1138,7 @@ export default function CompositionsPage() {
   return (
     <AuthGuard>
       <Layout>
-        <Box sx={{ p: 3 }}>
+        <Box sx={{ p: 5 }}>
           <Typography variant="h4" gutterBottom>
             Composition des Équipes
           </Typography>
@@ -1281,7 +1225,7 @@ export default function CompositionsPage() {
                     overflow: "auto",
                   }}
                 >
-                  <Box sx={{ p: 2 }}>
+                  <Box sx={{ p: 5 }}>
                     <Typography variant="h6" gutterBottom>
                       Joueurs disponibles
                     </Typography>

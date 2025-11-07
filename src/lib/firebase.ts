@@ -263,12 +263,8 @@ export const storage = new Proxy({} as FirebaseStorage, {
 
 // Configuration Firestore - Log de debug côté client
 if (typeof window !== "undefined") {
-  const config = getFirebaseConfig();
-  console.log("🔥 Configuration Firebase:", {
-    projectId: config.projectId,
-    authDomain: config.authDomain,
-    apiKey: config.apiKey ? `${config.apiKey.substring(0, 10)}...` : undefined,
-  });
+  // Intentionally no console output to avoid leaking configuration details.
+  getFirebaseConfig();
 }
 
 export default (() => {

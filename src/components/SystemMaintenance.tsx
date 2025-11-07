@@ -1148,7 +1148,8 @@ export function SystemMaintenance({
                             size="small"
                             onClick={() => {
                               // Afficher les détails du log
-                              console.log("Log details:", log);
+                              setSelectedLog(log);
+                              setLogDialogOpen(true);
                             }}
                           >
                             Voir

@@ -53,7 +53,7 @@ function TabPanel(props: TabPanelProps) {
       aria-labelledby={`joueurs-tab-${index}`}
       {...other}
     >
-      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+      {value === index && <Box sx={{ p: 5 }}>{children}</Box>}
     </div>
   );
 }
@@ -258,7 +258,7 @@ export default function JoueursPage() {
 
   return (
     <Layout>
-      <Box sx={{ p: 3 }}>
+      <Box sx={{ p: 5 }}>
         <Typography variant="h4" gutterBottom>
           Gestion des Joueurs
         </Typography>
@@ -393,8 +393,6 @@ export default function JoueursPage() {
             <Tab label={`Joueurs actifs (${filteredPlayers.length})`} />
             <Tab label="Sans licence" />
             <Tab label="Temporaires" />
-            <Tab label="Participations" />
-            <Tab label="Équipes par défaut" />
           </Tabs>
         </Box>
 
@@ -980,28 +978,6 @@ export default function JoueursPage() {
               </Table>
             </TableContainer>
           )}
-        </TabPanel>
-
-        <TabPanel value={selectedTab} index={3}>
-          <Typography variant="h6" gutterBottom>
-            Participations aux championnats par équipe
-          </Typography>
-          <Alert severity="info" sx={{ mb: 2 }}>
-            Gérez les participations de chaque joueur aux différentes équipes du
-            club.
-          </Alert>
-          {/* TODO: Implémenter l&apos;interface de gestion des participations */}
-        </TabPanel>
-
-        <TabPanel value={selectedTab} index={4}>
-          <Typography variant="h6" gutterBottom>
-            Équipes par défaut
-          </Typography>
-          <Alert severity="info" sx={{ mb: 2 }}>
-            Définissez les équipes par défaut pour chaque joueur (masculin et
-            féminin).
-          </Alert>
-          {/* TODO: Implémenter l&apos;interface de gestion des équipes par défaut */}
         </TabPanel>
       </Box>
     </Layout>

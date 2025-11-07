@@ -81,11 +81,33 @@ export class AvailabilityService {
       );
       const docRef = doc(getDbInstanceDirect(), this.collectionName, docId);
 
+      const sanitizedPlayers: PlayerAvailability = Object.entries(
+        availability.players
+      ).reduce((acc, [playerId, response]) => {
+        if (!response) {
+          return acc;
+        }
+
+        const sanitized: AvailabilityResponse = {
+          available: Boolean(response.available),
+        };
+
+        if (typeof response.comment === "string") {
+          const trimmed = response.comment.trim();
+          if (trimmed.length > 0) {
+            sanitized.comment = trimmed;
+          }
+        }
+
+        acc[playerId] = sanitized;
+        return acc;
+      }, {} as PlayerAvailability);
+
       const dataToSave: Record<string, any> = {
         journee: availability.journee,
         phase: availability.phase,
         championshipType: availability.championshipType,
-        players: availability.players,
+        players: sanitizedPlayers,
         updatedAt: Timestamp.fromDate(new Date()),
         createdAt: availability.createdAt
           ? availability.createdAt instanceof Date
