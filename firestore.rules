@@ -17,6 +17,10 @@ service cloud.firestore {
     
     // Règles pour les utilisateurs
     match /users/{userId} {
+      // Permettre la lecture et l'écriture (création, mise à jour, suppression) 
+      // pour l'utilisateur authentifié sur son propre document
+      // IMPORTANT: userId doit correspondre à request.auth.uid
+      // Utiliser 'write' pour permettre setDoc avec merge: true
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     

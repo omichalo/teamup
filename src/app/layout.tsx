@@ -7,6 +7,10 @@ import "@fontsource-variable/figtree";
 export const metadata: Metadata = {
   title: "SQY Ping - Team Up",
   description: "Application de gestion des équipes pour le club SQY Ping",
+  icons: {
+    icon: "/icon.png",
+    apple: "/apple-icon.png",
+  },
 };
 
 // Force dynamic rendering to avoid static generation errors

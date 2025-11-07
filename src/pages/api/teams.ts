@@ -5,6 +5,16 @@ import {
   initializeFirebaseAdmin,
 } from "@/lib/firebase-admin";
 
+interface TeamResponse {
+  id: string;
+  name: string;
+  division: string;
+  isFemale?: boolean;
+  teamNumber: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -17,7 +27,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Récupérer les équipes depuis Firestore
     const teamsSnapshot = await firestore.collection("teams").get();
 
-    const teams: any[] = [];
+    const teams: TeamResponse[] = [];
     teamsSnapshot.forEach((doc) => {
       const data = doc.data();
       teams.push({
@@ -25,14 +35,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         name: data.name,
         division: data.division,
         isFemale: data.isFemale,
-        teamNumber: data.teamNumber,
-        createdAt: data.createdAt?.toDate() || new Date(),
-        updatedAt: data.updatedAt?.toDate() || new Date(),
+        teamNumber: data.number || data.teamNumber,
+        createdAt: data.createdAt?.toDate?.() || data.createdAt || new Date(),
+        updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || new Date(),
       });
     });
 
     // Trier par numéro d&apos;équipe
-    teams.sort((a, b) => a.teamNumber - b.teamNumber);
+    teams.sort((a, b) => (a.teamNumber || 0) - (b.teamNumber || 0));
 
     console.log(`📊 ${teams.length} équipes récupérées depuis Firestore`);
 
@@ -42,12 +52,27 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     });
   } catch (error) {
     console.error("Firestore Error:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+
+    // Vérifier si c'est une erreur de credentials
+    if (
+      errorMessage.includes("credentials") ||
+      errorMessage.includes("Could not load the default credentials")
+    ) {
+      return res.status(500).json({
+        error: "Firebase Admin credentials not configured",
+        details:
+          "Pour le développement local, configurez les credentials Firebase Admin. Voir README.md pour plus d'informations.",
+        message: errorMessage,
+      });
+    }
+
     res.status(500).json({
       error: "Failed to fetch teams data",
-      details: error instanceof Error ? error.message : "Unknown error",
+      details: errorMessage,
     });
   }
 }
 
 export default withOptionalAuth(handler);
-

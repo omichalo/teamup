@@ -66,6 +66,7 @@ ui-debug.log
 backend-service-account.json
 *-credentials.json
 *credentials*.json
+*-firebase-adminsdk*.json
 *.pem
 *.key
 !*.pub

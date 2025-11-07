@@ -4,7 +4,6 @@ import {
   getDocs,
   getDoc,
   addDoc,
-  setDoc,
   updateDoc,
   deleteDoc,
   query,
@@ -24,7 +23,6 @@ import {
   Availability,
   BurnRecord,
   ClubSettings,
-  User,
 } from "@/types";
 
 // Helper function to convert Firestore timestamps to Date objects
@@ -390,68 +388,4 @@ export const updateClubSettings = async (
       updatedAt: Timestamp.fromDate(now),
     });
   }
-};
-
-// Users Collection - Lazy getter utilisant l'instance réelle
-function getUsersCollection() {
-  return collection(getDbInstanceDirect(), "users");
-}
-export const usersCollection = getUsersCollection();
-
-export const getUser = async (id: string): Promise<User | null> => {
-  const docRef = doc(usersCollection, id);
-  const docSnap = await getDoc(docRef);
-  if (docSnap.exists()) {
-    return {
-      id: docSnap.id,
-      ...convertTimestamps(docSnap.data()),
-    } as User;
-  }
-  return null;
-};
-
-export const addUser = async (
-  user: Omit<User, "id" | "createdAt" | "updatedAt">,
-  id?: string
-): Promise<string> => {
-  const now = new Date();
-
-  // Filtrer les champs undefined pour éviter les erreurs Firebase
-  const cleanUser = Object.fromEntries(
-    Object.entries(user).filter(([_, value]) => value !== undefined)
-  );
-
-  const userData = {
-    ...cleanUser,
-    createdAt: Timestamp.fromDate(now),
-    updatedAt: Timestamp.fromDate(now),
-  };
-
-  if (id) {
-    // Utiliser l&apos;ID spécifié (comme l&apos;UID Firebase)
-    const docRef = doc(usersCollection, id);
-    await setDoc(docRef, userData);
-    return id;
-  } else {
-    // Générer un ID automatique
-    const docRef = await addDoc(usersCollection, userData);
-    return docRef.id;
-  }
-};
-
-export const updateUser = async (
-  id: string,
-  updates: Partial<User>
-): Promise<void> => {
-  const docRef = doc(usersCollection, id);
-
-  // Filtrer les champs undefined pour éviter les erreurs Firebase
-  const cleanUpdates = Object.fromEntries(
-    Object.entries(updates).filter(([_, value]) => value !== undefined)
-  );
-
-  await updateDoc(docRef, {
-    ...cleanUpdates,
-    updatedAt: Timestamp.fromDate(new Date()),
-  });
 };

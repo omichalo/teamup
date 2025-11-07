@@ -27,12 +27,28 @@ const app = (() => {
     });
   }
 
+  // Vérifier si un fichier de service account est spécifié via GOOGLE_APPLICATION_CREDENTIALS
+  const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (serviceAccountPath) {
+    console.log(`🔥 Initialisation Firebase Admin avec fichier service account: ${serviceAccountPath}`);
+    try {
+      // Utiliser applicationDefault() qui lit automatiquement GOOGLE_APPLICATION_CREDENTIALS
+      return initializeApp({
+        credential: applicationDefault(),
+        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "sqyping-teamup",
+      });
+    } catch (error) {
+      console.error("❌ Erreur lors de l'initialisation avec GOOGLE_APPLICATION_CREDENTIALS:", error);
+      // Continue avec les autres méthodes
+    }
+  }
+
   // Sinon, utiliser les credentials explicites si disponibles
   const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
 
   if (privateKey && clientEmail) {
-    console.log("🔥 Initialisation Firebase Admin avec credentials explicites");
+    console.log("🔥 Initialisation Firebase Admin avec credentials explicites (variables d'environnement)");
     return initializeApp({
       credential: cert({
         projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
@@ -44,11 +60,21 @@ const app = (() => {
   }
 
   // Fallback: utiliser les credentials par défaut même en local
-  console.log("⚠️ Aucune credential explicite trouvée, utilisation des Application Default Credentials");
-  return initializeApp({
-    credential: applicationDefault(),
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "sqyping-teamup",
-  });
+  // Cela peut échouer en local si les credentials ne sont pas configurés
+  console.log("⚠️ Aucune credential explicite trouvée, tentative d'utilisation des Application Default Credentials");
+  try {
+    return initializeApp({
+      credential: applicationDefault(),
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "sqyping-teamup",
+    });
+  } catch (error) {
+    console.error("❌ Erreur lors de l'initialisation de Firebase Admin:", error);
+    throw new Error(
+      "Firebase Admin credentials not configured. " +
+      "Pour le développement local, configurez les variables d'environnement FIREBASE_PRIVATE_KEY et FIREBASE_CLIENT_EMAIL, " +
+      "ou utilisez 'gcloud auth application-default login' pour configurer les credentials par défaut."
+    );
+  }
 })();
 
 // Exporter l&apos;instance Firebase Admin
