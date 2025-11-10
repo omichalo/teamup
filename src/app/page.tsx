@@ -22,6 +22,7 @@ import {
   Assignment as AssignmentIcon,
   AdminPanelSettings as AdminIcon,
   Groups,
+  PlaylistAddCheck as DefaultCompoIcon,
 } from "@mui/icons-material";
 import { alpha } from "@mui/material/styles";
 import { useRouter } from "next/navigation";
@@ -73,6 +74,14 @@ export default function DashboardPage() {
       cta: "Composer les équipes",
       icon: <AssignmentIcon fontSize="medium" />,
       color: "warning",
+    },
+    {
+      title: "Compositions par défaut",
+      description: "Définir la base de chaque équipe en début de phase",
+      href: "/compositions/defaults",
+      cta: "Configurer les bases",
+      icon: <DefaultCompoIcon fontSize="medium" />,
+      color: "success",
     },
     {
       title: "Admin",
@@ -182,6 +191,21 @@ export default function DashboardPage() {
                 }}
               >
                 Consulter les joueurs
+              </Button>
+              <Button
+                variant="outlined"
+                color="inherit"
+                onClick={() => router.push("/compositions/defaults")}
+                sx={{
+                  borderColor: alpha("#ffffff", 0.5),
+                  color: "common.white",
+                  "&:hover": {
+                    borderColor: "common.white",
+                    backgroundColor: alpha("#ffffff", 0.12),
+                  },
+                }}
+              >
+                Préparer les compos par défaut
               </Button>
             </Stack>
           </Stack>

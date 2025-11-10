@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import Link from "next/link";
 import {
   Box,
   Typography,
@@ -18,28 +19,46 @@ import {
   Tab,
   Chip,
   CircularProgress,
-  Paper,
-  List,
   ListItem,
   ListItemText,
   ListItemButton,
-  Divider,
   IconButton,
-  TextField,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from "@mui/material";
-import { DragIndicator } from "@mui/icons-material";
-import { useEquipesWithMatches } from "@/hooks/useEquipesWithMatches";
+import { DragIndicator, ContentCopy, RestartAlt } from "@mui/icons-material";
+import {
+  useEquipesWithMatches,
+  type EquipeWithMatches,
+} from "@/hooks/useEquipesWithMatches";
 import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
 import { AvailabilityService } from "@/lib/services/availability-service";
 import { CompositionService } from "@/lib/services/composition-service";
+import { CompositionDefaultsService } from "@/lib/services/composition-defaults-service";
 import { Player } from "@/types/team-management";
 import { Layout } from "@/components/Layout";
 import { AuthGuard } from "@/components/AuthGuard";
 import { getCurrentPhase } from "@/lib/shared/phase-utils";
-import { extractTeamNumber, validateFFTTRules } from "@/lib/shared/fftt-utils";
-
-// Constante pour la journée concernée par la règle
-const JOURNEE_CONCERNEE_PAR_REGLE = 2;
+import {
+  JOURNEE_CONCERNEE_PAR_REGLE,
+  AssignmentValidationResult,
+  canAssignPlayerToTeam,
+  getMatchForTeamAndJournee,
+  getPlayersFromMatch,
+  isMatchPlayed,
+} from "@/lib/compositions/validation";
+import { AvailablePlayersPanel } from "@/components/compositions/AvailablePlayersPanel";
+import { TeamCompositionCard } from "@/components/compositions/TeamCompositionCard";
+import { CompositionsSummary } from "@/components/compositions/CompositionsSummary";
+import { createDragImage } from "@/lib/compositions/drag-utils";
+import {
+  CompositionRulesHelp,
+  type CompositionRuleItem,
+} from "@/components/compositions/CompositionRulesHelp";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -82,10 +101,93 @@ export default function CompositionsPage() {
   const [dragOverTeamId, setDragOverTeamId] = useState<string | null>(null);
   // État pour la recherche de joueurs
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [isResetting, setIsResetting] = useState(false);
+  const [isApplyingDefaults, setIsApplyingDefaults] = useState(false);
+  const [confirmationDialog, setConfirmationDialog] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    onConfirm?: (() => void) | (() => Promise<void>);
+  }>({
+    open: false,
+    title: "",
+    description: "",
+    confirmLabel: "Confirmer",
+    cancelLabel: "Annuler",
+  });
+  const [defaultCompositions, setDefaultCompositions] = useState<{
+    masculin: Record<string, string[]>;
+    feminin: Record<string, string[]>;
+  }>({
+    masculin: {},
+    feminin: {},
+  });
+  const [defaultCompositionsLoaded, setDefaultCompositionsLoaded] =
+    useState(false);
+  const [availabilitiesLoaded, setAvailabilitiesLoaded] = useState(false);
 
   const playerService = useMemo(() => new FirestorePlayerService(), []);
   const availabilityService = useMemo(() => new AvailabilityService(), []);
   const compositionService = useMemo(() => new CompositionService(), []);
+  const compositionDefaultsService = useMemo(
+    () => new CompositionDefaultsService(),
+    []
+  );
+
+  const availablePlayersSubtitle = useMemo(() => {
+    const base = tabValue === 0 ? "Masculin" : "Féminin";
+    if (selectedJournee) {
+      return `${base} - Journée ${selectedJournee}`;
+    }
+    return base;
+  }, [tabValue, selectedJournee]);
+
+  const compositionRules: CompositionRuleItem[] = useMemo(
+    () => [
+      {
+        id: "maxPlayersDaily",
+        label: "Une composition de journée ne peut aligner que 4 joueurs",
+        scope: "daily",
+      },
+      {
+        id: "maxPlayersDefaults",
+        label: "Une composition par défaut peut contenir jusqu'à 5 joueurs",
+        scope: "defaults",
+      },
+      {
+        id: "foreign",
+        label: "Maximum un joueur étranger (ETR) par équipe",
+        scope: "both",
+      },
+      {
+        id: "female-in-male",
+        label: "Une équipe masculine ne peut comporter plus de deux joueuses",
+        scope: "both",
+      },
+      {
+        id: "burning",
+        label:
+          "Respect du brûlage : impossible d'aligner un joueur dans une équipe de numéro inférieur",
+        scope: "both",
+      },
+      {
+        id: "fftt",
+        label: "Points minimum (selon division nationale)",
+        scope: "both",
+      },
+      {
+        id: "journee2",
+        label:
+          "Journée 2 : au plus un joueur ayant joué la J1 dans une équipe de numéro inférieur",
+        scope: "daily",
+        description:
+          "Cette règle ne s'applique que sur la page des compositions de journée lorsque la J2 est sélectionnée.",
+      },
+    ],
+    []
+  );
 
   // Déterminer la phase en cours
   const currentPhase = useMemo(() => {
@@ -211,7 +313,42 @@ export default function CompositionsPage() {
   }>({});
 
   useEffect(() => {
+    if (!selectedPhase) {
+      setDefaultCompositions({ masculin: {}, feminin: {} });
+      setDefaultCompositionsLoaded(false);
+      return;
+    }
+
+    setDefaultCompositionsLoaded(false);
+
+    const loadDefaults = async () => {
+      try {
+        const [masculineDefaults, feminineDefaults] = await Promise.all([
+          compositionDefaultsService.getDefaults(selectedPhase, "masculin"),
+          compositionDefaultsService.getDefaults(selectedPhase, "feminin"),
+        ]);
+
+        setDefaultCompositions({
+          masculin: masculineDefaults?.teams || {},
+          feminin: feminineDefaults?.teams || {},
+        });
+      } catch (error) {
+        console.error(
+          "Erreur lors du chargement des compositions par défaut:",
+          error
+        );
+        setDefaultCompositions({ masculin: {}, feminin: {} });
+      }
+
+      setDefaultCompositionsLoaded(true);
+    };
+
+    loadDefaults();
+  }, [selectedPhase, compositionDefaultsService]);
+
+  useEffect(() => {
     if (selectedJournee !== null && selectedPhase !== null) {
+      setAvailabilitiesLoaded(false);
       const loadAvailability = async () => {
         try {
           const [masculineAvailability, feminineAvailability] =
@@ -235,37 +372,16 @@ export default function CompositionsPage() {
         } catch (error) {
           console.error("Erreur lors du chargement des disponibilités:", error);
           setAvailabilities({});
+        } finally {
+          setAvailabilitiesLoaded(true);
         }
       };
       loadAvailability();
+    } else {
+      setAvailabilities({});
+      setAvailabilitiesLoaded(false);
     }
   }, [selectedJournee, selectedPhase, availabilityService]);
-
-  // Charger les compositions pour la journée et phase sélectionnées
-  useEffect(() => {
-    if (selectedJournee !== null && selectedPhase !== null) {
-      const loadCompositions = async () => {
-        try {
-          const championshipType = tabValue === 0 ? "masculin" : "feminin";
-          const composition = await compositionService.getComposition(
-            selectedJournee,
-            selectedPhase,
-            championshipType
-          );
-
-          if (composition) {
-            setCompositions(composition.teams);
-          } else {
-            setCompositions({});
-          }
-        } catch (error) {
-          console.error("Erreur lors du chargement des compositions:", error);
-          setCompositions({});
-        }
-      };
-      loadCompositions();
-    }
-  }, [selectedJournee, selectedPhase, tabValue, compositionService]);
 
   // Filtrer les joueurs disponibles selon l'onglet sélectionné
   const availablePlayers = useMemo(() => {
@@ -304,6 +420,77 @@ export default function CompositionsPage() {
     });
   }, [availablePlayers, searchQuery]);
 
+  useEffect(() => {
+    if (selectedJournee === null || selectedPhase === null) {
+      setCompositions({});
+      return;
+    }
+
+    let isCancelled = false;
+    const championshipType = tabValue === 0 ? "masculin" : "feminin";
+
+    const loadComposition = async () => {
+      try {
+        const composition = await compositionService.getComposition(
+          selectedJournee,
+          selectedPhase,
+          championshipType
+        );
+
+        if (isCancelled) {
+          return;
+        }
+
+        if (composition) {
+          setCompositions(composition.teams);
+          return;
+        }
+
+        if (!defaultCompositionsLoaded || !availabilitiesLoaded) {
+          setCompositions({});
+          return;
+        }
+
+        const defaultsForType = defaultCompositions[championshipType] || {};
+        const availabilityMap =
+          (championshipType === "masculin"
+            ? availabilities.masculin
+            : availabilities.feminin) || {};
+
+        const initialTeams = Object.fromEntries(
+          Object.entries(defaultsForType).map(([teamId, playerIds]) => {
+            const availablePlayerIds = playerIds
+              .filter((id) => availabilityMap[id]?.available === true)
+              .slice(0, 4);
+            return [teamId, availablePlayerIds];
+          })
+        );
+
+        setCompositions(initialTeams);
+      } catch (error) {
+        if (!isCancelled) {
+          console.error("Erreur lors du chargement des compositions:", error);
+          setCompositions({});
+        }
+      }
+    };
+
+    loadComposition();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    selectedJournee,
+    selectedPhase,
+    tabValue,
+    compositionService,
+    defaultCompositions,
+    defaultCompositionsLoaded,
+    availabilities,
+    availabilitiesLoaded,
+  ]);
+
   // Grouper les équipes par type (masculin/féminin)
   const equipesByType = useMemo(() => {
     const masculin: typeof equipes = [];
@@ -323,467 +510,165 @@ export default function CompositionsPage() {
     return { masculin, feminin };
   }, [equipes]);
 
+  const hasAssignedPlayers = useMemo(
+    () =>
+      Object.values(compositions).some(
+        (teamPlayers) => Array.isArray(teamPlayers) && teamPlayers.length > 0
+      ),
+    [compositions]
+  );
+
+  const hasDefaultCompositions = useMemo(() => {
+    const hasMasculineDefaults = Object.values(
+      defaultCompositions.masculin || {}
+    ).some((playerIds) => Array.isArray(playerIds) && playerIds.length > 0);
+    const hasFeminineDefaults = Object.values(
+      defaultCompositions.feminin || {}
+    ).some((playerIds) => Array.isArray(playerIds) && playerIds.length > 0);
+    return hasMasculineDefaults || hasFeminineDefaults;
+  }, [defaultCompositions]);
+
+  const canResetButton = useMemo(
+    () =>
+      selectedJournee !== null &&
+      selectedPhase !== null &&
+      hasAssignedPlayers &&
+      !isResetting,
+    [hasAssignedPlayers, isResetting, selectedJournee, selectedPhase]
+  );
+
+  const canCopyDefaultsButton = useMemo(
+    () =>
+      selectedJournee !== null &&
+      selectedPhase !== null &&
+      defaultCompositionsLoaded &&
+      availabilitiesLoaded &&
+      hasDefaultCompositions &&
+      !isApplyingDefaults,
+    [
+      availabilitiesLoaded,
+      defaultCompositionsLoaded,
+      hasDefaultCompositions,
+      isApplyingDefaults,
+      selectedJournee,
+      selectedPhase,
+    ]
+  );
+
+  const {
+    availablePlayersWithoutAssignment,
+    filteredAvailablePlayersWithoutAssignment,
+  } = useMemo(() => {
+    const sameTypeEquipes =
+      tabValue === 0 ? equipesByType.masculin : equipesByType.feminin;
+    const assignedIds = new Set<string>();
+    sameTypeEquipes.forEach((equipe) => {
+      const assigned = compositions[equipe.team.id] || [];
+      assigned.forEach((playerId) => assignedIds.add(playerId));
+    });
+
+    const base = availablePlayers.filter(
+      (player) => !assignedIds.has(player.id)
+    );
+    const filtered = filteredAvailablePlayers.filter(
+      (player) => !assignedIds.has(player.id)
+    );
+
+    return {
+      availablePlayersWithoutAssignment: base,
+      filteredAvailablePlayersWithoutAssignment: filtered,
+    };
+  }, [
+    availablePlayers,
+    filteredAvailablePlayers,
+    tabValue,
+    equipesByType,
+    compositions,
+  ]);
+
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
   };
 
   // Fonction pour trouver le match correspondant à une équipe pour la journée et phase sélectionnées
   const getMatchForTeam = useCallback(
-    (equipe: { team: { id: string; name: string }; matches: any[] }) => {
+    (equipe: EquipeWithMatches) => {
       if (selectedJournee === null || selectedPhase === null) {
         return null;
       }
-      const match = equipe.matches.find(
-        (match) =>
-          match.journee === selectedJournee &&
-          match.phase?.toLowerCase() === selectedPhase.toLowerCase()
+      return (
+        getMatchForTeamAndJournee(
+          equipe,
+          selectedJournee,
+          selectedPhase as "aller" | "retour"
+        ) || null
       );
-      return match;
     },
     [selectedJournee, selectedPhase]
   );
 
-  // Fonction pour trouver le match d'une équipe pour une journée et phase spécifiques
-  const getMatchForTeamAndJournee = useCallback(
-    (
-      equipe: { team: { id: string; name: string }; matches: any[] },
-      journee: number,
-      phase: string
-    ) => {
-      return equipe.matches.find(
-        (match) =>
-          match.journee === journee &&
-          match.phase?.toLowerCase() === phase.toLowerCase()
-      );
-    },
-    []
-  );
+  const compositionSummary = useMemo(() => {
+    const currentTypeEquipes =
+      tabValue === 0 ? equipesByType.masculin : equipesByType.feminin;
 
-  // Fonction pour vérifier si un match est déjà joué
-  const isMatchPlayed = (match: Match | null): boolean => {
-    if (!match) {
-      return false;
-    }
+    let equipesCompletes = 0;
+    let equipesIncompletes = 0;
+    let equipesMatchsJoues = 0;
 
-    // Un match est joué si :
-    // 1. Il a des joueurs dans joueursSQY (le plus fiable car ça vient des données du match joué)
-    // 2. OU (le score est présent ET a un format valide avec au moins un score > 0 ET le result est valide)
-    // Note: on ne se fie pas au result seul car "ÉGALITÉ" avec score "0-0" n'est pas un match joué
+    currentTypeEquipes.forEach((equipe) => {
+      const match = getMatchForTeam(equipe);
+      const matchPlayed = isMatchPlayed(match);
 
-    // Vérifier la présence de joueurs (le plus fiable)
-    const hasPlayers =
-      match.joueursSQY &&
-      Array.isArray(match.joueursSQY) &&
-      match.joueursSQY.length > 0;
-
-    // Vérifier le score (mais exclure 0-0 car ce n'est pas un match réellement joué)
-    let hasValidScore = false;
-    const scoreValue = match.score;
-    const scoreType = typeof scoreValue;
-    const scoreIsString = scoreType === "string";
-    const scoreNotEmpty = scoreIsString && scoreValue !== "";
-    const scoreNotAVenir = scoreIsString && scoreValue !== "À VENIR";
-    const scoreNotZeroZero = scoreIsString && scoreValue !== "0-0";
-
-    if (
-      scoreValue &&
-      scoreIsString &&
-      scoreNotEmpty &&
-      scoreNotAVenir &&
-      scoreNotZeroZero
-    ) {
-      // Vérifier que le score a un format valide (ex: "4-2", "3-3") et qu'au moins un score > 0
-      const scoreMatch = scoreValue.match(/^(\d+)-(\d+)$/);
-      if (scoreMatch !== null && scoreMatch.length === 3) {
-        const scoreA = parseInt(scoreMatch[1], 10);
-        const scoreB = parseInt(scoreMatch[2], 10);
-        // Au moins un des deux scores doit être > 0
-        hasValidScore = scoreA > 0 || scoreB > 0;
-      }
-    }
-
-    // Vérifier le result (mais seulement si on a aussi un score valide)
-    // On ne se fie pas au result seul car "ÉGALITÉ" avec score "0-0" n'est pas un match joué
-    const validResults = ["VICTOIRE", "DÉFAITE", "ÉGALITÉ", "NUL", "DEFAITE"]; // DEFAITE sans accent aussi
-    const resultValue = match.result;
-    const resultType = typeof resultValue;
-    const resultIsString = resultType === "string";
-    const resultNotAVenir = resultIsString && resultValue !== "À VENIR";
-    const resultInValidList =
-      resultIsString && validResults.includes(resultValue.toUpperCase());
-    const hasValidResult =
-      hasValidScore &&
-      resultValue &&
-      resultIsString &&
-      resultNotAVenir &&
-      resultInValidList;
-
-    const isPlayed = hasPlayers || hasValidScore || hasValidResult;
-
-    return isPlayed;
-  };
-
-  // Fonction pour obtenir les joueurs ayant joué un match (depuis joueursSQY)
-  const getPlayersFromMatch = useCallback(
-    (match: any): Player[] => {
-      if (!match || !match.joueursSQY || !Array.isArray(match.joueursSQY)) {
-        return [];
-      }
-      // Trouver les joueurs par leur licence
-      return match.joueursSQY
-        .map((joueurSQY: any): Player | null => {
-          if (!joueurSQY.licence) return null;
-          return players.find((p) => p.license === joueurSQY.licence) || null;
-        })
-        .filter((p: Player | null): p is Player => p !== null && p !== undefined);
-    },
-    [players]
-  );
-
-  // Fonction pour déterminer dans quelle équipe un joueur a joué la 1ère journée
-  const getTeamNumberForPlayerJournee1 = useCallback(
-    (playerId: string, phase: "aller" | "retour"): number | null => {
-      const player = players.find((p) => p.id === playerId);
-      if (!player) {
-        return null;
+      if (matchPlayed) {
+        equipesMatchsJoues += 1;
+        return;
       }
 
-      // Parcourir toutes les équipes pour trouver le match de J1
-      for (const equipe of equipes) {
-        const matchJ1 = getMatchForTeamAndJournee(equipe, 1, phase);
-
-        // Vérifier si le match est joué et contient le joueur
-        if (matchJ1 && isMatchPlayed(matchJ1)) {
-          const playersFromMatch = getPlayersFromMatch(matchJ1);
-          const playerInMatch = playersFromMatch.find((p) => p.id === playerId);
-
-          if (playerInMatch) {
-            // Le joueur a joué dans cette équipe lors de la J1
-            const teamNumber = extractTeamNumber(equipe.team.name);
-            return teamNumber > 0 ? teamNumber : null;
-          }
-        }
-      }
-
-      return null; // Le joueur n'a pas joué la J1
-    },
-    [
-      players,
-      equipes,
-      getMatchForTeamAndJournee,
-      isMatchPlayed,
-      getPlayersFromMatch,
-    ]
-  );
-
-  // Fonction pour vérifier si un joueur a joué J1 dans une équipe de numéro inférieur
-  const didPlayerPlayJ1InLowerTeam = useCallback(
-    (
-      playerId: string,
-      targetTeamNumber: number,
-      phase: "aller" | "retour"
-    ): boolean => {
-      const playerJ1TeamNumber = getTeamNumberForPlayerJournee1(
-        playerId,
-        phase
+      const teamPlayers =
+        compositions[equipe.team.id]?.map((playerId) =>
+          players.find((p) => p.id === playerId)
+        ) ?? [];
+      const teamPlayersData = teamPlayers.filter(
+        (p): p is Player => p !== undefined
       );
 
-      if (playerJ1TeamNumber === null) {
-        // Le joueur n'a pas joué la J1, donc pas de restriction
-        return false;
+      if (teamPlayersData.length >= 4) {
+        equipesCompletes += 1;
+      } else {
+        equipesIncompletes += 1;
       }
+    });
 
-      // Un joueur a joué dans une équipe "inférieure" si le numéro de son équipe J1 est < numéro équipe cible
-      // (équipe 1 est "inférieure" à équipe 6, équipe 2 est "inférieure" à équipe 5, etc.)
-      // Cela signifie que le joueur vient d'une équipe plus forte (numéro plus petit) vers une équipe plus faible (numéro plus grand)
-      return playerJ1TeamNumber < targetTeamNumber;
-    },
-    [getTeamNumberForPlayerJournee1]
-  );
+    const totalEditable = equipesCompletes + equipesIncompletes;
+    const percentage =
+      totalEditable > 0
+        ? Math.round((equipesCompletes / totalEditable) * 100)
+        : 0;
+
+    return {
+      totalEditable,
+      equipesCompletes,
+      equipesIncompletes,
+      equipesMatchsJoues,
+      percentage,
+    };
+  }, [tabValue, equipesByType, compositions, players, getMatchForTeam]);
 
   // Fonction pour vérifier si un drop est possible
   const canDropPlayer = (
     playerId: string,
     teamId: string
-  ): { canDrop: boolean; reason?: string } => {
-    const player = players.find((p) => p.id === playerId);
-    const equipe = equipes.find((eq) => eq.team.id === teamId);
-
-    if (!player || !equipe) {
-      return { canDrop: false, reason: "Données introuvables" };
-    }
-
-    // Vérifier le nombre de joueurs
-    const currentTeamPlayers = compositions[teamId] || [];
-    if (currentTeamPlayers.length >= 4) {
-      return {
-        canDrop: false,
-        reason: "L'équipe est complète (4/4 joueurs)",
-      };
-    }
-
-    // Vérifier si le joueur est étranger (ETR) et si l'équipe a déjà un joueur étranger
-    // (en excluant le joueur actuellement dragué de la vérification)
-    if (player.nationality === "ETR") {
-      const currentTeamPlayersData = currentTeamPlayers
-        .filter((playerId) => playerId !== player.id) // Exclure le joueur actuellement dragué
-        .map((playerId) => players.find((p) => p.id === playerId))
-        .filter((p): p is Player => p !== undefined);
-
-      const hasForeignPlayer = currentTeamPlayersData.some(
-        (p) => p.nationality === "ETR"
-      );
-
-      if (hasForeignPlayer) {
-        return {
-          canDrop: false,
-          reason: "L'équipe contient déjà un joueur étranger (ETR)",
-        };
-      }
-    }
-
-    // Vérifier le brûlage
-    const teamNumber = extractTeamNumber(equipe.team.name);
-    if (teamNumber === 0) {
-      // Si on ne peut pas extraire le numéro, on autorise le drop
-      return { canDrop: true };
-    }
-
-    const isFemaleTeam = equipe.matches.some(
-      (match) => match.isFemale === true
-    );
-    const championshipType = isFemaleTeam ? "feminin" : "masculin";
-    const phase = selectedPhase || "aller";
-
-    const burnedTeam =
-      championshipType === "masculin"
-        ? player.highestMasculineTeamNumberByPhase?.[phase]
-        : player.highestFeminineTeamNumberByPhase?.[phase];
-
-    if (burnedTeam !== undefined && burnedTeam !== null) {
-      if (teamNumber > burnedTeam) {
-        return {
-          canDrop: false,
-          reason: `Brûlé dans l'équipe ${burnedTeam}, ne peut pas jouer dans l'équipe ${teamNumber}`,
-        };
-      }
-    }
-
-    // Vérifier les règles FFTT
-    // Simuler la composition avec le joueur dragué ajouté
-    const simulatedTeamPlayers = [
-      ...currentTeamPlayers
-        .filter((pid) => pid !== player.id) // Exclure le joueur actuellement dragué s'il est déjà dans l'équipe
-        .map((pid) => players.find((p) => p.id === pid))
-        .filter((p): p is Player => p !== undefined),
-      player, // Ajouter le joueur dragué
-    ];
-
-    if (!isFemaleTeam) {
-      const femalePlayersCount = simulatedTeamPlayers.filter(
-        (p) => p.gender === "F"
-      ).length;
-      if (femalePlayersCount > 2) {
-        return {
-          canDrop: false,
-          reason:
-            "Une équipe masculine ne peut comporter plus de deux joueuses",
-        };
-      }
-    }
-
-    // Vérifier les règles FFTT uniquement si l'équipe est complète (4 joueurs) ou si c'est une règle qui s'applique avant complétion
-    const division = equipe.team.division || "";
-    const { valid, reason } = validateFFTTRules(
-      simulatedTeamPlayers,
-      division,
-      isFemaleTeam
-    );
-
-    if (!valid) {
-      return {
-        canDrop: false,
-        reason: reason || "Règle FFTT non respectée",
-      };
-    }
-
-    // Vérifier la règle : J2 ne peut pas avoir plus d'un joueur ayant joué J1 dans une équipe inférieure
-    if (selectedJournee === JOURNEE_CONCERNEE_PAR_REGLE && selectedPhase) {
-      const phase = selectedPhase as "aller" | "retour";
-
-      // Compter combien de joueurs (y compris celui qu'on essaie d'ajouter) ont joué J1 dans une équipe inférieure
-      const playersFromLowerTeams = simulatedTeamPlayers.filter((p) =>
-        didPlayerPlayJ1InLowerTeam(p.id, teamNumber, phase)
-      );
-
-      // Si on essaie d'ajouter un joueur qui a joué J1 dans une équipe inférieure
-      const playerFromLowerTeam = didPlayerPlayJ1InLowerTeam(
-        player.id,
-        teamNumber,
-        phase
-      );
-
-      if (playerFromLowerTeam && playersFromLowerTeams.length > 1) {
-        return {
-          canDrop: false,
-          reason: `Lors de la ${JOURNEE_CONCERNEE_PAR_REGLE}ème journée, une équipe ne peut comporter qu'un seul joueur ayant joué la 1ère journée dans une équipe de numéro inférieur`,
-        };
-      }
-    }
-
-    return { canDrop: true };
-  };
-
-  // Fonction helper pour créer une image de drag uniforme
-  // Mutualisée pour les deux cas : joueur depuis la liste disponible ou depuis une équipe
-  const createDragImage = (
-    player: Player,
-    championshipType: "masculin" | "feminin" = "masculin"
-  ): HTMLElement => {
-    // Obtenir les dimensions approximatives (on va utiliser une largeur fixe raisonnable)
-    const width = 300; // Largeur fixe pour l'image de drag
-    const minHeight = 60;
-
-    // Créer un élément temporaire
-    const tempDiv = document.createElement("div");
-    tempDiv.style.position = "absolute";
-    tempDiv.style.top = "-1000px";
-    tempDiv.style.left = "-1000px";
-    tempDiv.style.width = `${width}px`;
-    tempDiv.style.minHeight = `${minHeight}px`;
-    tempDiv.style.backgroundColor = "white";
-    tempDiv.style.border = "1px solid #ccc";
-    tempDiv.style.borderRadius = "4px";
-    tempDiv.style.padding = "8px";
-    tempDiv.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
-    tempDiv.style.opacity = "0.9";
-    tempDiv.style.pointerEvents = "none";
-    tempDiv.style.boxSizing = "border-box";
-    tempDiv.style.display = "flex";
-    tempDiv.style.alignItems = "center";
-    tempDiv.style.flexDirection = "row";
-
-    // Créer la structure de contenu (identique pour les deux cas)
-    const clonedContent = document.createElement("div");
-    clonedContent.style.width = "100%";
-    clonedContent.style.height = "auto";
-    clonedContent.style.margin = "0";
-    clonedContent.style.padding = "0";
-    clonedContent.style.display = "flex";
-    clonedContent.style.alignItems = "center";
-
-    // Créer l'icône DragIndicator
-    const iconContainer = document.createElement("div");
-    iconContainer.style.marginRight = "8px";
-    iconContainer.style.display = "flex";
-    iconContainer.style.alignItems = "center";
-    iconContainer.style.color = "rgba(0, 0, 0, 0.54)";
-    iconContainer.innerHTML = `
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M11 18c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm-2-8c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0-6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm6 4c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
-      </svg>
-    `;
-    clonedContent.appendChild(iconContainer);
-
-    // Créer le contenu principal (nom, chips, points)
-    const textContainer = document.createElement("div");
-    textContainer.style.flex = "1 1 auto";
-    textContainer.style.minWidth = "0";
-    textContainer.style.marginTop = "0";
-    textContainer.style.marginBottom = "0";
-
-    // Créer le container pour le nom et les chips
-    const primaryContainer = document.createElement("div");
-    primaryContainer.style.display = "flex";
-    primaryContainer.style.alignItems = "center";
-    primaryContainer.style.gap = "4px";
-    primaryContainer.style.flexWrap = "wrap";
-    primaryContainer.style.marginBottom = "4px";
-
-    // Ajouter le nom
-    const nameSpan = document.createElement("span");
-    nameSpan.textContent = `${player.firstName} ${player.name}`;
-    nameSpan.style.fontSize = "0.875rem";
-    nameSpan.style.fontWeight = "400";
-    nameSpan.style.lineHeight = "1.43";
-    nameSpan.style.letterSpacing = "0.01071em";
-    primaryContainer.appendChild(nameSpan);
-
-    // Créer les chips informatifs directement à partir des données du joueur
-    const isEuropean = player.nationality === "C";
-    const isForeign = player.nationality === "ETR";
-    const phase = selectedPhase || "aller";
-    const burnedTeam =
-      championshipType === "masculin"
-        ? player.highestMasculineTeamNumberByPhase?.[phase]
-        : player.highestFeminineTeamNumberByPhase?.[phase];
-
-    if (isEuropean) {
-      const euroChip = document.createElement("span");
-      euroChip.textContent = "EUR";
-      euroChip.style.display = "inline-flex";
-      euroChip.style.alignItems = "center";
-      euroChip.style.justifyContent = "center";
-      euroChip.style.height = "20px";
-      euroChip.style.padding = "0 6px";
-      euroChip.style.fontSize = "0.7rem";
-      euroChip.style.border = "1px solid rgba(25, 118, 210, 0.5)";
-      euroChip.style.borderRadius = "16px";
-      euroChip.style.color = "rgba(25, 118, 210, 1)";
-      euroChip.style.backgroundColor = "transparent";
-      primaryContainer.appendChild(euroChip);
-    }
-
-    if (isForeign) {
-      const etrChip = document.createElement("span");
-      etrChip.textContent = "ETR";
-      etrChip.style.display = "inline-flex";
-      etrChip.style.alignItems = "center";
-      etrChip.style.justifyContent = "center";
-      etrChip.style.height = "20px";
-      etrChip.style.padding = "0 6px";
-      etrChip.style.fontSize = "0.7rem";
-      etrChip.style.border = "1px solid rgba(237, 108, 2, 0.5)";
-      etrChip.style.borderRadius = "16px";
-      etrChip.style.color = "rgba(237, 108, 2, 1)";
-      etrChip.style.backgroundColor = "transparent";
-      primaryContainer.appendChild(etrChip);
-    }
-
-    if (burnedTeam !== undefined && burnedTeam !== null) {
-      const burnedChip = document.createElement("span");
-      burnedChip.textContent = `Brûlé Éq. ${burnedTeam}`;
-      burnedChip.style.display = "inline-flex";
-      burnedChip.style.alignItems = "center";
-      burnedChip.style.justifyContent = "center";
-      burnedChip.style.height = "20px";
-      burnedChip.style.padding = "0 6px";
-      burnedChip.style.fontSize = "0.7rem";
-      burnedChip.style.border = "1px solid rgba(211, 47, 47, 0.5)";
-      burnedChip.style.borderRadius = "16px";
-      burnedChip.style.color = "rgba(211, 47, 47, 1)";
-      burnedChip.style.backgroundColor = "transparent";
-      primaryContainer.appendChild(burnedChip);
-    }
-
-    textContainer.appendChild(primaryContainer);
-
-    // Ajouter les points (secondary text) - toujours créer depuis les données du joueur
-    const pointsText = document.createElement("span");
-    pointsText.textContent =
-      player.points !== undefined && player.points !== null
-        ? `${player.points} points`
-        : "Points non disponibles";
-    pointsText.style.fontSize = "0.75rem";
-    pointsText.style.lineHeight = "1.66";
-    pointsText.style.color = "rgba(0, 0, 0, 0.6)";
-    pointsText.style.display = "block";
-    textContainer.appendChild(pointsText);
-
-    clonedContent.appendChild(textContainer);
-    tempDiv.appendChild(clonedContent);
-
-    return tempDiv;
+  ): AssignmentValidationResult => {
+    return canAssignPlayerToTeam({
+      playerId,
+      teamId,
+      players,
+      equipes,
+      compositions,
+      selectedPhase,
+      selectedJournee,
+      journeeRule: JOURNEE_CONCERNEE_PAR_REGLE,
+    });
   };
 
   // Gestion du drag & drop
@@ -836,11 +721,14 @@ export default function CompositionsPage() {
       : "feminin";
 
     // Créer l'image de drag uniforme (mutualisée pour les deux cas)
-    const tempDiv = createDragImage(player, championshipType);
+    const tempDiv = createDragImage(player, {
+      championshipType,
+      phase: (selectedPhase || "aller") as "aller" | "retour",
+    });
     document.body.appendChild(tempDiv);
 
     // Forcer un reflow pour s'assurer que les dimensions sont calculées
-    tempDiv.offsetHeight;
+    void tempDiv.offsetHeight;
 
     // Utiliser l'élément temporaire comme image de drag
     e.dataTransfer.setDragImage(tempDiv, 0, 0);
@@ -893,8 +781,8 @@ export default function CompositionsPage() {
     setDragOverTeamId(teamId);
 
     if (draggedPlayerId) {
-      const { canDrop } = canDropPlayer(draggedPlayerId, teamId);
-      e.dataTransfer.dropEffect = canDrop ? "move" : "none";
+      const validation = canDropPlayer(draggedPlayerId, teamId);
+      e.dataTransfer.dropEffect = validation.canAssign ? "move" : "none";
     } else {
       e.dataTransfer.dropEffect = "move";
     }
@@ -924,42 +812,33 @@ export default function CompositionsPage() {
       return;
     }
 
-    // Extraire le numéro de l'équipe depuis son nom
-    const teamNumber = extractTeamNumber(equipe.team.name);
+    const validation = canDropPlayer(playerId, teamId);
+    if (!validation.canAssign) {
+      setDraggedPlayerId(null);
+      return;
+    }
 
-    // Déterminer le type de championnat (masculin ou féminin)
     const isFemaleTeam = equipe.matches.some(
       (match) => match.isFemale === true
     );
     const championshipType = isFemaleTeam ? "feminin" : "masculin";
-    const phase = selectedPhase || "aller";
-
-    // Vérifier le brûlage
-    const burnedTeam =
-      championshipType === "masculin"
-        ? player.highestMasculineTeamNumberByPhase?.[phase]
-        : player.highestFeminineTeamNumberByPhase?.[phase];
-
-    // Vérifier que le numéro d'équipe a été extrait correctement
-    if (teamNumber === 0) {
-      console.warn(
-        "⚠️ Impossible d'extraire le numéro d'équipe depuis:",
-        equipe.team.name
-      );
-      // On continue quand même sans vérification de brûlage si on ne peut pas extraire le numéro
-    }
-
-    if (burnedTeam !== undefined && burnedTeam !== null && teamNumber > 0) {
-      // Si le joueur est brûlé dans une équipe, il ne peut jouer QUE dans cette équipe ou les équipes plus hautes
-      // Exemple : brûlé dans l'équipe 2, peut jouer dans l'équipe 1 (plus haute) ou équipe 2 (même niveau)
-      // Mais ne peut PAS jouer dans l'équipe 3, 4, etc. (plus basses)
-      // Exemple : brûlé dans l'équipe 8, peut jouer dans 1, 2, 3, 4, 5, 6, 7, 8, mais pas dans 9, 10, etc.
-      if (teamNumber > burnedTeam) {
-        return;
-      }
-    }
 
     setCompositions((prev) => {
+      const latestValidation = canAssignPlayerToTeam({
+        playerId,
+        teamId,
+        players,
+        equipes,
+        compositions: prev,
+        selectedPhase,
+        selectedJournee,
+        journeeRule: JOURNEE_CONCERNEE_PAR_REGLE,
+      });
+
+      if (!latestValidation.canAssign) {
+        return prev;
+      }
+
       const currentTeamPlayers = prev[teamId] || [];
 
       // Ne pas ajouter si le joueur est déjà dans l'équipe (même équipe)
@@ -1009,56 +888,16 @@ export default function CompositionsPage() {
         }
       }
 
-      // Vérifier les règles FFTT avant d'ajouter le joueur
-      const simulatedTeamPlayers = [
-        ...targetTeamPlayers
-          .map((pid) => players.find((p) => p.id === pid))
-          .filter((p): p is Player => p !== undefined),
-        player, // Ajouter le joueur dragué
-      ];
-
-      const division = equipe.team.division || "";
-      const { valid } = validateFFTTRules(
-        simulatedTeamPlayers,
-        division,
-        isFemaleTeam
-      );
-
-      if (!valid) {
-        // Ne pas ajouter le joueur si les règles FFTT ne sont pas respectées
-        // Le feedback visuel via canDropPlayer suffit
-        return prev;
-      }
-
-      // Vérifier la règle : J2 ne peut pas avoir plus d'un joueur ayant joué J1 dans une équipe inférieure
-      if (selectedJournee === JOURNEE_CONCERNEE_PAR_REGLE && selectedPhase) {
-        const phaseValue = selectedPhase as "aller" | "retour";
-
-        // Compter combien de joueurs (y compris celui qu'on essaie d'ajouter) ont joué J1 dans une équipe inférieure
-        const playersFromLowerTeams = simulatedTeamPlayers.filter((p) =>
-          didPlayerPlayJ1InLowerTeam(p.id, teamNumber, phaseValue)
-        );
-
-        // Si on essaie d'ajouter un joueur qui a joué J1 dans une équipe inférieure
-        const playerFromLowerTeam = didPlayerPlayJ1InLowerTeam(
-          player.id,
-          teamNumber,
-          phaseValue
-        );
-
-        if (playerFromLowerTeam && playersFromLowerTeams.length > 1) {
-          return {
-            canDrop: false,
-            reason: `Lors de la ${JOURNEE_CONCERNEE_PAR_REGLE}ème journée, une équipe ne peut comporter qu'un seul joueur ayant joué la 1ère journée dans une équipe de numéro inférieur`,
-          };
-        }
-      }
-
       // Ajouter le joueur à la nouvelle équipe
       const newCompositions = {
         ...updatedCompositions,
         [teamId]: [...targetTeamPlayers, playerId],
       };
+
+      setDefaultCompositions((prev) => ({
+        ...prev,
+        [championshipType]: newCompositions,
+      }));
 
       // Sauvegarder les compositions
       if (selectedJournee !== null && selectedPhase !== null) {
@@ -1099,6 +938,13 @@ export default function CompositionsPage() {
         [teamId]: currentTeamPlayers.filter((id) => id !== playerId),
       };
 
+      if (championshipType) {
+        setDefaultCompositions((prevDefaults) => ({
+          ...prevDefaults,
+          [championshipType]: newCompositions,
+        }));
+      }
+
       // Sauvegarder les compositions
       if (selectedJournee !== null && selectedPhase !== null) {
         const saveComposition = async () => {
@@ -1120,6 +966,376 @@ export default function CompositionsPage() {
     });
   };
 
+  const runResetCompositions = useCallback(async () => {
+    if (
+      selectedJournee === null ||
+      selectedPhase === null ||
+      !hasAssignedPlayers ||
+      isResetting
+    ) {
+      console.log("[Compositions] Reset cancelled", {
+        selectedJournee,
+        selectedPhase,
+        hasAssignedPlayers,
+        isResetting,
+      });
+      return;
+    }
+
+    console.log("[Compositions] Reset compositions started", {
+      journee: selectedJournee,
+      phase: selectedPhase,
+    });
+
+    setIsResetting(true);
+
+    const previousState: Record<string, string[]> = Object.fromEntries(
+      Object.entries(compositions).map(([teamId, playerIds]) => [
+        teamId,
+        [...playerIds],
+      ])
+    );
+
+    const masculineTeamIds = equipesByType.masculin.map(
+      (equipe) => equipe.team.id
+    );
+    const feminineTeamIds = equipesByType.feminin.map(
+      (equipe) => equipe.team.id
+    );
+
+    const emptyTeamsEntries = [
+      ...masculineTeamIds.map<[string, string[]]>((teamId) => [teamId, []]),
+      ...feminineTeamIds.map<[string, string[]]>((teamId) => [teamId, []]),
+    ];
+    const emptyTeams = Object.fromEntries(emptyTeamsEntries);
+
+    setCompositions(emptyTeams);
+
+    try {
+      await Promise.all([
+        masculineTeamIds.length > 0
+          ? compositionService.saveComposition({
+              journee: selectedJournee,
+              phase: selectedPhase,
+              championshipType: "masculin",
+              teams: Object.fromEntries(
+                masculineTeamIds.map<[string, string[]]>((teamId) => [
+                  teamId,
+                  [],
+                ])
+              ),
+            })
+          : Promise.resolve(),
+        feminineTeamIds.length > 0
+          ? compositionService.saveComposition({
+              journee: selectedJournee,
+              phase: selectedPhase,
+              championshipType: "feminin",
+              teams: Object.fromEntries(
+                feminineTeamIds.map<[string, string[]]>((teamId) => [
+                  teamId,
+                  [],
+                ])
+              ),
+            })
+          : Promise.resolve(),
+      ]);
+    } catch (error) {
+      console.error(
+        "Erreur lors de la réinitialisation des compositions:",
+        error
+      );
+      console.log("[Compositions] Reset compositions failed", {
+        journee: selectedJournee,
+        phase: selectedPhase,
+        error,
+      });
+      setCompositions(previousState);
+    } finally {
+      setIsResetting(false);
+      console.log("[Compositions] Reset compositions finished", {
+        journee: selectedJournee,
+        phase: selectedPhase,
+      });
+    }
+  }, [
+    compositions,
+    compositionService,
+    equipesByType,
+    hasAssignedPlayers,
+    isResetting,
+    selectedJournee,
+    selectedPhase,
+  ]);
+
+  const runApplyDefaultCompositions = useCallback(async () => {
+    if (
+      selectedJournee === null ||
+      selectedPhase === null ||
+      !defaultCompositionsLoaded ||
+      !availabilitiesLoaded ||
+      !hasDefaultCompositions ||
+      isApplyingDefaults
+    ) {
+      console.log("[Compositions] Apply defaults cancelled", {
+        selectedJournee,
+        selectedPhase,
+        defaultCompositionsLoaded,
+        availabilitiesLoaded,
+        hasDefaultCompositions,
+        isApplyingDefaults,
+      });
+      return;
+    }
+
+    setIsApplyingDefaults(true);
+
+    const previousState: Record<string, string[]> = Object.fromEntries(
+      Object.entries(compositions).map(([teamId, playerIds]) => [
+        teamId,
+        [...playerIds],
+      ])
+    );
+
+    try {
+      const masculineTeamIds = equipesByType.masculin.map(
+        (equipe) => equipe.team.id
+      );
+      const feminineTeamIds = equipesByType.feminin.map(
+        (equipe) => equipe.team.id
+      );
+
+      console.log("[Compositions] Apply defaults started", {
+        journee: selectedJournee,
+        phase: selectedPhase,
+        masculineTeamIds,
+        feminineTeamIds,
+      });
+
+      const nextCompositions: Record<string, string[]> = Object.fromEntries([
+        ...masculineTeamIds.map<[string, string[]]>((teamId) => [teamId, []]),
+        ...feminineTeamIds.map<[string, string[]]>((teamId) => [teamId, []]),
+      ]);
+
+      const processType = (
+        championshipType: "masculin" | "feminin",
+        teamIds: string[]
+      ) => {
+        const defaultsForType = defaultCompositions[championshipType] || {};
+        const availabilityMap =
+          (championshipType === "masculin"
+            ? availabilities.masculin
+            : availabilities.feminin) || {};
+        const assignedPlayersForType = new Set<string>();
+
+        teamIds.forEach((teamId) => {
+          const defaultPlayers = defaultsForType[teamId] || [];
+          const nextTeamPlayers: string[] = [];
+
+          defaultPlayers.forEach((playerId) => {
+            if (nextTeamPlayers.length >= 4) {
+              return;
+            }
+
+            if (assignedPlayersForType.has(playerId)) {
+              return;
+            }
+
+            const availability = availabilityMap[playerId];
+            if (!availability || availability.available !== true) {
+              console.log("[Compositions] Player skipped (not available)", {
+                playerId,
+                teamId,
+                championshipType,
+                availability,
+              });
+              return;
+            }
+
+            const player = players.find((p) => p.id === playerId);
+            if (!player) {
+              console.log("[Compositions] Player skipped (not found)", {
+                playerId,
+                teamId,
+                championshipType,
+              });
+              return;
+            }
+
+            const simulatedCompositions: Record<string, string[]> = {
+              ...nextCompositions,
+              [teamId]: [...nextTeamPlayers, playerId],
+            };
+
+            const validation = canAssignPlayerToTeam({
+              playerId,
+              teamId,
+              players,
+              equipes,
+              compositions: simulatedCompositions,
+              selectedPhase,
+              selectedJournee,
+              journeeRule: JOURNEE_CONCERNEE_PAR_REGLE,
+            });
+
+            if (!validation.canAssign) {
+              console.log("[Compositions] Player skipped (validation failed)", {
+                playerId,
+                teamId,
+                championshipType,
+                reason: validation.reason,
+              });
+              return;
+            }
+
+            nextTeamPlayers.push(playerId);
+            assignedPlayersForType.add(playerId);
+            console.log("[Compositions] Player added from defaults", {
+              playerId,
+              teamId,
+              championshipType,
+              nextTeamPlayers,
+            });
+          });
+
+          nextCompositions[teamId] = nextTeamPlayers;
+        });
+      };
+
+      processType("masculin", masculineTeamIds);
+      processType("feminin", feminineTeamIds);
+
+      setCompositions(nextCompositions);
+      console.log("[Compositions] Apply defaults next state", nextCompositions);
+
+      await Promise.all([
+        masculineTeamIds.length > 0
+          ? compositionService.saveComposition({
+              journee: selectedJournee,
+              phase: selectedPhase,
+              championshipType: "masculin",
+              teams: Object.fromEntries(
+                masculineTeamIds.map<[string, string[]]>((teamId) => [
+                  teamId,
+                  nextCompositions[teamId] || [],
+                ])
+              ),
+            })
+          : Promise.resolve(),
+        feminineTeamIds.length > 0
+          ? compositionService.saveComposition({
+              journee: selectedJournee,
+              phase: selectedPhase,
+              championshipType: "feminin",
+              teams: Object.fromEntries(
+                feminineTeamIds.map<[string, string[]]>((teamId) => [
+                  teamId,
+                  nextCompositions[teamId] || [],
+                ])
+              ),
+            })
+          : Promise.resolve(),
+      ]);
+    } catch (error) {
+      console.error(
+        "Erreur lors de la copie des compositions par défaut:",
+        error
+      );
+      console.log("[Compositions] Apply defaults failed", {
+        journee: selectedJournee,
+        phase: selectedPhase,
+        error,
+      });
+      setCompositions(previousState);
+    } finally {
+      setIsApplyingDefaults(false);
+      console.log("[Compositions] Apply defaults finished", {
+        journee: selectedJournee,
+        phase: selectedPhase,
+      });
+    }
+  }, [
+    availabilities,
+    availabilitiesLoaded,
+    compositionService,
+    compositions,
+    defaultCompositions,
+    defaultCompositionsLoaded,
+    equipes,
+    equipesByType,
+    hasDefaultCompositions,
+    isApplyingDefaults,
+    players,
+    selectedJournee,
+    selectedPhase,
+  ]);
+
+  const handleResetButtonClick = useCallback(() => {
+    if (!canResetButton) {
+      return;
+    }
+
+    setConfirmationDialog({
+      open: true,
+      title: "Réinitialiser les compositions",
+      description:
+        selectedJournee !== null
+          ? `Réinitialiser toutes les compositions (masculines et féminines) pour la journée ${selectedJournee} ?`
+          : "Réinitialiser toutes les compositions ?",
+      confirmLabel: "Réinitialiser",
+      cancelLabel: "Annuler",
+      onConfirm: () => {
+        void runResetCompositions();
+      },
+    });
+  }, [canResetButton, runResetCompositions, selectedJournee]);
+
+  const handleApplyDefaultsClick = useCallback(() => {
+    if (!canCopyDefaultsButton) {
+      return;
+    }
+
+    if (hasAssignedPlayers) {
+      setConfirmationDialog({
+        open: true,
+        title: "Remplacer par les compositions par défaut",
+        description:
+          selectedJournee !== null
+            ? `Des compositions existent pour la journée ${selectedJournee}. Les remplacer par les compositions par défaut (toutes équipes) ?`
+            : "Des compositions existent déjà. Les remplacer par les compositions par défaut ?",
+        confirmLabel: "Remplacer",
+        cancelLabel: "Annuler",
+        onConfirm: () => {
+          void runApplyDefaultCompositions();
+        },
+      });
+      return;
+    }
+
+    void runApplyDefaultCompositions();
+  }, [
+    canCopyDefaultsButton,
+    hasAssignedPlayers,
+    runApplyDefaultCompositions,
+    selectedJournee,
+  ]);
+
+  const handleCancelConfirmation = useCallback(() => {
+    setConfirmationDialog((prev) => ({ ...prev, open: false }));
+  }, []);
+
+  const handleConfirmDialog = useCallback(() => {
+    const action = confirmationDialog.onConfirm;
+    setConfirmationDialog((prev) => ({
+      ...prev,
+      open: false,
+      onConfirm: undefined,
+    }));
+    if (action) {
+      void action();
+    }
+  }, [confirmationDialog]);
+
   if (loadingEquipes || loadingPlayers) {
     return (
       <Layout>
@@ -1139,6 +1355,33 @@ export default function CompositionsPage() {
     <AuthGuard>
       <Layout>
         <Box sx={{ p: 5 }}>
+          <Dialog
+            open={confirmationDialog.open}
+            onClose={handleCancelConfirmation}
+            aria-labelledby="composition-confirmation-dialog-title"
+          >
+            <DialogTitle id="composition-confirmation-dialog-title">
+              {confirmationDialog.title}
+            </DialogTitle>
+            <DialogContent>
+              <DialogContentText>
+                {confirmationDialog.description}
+              </DialogContentText>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={handleCancelConfirmation}>
+                {confirmationDialog.cancelLabel ?? "Annuler"}
+              </Button>
+              <Button
+                onClick={handleConfirmDialog}
+                variant="contained"
+                color="primary"
+              >
+                {confirmationDialog.confirmLabel ?? "Confirmer"}
+              </Button>
+            </DialogActions>
+          </Dialog>
+
           <Typography variant="h4" gutterBottom>
             Composition des Équipes
           </Typography>
@@ -1203,7 +1446,45 @@ export default function CompositionsPage() {
             </CardContent>
           </Card>
 
-          {selectedJournee && selectedPhase && (
+          <Box
+            sx={{
+              mb: 3,
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 1.5,
+              alignItems: "center",
+            }}
+          >
+            <Button
+              component={Link}
+              href="/compositions/defaults"
+              variant="outlined"
+            >
+              Gérer les compositions par défaut
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<ContentCopy />}
+              disabled={!canCopyDefaultsButton}
+              onClick={handleApplyDefaultsClick}
+            >
+              Copier les compos par défaut (toutes équipes)
+            </Button>
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<RestartAlt />}
+              disabled={!canResetButton}
+              onClick={handleResetButtonClick}
+            >
+              Réinitialiser toutes les compos
+            </Button>
+          </Box>
+
+          <CompositionRulesHelp rules={compositionRules} />
+
+          {selectedJournee && selectedPhase ? (
             <>
               <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
                 <Tabs value={tabValue} onChange={handleTabChange}>
@@ -1213,312 +1494,157 @@ export default function CompositionsPage() {
               </Box>
 
               <Box sx={{ display: "flex", gap: 2, position: "relative" }}>
-                {/* Zone sticky pour les joueurs disponibles */}
-                <Paper
-                  sx={{
-                    position: "sticky",
-                    top: 20,
-                    alignSelf: "flex-start",
-                    minWidth: 300,
-                    maxWidth: 350,
-                    maxHeight: "calc(100vh - 100px)",
-                    overflow: "auto",
-                  }}
-                >
-                  <Box sx={{ p: 5 }}>
-                    <Typography variant="h6" gutterBottom>
-                      Joueurs disponibles
-                    </Typography>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ mb: 2, display: "block" }}
-                    >
-                      {tabValue === 0 ? "Masculin" : "Féminin"} - Journée{" "}
-                      {selectedJournee}
-                    </Typography>
-                    <Divider sx={{ mb: 2 }} />
-                    <TextField
-                      fullWidth
-                      size="small"
-                      placeholder="Rechercher un joueur..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      sx={{ mb: 2 }}
-                    />
-                    {availablePlayers.length === 0 ? (
-                      <Typography variant="body2" color="text.secondary">
-                        Aucun joueur disponible
-                      </Typography>
-                    ) : filteredAvailablePlayers.length === 0 ? (
-                      <Typography variant="body2" color="text.secondary">
-                        Aucun joueur trouvé pour &ldquo;{searchQuery}&rdquo;
-                      </Typography>
-                    ) : (
-                      <List dense>
-                        {filteredAvailablePlayers
-                          .filter((player) => {
-                            // Filtrer les joueurs qui ne sont dans aucune équipe du type actuel
-                            const currentTypeEquipes =
-                              tabValue === 0
-                                ? equipesByType.masculin
-                                : equipesByType.feminin;
-                            return !currentTypeEquipes.some((equipe) =>
-                              compositions[equipe.team.id]?.includes(player.id)
-                            );
-                          })
-                          .map((player) => {
-                            // Déterminer le brûlage selon l'onglet et la phase
-                            const championshipType =
-                              tabValue === 0 ? "masculin" : "feminin";
-                            const phase = selectedPhase || "aller";
+                <AvailablePlayersPanel
+                  title="Joueurs disponibles"
+                  subtitle={availablePlayersSubtitle}
+                  searchQuery={searchQuery}
+                  onSearchChange={setSearchQuery}
+                  totalCount={availablePlayersWithoutAssignment.length}
+                  filteredPlayers={filteredAvailablePlayersWithoutAssignment}
+                  emptyMessage="Aucun joueur disponible"
+                  noResultMessage={(query) =>
+                    `Aucun joueur trouvé pour “${query}”`
+                  }
+                  renderPlayerItem={(player) => {
+                    const phase = selectedPhase || "aller";
+                    const championshipType =
+                      tabValue === 0 ? "masculin" : "feminin";
+                    const burnedTeam =
+                      championshipType === "masculin"
+                        ? player.highestMasculineTeamNumberByPhase?.[phase]
+                        : player.highestFeminineTeamNumberByPhase?.[phase];
+                    const isForeign = player.nationality === "ETR";
+                    const isEuropean = player.nationality === "C";
 
-                            const burnedTeam =
-                              championshipType === "masculin"
-                                ? player.highestMasculineTeamNumberByPhase?.[
-                                    phase
-                                  ]
-                                : player.highestFeminineTeamNumberByPhase?.[
-                                    phase
-                                  ];
-
-                            // Déterminer si le joueur est étranger ou européen
-                            const isForeign = player.nationality === "ETR";
-                            const isEuropean = player.nationality === "C";
-
-                            return (
-                              <ListItem
-                                key={player.id}
-                                disablePadding
-                                draggable
-                                onDragStart={(e) =>
-                                  handleDragStart(e, player.id)
-                                }
-                                onDragEnd={handleDragEnd}
-                                sx={{
-                                  cursor: "grab",
-                                  border: "1px solid",
-                                  borderColor: "divider",
-                                  borderRadius: 1,
-                                  mb: 1,
-                                  backgroundColor: "background.paper",
-                                  "&:hover": {
-                                    backgroundColor: "action.hover",
-                                    borderColor: "primary.main",
-                                    boxShadow: 1,
-                                    cursor: "grab",
-                                  },
-                                  "&:active": {
-                                    cursor: "grabbing",
-                                    opacity: 0.5,
-                                  },
-                                }}
-                              >
-                                <ListItemButton>
-                                  <IconButton
-                                    edge="start"
-                                    size="small"
-                                    sx={{
-                                      mr: 1,
-                                      color: "text.secondary",
-                                      cursor:
-                                        draggedPlayerId === player.id
-                                          ? "grabbing"
-                                          : "grab",
-                                      "&:hover": {
-                                        cursor: "grab",
-                                      },
-                                      "&:active": {
-                                        cursor: "grabbing",
-                                      },
-                                    }}
-                                    disabled
-                                  >
-                                    <DragIndicator fontSize="small" />
-                                  </IconButton>
-                                  <ListItemText
-                                    primary={
-                                      <Box
-                                        sx={{
-                                          display: "flex",
-                                          alignItems: "center",
-                                          gap: 1,
-                                          flexWrap: "wrap",
-                                        }}
-                                      >
-                                        <Typography
-                                          variant="body2"
-                                          component="span"
-                                        >
-                                          {player.firstName} {player.name}
-                                        </Typography>
-                                        {isEuropean && (
-                                          <Chip
-                                            label="EUR"
-                                            size="small"
-                                            color="info"
-                                            variant="outlined"
-                                            sx={{
-                                              height: 20,
-                                              fontSize: "0.7rem",
-                                            }}
-                                          />
-                                        )}
-                                        {isForeign && (
-                                          <Chip
-                                            label="ETR"
-                                            size="small"
-                                            color="warning"
-                                            variant="outlined"
-                                            sx={{
-                                              height: 20,
-                                              fontSize: "0.7rem",
-                                            }}
-                                          />
-                                        )}
-                                        {burnedTeam !== undefined &&
-                                          burnedTeam !== null && (
-                                            <Chip
-                                              label={`Brûlé Éq. ${burnedTeam}`}
-                                              size="small"
-                                              color="error"
-                                              variant="outlined"
-                                              sx={{
-                                                height: 20,
-                                                fontSize: "0.7rem",
-                                              }}
-                                            />
-                                          )}
-                                      </Box>
-                                    }
-                                    secondary={
-                                      <Typography
-                                        variant="caption"
-                                        color="text.secondary"
-                                      >
-                                        {player.points !== undefined &&
-                                        player.points !== null
-                                          ? `${player.points} points`
-                                          : "Points non disponibles"}
-                                      </Typography>
-                                    }
-                                  />
-                                </ListItemButton>
-                              </ListItem>
-                            );
-                          })}
-                      </List>
-                    )}
-                  </Box>
-                </Paper>
-
-                {/* Zone principale pour les équipes */}
-                <Box sx={{ flex: 1 }}>
-                  {/* Bilan de complétude des compositions */}
-                  <Paper
-                    sx={{ p: 2, mb: 3, backgroundColor: "background.default" }}
-                  >
-                    <Typography variant="h6" gutterBottom>
-                      Bilan des compositions
-                    </Typography>
-                    {(() => {
-                      const currentTypeEquipes =
-                        tabValue === 0
-                          ? equipesByType.masculin
-                          : equipesByType.feminin;
-
-                      let totalEquipes = 0;
-                      let equipesCompletes = 0;
-                      let equipesIncompletes = 0;
-                      let equipesMatchsJoues = 0;
-
-                      currentTypeEquipes.forEach((equipe) => {
-                        const match = getMatchForTeam(equipe);
-                        const matchPlayed = isMatchPlayed(match);
-
-                        if (matchPlayed) {
-                          equipesMatchsJoues++;
-                        } else {
-                          const teamPlayers =
-                            compositions[equipe.team.id] || [];
-                          const teamPlayersData = teamPlayers
-                            .map((playerId) =>
-                              players.find((p) => p.id === playerId)
-                            )
-                            .filter((p): p is Player => p !== undefined);
-
-                          totalEquipes++;
-                          if (teamPlayersData.length >= 4) {
-                            equipesCompletes++;
-                          } else {
-                            equipesIncompletes++;
+                    return (
+                      <ListItem
+                        disablePadding
+                        sx={{ mb: 1 }}
+                        secondaryAction={null}
+                      >
+                        <ListItemButton
+                          draggable
+                          onDragStart={(event) =>
+                            handleDragStart(event, player.id)
                           }
-                        }
-                      });
-
-                      const totalEditable =
-                        equipesCompletes + equipesIncompletes;
-                      const pourcentageComplet =
-                        totalEditable > 0
-                          ? Math.round((equipesCompletes / totalEditable) * 100)
-                          : 0;
-
-                      return (
-                        <Box
+                          onDragEnd={handleDragEnd}
                           sx={{
-                            display: "flex",
-                            gap: 2,
-                            flexWrap: "wrap",
-                            alignItems: "center",
+                            cursor: "grab",
+                            border: "1px solid",
+                            borderColor: "divider",
+                            borderRadius: 1,
+                            backgroundColor: "background.paper",
+                            "&:hover": {
+                              backgroundColor: "action.hover",
+                              borderColor: "primary.main",
+                              boxShadow: 1,
+                              cursor: "grab",
+                            },
+                            "&:active": {
+                              cursor: "grabbing",
+                              opacity: 0.6,
+                            },
                           }}
                         >
-                          <Chip
-                            label={`${totalEditable} équipe${
-                              totalEditable > 1 ? "s" : ""
-                            } à composer`}
-                            color="default"
-                            variant="outlined"
-                          />
-                          <Chip
-                            label={`${equipesCompletes} complète${
-                              equipesCompletes > 1 ? "s" : ""
-                            } (4/4)`}
-                            color="success"
-                            variant={
-                              equipesCompletes > 0 ? "filled" : "outlined"
+                          <IconButton
+                            edge="start"
+                            size="small"
+                            sx={{
+                              mr: 1,
+                              color: "text.secondary",
+                              cursor:
+                                draggedPlayerId === player.id
+                                  ? "grabbing"
+                                  : "grab",
+                              "&:hover": {
+                                cursor: "grab",
+                              },
+                              "&:active": {
+                                cursor: "grabbing",
+                              },
+                            }}
+                            disabled
+                          >
+                            <DragIndicator fontSize="small" />
+                          </IconButton>
+                          <ListItemText
+                            primary={
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 1,
+                                  flexWrap: "wrap",
+                                }}
+                              >
+                                <Typography variant="body2" component="span">
+                                  {player.firstName} {player.name}
+                                </Typography>
+                                {isEuropean && (
+                                  <Chip
+                                    label="EUR"
+                                    size="small"
+                                    color="info"
+                                    variant="outlined"
+                                    sx={{
+                                      height: 20,
+                                      fontSize: "0.7rem",
+                                    }}
+                                  />
+                                )}
+                                {isForeign && (
+                                  <Chip
+                                    label="ETR"
+                                    size="small"
+                                    color="warning"
+                                    variant="outlined"
+                                    sx={{
+                                      height: 20,
+                                      fontSize: "0.7rem",
+                                    }}
+                                  />
+                                )}
+                                {burnedTeam !== undefined &&
+                                  burnedTeam !== null && (
+                                    <Chip
+                                      label={`Brûlé Éq. ${burnedTeam}`}
+                                      size="small"
+                                      color="error"
+                                      variant="outlined"
+                                      sx={{
+                                        height: 20,
+                                        fontSize: "0.7rem",
+                                      }}
+                                    />
+                                  )}
+                              </Box>
+                            }
+                            secondary={
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                {player.points !== undefined &&
+                                player.points !== null
+                                  ? `${player.points} points`
+                                  : "Points non disponibles"}
+                              </Typography>
                             }
                           />
-                          <Chip
-                            label={`${equipesIncompletes} incomplète${
-                              equipesIncompletes > 1 ? "s" : ""
-                            }`}
-                            color="warning"
-                            variant={
-                              equipesIncompletes > 0 ? "filled" : "outlined"
-                            }
-                          />
-                          {equipesMatchsJoues > 0 && (
-                            <Chip
-                              label={`${equipesMatchsJoues} match${
-                                equipesMatchsJoues > 1 ? "s" : ""
-                              } joué${equipesMatchsJoues > 1 ? "s" : ""}`}
-                              color="info"
-                              variant="outlined"
-                            />
-                          )}
-                          {totalEditable > 0 && (
-                            <Typography
-                              variant="body2"
-                              color="text.secondary"
-                              sx={{ ml: "auto" }}
-                            >
-                              {pourcentageComplet}% complété
-                            </Typography>
-                          )}
-                        </Box>
-                      );
-                    })()}
-                  </Paper>
+                        </ListItemButton>
+                      </ListItem>
+                    );
+                  }}
+                />
+
+                <Box sx={{ flex: 1 }}>
+                  <CompositionsSummary
+                    totalTeams={compositionSummary.totalEditable}
+                    completedTeams={compositionSummary.equipesCompletes}
+                    incompleteTeams={compositionSummary.equipesIncompletes}
+                    matchesPlayed={compositionSummary.equipesMatchsJoues}
+                    percentage={compositionSummary.percentage}
+                  />
 
                   <TabPanel value={tabValue} index={0}>
                     {equipesByType.masculin.length === 0 ? (
@@ -1534,13 +1660,10 @@ export default function CompositionsPage() {
                         }}
                       >
                         {equipesByType.masculin.map((equipe) => {
-                          // Trouver le match correspondant
                           const match = getMatchForTeam(equipe);
                           const matchPlayed = isMatchPlayed(match);
-
-                          // Si le match est joué, utiliser les joueurs du match, sinon la composition
                           const teamPlayers = matchPlayed
-                            ? getPlayersFromMatch(match)
+                            ? getPlayersFromMatch(match, players)
                             : (compositions[equipe.team.id] || [])
                                 .map((playerId) =>
                                   players.find((p) => p.id === playerId)
@@ -1553,343 +1676,108 @@ export default function CompositionsPage() {
                               ? teamPlayers
                               : [];
 
-                          // Désactiver le drag & drop si le match est joué
-                          // isDragOver est true seulement si on survole AVEC un joueur dragué (dragOverTeamId doit être défini)
                           const isDragOver =
                             !matchPlayed &&
                             draggedPlayerId &&
                             dragOverTeamId === equipe.team.id;
-                          // Ne calculer dropCheck que si on est vraiment en train de draguer ET de survoler cette équipe
-                          // Sinon, pas de raison à afficher
+
                           const dropCheck =
                             !matchPlayed &&
                             draggedPlayerId &&
                             dragOverTeamId === equipe.team.id
                               ? canDropPlayer(draggedPlayerId, equipe.team.id)
-                              : { canDrop: true, reason: undefined };
+                              : {
+                                  canAssign: true,
+                                  reason: undefined,
+                                  simulatedPlayers: teamPlayersData,
+                                };
                           const canDrop = matchPlayed
                             ? false
-                            : dropCheck.canDrop;
+                            : dropCheck.canAssign;
+                          const dragHandlers = matchPlayed
+                            ? undefined
+                            : {
+                                onDragOver: (event: React.DragEvent) =>
+                                  handleDragOver(event, equipe.team.id),
+                                onDragLeave: handleDragLeave,
+                                onDrop: (event: React.DragEvent) =>
+                                  handleDrop(event, equipe.team.id),
+                              };
 
                           return (
-                            <Card
+                            <TeamCompositionCard
                               key={equipe.team.id}
-                              elevation={0}
-                              {...(!matchPlayed &&
-                                draggedPlayerId &&
-                                dragOverTeamId === equipe.team.id && {
-                                  className: canDrop
-                                    ? "droppable--over"
-                                    : "droppable--blocked",
-                                })}
-                              onDragOver={
-                                matchPlayed
-                                  ? undefined
-                                  : (e) => handleDragOver(e, equipe.team.id)
+                              equipe={equipe}
+                              players={teamPlayersData}
+                              onRemovePlayer={(playerId) =>
+                                handleRemovePlayer(equipe.team.id, playerId)
                               }
-                              onDragLeave={
-                                matchPlayed ? undefined : handleDragLeave
+                              onPlayerDragStart={(event, playerId) =>
+                                handleDragStart(event, playerId)
                               }
-                              onDrop={
-                                matchPlayed
-                                  ? undefined
-                                  : (e) => handleDrop(e, equipe.team.id)
-                              }
-                              sx={{
-                                position: "relative",
-                                cursor:
-                                  !matchPlayed &&
-                                  draggedPlayerId &&
-                                  dragOverTeamId === equipe.team.id
-                                    ? canDrop
-                                      ? "grab"
-                                      : "not-allowed"
-                                    : undefined,
-                                border: "2px dashed",
-                                borderColor: matchPlayed
-                                  ? "info.main"
-                                  : teamPlayersData.length >= 4
-                                  ? "success.main"
-                                  : dragOverTeamId === equipe.team.id &&
-                                    draggedPlayerId
-                                  ? canDrop
-                                    ? "primary.main"
-                                    : "error.main"
-                                  : "divider",
-                                opacity: isDragOver && !canDrop ? 0.5 : 1,
-                                transition: "opacity 0.2s ease-in-out",
-                                backgroundColor: matchPlayed
-                                  ? "action.disabledBackground"
-                                  : "background.paper",
-                                boxShadow: "none",
-                                "&:hover": {
-                                  borderColor: matchPlayed
-                                    ? "info.main"
-                                    : teamPlayersData.length >= 4
-                                    ? "success.main"
-                                    : dragOverTeamId === equipe.team.id &&
-                                      draggedPlayerId
-                                    ? canDrop
-                                      ? "primary.main"
-                                      : "error.main"
-                                    : "primary.main",
-                                  backgroundColor: matchPlayed
-                                    ? "action.disabledBackground"
-                                    : "action.hover",
-                                },
-                              }}
-                            >
-                              <CardContent>
-                                <Box
-                                  sx={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                    mb: 1,
-                                  }}
-                                >
-                                  <Box
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 1,
-                                    }}
-                                  >
-                                    <Typography variant="h6">
-                                      {equipe.team.name}
-                                    </Typography>
-                                    {matchPlayed && (
+                              onPlayerDragEnd={handleDragEnd}
+                              isDragOver={Boolean(isDragOver)}
+                              canDrop={canDrop}
+                              dropReason={dropCheck.reason}
+                              draggedPlayerId={draggedPlayerId}
+                              dragOverTeamId={dragOverTeamId}
+                              matchPlayed={matchPlayed}
+                              renderPlayerIndicators={(player) => {
+                                const phase = selectedPhase || "aller";
+                                const burnedTeam =
+                                  player.highestMasculineTeamNumberByPhase?.[
+                                    phase
+                                  ];
+                                return (
+                                  <>
+                                    {player.nationality === "C" && (
                                       <Chip
-                                        label="Match joué"
+                                        label="EUR"
                                         size="small"
                                         color="info"
-                                        variant="filled"
+                                        variant="outlined"
+                                        sx={{
+                                          height: 18,
+                                          fontSize: "0.65rem",
+                                        }}
                                       />
                                     )}
-                                  </Box>
-                                  <Chip
-                                    label={`${teamPlayersData.length}/4 joueurs`}
-                                    size="small"
-                                    color={
-                                      teamPlayersData.length >= 4
-                                        ? "success"
-                                        : "default"
-                                    }
-                                    variant={
-                                      teamPlayersData.length >= 4
-                                        ? "filled"
-                                        : "outlined"
-                                    }
-                                  />
-                                </Box>
-                                <Divider sx={{ mb: 2 }} />
-                                {matchPlayed && (
-                                  <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                    sx={{
-                                      mb: 2,
-                                      display: "block",
-                                      fontStyle: "italic",
-                                    }}
-                                  >
-                                    Composition du match joué (non modifiable)
-                                  </Typography>
-                                )}
-                                {/* Afficher le message d'erreur seulement lors du survol avec un joueur dragué */}
-                                {isDragOver && !canDrop && dropCheck.reason && (
-                                  <Box
-                                    sx={{
-                                      py: 1,
-                                      px: 2,
-                                      mb: 2,
-                                      backgroundColor: "error.main",
-                                      color: "error.contrastText",
-                                      borderRadius: 1,
-                                      textAlign: "center",
-                                    }}
-                                  >
-                                    <Typography
-                                      variant="caption"
-                                      fontWeight="bold"
-                                    >
-                                      ❌ {dropCheck.reason}
-                                    </Typography>
-                                  </Box>
-                                )}
-                                {teamPlayersData.length === 0 && (
-                                  <Typography
-                                    variant="body2"
-                                    color="text.secondary"
-                                    sx={{
-                                      py: 2,
-                                      textAlign: "center",
-                                      fontStyle: "italic",
-                                    }}
-                                  >
-                                    Déposez des joueurs ici
-                                  </Typography>
-                                )}
-                                {teamPlayersData.length > 0 && (
-                                  <Box
-                                    sx={{
-                                      display: "grid",
-                                      gridTemplateColumns: "1fr 1fr",
-                                      gap: 1,
-                                    }}
-                                  >
-                                    {teamPlayersData.map((player) => {
-                                      const phase = selectedPhase || "aller";
-                                      const burnedTeam =
-                                        player
-                                          .highestMasculineTeamNumberByPhase?.[
-                                          phase
-                                        ];
-                                      const isForeign =
-                                        player.nationality === "ETR";
-                                      const isEuropean =
-                                        player.nationality === "C";
-
-                                      return (
-                                        <Box
-                                          key={player.id}
-                                          draggable
-                                          onDragStart={(e) =>
-                                            handleDragStart(e, player.id)
-                                          }
-                                          onDragEnd={handleDragEnd}
+                                    {player.nationality === "ETR" && (
+                                      <Chip
+                                        label="ETR"
+                                        size="small"
+                                        color="warning"
+                                        variant="outlined"
+                                        sx={{
+                                          height: 18,
+                                          fontSize: "0.65rem",
+                                        }}
+                                      />
+                                    )}
+                                    {burnedTeam !== undefined &&
+                                      burnedTeam !== null && (
+                                        <Chip
+                                          label={`Brûlé Éq. ${burnedTeam}`}
+                                          size="small"
+                                          color="error"
+                                          variant="outlined"
                                           sx={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: 0.5,
-                                            p: 1,
-                                            border: "1px solid",
-                                            borderColor: "divider",
-                                            borderRadius: 1,
-                                            position: "relative",
-                                            cursor: "grab",
-                                            "&:hover": {
-                                              backgroundColor: "action.hover",
-                                              borderColor: "primary.main",
-                                              boxShadow: 1,
-                                            },
-                                            "&:active": {
-                                              cursor: "grabbing",
-                                              opacity: 0.7,
-                                            },
+                                            height: 18,
+                                            fontSize: "0.65rem",
                                           }}
-                                        >
-                                          <Box
-                                            sx={{
-                                              display: "flex",
-                                              flexDirection: "column",
-                                              flex: 1,
-                                              minWidth: 0,
-                                            }}
-                                          >
-                                            <Box
-                                              sx={{
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: 0.5,
-                                                flexWrap: "wrap",
-                                              }}
-                                            >
-                                              <Typography
-                                                variant="body2"
-                                                component="span"
-                                                sx={{
-                                                  fontWeight: "medium",
-                                                }}
-                                              >
-                                                {player.firstName} {player.name}
-                                              </Typography>
-                                              {isEuropean && (
-                                                <Chip
-                                                  label="EUR"
-                                                  size="small"
-                                                  color="info"
-                                                  variant="outlined"
-                                                  sx={{
-                                                    height: 18,
-                                                    fontSize: "0.65rem",
-                                                  }}
-                                                />
-                                              )}
-                                              {isForeign && (
-                                                <Chip
-                                                  label="ETR"
-                                                  size="small"
-                                                  color="warning"
-                                                  variant="outlined"
-                                                  sx={{
-                                                    height: 18,
-                                                    fontSize: "0.65rem",
-                                                  }}
-                                                />
-                                              )}
-                                              {burnedTeam !== undefined &&
-                                                burnedTeam !== null && (
-                                                  <Chip
-                                                    label={`Brûlé Éq. ${burnedTeam}`}
-                                                    size="small"
-                                                    color="error"
-                                                    variant="outlined"
-                                                    sx={{
-                                                      height: 18,
-                                                      fontSize: "0.65rem",
-                                                    }}
-                                                  />
-                                                )}
-                                            </Box>
-                                            <Typography
-                                              variant="caption"
-                                              color="text.secondary"
-                                            >
-                                              {player.points !== undefined &&
-                                              player.points !== null
-                                                ? `${player.points} points`
-                                                : "Points non disponibles"}
-                                            </Typography>
-                                          </Box>
-                                          {!matchPlayed && (
-                                            <Chip
-                                              label="×"
-                                              size="small"
-                                              data-chip="remove"
-                                              draggable={false}
-                                              onDragStart={(e) => {
-                                                e.stopPropagation();
-                                                e.preventDefault();
-                                              }}
-                                              onMouseDown={(e) => {
-                                                e.stopPropagation();
-                                              }}
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleRemovePlayer(
-                                                  equipe.team.id,
-                                                  player.id
-                                                );
-                                              }}
-                                              sx={{
-                                                cursor: "pointer",
-                                                minWidth: 24,
-                                                height: 24,
-                                                "&:hover": {
-                                                  backgroundColor: "error.main",
-                                                  color: "white",
-                                                },
-                                              }}
-                                            />
-                                          )}
-                                        </Box>
-                                      );
-                                    })}
-                                  </Box>
-                                )}
-                              </CardContent>
-                            </Card>
+                                        />
+                                      )}
+                                  </>
+                                );
+                              }}
+                              renderPlayerSecondary={(player) =>
+                                player.points !== undefined &&
+                                player.points !== null
+                                  ? `${player.points} points`
+                                  : "Points non disponibles"
+                              }
+                              {...(dragHandlers ?? {})}
+                            />
                           );
                         })}
                       </Box>
@@ -1910,13 +1798,10 @@ export default function CompositionsPage() {
                         }}
                       >
                         {equipesByType.feminin.map((equipe) => {
-                          // Trouver le match correspondant
                           const match = getMatchForTeam(equipe);
                           const matchPlayed = isMatchPlayed(match);
-
-                          // Si le match est joué, utiliser les joueurs du match, sinon la composition
                           const teamPlayers = matchPlayed
-                            ? getPlayersFromMatch(match)
+                            ? getPlayersFromMatch(match, players)
                             : (compositions[equipe.team.id] || [])
                                 .map((playerId) =>
                                   players.find((p) => p.id === playerId)
@@ -1929,304 +1814,107 @@ export default function CompositionsPage() {
                               ? teamPlayers
                               : [];
 
-                          // Désactiver le drag & drop si le match est joué
-                          // isDragOver est true seulement si on survole avec un joueur dragué
-                          // ET qu'on est actuellement en train de draguer (dragOverTeamId est défini)
                           const isDragOver =
                             !matchPlayed &&
                             draggedPlayerId &&
-                            dragOverTeamId === equipe.team.id &&
-                            dragOverTeamId !== null;
-                          // Ne calculer dropCheck que si on est vraiment en train de draguer
+                            dragOverTeamId === equipe.team.id;
                           const dropCheck =
                             !matchPlayed &&
                             draggedPlayerId &&
                             dragOverTeamId === equipe.team.id
                               ? canDropPlayer(draggedPlayerId, equipe.team.id)
-                              : { canDrop: true, reason: undefined };
+                              : {
+                                  canAssign: true,
+                                  reason: undefined,
+                                  simulatedPlayers: teamPlayersData,
+                                };
                           const canDrop = matchPlayed
                             ? false
-                            : dropCheck.canDrop;
+                            : dropCheck.canAssign;
+                          const dragHandlers = matchPlayed
+                            ? undefined
+                            : {
+                                onDragOver: (event: React.DragEvent) =>
+                                  handleDragOver(event, equipe.team.id),
+                                onDragLeave: handleDragLeave,
+                                onDrop: (event: React.DragEvent) =>
+                                  handleDrop(event, equipe.team.id),
+                              };
 
                           return (
-                            <Card
+                            <TeamCompositionCard
                               key={equipe.team.id}
-                              onDragOver={
-                                matchPlayed
-                                  ? undefined
-                                  : (e) => handleDragOver(e, equipe.team.id)
+                              equipe={equipe}
+                              players={teamPlayersData}
+                              onRemovePlayer={(playerId) =>
+                                handleRemovePlayer(equipe.team.id, playerId)
                               }
-                              onDragLeave={
-                                matchPlayed ? undefined : handleDragLeave
+                              onPlayerDragStart={(event, playerId) =>
+                                handleDragStart(event, playerId)
                               }
-                              onDrop={
-                                matchPlayed
-                                  ? undefined
-                                  : (e) => handleDrop(e, equipe.team.id)
-                              }
-                              sx={{
-                                border: "2px dashed",
-                                borderColor: matchPlayed
-                                  ? "info.main"
-                                  : teamPlayersData.length >= 4
-                                  ? "success.main"
-                                  : "divider",
-                                opacity: isDragOver && !canDrop ? 0.5 : 1,
-                                transition: "opacity 0.2s ease-in-out",
-                                backgroundColor: matchPlayed
-                                  ? "action.disabledBackground"
-                                  : "background.paper",
-                                "&:hover": {
-                                  borderColor: matchPlayed
-                                    ? "info.main"
-                                    : teamPlayersData.length >= 4
-                                    ? "success.main"
-                                    : "primary.main",
-                                  backgroundColor: matchPlayed
-                                    ? "action.disabledBackground"
-                                    : "action.hover",
-                                },
-                              }}
-                            >
-                              <CardContent>
-                                <Box
-                                  sx={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                    mb: 1,
-                                  }}
-                                >
-                                  <Box
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 1,
-                                    }}
-                                  >
-                                    <Typography variant="h6">
-                                      {equipe.team.name}
-                                    </Typography>
-                                    {matchPlayed && (
+                              onPlayerDragEnd={handleDragEnd}
+                              isDragOver={Boolean(isDragOver)}
+                              canDrop={canDrop}
+                              dropReason={dropCheck.reason}
+                              draggedPlayerId={draggedPlayerId}
+                              dragOverTeamId={dragOverTeamId}
+                              matchPlayed={matchPlayed}
+                              renderPlayerIndicators={(player) => {
+                                const phase = selectedPhase || "aller";
+                                const burnedTeam =
+                                  player.highestFeminineTeamNumberByPhase?.[
+                                    phase
+                                  ];
+                                return (
+                                  <>
+                                    {player.nationality === "C" && (
                                       <Chip
-                                        label="Match joué"
+                                        label="EUR"
                                         size="small"
                                         color="info"
-                                        variant="filled"
+                                        variant="outlined"
+                                        sx={{
+                                          height: 18,
+                                          fontSize: "0.65rem",
+                                        }}
                                       />
                                     )}
-                                  </Box>
-                                  <Chip
-                                    label={`${teamPlayersData.length}/4 joueurs`}
-                                    size="small"
-                                    color={
-                                      teamPlayersData.length >= 4
-                                        ? "success"
-                                        : "default"
-                                    }
-                                    variant={
-                                      teamPlayersData.length >= 4
-                                        ? "filled"
-                                        : "outlined"
-                                    }
-                                  />
-                                </Box>
-                                <Divider sx={{ mb: 2 }} />
-                                {matchPlayed && (
-                                  <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                    sx={{
-                                      mb: 2,
-                                      display: "block",
-                                      fontStyle: "italic",
-                                    }}
-                                  >
-                                    Composition du match joué (non modifiable)
-                                  </Typography>
-                                )}
-                                {/* Afficher le message d'erreur seulement lors du survol avec un joueur dragué */}
-                                {isDragOver && !canDrop && dropCheck.reason && (
-                                  <Box
-                                    sx={{
-                                      py: 1,
-                                      px: 2,
-                                      mb: 2,
-                                      backgroundColor: "error.main",
-                                      color: "error.contrastText",
-                                      borderRadius: 1,
-                                      textAlign: "center",
-                                    }}
-                                  >
-                                    <Typography
-                                      variant="caption"
-                                      fontWeight="bold"
-                                    >
-                                      ❌ {dropCheck.reason}
-                                    </Typography>
-                                  </Box>
-                                )}
-                                {teamPlayersData.length === 0 && (
-                                  <Typography
-                                    variant="body2"
-                                    color="text.secondary"
-                                    sx={{
-                                      py: 2,
-                                      textAlign: "center",
-                                      fontStyle: "italic",
-                                    }}
-                                  >
-                                    Déposez des joueurs ici
-                                  </Typography>
-                                )}
-                                {teamPlayersData.length > 0 && (
-                                  <Box
-                                    sx={{
-                                      display: "grid",
-                                      gridTemplateColumns: "1fr 1fr",
-                                      gap: 1,
-                                    }}
-                                  >
-                                    {teamPlayersData.map((player) => {
-                                      const phase = selectedPhase || "aller";
-                                      const burnedTeam =
-                                        player
-                                          .highestFeminineTeamNumberByPhase?.[
-                                          phase
-                                        ];
-                                      const isForeign =
-                                        player.nationality === "ETR";
-                                      const isEuropean =
-                                        player.nationality === "C";
-
-                                      return (
-                                        <Box
-                                          key={player.id}
+                                    {player.nationality === "ETR" && (
+                                      <Chip
+                                        label="ETR"
+                                        size="small"
+                                        color="warning"
+                                        variant="outlined"
+                                        sx={{
+                                          height: 18,
+                                          fontSize: "0.65rem",
+                                        }}
+                                      />
+                                    )}
+                                    {burnedTeam !== undefined &&
+                                      burnedTeam !== null && (
+                                        <Chip
+                                          label={`Brûlé Éq. ${burnedTeam}`}
+                                          size="small"
+                                          color="error"
+                                          variant="outlined"
                                           sx={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: 0.5,
-                                            p: 1,
-                                            border: "1px solid",
-                                            borderColor: "divider",
-                                            borderRadius: 1,
-                                            position: "relative",
-                                            "&:hover": {
-                                              backgroundColor: "action.hover",
-                                            },
+                                            height: 18,
+                                            fontSize: "0.65rem",
                                           }}
-                                        >
-                                          <Box
-                                            sx={{
-                                              display: "flex",
-                                              flexDirection: "column",
-                                              flex: 1,
-                                              minWidth: 0,
-                                            }}
-                                          >
-                                            <Box
-                                              sx={{
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: 0.5,
-                                                flexWrap: "wrap",
-                                              }}
-                                            >
-                                              <Typography
-                                                variant="body2"
-                                                component="span"
-                                                sx={{
-                                                  fontWeight: "medium",
-                                                }}
-                                              >
-                                                {player.firstName} {player.name}
-                                              </Typography>
-                                              {isEuropean && (
-                                                <Chip
-                                                  label="EUR"
-                                                  size="small"
-                                                  color="info"
-                                                  variant="outlined"
-                                                  sx={{
-                                                    height: 18,
-                                                    fontSize: "0.65rem",
-                                                  }}
-                                                />
-                                              )}
-                                              {isForeign && (
-                                                <Chip
-                                                  label="ETR"
-                                                  size="small"
-                                                  color="warning"
-                                                  variant="outlined"
-                                                  sx={{
-                                                    height: 18,
-                                                    fontSize: "0.65rem",
-                                                  }}
-                                                />
-                                              )}
-                                              {burnedTeam !== undefined &&
-                                                burnedTeam !== null && (
-                                                  <Chip
-                                                    label={`Brûlé Éq. ${burnedTeam}`}
-                                                    size="small"
-                                                    color="error"
-                                                    variant="outlined"
-                                                    sx={{
-                                                      height: 18,
-                                                      fontSize: "0.65rem",
-                                                    }}
-                                                  />
-                                                )}
-                                            </Box>
-                                            <Typography
-                                              variant="caption"
-                                              color="text.secondary"
-                                            >
-                                              {player.points !== undefined &&
-                                              player.points !== null
-                                                ? `${player.points} points`
-                                                : "Points non disponibles"}
-                                            </Typography>
-                                          </Box>
-                                          {!matchPlayed && (
-                                            <Chip
-                                              label="×"
-                                              size="small"
-                                              data-chip="remove"
-                                              draggable={false}
-                                              onDragStart={(e) => {
-                                                e.stopPropagation();
-                                                e.preventDefault();
-                                              }}
-                                              onMouseDown={(e) => {
-                                                e.stopPropagation();
-                                              }}
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleRemovePlayer(
-                                                  equipe.team.id,
-                                                  player.id
-                                                );
-                                              }}
-                                              sx={{
-                                                cursor: "pointer",
-                                                minWidth: 24,
-                                                height: 24,
-                                                "&:hover": {
-                                                  backgroundColor: "error.main",
-                                                  color: "white",
-                                                },
-                                              }}
-                                            />
-                                          )}
-                                        </Box>
-                                      );
-                                    })}
-                                  </Box>
-                                )}
-                              </CardContent>
-                            </Card>
+                                        />
+                                      )}
+                                  </>
+                                );
+                              }}
+                              renderPlayerSecondary={(player) =>
+                                player.points !== undefined &&
+                                player.points !== null
+                                  ? `${player.points} points`
+                                  : "Points non disponibles"
+                              }
+                              {...(dragHandlers ?? {})}
+                            />
                           );
                         })}
                       </Box>
@@ -2235,7 +1923,7 @@ export default function CompositionsPage() {
                 </Box>
               </Box>
             </>
-          )}
+          ) : null}
 
           {(!selectedJournee || !selectedPhase) && (
             <Card>

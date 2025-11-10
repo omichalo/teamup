@@ -669,6 +669,16 @@ export default function DisponibilitesPage() {
                   )}
                 </Box>
               )}
+
+              <Box sx={{ mt: 4, textAlign: "center" }}>
+                <Button
+                  variant="outlined"
+                  href="/compositions/defaults"
+                  sx={{ px: 3 }}
+                >
+                  Configurer les compositions par défaut
+                </Button>
+              </Box>
             </>
           )}
         </Box>

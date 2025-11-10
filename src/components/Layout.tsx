@@ -21,6 +21,7 @@ import {
   Person,
   Groups,
   Assignment,
+  PlaylistAddCheck,
 } from "@mui/icons-material";
 import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
@@ -61,6 +62,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     { label: "Équipes", href: "/equipes", icon: <Groups /> },
     { label: "Disponibilités", href: "/disponibilites", icon: <Event /> },
     { label: "Compositions", href: "/compositions", icon: <Assignment /> },
+    {
+      label: "Compo. par défaut",
+      href: "/compositions/defaults",
+      icon: <PlaylistAddCheck />,
+    },
     ...(isAdmin
       ? [
           {

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Match, Team } from "@/types";
 import { transformAggregatedTeamEntry } from "@/lib/client/team-match-transform";
 
-interface EquipeWithMatches {
+export interface EquipeWithMatches {
   team: Team;
   matches: Match[];
 }

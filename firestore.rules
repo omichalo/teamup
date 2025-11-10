@@ -47,7 +47,13 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if request.auth != null;
     }
-    
+
+    // Règles pour les compositions par défaut
+    match /compositionDefaults/{defaultsId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+ 
     // Règles pour les disponibilités
     match /availabilities/{availabilityId} {
       allow read: if request.auth != null;
