@@ -1331,10 +1331,11 @@ export default function CompositionsPage() {
       open: false,
       onConfirm: undefined,
     }));
+
     if (action) {
       void action();
     }
-  }, [confirmationDialog]);
+  }, [confirmationDialog.onConfirm]);
 
   if (loadingEquipes || loadingPlayers) {
     return (
