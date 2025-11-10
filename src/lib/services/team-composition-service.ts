@@ -164,7 +164,7 @@ export class TeamCompositionService {
    * Sauvegarde une composition d&apos;équipe
    */
   private async saveTeamComposition(
-    composition: TeamComposition
+    _composition: TeamComposition
   ): Promise<void> {
     // TODO: Implémenter la sauvegarde dans Firestore
   }

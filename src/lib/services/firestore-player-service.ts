@@ -6,8 +6,6 @@ import {
   addDoc,
   query,
   orderBy,
-  where,
-  Timestamp,
 } from "firebase/firestore";
 import { getDbInstanceDirect } from "@/lib/firebase";
 import { Player } from "@/types/team-management";

@@ -180,6 +180,8 @@ export function SystemMaintenance({
   const [taskStatus, setTaskStatus] = useState<TaskStatus | null>(null);
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null);
   const [maintenanceLogs, setMaintenanceLogs] = useState<MaintenanceLog[]>([]);
+  const [selectedLog, setSelectedLog] = useState<MaintenanceLog | null>(null);
+  const [logDialogOpen, setLogDialogOpen] = useState(false);
   const [newSchedule, setNewSchedule] = useState<TaskSchedule>({
     frequency: "daily",
     time: "02:00",
@@ -1147,7 +1149,6 @@ export function SystemMaintenance({
                           <Button
                             size="small"
                             onClick={() => {
-                              // Afficher les détails du log
                               setSelectedLog(log);
                               setLogDialogOpen(true);
                             }}
@@ -1167,6 +1168,118 @@ export function SystemMaintenance({
           <Button onClick={() => setLogsDialogOpen(false)}>Fermer</Button>
         </DialogActions>
       </Dialog>
+
+      {selectedLog && (
+        <Dialog
+          open={logDialogOpen}
+          onClose={() => {
+            setLogDialogOpen(false);
+            setSelectedLog(null);
+          }}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle>Détails du log</DialogTitle>
+          <DialogContent dividers>
+            <Box display="flex" flexDirection="column" gap={2}>
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Tâche
+                </Typography>
+                <Typography variant="body1">{selectedLog.taskName}</Typography>
+              </Box>
+
+              <Box display="flex" gap={3}>
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Début
+                  </Typography>
+                  <Typography variant="body2">
+                    {formatDate(selectedLog.startTime)}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Fin
+                  </Typography>
+                  <Typography variant="body2">
+                    {selectedLog.endTime
+                      ? formatDate(selectedLog.endTime)
+                      : "N/A"}
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Statut
+                  </Typography>
+                  <Chip
+                    label={selectedLog.status}
+                    size="small"
+                    color={
+                      selectedLog.status === "completed"
+                        ? "success"
+                        : selectedLog.status === "failed"
+                        ? "error"
+                        : "default"
+                    }
+                  />
+                </Box>
+              </Box>
+
+              <Divider />
+
+              {selectedLog.logs.length > 0 && (
+                <Box>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Logs ({selectedLog.logs.length})
+                  </Typography>
+                  <Paper variant="outlined" sx={{ p: 2, maxHeight: 240, overflow: "auto" }}>
+                    <pre style={{ margin: 0, fontSize: "12px" }}>
+                      {selectedLog.logs.join("\n")}
+                    </pre>
+                  </Paper>
+                </Box>
+              )}
+
+              {selectedLog.errors.length > 0 && (
+                <Box>
+                  <Typography variant="subtitle2" color="error" gutterBottom>
+                    Erreurs ({selectedLog.errors.length})
+                  </Typography>
+                  <Paper variant="outlined" sx={{ p: 2, maxHeight: 240, overflow: "auto" }}>
+                    <pre style={{ margin: 0, fontSize: "12px", color: "red" }}>
+                      {selectedLog.errors.join("\n")}
+                    </pre>
+                  </Paper>
+                </Box>
+              )}
+
+              {selectedLog.warnings.length > 0 && (
+                <Box>
+                  <Typography variant="subtitle2" color="warning.main" gutterBottom>
+                    Avertissements ({selectedLog.warnings.length})
+                  </Typography>
+                  <Paper variant="outlined" sx={{ p: 2, maxHeight: 240, overflow: "auto" }}>
+                    <pre style={{ margin: 0, fontSize: "12px", color: "#ED6C02" }}>
+                      {selectedLog.warnings.join("\n")}
+                    </pre>
+                  </Paper>
+                </Box>
+              )}
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() => {
+                setLogDialogOpen(false);
+                setSelectedLog(null);
+              }}
+            >
+              Fermer
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
     </Box>
   );
 }

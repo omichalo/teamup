@@ -10,11 +10,11 @@ import {
   Card,
   CardContent,
   Button,
-  Grid,
   Stack,
   Chip,
   CardActions,
 } from "@mui/material";
+import Grid from "@mui/material/GridLegacy";
 import type { PaletteColor } from "@mui/material";
 import {
   Person as PersonIcon,

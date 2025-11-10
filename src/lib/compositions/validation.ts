@@ -86,11 +86,13 @@ export const isMatchPlayed = (match: Match | null): boolean => {
   const resultIsString = resultType === "string";
   const resultNotAVenir = resultIsString && resultValue !== "À VENIR";
   const resultInValidList =
-    resultIsString && validResults.includes(resultValue.toUpperCase());
+    resultIsString &&
+    typeof resultValue === "string" &&
+    validResults.includes(resultValue.toUpperCase());
   const hasValidResult =
     hasValidScore &&
-    resultValue &&
     resultIsString &&
+    !!resultValue &&
     resultNotAVenir &&
     resultInValidList;
 

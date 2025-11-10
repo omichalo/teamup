@@ -43,8 +43,6 @@ const scopeTooltipMap: Record<CompositionRuleItem["scope"], string> = {
   daily: "Règle spécifique aux compositions de journée",
 };
 
-type Scope = CompositionRuleItem["scope"];
-
 export const CompositionRulesHelp: React.FC<CompositionRulesHelpProps> = ({
   title = "Règles de validation",
   rules,

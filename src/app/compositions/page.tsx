@@ -1326,11 +1326,13 @@ export default function CompositionsPage() {
 
   const handleConfirmDialog = useCallback(() => {
     const action = confirmationDialog.onConfirm;
-    setConfirmationDialog((prev) => ({
-      ...prev,
-      open: false,
-      onConfirm: undefined,
-    }));
+    setConfirmationDialog((prev) => {
+      const { onConfirm: _ignored, ...rest } = prev;
+      return {
+        ...rest,
+        open: false,
+      };
+    });
 
     if (action) {
       void action();

@@ -1,4 +1,4 @@
-import { Match, Team } from "@/types";
+import { Match, Team, Composition } from "@/types";
 
 const toDate = (value: unknown): Date => {
   if (!value) {
@@ -53,7 +53,7 @@ export const transformAggregatedTeamEntry = (
   const transformedMatches: Match[] = (matches || []).map((match) => {
     const ffttId = (match.ffttId as string) || (match.id as string) || "";
 
-    return {
+    const result: Match = {
       id: (match.id as string) || ffttId,
       ffttId,
       teamNumber: (match.teamNumber as number) || teamNumber,
@@ -66,24 +66,83 @@ export const transformAggregatedTeamEntry = (
       isForfeit: Boolean(match.isForfeit),
       phase: (match.phase as string) || "aller",
       journee: (match.journee as number) || 0,
-      composition: match.composition as Match["composition"],
-      isFemale: match.isFemale as boolean | undefined,
-      division: (match.division as string) || team.division || "",
-      teamId: (match.teamId as string) || team.id,
-      epreuve: match.epreuve as string | undefined,
-      score: match.score as string | undefined,
-      result: match.result as string | undefined,
-      compositionString: match.compositionString as string | undefined,
-      rencontreId: match.rencontreId as string | undefined,
-      equipeIds: match.equipeIds as { equipe1: string; equipe2: string } | undefined,
-      lienDetails: match.lienDetails as string | undefined,
-      resultatsIndividuels: match.resultatsIndividuels,
-      joueursSQY: (match.joueursSQY as Array<Record<string, unknown>>) || [],
-      joueursAdversaires:
-        (match.joueursAdversaires as Array<Record<string, unknown>>) || [],
       createdAt: toDate(match.createdAt),
       updatedAt: toDate(match.updatedAt),
     };
+
+    const isFemaleValue = match.isFemale;
+    if (typeof isFemaleValue === "boolean") {
+      result.isFemale = isFemaleValue;
+    }
+
+    const divisionValue = (match.division as string) || team.division || "";
+    if (divisionValue) {
+      result.division = divisionValue;
+    }
+
+    const teamIdValue = (match.teamId as string) || team.id;
+    if (teamIdValue) {
+      result.teamId = teamIdValue;
+    }
+
+    const epreuveValue = match.epreuve as string | undefined;
+    if (epreuveValue) {
+      result.epreuve = epreuveValue;
+    }
+
+    const scoreValue = match.score as string | undefined;
+    if (scoreValue) {
+      result.score = scoreValue;
+    }
+
+    const resultValue = match.result as string | undefined;
+    if (resultValue) {
+      result.result = resultValue;
+    }
+
+    const compositionStringValue = match.compositionString as string | undefined;
+    if (compositionStringValue) {
+      result.compositionString = compositionStringValue;
+    }
+
+    const rencontreIdValue = match.rencontreId as string | undefined;
+    if (rencontreIdValue) {
+      result.rencontreId = rencontreIdValue;
+    }
+
+    const equipeIdsValue = match.equipeIds as
+      | { equipe1: string; equipe2: string }
+      | undefined;
+    if (equipeIdsValue) {
+      result.equipeIds = equipeIdsValue;
+    }
+
+    const lienDetailsValue = match.lienDetails as string | undefined;
+    if (lienDetailsValue) {
+      result.lienDetails = lienDetailsValue;
+    }
+
+    if (match.resultatsIndividuels !== undefined) {
+      result.resultatsIndividuels = match.resultatsIndividuels;
+    }
+
+    const joueursSQYValue =
+      (match.joueursSQY as Array<Record<string, unknown>>) || [];
+    if (joueursSQYValue.length > 0) {
+      result.joueursSQY = joueursSQYValue;
+    }
+
+    const joueursAdversairesValue =
+      (match.joueursAdversaires as Array<Record<string, unknown>>) || [];
+    if (joueursAdversairesValue.length > 0) {
+      result.joueursAdversaires = joueursAdversairesValue;
+    }
+
+    if (match.composition) {
+      result.composition = match.composition as Composition;
+    }
+
+    return result;
   });
 
   transformedMatches.sort(
