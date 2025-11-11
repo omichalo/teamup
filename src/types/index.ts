@@ -147,9 +147,9 @@ export interface User {
   id: string;
   email: string;
   displayName: string;
-  photoURL?: string;
+  photoURL?: string | null;
   role: UserRole;
-  playerId?: string; // Si c&apos;est un joueur
+  playerId?: string | null; // Si c&apos;est un joueur
   coachRequestStatus: CoachRequestStatus;
   coachRequestMessage?: string | null;
   coachRequestUpdatedAt?: Date | null;

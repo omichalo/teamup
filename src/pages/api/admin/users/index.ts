@@ -86,10 +86,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           firebaseUser.displayName ?? (profile.displayName as string) ?? "",
         photoURL:
           firebaseUser.photoURL ??
-          (typeof profile.photoURL === "string" ? profile.photoURL : undefined),
+          (typeof profile.photoURL === "string" && profile.photoURL.trim().length > 0
+            ? profile.photoURL
+            : null),
         role,
         playerId:
-          typeof profile.playerId === "string" ? profile.playerId : undefined,
+          typeof profile.playerId === "string" && profile.playerId.trim().length > 0
+            ? profile.playerId
+            : null,
         coachRequestStatus,
         coachRequestMessage:
           typeof profile.coachRequestMessage === "string"

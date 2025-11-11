@@ -80,9 +80,9 @@ const buildFallbackUser = (
     email: baseEmail,
     displayName,
     photoURL:
-      firebaseAuthUser.photoURL ?? overrides?.photoURL ?? undefined,
+      firebaseAuthUser.photoURL ?? overrides?.photoURL ?? null,
     role: overrides?.role ?? DEFAULT_ROLE,
-    playerId: overrides?.playerId,
+    playerId: overrides?.playerId ?? null,
     coachRequestStatus:
       overrides?.coachRequestStatus ?? DEFAULT_COACH_REQUEST_STATUS,
     coachRequestMessage: overrides?.coachRequestMessage ?? null,
@@ -152,7 +152,7 @@ export const useAuthState = () => {
         buildFallbackUser(firebaseAuthUser, {
           email: fallbackEmail,
           displayName: fallbackDisplayName,
-          photoURL: fallbackPhotoURL ?? undefined,
+          photoURL: fallbackPhotoURL,
           role: claimsInfo.role,
           coachRequestStatus: claimsInfo.coachRequestStatus,
           lastLoginAt: now,

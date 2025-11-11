@@ -61,31 +61,31 @@ interface SyncStatus {
     lastSync: string | null;
     count: number;
     status: "idle" | "syncing" | "success" | "error";
-    error?: string;
+    error: string | null;
   };
   teams: {
     lastSync: string | null;
     count: number;
     status: "idle" | "syncing" | "success" | "error";
-    error?: string;
+    error: string | null;
   };
   teamMatches: {
     lastSync: string | null;
     count: number;
     status: "idle" | "syncing" | "success" | "error";
-    error?: string;
+    error: string | null;
   };
 }
 
-export default function AdminPage(): JSX.Element {
+export default function AdminPage() {
   const { firebaseUser } = useAuth();
 
   const [tabValue, setTabValue] = useState(0);
 
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
-    players: { lastSync: null, count: 0, status: "idle" },
-    teams: { lastSync: null, count: 0, status: "idle" },
-    teamMatches: { lastSync: null, count: 0, status: "idle" },
+    players: { lastSync: null, count: 0, status: "idle", error: null },
+    teams: { lastSync: null, count: 0, status: "idle", error: null },
+    teamMatches: { lastSync: null, count: 0, status: "idle", error: null },
   });
   const [syncLoading, setSyncLoading] = useState(true);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -124,16 +124,19 @@ export default function AdminPage(): JSX.Element {
               lastSync: result.data?.players?.lastSync || null,
               count: result.data?.players?.count || 0,
               status: "idle",
+              error: null,
             },
             teams: {
               lastSync: result.data?.teams?.lastSync || null,
               count: result.data?.teams?.count || 0,
               status: "idle",
+              error: null,
             },
             teamMatches: {
               lastSync: result.data?.teamMatches?.lastSync || null,
               count: result.data?.teamMatches?.count || 0,
               status: "idle",
+              error: null,
             },
           });
         } else {
@@ -156,7 +159,7 @@ export default function AdminPage(): JSX.Element {
 
     setSyncStatus((prev) => ({
       ...prev,
-      players: { ...prev.players, status: "syncing", error: undefined },
+      players: { ...prev.players, status: "syncing", error: null },
     }));
 
     try {
@@ -174,9 +177,11 @@ export default function AdminPage(): JSX.Element {
         setSyncStatus((prev) => ({
           ...prev,
           players: {
+            ...prev.players,
             lastSync: new Date().toISOString(),
             count: result.data?.playersCount || 0,
             status: "success",
+            error: null,
           },
         }));
       } else {
@@ -208,7 +213,7 @@ export default function AdminPage(): JSX.Element {
 
     setSyncStatus((prev) => ({
       ...prev,
-      teams: { ...prev.teams, status: "syncing", error: undefined },
+      teams: { ...prev.teams, status: "syncing", error: null },
     }));
 
     try {
@@ -226,9 +231,11 @@ export default function AdminPage(): JSX.Element {
         setSyncStatus((prev) => ({
           ...prev,
           teams: {
+            ...prev.teams,
             lastSync: new Date().toISOString(),
             count: result.data?.teamsCount || 0,
             status: "success",
+            error: null,
           },
         }));
       } else {
@@ -260,7 +267,7 @@ export default function AdminPage(): JSX.Element {
 
     setSyncStatus((prev) => ({
       ...prev,
-      teamMatches: { ...prev.teamMatches, status: "syncing", error: undefined },
+      teamMatches: { ...prev.teamMatches, status: "syncing", error: null },
     }));
 
     try {
@@ -278,9 +285,11 @@ export default function AdminPage(): JSX.Element {
         setSyncStatus((prev) => ({
           ...prev,
           teamMatches: {
+            ...prev.teamMatches,
             lastSync: new Date().toISOString(),
             count: result.data?.matchesCount || 0,
             status: "success",
+            error: null,
           },
         }));
       } else {

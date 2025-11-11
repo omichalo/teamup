@@ -10,12 +10,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { getDbInstanceDirect } from "@/lib/firebase";
-import {
-  CoachRequestStatus,
-  User,
-  UserProfileDocument,
-  UserRole,
-} from "@/types";
+import { User, UserProfileDocument, UserRole } from "@/types";
 import {
   DEFAULT_COACH_REQUEST_STATUS,
   DEFAULT_ROLE,
@@ -65,9 +60,15 @@ const mapFirestoreUser = (id: string, data: FirestoreUserRaw): User => {
     id,
     email: data.email,
     displayName: data.displayName ?? "",
-    photoURL: data.photoURL,
+    photoURL:
+      typeof data.photoURL === "string" && data.photoURL.trim().length > 0
+        ? data.photoURL
+        : null,
     role,
-    playerId: data.playerId,
+    playerId:
+      typeof data.playerId === "string" && data.playerId.trim().length > 0
+        ? data.playerId
+        : null,
     coachRequestStatus,
     coachRequestMessage: data.coachRequestMessage ?? null,
     coachRequestUpdatedAt:

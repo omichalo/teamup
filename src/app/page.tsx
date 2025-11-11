@@ -40,7 +40,7 @@ interface QuickLink {
 }
 
 export default function DashboardPage() {
-  const { user, isAdmin } = useAuth();
+  const { isAdmin } = useAuth();
   const router = useRouter();
 
   const quickLinks: QuickLink[] = [
