@@ -24,6 +24,7 @@ import {
   Tab,
   Alert,
   InputAdornment,
+  Snackbar,
 } from "@mui/material";
 import {
   CheckCircle,
@@ -35,15 +36,142 @@ import {
 import { useEquipesWithMatches } from "@/hooks/useEquipesWithMatches";
 import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
 import { AvailabilityService } from "@/lib/services/availability-service";
+import { CompositionService } from "@/lib/services/composition-service";
 import { Player } from "@/types/team-management";
 import { Layout } from "@/components/Layout";
 import { AuthGuard } from "@/components/AuthGuard";
 import { getCurrentPhase } from "@/lib/shared/phase-utils";
 
 interface AvailabilityResponse {
-  available: boolean;
+  available?: boolean;
   comment?: string;
 }
+
+type ChampionshipType = "masculin" | "feminin";
+
+type PlayerAvailabilityByType = {
+  masculin?: AvailabilityResponse;
+  feminin?: AvailabilityResponse;
+};
+
+type AvailabilityState = Record<string, PlayerAvailabilityByType>;
+
+const sanitizeAvailabilityEntry = (
+  entry?: AvailabilityResponse | null
+): AvailabilityResponse | undefined => {
+  if (!entry) {
+    return undefined;
+  }
+
+  const sanitized: AvailabilityResponse = {};
+
+  if (typeof entry.available === "boolean") {
+    sanitized.available = entry.available;
+  }
+
+  if (typeof entry.comment === "string") {
+    const trimmed = entry.comment.trim();
+    if (trimmed.length > 0) {
+      sanitized.comment = trimmed;
+    }
+  }
+
+  if (sanitized.available === undefined && sanitized.comment === undefined) {
+    return undefined;
+  }
+
+  return sanitized;
+};
+
+const availabilityEntriesEqual = (
+  current?: AvailabilityResponse | null,
+  next?: AvailabilityResponse | null
+): boolean => {
+  const normalizedCurrent = sanitizeAvailabilityEntry(current);
+  const normalizedNext = sanitizeAvailabilityEntry(next);
+
+  if (!normalizedCurrent && !normalizedNext) {
+    return true;
+  }
+  if (!normalizedCurrent || !normalizedNext) {
+    return false;
+  }
+
+  return (
+    normalizedCurrent.available === normalizedNext.available &&
+    normalizedCurrent.comment === normalizedNext.comment
+  );
+};
+
+const updateAvailabilityState = (
+  previousState: AvailabilityState,
+  playerId: string,
+  championshipType: ChampionshipType,
+  computeNextEntry: (
+    currentEntry: AvailabilityResponse | undefined
+  ) => AvailabilityResponse | undefined
+): { nextState: AvailabilityState; changed: boolean } => {
+  const currentPlayerState = previousState[playerId];
+  const currentEntry = currentPlayerState?.[championshipType];
+
+  const computedEntry = computeNextEntry(currentEntry);
+  const normalizedCurrent = sanitizeAvailabilityEntry(currentEntry);
+  const normalizedNext = sanitizeAvailabilityEntry(computedEntry);
+
+  if (availabilityEntriesEqual(normalizedCurrent, normalizedNext)) {
+    return { nextState: previousState, changed: false };
+  }
+
+  const nextState: AvailabilityState = { ...previousState };
+
+  if (!normalizedNext) {
+    if (!currentPlayerState) {
+      return { nextState: previousState, changed: false };
+    }
+
+    const nextPlayerState: PlayerAvailabilityByType = {
+      ...currentPlayerState,
+    };
+    delete nextPlayerState[championshipType];
+
+    if (Object.keys(nextPlayerState).length === 0) {
+      delete nextState[playerId];
+    } else {
+      nextState[playerId] = nextPlayerState;
+    }
+
+    return { nextState, changed: true };
+  }
+
+  const sanitizedEntry: AvailabilityResponse = {
+    ...normalizedNext,
+  };
+
+  const nextPlayerState: PlayerAvailabilityByType = {
+    ...(currentPlayerState ?? {}),
+    [championshipType]: sanitizedEntry,
+  };
+
+  nextState[playerId] = nextPlayerState;
+
+  return { nextState, changed: true };
+};
+
+const buildPlayersPayload = (
+  state: AvailabilityState,
+  championshipType: ChampionshipType
+): Record<string, AvailabilityResponse> => {
+  const payload: Record<string, AvailabilityResponse> = {};
+
+  Object.entries(state).forEach(([playerId, playerState]) => {
+    const entry = sanitizeAvailabilityEntry(playerState[championshipType]);
+    if (entry) {
+      payload[playerId] = entry;
+    }
+  });
+
+  return payload;
+};
 
 export default function DisponibilitesPage() {
   const { equipes, loading: loadingEquipes } = useEquipesWithMatches();
@@ -55,31 +183,60 @@ export default function DisponibilitesPage() {
   );
   const [showAllPlayers, setShowAllPlayers] = useState(false);
   // Structure: { playerId: { masculin?: AvailabilityResponse, feminin?: AvailabilityResponse } }
-  const [availabilities, setAvailabilities] = useState<
-    Record<
-      string,
-      {
-        masculin?: AvailabilityResponse;
-        feminin?: AvailabilityResponse;
-      }
-    >
-  >({});
+  const [availabilities, setAvailabilities] = useState<AvailabilityState>({});
   const [searchQuery, setSearchQuery] = useState("");
   const commentSaveTimeoutRef = React.useRef<
     Record<string, { masculin?: NodeJS.Timeout; feminin?: NodeJS.Timeout }>
   >({});
-  const availabilitiesRef = React.useRef<
-    Record<
-      string,
-      {
-        masculin?: AvailabilityResponse;
-        feminin?: AvailabilityResponse;
-      }
-    >
-  >({});
+  const availabilitiesRef = React.useRef<AvailabilityState>({});
+  const assignedPlayersByTypeRef = React.useRef<{
+    masculin: Set<string>;
+    feminin: Set<string>;
+  }>({ masculin: new Set(), feminin: new Set() });
+  const assignedPlayersDetailsRef = React.useRef<{
+    masculin: Record<string, string[]>;
+    feminin: Record<string, string[]>;
+  }>({ masculin: {}, feminin: {} });
 
   const playerService = useMemo(() => new FirestorePlayerService(), []);
   const availabilityService = useMemo(() => new AvailabilityService(), []);
+  const compositionService = useMemo(() => new CompositionService(), []);
+  const [availabilityWarning, setAvailabilityWarning] = useState<string | null>(
+    null
+  );
+
+  const handleWarningClose = useCallback(() => {
+    setAvailabilityWarning(null);
+  }, []);
+
+  const persistAvailability = useCallback(
+    async (stateSnapshot: AvailabilityState, championshipType: ChampionshipType) => {
+      if (selectedJournee === null || selectedPhase === null) {
+        return;
+      }
+
+      const payload = buildPlayersPayload(stateSnapshot, championshipType);
+
+      console.log("[Disponibilites] Persist availability", {
+        journee: selectedJournee,
+        phase: selectedPhase,
+        championshipType,
+        payload,
+      });
+
+      try {
+        await availabilityService.saveAvailability({
+          journee: selectedJournee,
+          phase: selectedPhase,
+          championshipType,
+          players: payload,
+        });
+      } catch (error) {
+        console.error("Erreur lors de la sauvegarde de la disponibilité:", error);
+      }
+    },
+    [availabilityService, selectedJournee, selectedPhase]
+  );
 
   // Mettre à jour la ref quand availabilities change
   useEffect(() => {
@@ -283,22 +440,20 @@ export default function DisponibilitesPage() {
             ]);
 
           // Fusionner les deux types de disponibilités
-          const mergedAvailabilities: Record<
-            string,
-            {
-              masculin?: AvailabilityResponse;
-              feminin?: AvailabilityResponse;
-            }
-          > = {};
+          const mergedAvailabilities: AvailabilityState = {};
 
           // Ajouter les disponibilités masculines
           if (masculineAvailability) {
             Object.entries(masculineAvailability.players).forEach(
               ([playerId, response]) => {
+                const sanitized = sanitizeAvailabilityEntry(response);
+                if (!sanitized) {
+                  return;
+                }
                 if (!mergedAvailabilities[playerId]) {
                   mergedAvailabilities[playerId] = {};
                 }
-                mergedAvailabilities[playerId].masculin = response;
+                mergedAvailabilities[playerId].masculin = sanitized;
               }
             );
           }
@@ -307,16 +462,20 @@ export default function DisponibilitesPage() {
           if (feminineAvailability) {
             Object.entries(feminineAvailability.players).forEach(
               ([playerId, response]) => {
+                const sanitized = sanitizeAvailabilityEntry(response);
+                if (!sanitized) {
+                  return;
+                }
                 if (!mergedAvailabilities[playerId]) {
                   mergedAvailabilities[playerId] = {};
                 }
-                mergedAvailabilities[playerId].feminin = response;
+                mergedAvailabilities[playerId].feminin = sanitized;
               }
             );
           }
 
           setAvailabilities(mergedAvailabilities);
-        } catch (error) {
+    } catch (error) {
           console.error("Erreur lors du chargement des disponibilités:", error);
           setAvailabilities({});
         }
@@ -325,89 +484,252 @@ export default function DisponibilitesPage() {
     }
   }, [selectedJournee, selectedPhase, availabilityService]);
 
+  useEffect(() => {
+    if (
+      selectedJournee === null ||
+      selectedPhase === null ||
+      loadingEquipes ||
+      loadingPlayers
+    ) {
+      assignedPlayersByTypeRef.current = {
+        masculin: new Set(),
+        feminin: new Set(),
+      };
+      assignedPlayersDetailsRef.current = { masculin: {}, feminin: {} };
+      return;
+    }
+
+    let isCancelled = false;
+
+    const loadAssignedPlayers = async () => {
+      try {
+        const [masculineComposition, feminineComposition] = await Promise.all([
+          compositionService.getComposition(
+            selectedJournee,
+            selectedPhase,
+            "masculin"
+          ),
+          compositionService.getComposition(
+            selectedJournee,
+            selectedPhase,
+            "feminin"
+          ),
+        ]);
+
+        if (isCancelled) {
+          return;
+        }
+
+        const mapping = {
+          masculin: new Set<string>(),
+          feminin: new Set<string>(),
+        };
+        const details: {
+          masculin: Record<string, string[]>;
+          feminin: Record<string, string[]>;
+        } = { masculin: {}, feminin: {} };
+
+        const processComposition = (
+          composition:
+            | Awaited<
+                ReturnType<typeof compositionService.getComposition>
+              >
+            | null,
+          type: ChampionshipType
+        ) => {
+          if (!composition?.teams) {
+            return;
+          }
+          Object.entries(composition.teams).forEach(([teamId, playerIds]) => {
+            const teamName =
+              equipes.find((eq) => eq.team.id === teamId)?.team.name || teamId;
+            playerIds.forEach((playerId) => {
+              if (!playerId) {
+                return;
+              }
+              mapping[type].add(playerId);
+              if (!details[type][playerId]) {
+                details[type][playerId] = [];
+              }
+              if (!details[type][playerId].includes(teamName)) {
+                details[type][playerId].push(teamName);
+              }
+            });
+          });
+        };
+
+        processComposition(masculineComposition, "masculin");
+        processComposition(feminineComposition, "feminin");
+
+        assignedPlayersByTypeRef.current = mapping;
+        assignedPlayersDetailsRef.current = details;
+      } catch (error) {
+        if (isCancelled) {
+          return;
+        }
+        console.error(
+          "Erreur lors du chargement des compositions pour la page disponibilités:",
+          error
+        );
+        assignedPlayersByTypeRef.current = {
+          masculin: new Set(),
+          feminin: new Set(),
+        };
+        assignedPlayersDetailsRef.current = { masculin: {}, feminin: {} };
+      }
+    };
+
+    loadAssignedPlayers();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    selectedJournee,
+    selectedPhase,
+    compositionService,
+    equipes,
+    loadingEquipes,
+    loadingPlayers,
+  ]);
+
   const handleAvailabilityChange = (
     playerId: string,
-    championshipType: "masculin" | "feminin",
+    championshipType: ChampionshipType,
     available: boolean
   ) => {
     if (selectedJournee === null || selectedPhase === null) return;
 
-    setAvailabilities((prev) => {
-      const playerAvailabilities = prev[playerId] || {};
-      const updatedAvailabilities = {
-        ...prev,
-        [playerId]: {
-          ...playerAvailabilities,
-          [championshipType]: {
-            ...playerAvailabilities[championshipType],
-            available,
-          },
-        },
-      };
+    if (commentSaveTimeoutRef.current[playerId]?.[championshipType]) {
+      clearTimeout(commentSaveTimeoutRef.current[playerId][championshipType]!);
+      delete commentSaveTimeoutRef.current[playerId][championshipType];
+    }
 
-      // Sauvegarde automatique pour le type de championnat spécifique
-      // Récupérer d'abord les données existantes pour préserver les autres joueurs
-      availabilityService
-        .getAvailability(selectedJournee, selectedPhase, championshipType)
-        .then((existingAvailability) => {
-          const playersForChampionship: Record<string, AvailabilityResponse> = {
-            ...(existingAvailability?.players || {}),
+    let nextStateSnapshot: AvailabilityState | null = null;
+    let stateChanged = false;
+
+    setAvailabilities((prev) => {
+      const { nextState, changed } = updateAvailabilityState(
+        prev,
+        playerId,
+        championshipType,
+        (currentEntry) => {
+          if (currentEntry?.available === available) {
+            const nextEntry: AvailabilityResponse = {};
+            if (
+              typeof currentEntry?.comment === "string" &&
+              currentEntry.comment.trim().length > 0
+            ) {
+              nextEntry.comment = currentEntry.comment;
+            }
+            return nextEntry;
+          }
+
+          const nextEntry: AvailabilityResponse = {
+            available,
           };
 
-          // Mettre à jour avec les nouvelles disponibilités
-          Object.entries(updatedAvailabilities).forEach(([pid, avail]) => {
-            const response = avail[championshipType];
-            if (response) {
-              playersForChampionship[pid] = response;
-            }
-          });
+          if (
+            typeof currentEntry?.comment === "string" &&
+            currentEntry.comment.trim().length > 0
+          ) {
+            nextEntry.comment = currentEntry.comment;
+          }
 
-          return availabilityService.saveAvailability({
-            journee: selectedJournee,
-            phase: selectedPhase,
-            championshipType,
-            players: playersForChampionship,
-          });
-        })
-        .catch((error) => {
-          console.error("Erreur lors de la sauvegarde automatique:", error);
-        });
+          return nextEntry;
+        }
+      );
 
-      return updatedAvailabilities;
+      if (!changed) {
+        return prev;
+      }
+
+      nextStateSnapshot = nextState;
+      stateChanged = true;
+      return nextState;
     });
+
+    if (stateChanged && nextStateSnapshot) {
+      void persistAvailability(nextStateSnapshot, championshipType);
+
+      const resultingEntry = nextStateSnapshot[playerId]?.[
+        championshipType
+      ] as AvailabilityResponse | undefined;
+      const isNowAvailable = resultingEntry?.available === true;
+      const isPlayerAssigned =
+        assignedPlayersByTypeRef.current[championshipType]?.has(playerId) ??
+        false;
+
+      if (isPlayerAssigned && !isNowAvailable) {
+        const playerInfo = players.find((p) => p.id === playerId);
+        const playerLabel = playerInfo
+          ? `${playerInfo.firstName} ${playerInfo.name}`
+          : playerId;
+        const assignedTeams =
+          assignedPlayersDetailsRef.current[championshipType]?.[playerId] || [];
+        const teamsLabel =
+          assignedTeams.length > 0
+            ? ` (${assignedTeams.join(", ")})`
+            : "";
+
+        const warningText = `${playerLabel} est actuellement positionné dans une composition${teamsLabel}. Cette équipe sera invalide tant que la disponibilité n'est pas réajustée.`;
+        setAvailabilityWarning(warningText);
+        console.warn(
+          `[Disponibilites] Attention: ${playerLabel} est positionné dans une composition de journée${teamsLabel} mais vient d'être marqué indisponible pour ${championshipType}.`
+        );
+      }
+    }
   };
 
   const handleCommentChange = (
     playerId: string,
-    championshipType: "masculin" | "feminin",
+    championshipType: ChampionshipType,
     comment: string
   ) => {
     if (selectedJournee === null || selectedPhase === null) return;
 
-    // Annuler le timeout précédent pour ce joueur et ce type de championnat
     if (commentSaveTimeoutRef.current[playerId]?.[championshipType]) {
       clearTimeout(commentSaveTimeoutRef.current[playerId][championshipType]!);
     }
 
-    setAvailabilities((prev) => {
-      const playerAvailabilities = prev[playerId] || {};
-      const existingResponse = playerAvailabilities[championshipType] || {
-        available: true,
-      };
+    const trimmedComment = comment.trim();
 
-      return {
-        ...prev,
-        [playerId]: {
-          ...playerAvailabilities,
-          [championshipType]: {
-            ...existingResponse,
-            comment: comment || undefined,
-          },
-        },
-      };
+    let nextStateSnapshot: AvailabilityState | null = null;
+    let stateChanged = false;
+
+    setAvailabilities((prev) => {
+      const { nextState, changed } = updateAvailabilityState(
+        prev,
+        playerId,
+        championshipType,
+        (currentEntry) => {
+          const nextEntry: AvailabilityResponse = {};
+
+          if (typeof currentEntry?.available === "boolean") {
+            nextEntry.available = currentEntry.available;
+          }
+
+          if (trimmedComment.length > 0) {
+            nextEntry.comment = trimmedComment;
+          }
+
+          return nextEntry;
+        }
+      );
+
+      if (!changed) {
+        return prev;
+      }
+
+      nextStateSnapshot = nextState;
+      stateChanged = true;
+      return nextState;
     });
 
-    // Sauvegarde automatique après un délai (debounce)
+    if (!stateChanged || !nextStateSnapshot) {
+      return;
+    }
+
     if (!commentSaveTimeoutRef.current[playerId]) {
       commentSaveTimeoutRef.current[playerId] = {};
     }
@@ -415,32 +737,8 @@ export default function DisponibilitesPage() {
     commentSaveTimeoutRef.current[playerId][championshipType] = setTimeout(
       async () => {
         try {
-          // Récupérer d'abord les données existantes pour préserver les autres joueurs
-          const existingAvailability =
-            await availabilityService.getAvailability(
-              selectedJournee,
-              selectedPhase,
-              championshipType
-            );
-
-          const playersForChampionship: Record<string, AvailabilityResponse> = {
-            ...(existingAvailability?.players || {}),
-          };
-
-          // Mettre à jour avec les nouvelles disponibilités
-          Object.entries(availabilitiesRef.current).forEach(([pid, avail]) => {
-            const response = avail[championshipType];
-            if (response) {
-              playersForChampionship[pid] = response;
-            }
-          });
-
-          await availabilityService.saveAvailability({
-            journee: selectedJournee,
-            phase: selectedPhase,
-            championshipType,
-            players: playersForChampionship,
-          });
+          const snapshot = availabilitiesRef.current;
+          await persistAvailability(snapshot, championshipType);
         } catch (error) {
           console.error("Erreur lors de la sauvegarde automatique:", error);
         }
@@ -457,31 +755,45 @@ export default function DisponibilitesPage() {
   if (loadingEquipes || loadingPlayers) {
     return (
       <Layout>
-        <Box
-          display="flex"
-          justifyContent="center"
-          alignItems="center"
-          minHeight="400px"
-        >
-          <CircularProgress />
-        </Box>
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="400px"
+      >
+        <CircularProgress />
+      </Box>
       </Layout>
     );
   }
 
   return (
     <AuthGuard>
-      <Layout>
+    <Layout>
         <Box sx={{ p: 5 }}>
-          <Typography variant="h4" gutterBottom>
+          <Snackbar
+            open={Boolean(availabilityWarning)}
+            autoHideDuration={6000}
+            onClose={handleWarningClose}
+            anchorOrigin={{ vertical: "top", horizontal: "center" }}
+          >
+            <Alert
+              onClose={handleWarningClose}
+              severity="warning"
+              sx={{ width: "100%" }}
+            >
+              {availabilityWarning}
+            </Alert>
+          </Snackbar>
+        <Typography variant="h4" gutterBottom>
             Disponibilités des Joueurs
-          </Typography>
+        </Typography>
 
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
             Saisissez la disponibilité des joueurs pour une journée de
             championnat. Par défaut, seuls les joueurs participant au
             championnat sont affichés.
-          </Typography>
+        </Typography>
 
           <Card sx={{ mb: 1 }}>
             <CardContent sx={{ pt: 2.5, pb: 1.5 }}>
@@ -952,7 +1264,7 @@ function PlayerList({
                         }}
                       >
                         💬
-                      </Button>
+                </Button>
                     </Box>
                   )}
                 </Box>
@@ -991,20 +1303,20 @@ function PlayerList({
                       rows={2}
                       inputProps={{
                         "aria-labelledby": `comment-label-${player.id}-masculin`,
-                      }}
-                    />
-                  </Box>
+                  }}
+                />
+              </Box>
 
                   {/* Commentaire Féminin (uniquement pour les femmes) */}
                   {isFemale && (
-                    <Box>
+          <Box>
                       <Typography
                         id={`comment-label-${player.id}-feminin`}
                         variant="caption"
                         sx={{ mb: 0.5, display: "block" }}
                       >
                         Commentaire Féminin:
-                      </Typography>
+            </Typography>
                       <TextField
                         fullWidth
                         size="small"
@@ -1021,9 +1333,9 @@ function PlayerList({
                           "aria-labelledby": `comment-label-${player.id}-feminin`,
                         }}
                       />
-                    </Box>
-                  )}
-                </Box>
+          </Box>
+        )}
+      </Box>
               )}
 
               {/* Afficher les commentaires existants s'il y en a (même si pas expanded) */}

@@ -1,15 +1,56 @@
-import {
-  doc,
-  getDoc,
-  setDoc,
-  Timestamp,
-} from "firebase/firestore";
+import { doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
 import { getDbInstanceDirect } from "@/lib/firebase";
 
 export interface AvailabilityResponse {
-  available: boolean;
+  available?: boolean;
   comment?: string;
 }
+
+const sanitizeResponse = (
+  response?: AvailabilityResponse | null
+): AvailabilityResponse | undefined => {
+  if (!response) {
+    return undefined;
+  }
+
+  const sanitized: AvailabilityResponse = {};
+
+  if (typeof response.available === "boolean") {
+    sanitized.available = response.available;
+  }
+
+  if (typeof response.comment === "string") {
+    const trimmed = response.comment.trim();
+    if (trimmed.length > 0) {
+      sanitized.comment = trimmed;
+    }
+  }
+
+  if (sanitized.available === undefined && sanitized.comment === undefined) {
+    return undefined;
+  }
+
+  return sanitized;
+};
+
+const toTimestamp = (value: unknown | Date | Timestamp | undefined): Timestamp => {
+  if (value instanceof Timestamp) {
+    return value;
+  }
+
+  if (value instanceof Date) {
+    return Timestamp.fromDate(value);
+  }
+
+  if (typeof value === "string" || typeof value === "number") {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) {
+      return Timestamp.fromDate(date);
+    }
+  }
+
+  return Timestamp.fromDate(new Date());
+};
 
 export interface PlayerAvailability {
   [playerId: string]: AvailabilityResponse;
@@ -81,47 +122,55 @@ export class AvailabilityService {
       );
       const docRef = doc(getDbInstanceDirect(), this.collectionName, docId);
 
-      const sanitizedPlayers: PlayerAvailability = Object.entries(
-        availability.players
-      ).reduce((acc, [playerId, response]) => {
-        if (!response) {
-          return acc;
+      const existingSnap = await getDoc(docRef);
+      const existingData = existingSnap.exists() ? existingSnap.data() : null;
+
+      console.log("[AvailabilityService] saveAvailability input", {
+        docId,
+        incomingPlayers: availability.players,
+      });
+
+      const sanitizedPlayers: PlayerAvailability = {};
+
+      Object.entries(availability.players).forEach(([playerId, response]) => {
+        const sanitized = sanitizeResponse(response);
+        if (sanitized) {
+          sanitizedPlayers[playerId] = sanitized;
         }
+      });
 
-        const sanitized: AvailabilityResponse = {
-          available: Boolean(response.available),
-        };
+      const createdAtTimestamp = availability.createdAt
+        ? toTimestamp(availability.createdAt)
+        : existingData?.createdAt
+        ? toTimestamp(existingData.createdAt)
+        : Timestamp.fromDate(new Date());
 
-        if (typeof response.comment === "string") {
-          const trimmed = response.comment.trim();
-          if (trimmed.length > 0) {
-            sanitized.comment = trimmed;
-          }
-        }
-
-        acc[playerId] = sanitized;
-        return acc;
-      }, {} as PlayerAvailability);
-
-      const dataToSave: Record<string, any> = {
+      const dataToSave: Record<string, unknown> = {
         journee: availability.journee,
         phase: availability.phase,
         championshipType: availability.championshipType,
         players: sanitizedPlayers,
         updatedAt: Timestamp.fromDate(new Date()),
-        createdAt: availability.createdAt
-          ? availability.createdAt instanceof Date
-            ? Timestamp.fromDate(availability.createdAt)
-            : Timestamp.fromDate(new Date(availability.createdAt))
-          : Timestamp.fromDate(new Date()),
+        createdAt: createdAtTimestamp,
       };
 
-      // Ne pas inclure date s'il est undefined
       if (availability.date !== undefined) {
         dataToSave.date = availability.date;
+      } else if (existingData?.date !== undefined) {
+        dataToSave.date = existingData.date;
       }
 
-      await setDoc(docRef, dataToSave, { merge: true });
+      console.log("[AvailabilityService] sanitized players", {
+        docId,
+        players: sanitizedPlayers,
+      });
+
+      await setDoc(docRef, dataToSave);
+      console.log("[AvailabilityService] Saved availability document", {
+        docId,
+        dataToSave,
+        playersKeys: Object.keys(sanitizedPlayers),
+      });
     } catch (error) {
       console.error("Erreur lors de la sauvegarde de la disponibilité:", error);
       throw error;

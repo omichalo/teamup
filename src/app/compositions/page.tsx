@@ -50,6 +50,8 @@ import {
   getMatchForTeamAndJournee,
   getPlayersFromMatch,
   isMatchPlayed,
+  validateTeamCompositionState,
+  extractTeamNumber,
 } from "@/lib/compositions/validation";
 import { AvailablePlayersPanel } from "@/components/compositions/AvailablePlayersPanel";
 import { TeamCompositionCard } from "@/components/compositions/TeamCompositionCard";
@@ -124,6 +126,12 @@ export default function CompositionsPage() {
     masculin: {},
     feminin: {},
   });
+  const [teamValidationErrors, setTeamValidationErrors] = useState<
+    Record<
+      string,
+      { reason: string; offendingPlayerIds?: string[] } | undefined
+    >
+  >({});
   const [defaultCompositionsLoaded, setDefaultCompositionsLoaded] =
     useState(false);
   const [availabilitiesLoaded, setAvailabilitiesLoaded] = useState(false);
@@ -306,12 +314,109 @@ export default function CompositionsPage() {
     loadPlayers();
   }, [loadPlayers]);
 
-  // Charger les disponibilités pour la journée et phase sélectionnées
   const [availabilities, setAvailabilities] = useState<{
-    masculin?: Record<string, { available: boolean; comment?: string }>;
-    feminin?: Record<string, { available: boolean; comment?: string }>;
+    masculin?: Record<string, { available?: boolean; comment?: string }>;
+    feminin?: Record<string, { available?: boolean; comment?: string }>;
   }>({});
 
+  useEffect(() => {
+    if (
+      loadingEquipes ||
+      loadingPlayers ||
+      selectedPhase === null ||
+      selectedJournee === null
+    ) {
+      setTeamValidationErrors({});
+      return;
+    }
+
+    const nextErrors: Record<
+      string,
+      { reason: string; offendingPlayerIds?: string[] } | undefined
+    > = {};
+
+    equipes.forEach((equipe) => {
+      const validation = validateTeamCompositionState({
+        teamId: equipe.team.id,
+        players,
+        equipes,
+        compositions,
+        selectedPhase,
+        selectedJournee,
+        journeeRule: JOURNEE_CONCERNEE_PAR_REGLE,
+      });
+
+      if (!validation.valid) {
+        const errorInfo: { reason: string; offendingPlayerIds?: string[] } = {
+          reason: validation.reason || "Composition invalide",
+        };
+        if (validation.offendingPlayerIds) {
+          errorInfo.offendingPlayerIds = validation.offendingPlayerIds;
+        }
+        nextErrors[equipe.team.id] = errorInfo;
+      }
+
+      const championshipType = equipe.matches.some(
+        (match) => match.isFemale === true
+      )
+        ? "feminin"
+        : "masculin";
+      const availabilityMap =
+        (championshipType === "masculin"
+          ? availabilities.masculin
+          : availabilities.feminin) || {};
+      const teamPlayerIds = compositions[equipe.team.id] || [];
+      const unavailablePlayers = teamPlayerIds.filter((playerId) => {
+        const availability = availabilityMap[playerId];
+        return !availability || availability.available !== true;
+      });
+
+      if (unavailablePlayers.length > 0) {
+        const unavailablePlayerNames = unavailablePlayers
+          .map((playerId) => players.find((p) => p.id === playerId))
+          .filter((p): p is Player => p !== undefined)
+          .map((p) => `${p.firstName} ${p.name}`);
+
+        const reasonText =
+          unavailablePlayerNames.length > 0
+            ? `Joueur${
+                unavailablePlayerNames.length > 1 ? "s" : ""
+              } indisponible${
+                unavailablePlayerNames.length > 1 ? "s" : ""
+              }: ${unavailablePlayerNames.join(", ")}`
+            : "Un ou plusieurs joueurs de cette équipe ne sont pas disponibles.";
+
+        const existing = nextErrors[equipe.team.id];
+        if (existing) {
+          const hasReason = existing.reason.includes(reasonText);
+          existing.reason = hasReason
+            ? existing.reason
+            : `${existing.reason} • ${reasonText}`;
+          existing.offendingPlayerIds = Array.from(
+            new Set([...(existing.offendingPlayerIds ?? []), ...unavailablePlayers])
+          );
+        } else {
+          nextErrors[equipe.team.id] = {
+            reason: reasonText,
+            offendingPlayerIds: unavailablePlayers,
+          };
+        }
+      }
+    });
+
+    setTeamValidationErrors(nextErrors);
+  }, [
+    compositions,
+    equipes,
+    players,
+    loadingEquipes,
+    loadingPlayers,
+    selectedPhase,
+    selectedJournee,
+    availabilities,
+  ]);
+
+  // Charger les disponibilités pour la journée et phase sélectionnées
   useEffect(() => {
     if (!selectedPhase) {
       setDefaultCompositions({ masculin: {}, feminin: {} });
@@ -613,6 +718,7 @@ export default function CompositionsPage() {
 
     let equipesCompletes = 0;
     let equipesIncompletes = 0;
+    let equipesInvalides = 0;
     let equipesMatchsJoues = 0;
 
     currentTypeEquipes.forEach((equipe) => {
@@ -632,6 +738,13 @@ export default function CompositionsPage() {
         (p): p is Player => p !== undefined
       );
 
+      const validationError = teamValidationErrors[equipe.team.id];
+
+      if (validationError) {
+        equipesInvalides += 1;
+        return;
+      }
+
       if (teamPlayersData.length >= 4) {
         equipesCompletes += 1;
       } else {
@@ -639,7 +752,8 @@ export default function CompositionsPage() {
       }
     });
 
-    const totalEditable = equipesCompletes + equipesIncompletes;
+    const totalEditable =
+      equipesCompletes + equipesIncompletes + equipesInvalides;
     const percentage =
       totalEditable > 0
         ? Math.round((equipesCompletes / totalEditable) * 100)
@@ -649,10 +763,18 @@ export default function CompositionsPage() {
       totalEditable,
       equipesCompletes,
       equipesIncompletes,
+      equipesInvalides,
       equipesMatchsJoues,
       percentage,
     };
-  }, [tabValue, equipesByType, compositions, players, getMatchForTeam]);
+  }, [
+    tabValue,
+    equipesByType,
+    compositions,
+    players,
+    getMatchForTeam,
+    teamValidationErrors,
+  ]);
 
   // Fonction pour vérifier si un drop est possible
   const canDropPlayer = (
@@ -1126,21 +1248,12 @@ export default function CompositionsPage() {
           (championshipType === "masculin"
             ? availabilities.masculin
             : availabilities.feminin) || {};
-        const assignedPlayersForType = new Set<string>();
 
         teamIds.forEach((teamId) => {
           const defaultPlayers = defaultsForType[teamId] || [];
           const nextTeamPlayers: string[] = [];
 
           defaultPlayers.forEach((playerId) => {
-            if (nextTeamPlayers.length >= 4) {
-              return;
-            }
-
-            if (assignedPlayersForType.has(playerId)) {
-              return;
-            }
-
             const availability = availabilityMap[playerId];
             if (!availability || availability.available !== true) {
               console.log("[Compositions] Player skipped (not available)", {
@@ -1162,34 +1275,47 @@ export default function CompositionsPage() {
               return;
             }
 
-            const simulatedCompositions: Record<string, string[]> = {
-              ...nextCompositions,
-              [teamId]: [...nextTeamPlayers, playerId],
-            };
-
-            const validation = canAssignPlayerToTeam({
-              playerId,
-              teamId,
-              players,
-              equipes,
-              compositions: simulatedCompositions,
-              selectedPhase,
-              selectedJournee,
-              journeeRule: JOURNEE_CONCERNEE_PAR_REGLE,
-            });
-
-            if (!validation.canAssign) {
-              console.log("[Compositions] Player skipped (validation failed)", {
+            if (nextTeamPlayers.length >= 5) {
+              console.log("[Compositions] Player skipped (team full)", {
                 playerId,
                 teamId,
                 championshipType,
-                reason: validation.reason,
+              });
+              return;
+            }
+
+            const maxMasculine =
+              player.highestMasculineTeamNumberByPhase?.[selectedPhase || "aller"];
+            const maxFeminine =
+              player.highestFeminineTeamNumberByPhase?.[selectedPhase || "aller"];
+            const teamNumber = extractTeamNumber(
+              equipes.find((eq) => eq.team.id === teamId)?.team.name || ""
+            );
+
+            if (
+              teamNumber > 0 &&
+              ((championshipType === "masculin" &&
+                maxMasculine !== undefined &&
+                maxMasculine !== null &&
+                teamNumber > maxMasculine) ||
+                (championshipType === "feminin" &&
+                  maxFeminine !== undefined &&
+                  maxFeminine !== null &&
+                  teamNumber > maxFeminine))
+            ) {
+              console.log("[Compositions] Player skipped (burning rule)", {
+                playerId,
+                teamId,
+                championshipType,
+                phase: selectedPhase,
+                journee: selectedJournee,
+                maxMasculine,
+                maxFeminine,
               });
               return;
             }
 
             nextTeamPlayers.push(playerId);
-            assignedPlayersForType.add(playerId);
             console.log("[Compositions] Player added from defaults", {
               playerId,
               teamId,
@@ -1645,6 +1771,7 @@ export default function CompositionsPage() {
                     totalTeams={compositionSummary.totalEditable}
                     completedTeams={compositionSummary.equipesCompletes}
                     incompleteTeams={compositionSummary.equipesIncompletes}
+                    invalidTeams={compositionSummary.equipesInvalides}
                     matchesPlayed={compositionSummary.equipesMatchsJoues}
                     percentage={compositionSummary.percentage}
                   />
@@ -1679,6 +1806,8 @@ export default function CompositionsPage() {
                               ? teamPlayers
                               : [];
 
+                          const teamAvailabilityMap = availabilities.masculin || {};
+
                           const isDragOver =
                             !matchPlayed &&
                             draggedPlayerId &&
@@ -1706,63 +1835,66 @@ export default function CompositionsPage() {
                                 onDrop: (event: React.DragEvent) =>
                                   handleDrop(event, equipe.team.id),
                               };
+      const validationInfo =
+        !matchPlayed && selectedJournee !== null && selectedPhase !== null
+          ? teamValidationErrors[equipe.team.id]
+          : undefined;
+      const validationError = validationInfo?.reason;
+      const offendingPlayerIds = validationInfo?.offendingPlayerIds ?? [];
 
                           return (
-                            <TeamCompositionCard
-                              key={equipe.team.id}
-                              equipe={equipe}
-                              players={teamPlayersData}
-                              onRemovePlayer={(playerId) =>
-                                handleRemovePlayer(equipe.team.id, playerId)
-                              }
-                              onPlayerDragStart={(event, playerId) =>
-                                handleDragStart(event, playerId)
-                              }
-                              onPlayerDragEnd={handleDragEnd}
-                              isDragOver={Boolean(isDragOver)}
-                              canDrop={canDrop}
-                              dropReason={dropCheck.reason}
-                              draggedPlayerId={draggedPlayerId}
-                              dragOverTeamId={dragOverTeamId}
-                              matchPlayed={matchPlayed}
-                              renderPlayerIndicators={(player) => {
-                                const phase = selectedPhase || "aller";
-                                const burnedTeam =
-                                  player.highestMasculineTeamNumberByPhase?.[
-                                    phase
-                                  ];
-                                return (
-                                  <>
-                                    {player.nationality === "C" && (
-                                      <Chip
-                                        label="EUR"
-                                        size="small"
-                                        color="info"
-                                        variant="outlined"
-                                        sx={{
-                                          height: 18,
-                                          fontSize: "0.65rem",
-                                        }}
-                                      />
-                                    )}
-                                    {player.nationality === "ETR" && (
-                                      <Chip
-                                        label="ETR"
-                                        size="small"
-                                        color="warning"
-                                        variant="outlined"
-                                        sx={{
-                                          height: 18,
-                                          fontSize: "0.65rem",
-                                        }}
-                                      />
-                                    )}
-                                    {burnedTeam !== undefined &&
-                                      burnedTeam !== null && (
+                            <Box key={equipe.team.id}>
+                              <TeamCompositionCard
+                                equipe={equipe}
+                                players={teamPlayersData}
+                                onRemovePlayer={(playerId) =>
+                                  handleRemovePlayer(equipe.team.id, playerId)
+                                }
+                                onPlayerDragStart={(event, playerId) =>
+                                  handleDragStart(event, playerId)
+                                }
+                                onPlayerDragEnd={handleDragEnd}
+                                isDragOver={Boolean(isDragOver)}
+                                canDrop={canDrop}
+                                dropReason={dropCheck.reason}
+                                draggedPlayerId={draggedPlayerId}
+                                dragOverTeamId={dragOverTeamId}
+                                matchPlayed={matchPlayed}
+                                additionalHeader={
+                                  validationError ? (
+                                    <Chip
+                                      label="Invalide"
+                                      size="small"
+                                      color="error"
+                                      variant="filled"
+                                    />
+                                  ) : undefined
+                                }
+                                renderPlayerIndicators={(player) => {
+                                  const phase = selectedPhase || "aller";
+                                  const burnedTeam =
+                                    player.highestMasculineTeamNumberByPhase?.[
+                                      phase
+                                    ];
+                                  const availability =
+                                    teamAvailabilityMap[player.id];
+                                  const isPlayerAvailable =
+                                    availability?.available === true;
+                                  const showUnavailableIndicator =
+                                    !isPlayerAvailable;
+                                  const showJ2Indicator =
+                                    offendingPlayerIds.includes(player.id) &&
+                                    (validationError?.toLowerCase() || "").includes(
+                                      "journée 2"
+                                    ) &&
+                                    isPlayerAvailable;
+                                  return (
+                                    <>
+                                      {player.nationality === "C" && (
                                         <Chip
-                                          label={`Brûlé Éq. ${burnedTeam}`}
+                                          label="EUR"
                                           size="small"
-                                          color="error"
+                                          color="info"
                                           variant="outlined"
                                           sx={{
                                             height: 18,
@@ -1770,17 +1902,76 @@ export default function CompositionsPage() {
                                           }}
                                         />
                                       )}
-                                  </>
-                                );
-                              }}
-                              renderPlayerSecondary={(player) =>
-                                player.points !== undefined &&
-                                player.points !== null
-                                  ? `${player.points} points`
-                                  : "Points non disponibles"
-                              }
-                              {...(dragHandlers ?? {})}
-                            />
+                                      {player.nationality === "ETR" && (
+                                        <Chip
+                                          label="ETR"
+                                          size="small"
+                                          color="warning"
+                                          variant="outlined"
+                                          sx={{
+                                            height: 18,
+                                            fontSize: "0.65rem",
+                                          }}
+                                        />
+                                      )}
+                                      {burnedTeam !== undefined &&
+                                        burnedTeam !== null && (
+                                          <Chip
+                                            label={`Brûlé Éq. ${burnedTeam}`}
+                                            size="small"
+                                            color="error"
+                                            variant="outlined"
+                                            sx={{
+                                              height: 18,
+                                              fontSize: "0.65rem",
+                                            }}
+                                          />
+                                        )}
+                                      {showUnavailableIndicator && (
+                                        <Chip
+                                          label="Indispo"
+                                          size="small"
+                                          color="error"
+                                          variant="filled"
+                                          sx={{
+                                            height: 18,
+                                            fontSize: "0.65rem",
+                                          }}
+                                        />
+                                      )}
+                                      {showJ2Indicator && (
+                                        <Chip
+                                          label="J2"
+                                          size="small"
+                                          color="error"
+                                          variant="filled"
+                                          sx={{
+                                            height: 18,
+                                            fontSize: "0.65rem",
+                                          }}
+                                        />
+                                      )}
+                                    </>
+                                  );
+                                }}
+                                renderPlayerSecondary={(player) =>
+                                  player.points !== undefined &&
+                                  player.points !== null
+                                    ? `${player.points} points`
+                                    : "Points non disponibles"
+                                }
+                                {...(dragHandlers ?? {})}
+                              />
+                              {validationError && (
+                                <Typography
+                                  variant="caption"
+                                  color="error"
+                                  sx={{ mt: 1, display: "block" }}
+                                >
+                                  {validationError}
+                                </Typography>
+                              )}
+                            </Box>
                           );
                         })}
                       </Box>
@@ -1817,6 +2008,8 @@ export default function CompositionsPage() {
                               ? teamPlayers
                               : [];
 
+                          const teamAvailabilityMap = availabilities.feminin || {};
+
                           const isDragOver =
                             !matchPlayed &&
                             draggedPlayerId &&
@@ -1843,63 +2036,69 @@ export default function CompositionsPage() {
                                 onDrop: (event: React.DragEvent) =>
                                   handleDrop(event, equipe.team.id),
                               };
+                          const validationInfo =
+                            !matchPlayed &&
+                            selectedJournee !== null &&
+                            selectedPhase !== null
+                              ? teamValidationErrors[equipe.team.id]
+                              : undefined;
+                          const validationError = validationInfo?.reason;
+                          const offendingPlayerIds =
+                            validationInfo?.offendingPlayerIds ?? [];
 
                           return (
-                            <TeamCompositionCard
-                              key={equipe.team.id}
-                              equipe={equipe}
-                              players={teamPlayersData}
-                              onRemovePlayer={(playerId) =>
-                                handleRemovePlayer(equipe.team.id, playerId)
-                              }
-                              onPlayerDragStart={(event, playerId) =>
-                                handleDragStart(event, playerId)
-                              }
-                              onPlayerDragEnd={handleDragEnd}
-                              isDragOver={Boolean(isDragOver)}
-                              canDrop={canDrop}
-                              dropReason={dropCheck.reason}
-                              draggedPlayerId={draggedPlayerId}
-                              dragOverTeamId={dragOverTeamId}
-                              matchPlayed={matchPlayed}
-                              renderPlayerIndicators={(player) => {
-                                const phase = selectedPhase || "aller";
-                                const burnedTeam =
-                                  player.highestFeminineTeamNumberByPhase?.[
-                                    phase
-                                  ];
-                                return (
-                                  <>
-                                    {player.nationality === "C" && (
-                                      <Chip
-                                        label="EUR"
-                                        size="small"
-                                        color="info"
-                                        variant="outlined"
-                                        sx={{
-                                          height: 18,
-                                          fontSize: "0.65rem",
-                                        }}
-                                      />
-                                    )}
-                                    {player.nationality === "ETR" && (
-                                      <Chip
-                                        label="ETR"
-                                        size="small"
-                                        color="warning"
-                                        variant="outlined"
-                                        sx={{
-                                          height: 18,
-                                          fontSize: "0.65rem",
-                                        }}
-                                      />
-                                    )}
-                                    {burnedTeam !== undefined &&
-                                      burnedTeam !== null && (
+                            <Box key={equipe.team.id}>
+                              <TeamCompositionCard
+                                equipe={equipe}
+                                players={teamPlayersData}
+                                onRemovePlayer={(playerId) =>
+                                  handleRemovePlayer(equipe.team.id, playerId)
+                                }
+                                onPlayerDragStart={(event, playerId) =>
+                                  handleDragStart(event, playerId)
+                                }
+                                onPlayerDragEnd={handleDragEnd}
+                                isDragOver={Boolean(isDragOver)}
+                                canDrop={canDrop}
+                                dropReason={dropCheck.reason}
+                                draggedPlayerId={draggedPlayerId}
+                                dragOverTeamId={dragOverTeamId}
+                                matchPlayed={matchPlayed}
+                                additionalHeader={
+                                  validationError ? (
+                                    <Chip
+                                      label="Invalide"
+                                      size="small"
+                                      color="error"
+                                      variant="filled"
+                                    />
+                                  ) : undefined
+                                }
+                                renderPlayerIndicators={(player) => {
+                                  const phase = selectedPhase || "aller";
+                                  const burnedTeam =
+                                    player.highestFeminineTeamNumberByPhase?.[
+                                      phase
+                                    ];
+                                  const availability =
+                                    teamAvailabilityMap[player.id];
+                                  const isPlayerAvailable =
+                                    availability?.available === true;
+                                  const showUnavailableIndicator =
+                                    !isPlayerAvailable;
+                                  const showJ2Indicator =
+                                    offendingPlayerIds.includes(player.id) &&
+                                    (validationError?.toLowerCase() || "").includes(
+                                      "journée 2"
+                                    ) &&
+                                    isPlayerAvailable;
+                                  return (
+                                    <>
+                                      {player.nationality === "C" && (
                                         <Chip
-                                          label={`Brûlé Éq. ${burnedTeam}`}
+                                          label="EUR"
                                           size="small"
-                                          color="error"
+                                          color="info"
                                           variant="outlined"
                                           sx={{
                                             height: 18,
@@ -1907,17 +2106,76 @@ export default function CompositionsPage() {
                                           }}
                                         />
                                       )}
-                                  </>
-                                );
-                              }}
-                              renderPlayerSecondary={(player) =>
-                                player.points !== undefined &&
-                                player.points !== null
-                                  ? `${player.points} points`
-                                  : "Points non disponibles"
-                              }
-                              {...(dragHandlers ?? {})}
-                            />
+                                      {player.nationality === "ETR" && (
+                                        <Chip
+                                          label="ETR"
+                                          size="small"
+                                          color="warning"
+                                          variant="outlined"
+                                          sx={{
+                                            height: 18,
+                                            fontSize: "0.65rem",
+                                          }}
+                                        />
+                                      )}
+                                      {burnedTeam !== undefined &&
+                                        burnedTeam !== null && (
+                                          <Chip
+                                            label={`Brûlé Éq. ${burnedTeam}`}
+                                            size="small"
+                                            color="error"
+                                            variant="outlined"
+                                            sx={{
+                                              height: 18,
+                                              fontSize: "0.65rem",
+                                            }}
+                                          />
+                                        )}
+                                      {showUnavailableIndicator && (
+                                        <Chip
+                                          label="Indispo"
+                                          size="small"
+                                          color="error"
+                                          variant="filled"
+                                          sx={{
+                                            height: 18,
+                                            fontSize: "0.65rem",
+                                          }}
+                                        />
+                                      )}
+                                      {showJ2Indicator && (
+                                        <Chip
+                                          label="J2"
+                                          size="small"
+                                          color="error"
+                                          variant="filled"
+                                          sx={{
+                                            height: 18,
+                                            fontSize: "0.65rem",
+                                          }}
+                                        />
+                                      )}
+                                    </>
+                                  );
+                                }}
+                                renderPlayerSecondary={(player) =>
+                                  player.points !== undefined &&
+                                  player.points !== null
+                                    ? `${player.points} points`
+                                    : "Points non disponibles"
+                                }
+                                {...(dragHandlers ?? {})}
+                              />
+                              {validationError && (
+                                <Typography
+                                  variant="caption"
+                                  color="error"
+                                  sx={{ mt: 1, display: "block" }}
+                                >
+                                  {validationError}
+                                </Typography>
+                              )}
+                            </Box>
                           );
                         })}
                       </Box>

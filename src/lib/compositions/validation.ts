@@ -1,7 +1,7 @@
 import { Player } from "@/types/team-management";
 import { Match } from "@/types";
 import { EquipeWithMatches } from "@/hooks/useEquipesWithMatches";
-import { extractTeamNumber, validateFFTTRules } from "@/lib/shared/fftt-utils";
+import { validateFFTTRules } from "@/lib/shared/fftt-utils";
 
 export type PhaseType = "aller" | "retour";
 
@@ -41,6 +41,7 @@ export interface TeamCompositionValidationParams {
 export interface TeamCompositionValidationResult {
   valid: boolean;
   reason?: string;
+  offendingPlayerIds?: string[];
 }
 
 export const JOURNEE_CONCERNEE_PAR_REGLE = 2;
@@ -125,6 +126,11 @@ export const getMatchForTeamAndJournee = (
       match.journee === journee &&
       match.phase?.toLowerCase() === phase.toLowerCase()
   );
+};
+
+export const extractTeamNumber = (teamName: string): number => {
+  const match = teamName.match(/\b(\d+)\b/);
+  return match ? parseInt(match[1], 10) : 0;
 };
 
 const findEquipeById = (
@@ -385,7 +391,13 @@ export const validateTeamCompositionState = (
     .map((playerId) => players.find((p) => p.id === playerId))
     .filter((p): p is Player => p !== undefined);
 
+  const isDailyContext = selectedJournee !== null;
+
   if (teamPlayers.length === 0) {
+    return { valid: true };
+  }
+
+  if (isDailyContext && teamPlayers.length < maxPlayersPerTeam) {
     return { valid: true };
   }
 
@@ -439,6 +451,7 @@ export const validateTeamCompositionState = (
       return {
         valid: false,
         reason: `${burnedPlayer.firstName} ${burnedPlayer.name} est brûlé(e) : équipe autorisée ${burnedTeamNumber ?? "?"}, équipe actuelle ${teamNumber}`,
+        offendingPlayerIds: [burnedPlayer.id],
       };
     }
   }
@@ -473,6 +486,7 @@ export const validateTeamCompositionState = (
         return {
           valid: false,
           reason: `Lors de la ${journeeRule}ème journée, une équipe ne peut comporter qu'un seul joueur ayant joué la 1ère journée dans une équipe de numéro inférieur`,
+          offendingPlayerIds: playersFromLowerTeams.map((p) => p.id),
         };
       }
     }

@@ -584,19 +584,20 @@ export default function AdminPage() {
                   <Box sx={{ pl: 2 }}>
                     <Typography variant="body2" sx={{ mb: 1 }}>
                       • <strong>Joueurs :</strong> Synchronisation quotidienne à
-                      6h du matin
+                      6h00 (heure de Paris)
                     </Typography>
                     <Typography variant="body2" sx={{ mb: 1 }}>
                       • <strong>Équipes :</strong> Synchronisation quotidienne à
-                      1h du matin
+                      6h05 (heure de Paris)
                     </Typography>
                     <Typography variant="body2" sx={{ mb: 1 }}>
                       • <strong>Matchs par équipe :</strong> Synchronisation
-                      quotidienne à 2h30 du matin
+                      quotidienne à 6h10 (heure de Paris)
                     </Typography>
                     <Typography variant="body2">
                       • <strong>Détails des matchs :</strong> Récupération
-                      automatique des compositions et résultats
+                      automatique des compositions et résultats après chaque
+                      synchronisation quotidienne
                     </Typography>
                   </Box>
 
