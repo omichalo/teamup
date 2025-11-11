@@ -29,6 +29,7 @@ import {
 import { DragIndicator } from "@mui/icons-material";
 import { Layout } from "@/components/Layout";
 import { AuthGuard } from "@/components/AuthGuard";
+import { USER_ROLES } from "@/lib/auth/roles";
 import {
   useEquipesWithMatches,
   type EquipeWithMatches,
@@ -893,7 +894,10 @@ export default function DefaultCompositionsPage() {
   ];
 
   return (
-    <AuthGuard>
+    <AuthGuard
+      allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.COACH]}
+      redirectWhenUnauthorized="/joueur"
+    >
       <Layout>
         <Box sx={{ p: 5 }}>
           <Stack

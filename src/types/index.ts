@@ -139,13 +139,39 @@ export interface ClubSettings {
   updatedAt: Date;
 }
 
+export type UserRole = "admin" | "coach" | "player";
+
+export type CoachRequestStatus = "none" | "pending" | "approved" | "rejected";
+
 export interface User {
   id: string;
   email: string;
   displayName: string;
   photoURL?: string;
-  role: "coach" | "player";
+  role: UserRole;
   playerId?: string; // Si c&apos;est un joueur
+  coachRequestStatus: CoachRequestStatus;
+  coachRequestMessage?: string | null;
+  coachRequestUpdatedAt?: Date | null;
+  coachRequestHandledBy?: string | null;
+  coachRequestHandledAt?: Date | null;
+  lastLoginAt?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface UserProfileDocument {
+  email: string;
+  displayName?: string;
+  photoURL?: string | null;
+  role: UserRole;
+  playerId?: string;
+  coachRequestStatus?: CoachRequestStatus;
+  coachRequestMessage?: string | null;
+  coachRequestUpdatedAt?: Date | null;
+  coachRequestHandledBy?: string | null;
+  coachRequestHandledAt?: Date | null;
+  lastLoginAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

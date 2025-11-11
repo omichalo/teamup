@@ -40,6 +40,7 @@ import { CompositionService } from "@/lib/services/composition-service";
 import { Player } from "@/types/team-management";
 import { Layout } from "@/components/Layout";
 import { AuthGuard } from "@/components/AuthGuard";
+import { USER_ROLES } from "@/lib/auth/roles";
 import { getCurrentPhase } from "@/lib/shared/phase-utils";
 
 interface AvailabilityResponse {
@@ -768,7 +769,10 @@ export default function DisponibilitesPage() {
   }
 
   return (
-    <AuthGuard>
+    <AuthGuard
+      allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.COACH]}
+      redirectWhenUnauthorized="/joueur"
+    >
     <Layout>
         <Box sx={{ p: 5 }}>
           <Snackbar

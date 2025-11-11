@@ -37,6 +37,7 @@ import { useEquipesWithMatches } from "@/hooks/useEquipesWithMatches";
 import { Match } from "@/types";
 import { Layout } from "@/components/Layout";
 import { AuthGuard } from "@/components/AuthGuard";
+import { USER_ROLES } from "@/lib/auth/roles";
 
 export default function EquipesPage() {
   const { equipes, loading, error } = useEquipesWithMatches();
@@ -140,7 +141,10 @@ export default function EquipesPage() {
 
   if (loading) {
     return (
-      <AuthGuard>
+      <AuthGuard
+        allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.COACH]}
+        redirectWhenUnauthorized="/joueur"
+      >
         <Layout>
           <Box
             sx={{
@@ -162,7 +166,10 @@ export default function EquipesPage() {
 
   if (error) {
     return (
-      <AuthGuard>
+      <AuthGuard
+        allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.COACH]}
+        redirectWhenUnauthorized="/joueur"
+      >
         <Layout>
           <Box sx={{ p: 3 }}>
             <Alert severity="error">
@@ -175,7 +182,10 @@ export default function EquipesPage() {
   }
 
   return (
-    <AuthGuard>
+    <AuthGuard
+      allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.COACH]}
+      redirectWhenUnauthorized="/joueur"
+    >
       <Layout>
         <Box sx={{ p: 5 }}>
           <Typography variant="h4" component="h1" gutterBottom>

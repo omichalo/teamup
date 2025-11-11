@@ -1,10 +1,19 @@
 import { NextApiRequest, NextApiResponse } from "next";
+import { DecodedIdToken } from "firebase-admin/auth";
 import { initializeFirebaseAdmin, adminAuth } from "./firebase-admin";
+import {
+  resolveCoachRequestStatus,
+  resolveRole,
+} from "@/lib/auth/roles";
+import { CoachRequestStatus, UserRole } from "@/types";
 
 export interface AuthenticatedRequest extends NextApiRequest {
   user?: {
     uid: string;
     email: string;
+    role: UserRole;
+    coachRequestStatus: CoachRequestStatus;
+    claims: DecodedIdToken;
   };
 }
 
@@ -29,11 +38,18 @@ export function withAuth(
 
       // Vérifier le token Firebase
       const decodedToken = await adminAuth.verifyIdToken(token);
+      const role = resolveRole(decodedToken.role as string | undefined);
+      const coachRequestStatus = resolveCoachRequestStatus(
+        decodedToken.coachRequestStatus as string | undefined
+      );
 
       // Ajouter les informations utilisateur à la requête
       (req as AuthenticatedRequest).user = {
         uid: decodedToken.uid,
         email: decodedToken.email || "",
+        role,
+        coachRequestStatus,
+        claims: decodedToken,
       };
 
       // Appeler le handler original
@@ -73,11 +89,18 @@ export function withOptionalAuth(
 
         // Vérifier le token Firebase
         const decodedToken = await adminAuth.verifyIdToken(token);
+        const role = resolveRole(decodedToken.role as string | undefined);
+        const coachRequestStatus = resolveCoachRequestStatus(
+          decodedToken.coachRequestStatus as string | undefined
+        );
 
         // Ajouter les informations utilisateur à la requête
         (req as AuthenticatedRequest).user = {
           uid: decodedToken.uid,
           email: decodedToken.email || "",
+          role,
+          coachRequestStatus,
+          claims: decodedToken,
         };
       }
 

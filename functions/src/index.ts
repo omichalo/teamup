@@ -11,6 +11,35 @@ import {
   syncTeamMatchesWrapper,
 } from "./sync-wrappers";
 
+const ALLOWED_ROLES = new Set(["admin", "coach", "player"]);
+const ALLOWED_COACH_STATUSES = new Set([
+  "none",
+  "pending",
+  "approved",
+  "rejected",
+]);
+
+const resolveRole = (role: unknown): "admin" | "coach" | "player" => {
+  if (typeof role === "string" && ALLOWED_ROLES.has(role)) {
+    return role as "admin" | "coach" | "player";
+  }
+  return "player";
+};
+
+const resolveCoachStatus = (
+  status: unknown,
+  role: "admin" | "coach" | "player"
+): "none" | "pending" | "approved" | "rejected" => {
+  if (role === "coach") {
+    if (typeof status === "string" && ALLOWED_COACH_STATUSES.has(status)) {
+      return status as "none" | "pending" | "approved" | "rejected";
+    }
+    return "approved";
+  }
+
+  return "none";
+};
+
 /**
  * 🔄 Synchronisation quotidienne des joueurs SQY Ping
  * Se déclenche tous les jours à 6h00 (Europe/Paris)
@@ -40,6 +69,27 @@ export const syncPlayersManual = functions.https.onRequest(async (req, res) => {
 
   if (req.method !== "POST") {
     res.status(405).json({ error: "Method not allowed" });
+    return;
+  }
+
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      res.status(401).json({ error: "Token d'authentification requis" });
+      return;
+    }
+
+    const decodedToken = await admin.auth().verifyIdToken(
+      authHeader.split(" ")[1]
+    );
+    const role = resolveRole(decodedToken.role);
+    if (role !== "admin" && role !== "coach") {
+      res.status(403).json({ error: "Accès refusé" });
+      return;
+    }
+  } catch (authError) {
+    console.error("❌ Auth error:", authError);
+    res.status(401).json({ error: "Token d'authentification invalide" });
     return;
   }
 
@@ -89,6 +139,27 @@ export const syncTeamsManual = functions.https.onRequest(async (req, res) => {
   }
 
   try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      res.status(401).json({ error: "Token d'authentification requis" });
+      return;
+    }
+
+    const decodedToken = await admin.auth().verifyIdToken(
+      authHeader.split(" ")[1]
+    );
+    const role = resolveRole(decodedToken.role);
+    if (role !== "admin" && role !== "coach") {
+      res.status(403).json({ error: "Accès refusé" });
+      return;
+    }
+  } catch (authError) {
+    console.error("❌ Auth error:", authError);
+    res.status(401).json({ error: "Token d'authentification invalide" });
+    return;
+  }
+
+  try {
     console.log("🏆 Synchronisation manuelle des équipes SQY Ping démarrée");
     const result = await syncTeamsFunction();
     res.status(200).json(result);
@@ -133,6 +204,27 @@ export const syncTeamMatchesManual = functions.https.onRequest(
 
     if (req.method !== "POST") {
       res.status(405).json({ error: "Method not allowed" });
+      return;
+    }
+
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        res.status(401).json({ error: "Token d'authentification requis" });
+        return;
+      }
+
+      const decodedToken = await admin.auth().verifyIdToken(
+        authHeader.split(" ")[1]
+      );
+      const role = resolveRole(decodedToken.role);
+      if (role !== "admin" && role !== "coach") {
+        res.status(403).json({ error: "Accès refusé" });
+        return;
+      }
+    } catch (authError) {
+      console.error("❌ Auth error:", authError);
+      res.status(401).json({ error: "Token d'authentification invalide" });
       return;
     }
 
@@ -264,6 +356,27 @@ export const cleanupDuplicatePlayers = functions.https.onRequest(
       return;
     }
 
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      res.status(401).json({ error: "Token d'authentification requis" });
+      return;
+    }
+
+    const decodedToken = await admin.auth().verifyIdToken(
+      authHeader.split(" ")[1]
+    );
+    const role = resolveRole(decodedToken.role);
+    if (role !== "admin" && role !== "coach") {
+      res.status(403).json({ error: "Accès refusé" });
+      return;
+    }
+  } catch (authError) {
+    console.error("❌ Auth error:", authError);
+    res.status(401).json({ error: "Token d'authentification invalide" });
+    return;
+  }
+
     try {
       console.log("🧹 Nettoyage des doublons de joueurs...");
 
@@ -353,6 +466,111 @@ export const cleanupDuplicatePlayers = functions.https.onRequest(
     }
   }
 );
+
+export const setUserRole = functions.https.onRequest(async (req, res) => {
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  if (req.method === "OPTIONS") {
+    res.status(204).send("");
+    return;
+  }
+
+  if (req.method !== "POST") {
+    res.status(405).json({ error: "Method not allowed" });
+    return;
+  }
+
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      res.status(401).json({
+        success: false,
+        error: "Token d'authentification requis",
+      });
+      return;
+    }
+
+    const token = authHeader.split(" ")[1];
+    const decodedToken = await admin.auth().verifyIdToken(token);
+
+    if (decodedToken.role !== "admin") {
+      res.status(403).json({
+        success: false,
+        error: "Accès refusé",
+      });
+      return;
+    }
+
+    const { userId, role, coachRequestStatus, coachRequestMessage, playerId } =
+      req.body ?? {};
+
+    if (typeof userId !== "string" || userId.length === 0) {
+      res.status(400).json({
+        success: false,
+        error: "Paramètre 'userId' invalide",
+      });
+      return;
+    }
+
+    const resolvedRole = resolveRole(role);
+    const resolvedCoachStatus = resolveCoachStatus(
+      coachRequestStatus,
+      resolvedRole
+    );
+
+    const userRecord = await admin.auth().getUser(userId);
+    const existingClaims = userRecord.customClaims ?? {};
+
+    await admin.auth().setCustomUserClaims(userId, {
+      ...existingClaims,
+      role: resolvedRole,
+      coachRequestStatus: resolvedCoachStatus,
+    });
+
+    await admin.auth().revokeRefreshTokens(userId);
+
+    const firestore = admin.firestore();
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
+    await firestore.collection("users").doc(userId).set(
+      {
+        role: resolvedRole,
+        coachRequestStatus: resolvedCoachStatus,
+        coachRequestMessage:
+          coachRequestMessage !== undefined
+            ? coachRequestMessage
+            : admin.firestore.FieldValue.delete(),
+        coachRequestHandledBy: decodedToken.uid,
+        coachRequestHandledAt: now,
+        coachRequestUpdatedAt: now,
+        playerId:
+          playerId !== undefined
+            ? playerId
+            : admin.firestore.FieldValue.delete(),
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        userId,
+        role: resolvedRole,
+        coachRequestStatus: resolvedCoachStatus,
+      },
+    });
+  } catch (error) {
+    console.error("❌ Erreur lors de la mise à jour du rôle utilisateur:", error);
+    res.status(500).json({
+      success: false,
+      error: "Erreur lors de la mise à jour du rôle utilisateur",
+      details: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+});
 
 // ===== FONCTIONS UTILITAIRES =====
 

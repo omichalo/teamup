@@ -1,16 +1,21 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useMemo } from "react";
 import { Box, CircularProgress, Typography } from "@mui/material";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { UserRole } from "@/types";
+import { isAdmin } from "@/lib/auth/roles";
 
 interface AuthGuardProps {
   children: React.ReactNode;
   requireAuth?: boolean;
   redirectTo?: string;
   fallback?: React.ReactNode;
+  loadingFallback?: React.ReactNode;
+  allowedRoles?: UserRole[];
+  redirectWhenUnauthorized?: string;
+  redirectWhenAuthenticated?: string;
 }
 
 export const AuthGuard: React.FC<AuthGuardProps> = ({
@@ -18,28 +23,72 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
   requireAuth = true,
   redirectTo = "/auth",
   fallback,
+  loadingFallback,
+  allowedRoles,
+  redirectWhenUnauthorized = "/",
+  redirectWhenAuthenticated = "/",
 }) => {
   const { user, loading } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    if (!loading) {
-      if (requireAuth && !user) {
-        router.push(redirectTo);
-      } else if (!requireAuth && user) {
-        router.push("/");
-      }
+  const hasAccess = useMemo(() => {
+    if (!requireAuth) {
+      return true;
     }
-  }, [user, loading, requireAuth, redirectTo, router]);
 
-  // Si on attend une authentification et qu&apos;il n&apos;y a pas d&apos;utilisateur, afficher le fallback
-  if (requireAuth && !user) {
-    return fallback || null;
-  }
+    if (!user) {
+      return false;
+    }
 
-  // Pendant le chargement, afficher un loader seulement si on est sur une page protégée
-  // Sur la page d&apos;auth, on laisse le Layout gérer le chargement
+    if (!allowedRoles || allowedRoles.length === 0) {
+      return true;
+    }
+
+    if (allowedRoles.includes(user.role)) {
+      return true;
+    }
+
+    return isAdmin(user.role);
+  }, [allowedRoles, requireAuth, user]);
+
+  useEffect(() => {
+    if (loading) {
+      return;
+    }
+
+    if (requireAuth && !user) {
+      router.push(redirectTo);
+      return;
+    }
+
+    if (user && !hasAccess) {
+      router.push(redirectWhenUnauthorized);
+    }
+  }, [
+    hasAccess,
+    loading,
+    redirectTo,
+    redirectWhenUnauthorized,
+    requireAuth,
+    router,
+    user,
+  ]);
+
+  useEffect(() => {
+    if (loading) {
+      return;
+    }
+
+    if (!requireAuth && user) {
+      router.push(redirectWhenAuthenticated);
+    }
+  }, [loading, redirectWhenAuthenticated, requireAuth, router, user]);
+
   if (loading && requireAuth) {
+    if (loadingFallback) {
+      return <>{loadingFallback}</>;
+    }
+
     return (
       <Box
         sx={{
@@ -59,12 +108,17 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
     );
   }
 
-  // Si on n&apos;attend pas d&apos;authentification et qu&apos;il y a un utilisateur, ne rien afficher
-  // (la redirection va se faire)
-  if (!requireAuth && user) {
-    return null;
+  if (requireAuth && !loading && !user) {
+    return fallback || null;
   }
 
-  // Sinon, afficher le contenu
+  if (requireAuth && user && !hasAccess) {
+    return fallback || null;
+  }
+
+  if (!requireAuth && user) {
+    return loadingFallback || null;
+  }
+
   return <>{children}</>;
 };

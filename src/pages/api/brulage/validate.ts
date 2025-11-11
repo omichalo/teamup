@@ -3,10 +3,21 @@ import { BrulageService } from "@/services/brulageService";
 import { getBurnRecords, getPlayers } from "@/services/firebase";
 import { CompositionValidation } from "@/types";
 import { withAuth, AuthenticatedRequest } from "@/lib/auth-middleware";
+import { hasAnyRole, USER_ROLES } from "@/lib/auth/roles";
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  if (
+    !req.user ||
+    !hasAnyRole(req.user.role, [USER_ROLES.ADMIN, USER_ROLES.COACH])
+  ) {
+    return res.status(403).json({
+      error: "Accès refusé",
+      message: "Cette ressource est réservée aux administrateurs et coachs",
+    });
   }
 
   try {

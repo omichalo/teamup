@@ -4,10 +4,22 @@ import {
   initializeFirebaseAdmin,
   getFirestoreAdmin,
 } from "@/lib/firebase-admin";
+import { hasAnyRole, USER_ROLES } from "@/lib/auth/roles";
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== "GET") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  if (
+    !req.user ||
+    !hasAnyRole(req.user.role, [USER_ROLES.ADMIN, USER_ROLES.COACH])
+  ) {
+    return res.status(403).json({
+      success: false,
+      error: "Accès refusé",
+      message: "Cette ressource est réservée aux administrateurs et coachs",
+    });
   }
 
   try {

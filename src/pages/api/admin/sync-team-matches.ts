@@ -6,6 +6,7 @@ import {
   getFirestoreAdmin,
 } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
+import { hasAnyRole, USER_ROLES } from "@/lib/auth/roles";
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -17,6 +18,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(401).json({
       error: "Token d&apos;authentification requis",
       message: "Cette API nécessite une authentification valide",
+    });
+  }
+
+  if (!hasAnyRole(req.user.role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
+    return res.status(403).json({
+      error: "Accès refusé",
+      message: "Cette opération est réservée aux administrateurs et coachs",
     });
   }
 

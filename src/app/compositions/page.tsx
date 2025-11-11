@@ -42,6 +42,7 @@ import { CompositionDefaultsService } from "@/lib/services/composition-defaults-
 import { Player } from "@/types/team-management";
 import { Layout } from "@/components/Layout";
 import { AuthGuard } from "@/components/AuthGuard";
+import { USER_ROLES } from "@/lib/auth/roles";
 import { getCurrentPhase } from "@/lib/shared/phase-utils";
 import {
   JOURNEE_CONCERNEE_PAR_REGLE,
@@ -1481,7 +1482,10 @@ export default function CompositionsPage() {
   }
 
   return (
-    <AuthGuard>
+    <AuthGuard
+      allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.COACH]}
+      redirectWhenUnauthorized="/joueur"
+    >
       <Layout>
         <Box sx={{ p: 5 }}>
           <Dialog

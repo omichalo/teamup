@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import {
   AppBar,
   Toolbar,
@@ -22,6 +22,7 @@ import {
   Groups,
   Assignment,
   PlaylistAddCheck,
+  Home,
 } from "@mui/icons-material";
 import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
@@ -32,12 +33,55 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { user, signOut, isCoach } = useAuth();
+interface NavigationItem {
+  label: string;
+  href: string;
+  icon: React.ReactNode;
+}
 
-  const isAdmin = !!user;
+export const Layout: React.FC<LayoutProps> = ({ children }) => {
+  const { user, signOut, isCoach, isAdmin, isPlayer } = useAuth();
+
   const router = useRouter();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+
+  const navigationItems = useMemo<NavigationItem[]>(() => {
+    if (!user) {
+      return [];
+    }
+
+    if (isPlayer) {
+      return [
+        {
+          label: "Accueil joueur",
+          href: "/joueur",
+          icon: <Home />,
+        },
+      ];
+    }
+
+    const items: NavigationItem[] = [
+      { label: "Joueurs", href: "/joueurs", icon: <Person /> },
+      { label: "Équipes", href: "/equipes", icon: <Groups /> },
+      { label: "Disponibilités", href: "/disponibilites", icon: <Event /> },
+      { label: "Compositions", href: "/compositions", icon: <Assignment /> },
+      {
+        label: "Compo. par défaut",
+        href: "/compositions/defaults",
+        icon: <PlaylistAddCheck />,
+      },
+    ];
+
+    if (isAdmin) {
+      items.push({ label: "Admin", href: "/admin", icon: <AdminPanelSettings /> });
+    }
+
+    if (isCoach || isAdmin) {
+      items.push({ label: "Paramètres", href: "/settings", icon: <Settings /> });
+    }
+
+    return items;
+  }, [isAdmin, isCoach, isPlayer, user]);
 
   const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -56,30 +100,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     }
     handleClose();
   };
-
-  const navigationItems = [
-    { label: "Joueurs", href: "/joueurs", icon: <Person /> },
-    { label: "Équipes", href: "/equipes", icon: <Groups /> },
-    { label: "Disponibilités", href: "/disponibilites", icon: <Event /> },
-    { label: "Compositions", href: "/compositions", icon: <Assignment /> },
-    {
-      label: "Compo. par défaut",
-      href: "/compositions/defaults",
-      icon: <PlaylistAddCheck />,
-    },
-    ...(isAdmin
-      ? [
-          {
-            label: "Admin",
-            href: "/admin",
-            icon: <AdminPanelSettings />,
-          },
-        ]
-      : []),
-    ...(isCoach
-      ? [{ label: "Paramètres", href: "/settings", icon: <Settings /> }]
-      : []),
-  ];
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
@@ -133,27 +153,29 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             </Typography>
           </Box>
 
-          <Box sx={{ display: "flex", gap: 1 }}>
-            {navigationItems.map((item) => (
-              <Button
-                key={item.href}
-                color="inherit"
-                startIcon={item.icon}
-                component={Link}
-                href={item.href}
-                sx={{
-                  textTransform: "none",
-                  px: 1,
-                  minWidth: "auto",
-                  "& .MuiButton-startIcon": {
-                    marginRight: 0.5,
-                  },
-                }}
-              >
-                {item.label}
-              </Button>
-            ))}
-          </Box>
+          {navigationItems.length > 0 && (
+            <Box sx={{ display: "flex", gap: 1 }}>
+              {navigationItems.map((item) => (
+                <Button
+                  key={item.href}
+                  color="inherit"
+                  startIcon={item.icon}
+                  component={Link}
+                  href={item.href}
+                  sx={{
+                    textTransform: "none",
+                    px: 1,
+                    minWidth: "auto",
+                    "& .MuiButton-startIcon": {
+                      marginRight: 0.5,
+                    },
+                  }}
+                >
+                  {item.label}
+                </Button>
+              ))}
+            </Box>
+          )}
 
           {user ? (
             <>
@@ -170,7 +192,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                   alt={user.displayName}
                   sx={{ width: 32, height: 32 }}
                 >
-                  {user.displayName?.charAt(0)}
+                  {user.displayName?.charAt(0) || user.email.charAt(0)}
                 </Avatar>
               </IconButton>
               <Menu
@@ -190,7 +212,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               >
                 <MenuItem onClick={handleClose}>
                   <AccountCircle sx={{ mr: 1 }} />
-                  {user.displayName}
+                  {user.displayName || user.email}
                 </MenuItem>
                 <MenuItem onClick={handleSignOut}>
                   <Logout sx={{ mr: 1 }} />
@@ -206,9 +228,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         </Toolbar>
       </AppBar>
 
-      <Box component="main" sx={{ flexGrow: 1 }}>
-        {children}
-      </Box>
+      <Box component="main" sx={{ flexGrow: 1 }}>{children}</Box>
     </Box>
   );
 };
