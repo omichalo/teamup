@@ -9,6 +9,7 @@ import {
   updateDoc,
   writeBatch,
 } from "firebase/firestore";
+import { FirebaseError } from "firebase/app";
 import { getDbInstanceDirect } from "@/lib/firebase";
 import { User, UserProfileDocument, UserRole } from "@/types";
 import {
@@ -168,6 +169,18 @@ export class FirestoreUserService {
 
       return mapFirestoreUser(uid, snap.data() as FirestoreUserRaw);
     } catch (error) {
+      if (error instanceof FirebaseError) {
+        if (error.code === "permission-denied") {
+          console.warn(
+            "[FirestoreUserService] getUser permission denied for uid",
+            uid
+          );
+          return null;
+        }
+        if (error.code === "not-found") {
+          return null;
+        }
+      }
       console.error("[FirestoreUserService] getUser error", error);
       throw error;
     }
