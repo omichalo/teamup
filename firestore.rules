@@ -19,14 +19,11 @@ service cloud.firestore {
       return isAdmin() || authRole() == "coach";
     }
 
-    function isPlayer() {
-      return authRole() == "player";
-    }
     
     // Règles pour les utilisateurs
     match /users/{userId} {
-      allow create: if isAuthenticated() && request.auth.uid == userId;
-      allow read, update, delete:
+      allow create, update: if isAuthenticated() && request.auth.uid == userId;
+      allow read, delete:
         if isAuthenticated() &&
           (isAdmin() || request.auth.uid == userId);
     }
