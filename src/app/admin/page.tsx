@@ -101,7 +101,9 @@ export default function AdminPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [usersError, setUsersError] = useState<string | null>(null);
-  const [userActionSuccess, setUserActionSuccess] = useState<string | null>(null);
+  const [userActionSuccess, setUserActionSuccess] = useState<string | null>(
+    null
+  );
   const [processingUserId, setProcessingUserId] = useState<string | null>(null);
   const [usersInitialized, setUsersInitialized] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -116,45 +118,46 @@ export default function AdminPage() {
     setSyncError(null);
 
     try {
-        const response = await fetch("/api/admin/sync-status", {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
+      const response = await fetch("/api/admin/sync-status", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        setSyncStatus({
+          players: {
+            lastSync: result.data?.players?.lastSync || null,
+            count: result.data?.players?.count || 0,
+            status: "idle",
+            error: null,
+          },
+          teams: {
+            lastSync: result.data?.teams?.lastSync || null,
+            count: result.data?.teams?.count || 0,
+            status: "idle",
+            error: null,
+          },
+          teamMatches: {
+            lastSync: result.data?.teamMatches?.lastSync || null,
+            count: result.data?.teamMatches?.count || 0,
+            status: "idle",
+            error: null,
           },
         });
-        const result = await response.json();
-
-        if (response.ok && result.success) {
-          setSyncStatus({
-            players: {
-              lastSync: result.data?.players?.lastSync || null,
-              count: result.data?.players?.count || 0,
-              status: "idle",
-              error: null,
-            },
-            teams: {
-              lastSync: result.data?.teams?.lastSync || null,
-              count: result.data?.teams?.count || 0,
-              status: "idle",
-              error: null,
-            },
-            teamMatches: {
-              lastSync: result.data?.teamMatches?.lastSync || null,
-              count: result.data?.teamMatches?.count || 0,
-              status: "idle",
-              error: null,
-            },
-          });
-        } else {
-        const errorMessage = result.error || result.message || "Erreur inconnue";
-        setSyncError(errorMessage);
-        }
-      } catch (error) {
+      } else {
         const errorMessage =
-          error instanceof Error ? error.message : "Erreur réseau";
+          result.error || result.message || "Erreur inconnue";
+        setSyncError(errorMessage);
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Erreur réseau";
       setSyncError(errorMessage);
-      } finally {
+    } finally {
       setSyncLoading(false);
     }
   }, [user]);
@@ -337,7 +340,9 @@ export default function AdminPage() {
 
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
-        throw new Error(payload?.error || "Impossible de récupérer les utilisateurs");
+        throw new Error(
+          payload?.error || "Impossible de récupérer les utilisateurs"
+        );
       }
 
       const payload = await response.json();
@@ -373,7 +378,11 @@ export default function AdminPage() {
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ userId: targetUserId, action, role: USER_ROLES.COACH }),
+            body: JSON.stringify({
+              userId: targetUserId,
+              action,
+              role: USER_ROLES.COACH,
+            }),
           });
 
           if (!response.ok) {
@@ -422,7 +431,9 @@ export default function AdminPage() {
       return users;
     }
     return users.filter((user) => {
-      const combined = `${user.displayName ?? ""} ${user.email ?? ""}`.toLowerCase();
+      const combined = `${user.displayName ?? ""} ${
+        user.email ?? ""
+      }`.toLowerCase();
       return combined.includes(query);
     });
   }, [searchTerm, users]);
@@ -433,12 +444,15 @@ export default function AdminPage() {
   );
 
   const pendingRequests = useMemo(
-    () => users.filter((user) => user.coachRequestStatus === COACH_REQUEST_STATUS.PENDING),
+    () =>
+      users.filter(
+        (user) => user.coachRequestStatus === COACH_REQUEST_STATUS.PENDING
+      ),
     [users]
   );
 
   const coachRequestChipColor = (
-    status: typeof COACH_REQUEST_STATUS[keyof typeof COACH_REQUEST_STATUS]
+    status: (typeof COACH_REQUEST_STATUS)[keyof typeof COACH_REQUEST_STATUS]
   ) => {
     switch (status) {
       case COACH_REQUEST_STATUS.APPROVED:
@@ -463,7 +477,9 @@ export default function AdminPage() {
         newRole !== USER_ROLES.ADMIN &&
         adminCount <= 1
       ) {
-        setUsersError("Impossible de retirer les droits du dernier administrateur.");
+        setUsersError(
+          "Impossible de retirer les droits du dernier administrateur."
+        );
         setUserActionSuccess(null);
         return;
       }
@@ -519,7 +535,9 @@ export default function AdminPage() {
   }, []);
 
   const getCoachStatusLabel = useCallback(
-    (status: typeof COACH_REQUEST_STATUS[keyof typeof COACH_REQUEST_STATUS]) => {
+    (
+      status: (typeof COACH_REQUEST_STATUS)[keyof typeof COACH_REQUEST_STATUS]
+    ) => {
       switch (status) {
         case COACH_REQUEST_STATUS.PENDING:
           return "en attente";
@@ -591,20 +609,20 @@ export default function AdminPage() {
     return new Date(lastSync).toLocaleString("fr-FR");
   };
 
-
   return (
     <AuthGuard
       allowedRoles={[USER_ROLES.ADMIN]}
       redirectWhenUnauthorized="/joueur"
     >
-    <Layout>
+      <Layout>
         <Box sx={{ p: 5 }}>
-        <Typography variant="h4" gutterBottom>
+          <Typography variant="h4" gutterBottom>
             Administration
-        </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            Accédez aux opérations de synchronisation et à la gestion des utilisateurs.
-        </Typography>
+          </Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+            Accédez aux opérations de synchronisation et à la gestion des
+            utilisateurs.
+          </Typography>
 
           <Tabs
             value={tabValue}
@@ -613,16 +631,24 @@ export default function AdminPage() {
             variant="scrollable"
             allowScrollButtonsMobile
           >
-            <Tab label="Synchronisation FFTT" id="admin-tab-0" aria-controls="admin-tabpanel-0" />
-            <Tab label="Gestion des utilisateurs" id="admin-tab-1" aria-controls="admin-tabpanel-1" />
+            <Tab
+              label="Synchronisation FFTT"
+              id="admin-tab-0"
+              aria-controls="admin-tabpanel-0"
+            />
+            <Tab
+              label="Gestion des utilisateurs"
+              id="admin-tab-1"
+              aria-controls="admin-tabpanel-1"
+            />
           </Tabs>
 
           <TabPanel value={tabValue} index={0}>
             {syncError && (
-          <Alert severity="error" sx={{ mb: 3 }}>
+              <Alert severity="error" sx={{ mb: 3 }}>
                 {syncError}
-          </Alert>
-        )}
+              </Alert>
+            )}
             <Button
               variant="outlined"
               startIcon={<RefreshIcon />}
@@ -633,219 +659,261 @@ export default function AdminPage() {
               Actualiser le statut
             </Button>
             {syncLoading ? (
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              minHeight: "30vh",
-              gap: 2,
-            }}
-          >
-            <CircularProgress size={48} />
-            <Typography variant="h6" color="text.secondary">
-              Chargement des données de synchronisation...
-            </Typography>
-          </Box>
-        ) : (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              <Card>
-                <CardContent>
-                  <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                    <GroupIcon sx={{ mr: 1, color: "primary.main" }} />
-                      <Typography variant="h6">Synchronisation des joueurs</Typography>
-                  </Box>
-
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Synchronise la liste des joueurs du club depuis l&apos;API FFTT.
-                  </Typography>
-
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="body2">
-                      <strong>Dernière synchronisation :</strong>{" "}
-                      {formatLastSync(syncStatus.players.lastSync)}
-                    </Typography>
-                    <Typography variant="body2">
-                        <strong>Nombre de joueurs :</strong> {syncStatus.players.count}
-                    </Typography>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <Typography variant="body2" component="span">
-                        <strong>Statut :</strong>
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minHeight: "30vh",
+                  gap: 2,
+                }}
+              >
+                <CircularProgress size={48} />
+                <Typography variant="h6" color="text.secondary">
+                  Chargement des données de synchronisation...
+                </Typography>
+              </Box>
+            ) : (
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                <Card>
+                  <CardContent>
+                    <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                      <GroupIcon sx={{ mr: 1, color: "primary.main" }} />
+                      <Typography variant="h6">
+                        Synchronisation des joueurs
                       </Typography>
-                      {getStatusChip(syncStatus.players.status)}
                     </Box>
-                  </Box>
 
-                  {syncStatus.players.error && (
-                    <Alert severity="error" sx={{ mb: 2 }}>
-                      {syncStatus.players.error}
-                    </Alert>
-                  )}
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mb: 2 }}
+                    >
+                      Synchronise la liste des joueurs du club depuis l&apos;API
+                      FFTT.
+                    </Typography>
 
-                  <Button
-                    variant="contained"
-                    startIcon={
-                      syncStatus.players.status === "syncing" ? (
-                        <CircularProgress size={20} color="inherit" />
-                      ) : (
-                        <RefreshIcon />
-                      )
-                    }
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="body2">
+                        <strong>Dernière synchronisation :</strong>{" "}
+                        {formatLastSync(syncStatus.players.lastSync)}
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Nombre de joueurs :</strong>{" "}
+                        {syncStatus.players.count}
+                      </Typography>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        <Typography variant="body2" component="span">
+                          <strong>Statut :</strong>
+                        </Typography>
+                        {getStatusChip(syncStatus.players.status)}
+                      </Box>
+                    </Box>
+
+                    {syncStatus.players.error && (
+                      <Alert severity="error" sx={{ mb: 2 }}>
+                        {syncStatus.players.error}
+                      </Alert>
+                    )}
+
+                    <Button
+                      variant="contained"
+                      startIcon={
+                        syncStatus.players.status === "syncing" ? (
+                          <CircularProgress size={20} color="inherit" />
+                        ) : (
+                          <RefreshIcon />
+                        )
+                      }
                       onClick={() => handleSyncPlayers()}
-                    disabled={syncStatus.players.status === "syncing"}
-                    fullWidth
-                  >
-                    {syncStatus.players.status === "syncing"
-                      ? "Synchronisation en cours..."
-                      : "Synchroniser les joueurs"}
-                  </Button>
-                </CardContent>
-              </Card>
+                      disabled={syncStatus.players.status === "syncing"}
+                      fullWidth
+                    >
+                      {syncStatus.players.status === "syncing"
+                        ? "Synchronisation en cours..."
+                        : "Synchroniser les joueurs"}
+                    </Button>
+                  </CardContent>
+                </Card>
 
-              <Card>
-                <CardContent>
-                  <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                    <GroupsIcon sx={{ mr: 1, color: "primary.main" }} />
-                      <Typography variant="h6">Synchronisation des équipes</Typography>
-                  </Box>
-
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    Synchronise la liste des équipes du club depuis l&apos;API FFTT.
-                  </Typography>
-
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="body2">
-                      <strong>Dernière synchronisation :</strong>{" "}
-                      {formatLastSync(syncStatus.teams.lastSync)}
-                    </Typography>
-                    <Typography variant="body2">
-                        <strong>Nombre d&apos;équipes :</strong> {syncStatus.teams.count}
-                    </Typography>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <Typography variant="body2" component="span">
-                        <strong>Statut :</strong>
+                <Card>
+                  <CardContent>
+                    <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                      <GroupsIcon sx={{ mr: 1, color: "primary.main" }} />
+                      <Typography variant="h6">
+                        Synchronisation des équipes
                       </Typography>
-                      {getStatusChip(syncStatus.teams.status)}
                     </Box>
-                  </Box>
 
-                  {syncStatus.teams.error && (
-                    <Alert severity="error" sx={{ mb: 2 }}>
-                      {syncStatus.teams.error}
-                    </Alert>
-                  )}
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mb: 2 }}
+                    >
+                      Synchronise la liste des équipes du club depuis l&apos;API
+                      FFTT.
+                    </Typography>
 
-                  <Button
-                    variant="contained"
-                    startIcon={
-                      syncStatus.teams.status === "syncing" ? (
-                        <CircularProgress size={20} color="inherit" />
-                      ) : (
-                        <GroupsIcon />
-                      )
-                    }
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="body2">
+                        <strong>Dernière synchronisation :</strong>{" "}
+                        {formatLastSync(syncStatus.teams.lastSync)}
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Nombre d&apos;équipes :</strong>{" "}
+                        {syncStatus.teams.count}
+                      </Typography>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        <Typography variant="body2" component="span">
+                          <strong>Statut :</strong>
+                        </Typography>
+                        {getStatusChip(syncStatus.teams.status)}
+                      </Box>
+                    </Box>
+
+                    {syncStatus.teams.error && (
+                      <Alert severity="error" sx={{ mb: 2 }}>
+                        {syncStatus.teams.error}
+                      </Alert>
+                    )}
+
+                    <Button
+                      variant="contained"
+                      startIcon={
+                        syncStatus.teams.status === "syncing" ? (
+                          <CircularProgress size={20} color="inherit" />
+                        ) : (
+                          <GroupsIcon />
+                        )
+                      }
                       onClick={() => handleSyncTeams()}
-                    disabled={syncStatus.teams.status === "syncing"}
-                    fullWidth
-                  >
-                    {syncStatus.teams.status === "syncing"
-                      ? "Synchronisation en cours..."
-                      : "Synchroniser les équipes"}
-                  </Button>
-                </CardContent>
-              </Card>
+                      disabled={syncStatus.teams.status === "syncing"}
+                      fullWidth
+                    >
+                      {syncStatus.teams.status === "syncing"
+                        ? "Synchronisation en cours..."
+                        : "Synchroniser les équipes"}
+                    </Button>
+                  </CardContent>
+                </Card>
 
-              <Card>
-                <CardContent>
-                  <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                    <SportsIcon sx={{ mr: 1, color: "primary.main" }} />
-                    <Typography variant="h6">
-                      Synchronisation des matchs par équipe
-                    </Typography>
-                  </Box>
-
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Synchronise les rencontres et résultats dans des collections dédiées.
-                  </Typography>
-
-                  <Box sx={{ mb: 2 }}>
-                    <Typography variant="body2">
-                      <strong>Dernière synchronisation :</strong>{" "}
-                      {formatLastSync(syncStatus.teamMatches.lastSync)}
-                    </Typography>
-                    <Typography variant="body2">
-                      <strong>Nombre de matchs :</strong>{" "}
-                      {syncStatus.teamMatches.count}
-                    </Typography>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <Typography variant="body2" component="span">
-                        <strong>Statut :</strong>
+                <Card>
+                  <CardContent>
+                    <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                      <SportsIcon sx={{ mr: 1, color: "primary.main" }} />
+                      <Typography variant="h6">
+                        Synchronisation des matchs par équipe
                       </Typography>
-                      {getStatusChip(syncStatus.teamMatches.status)}
                     </Box>
-                  </Box>
 
-                  {syncStatus.teamMatches.error && (
-                    <Alert severity="error" sx={{ mb: 2 }}>
-                      {syncStatus.teamMatches.error}
-                    </Alert>
-                  )}
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mb: 2 }}
+                    >
+                      Synchronise les rencontres et résultats dans des
+                      collections dédiées.
+                    </Typography>
 
-                  <Button
-                    variant="contained"
-                    startIcon={
-                      syncStatus.teamMatches.status === "syncing" ? (
-                        <CircularProgress size={20} color="inherit" />
-                      ) : (
-                        <SportsIcon />
-                      )
-                    }
+                    <Box sx={{ mb: 2 }}>
+                      <Typography variant="body2">
+                        <strong>Dernière synchronisation :</strong>{" "}
+                        {formatLastSync(syncStatus.teamMatches.lastSync)}
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Nombre de matchs :</strong>{" "}
+                        {syncStatus.teamMatches.count}
+                      </Typography>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        <Typography variant="body2" component="span">
+                          <strong>Statut :</strong>
+                        </Typography>
+                        {getStatusChip(syncStatus.teamMatches.status)}
+                      </Box>
+                    </Box>
+
+                    {syncStatus.teamMatches.error && (
+                      <Alert severity="error" sx={{ mb: 2 }}>
+                        {syncStatus.teamMatches.error}
+                      </Alert>
+                    )}
+
+                    <Button
+                      variant="contained"
+                      startIcon={
+                        syncStatus.teamMatches.status === "syncing" ? (
+                          <CircularProgress size={20} color="inherit" />
+                        ) : (
+                          <SportsIcon />
+                        )
+                      }
                       onClick={() => handleSyncTeamMatches()}
-                    disabled={syncStatus.teamMatches.status === "syncing"}
-                    fullWidth
-                  >
-                    {syncStatus.teamMatches.status === "syncing"
-                      ? "Synchronisation en cours..."
-                      : "Synchroniser les matchs par équipe"}
-                  </Button>
-                </CardContent>
-              </Card>
+                      disabled={syncStatus.teamMatches.status === "syncing"}
+                      fullWidth
+                    >
+                      {syncStatus.teamMatches.status === "syncing"
+                        ? "Synchronisation en cours..."
+                        : "Synchroniser les matchs par équipe"}
+                    </Button>
+                  </CardContent>
+                </Card>
 
-              <Card>
-                <CardContent>
-                  <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                    <ScheduleIcon sx={{ mr: 1, color: "primary.main" }} />
-                      <Typography variant="h6">Synchronisation automatique</Typography>
+                <Card>
+                  <CardContent>
+                    <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
+                      <ScheduleIcon sx={{ mr: 1, color: "primary.main" }} />
+                      <Typography variant="h6">
+                        Synchronisation automatique
+                      </Typography>
                     </Box>
 
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Les données sont automatiquement synchronisées en arrière-plan :
-                  </Typography>
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mb: 2 }}
+                    >
+                      Les données sont automatiquement synchronisées en
+                      arrière-plan :
+                    </Typography>
 
-                  <Box sx={{ pl: 2 }}>
-                    <Typography variant="body2" sx={{ mb: 1 }}>
-                        • <strong>Joueurs :</strong> tous les jours à 6h00 (heure de Paris)
-                    </Typography>
-                    <Typography variant="body2" sx={{ mb: 1 }}>
-                        • <strong>Équipes :</strong> tous les jours à 6h05 (heure de Paris)
-                    </Typography>
-                    <Typography variant="body2" sx={{ mb: 1 }}>
-                        • <strong>Matchs par équipe :</strong> tous les jours à 6h10 (heure de Paris)
-                    </Typography>
-                    <Typography variant="body2">
-                        • <strong>Détails des matchs :</strong> récupération automatique des compositions et résultats après chaque synchronisation quotidienne
-                    </Typography>
-                  </Box>
+                    <Box sx={{ pl: 2 }}>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        • <strong>Joueurs :</strong> tous les jours à 6h00
+                        (heure de Paris)
+                      </Typography>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        • <strong>Équipes :</strong> tous les jours à 6h05
+                        (heure de Paris)
+                      </Typography>
+                      <Typography variant="body2" sx={{ mb: 1 }}>
+                        • <strong>Matchs par équipe :</strong> tous les jours à
+                        6h10 (heure de Paris)
+                      </Typography>
+                      <Typography variant="body2">
+                        • <strong>Détails des matchs :</strong> récupération
+                        automatique des compositions et résultats après chaque
+                        synchronisation quotidienne
+                      </Typography>
+                    </Box>
 
                     <Alert severity="info" sx={{ mt: 2 }}>
-                    <Typography variant="body2">
-                        La synchronisation manuelle peut durer plusieurs minutes. Les synchronisations automatiques s&apos;exécutent en arrière-plan sans bloquer l&apos;application.
-                    </Typography>
-                  </Alert>
-                </CardContent>
-              </Card>
-            </Box>
+                      <Typography variant="body2">
+                        La synchronisation manuelle peut durer plusieurs
+                        minutes. Les synchronisations automatiques
+                        s&apos;exécutent en arrière-plan sans bloquer
+                        l&apos;application.
+                      </Typography>
+                    </Alert>
+                  </CardContent>
+                </Card>
+              </Box>
             )}
           </TabPanel>
 
@@ -877,10 +945,14 @@ export default function AdminPage() {
                 {loadingUsers ? (
                   <Box display="flex" alignItems="center" gap={2}>
                     <CircularProgress size={24} />
-                    <Typography variant="body2">Chargement des demandes…</Typography>
+                    <Typography variant="body2">
+                      Chargement des demandes…
+                    </Typography>
                   </Box>
                 ) : pendingRequests.length === 0 ? (
-                  <Alert severity="info">Aucune demande coach en attente.</Alert>
+                  <Alert severity="info">
+                    Aucune demande coach en attente.
+                  </Alert>
                 ) : (
                   <Stack spacing={2}>
                     {pendingRequests.map((pendingUser) => (
@@ -894,7 +966,10 @@ export default function AdminPage() {
                               Email : {pendingUser.email}
                             </Typography>
                             {pendingUser.coachRequestMessage ? (
-                              <Typography variant="body2" color="text.secondary">
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                              >
                                 Message : {pendingUser.coachRequestMessage}
                               </Typography>
                             ) : null}
@@ -903,7 +978,12 @@ export default function AdminPage() {
                                 variant="contained"
                                 color="success"
                                 startIcon={<CheckIcon />}
-                                onClick={() => handleCoachRequestAction(pendingUser.id, "approve")}
+                                onClick={() =>
+                                  handleCoachRequestAction(
+                                    pendingUser.id,
+                                    "approve"
+                                  )
+                                }
                                 disabled={processingUserId === pendingUser.id}
                               >
                                 Approuver
@@ -912,7 +992,12 @@ export default function AdminPage() {
                                 variant="outlined"
                                 color="inherit"
                                 startIcon={<CloseIcon />}
-                                onClick={() => handleCoachRequestAction(pendingUser.id, "reject")}
+                                onClick={() =>
+                                  handleCoachRequestAction(
+                                    pendingUser.id,
+                                    "reject"
+                                  )
+                                }
                                 disabled={processingUserId === pendingUser.id}
                               >
                                 Rejeter
@@ -974,7 +1059,9 @@ export default function AdminPage() {
                 {loadingUsers ? (
                   <Box display="flex" alignItems="center" gap={2}>
                     <CircularProgress size={24} />
-                    <Typography variant="body2">Chargement des utilisateurs…</Typography>
+                    <Typography variant="body2">
+                      Chargement des utilisateurs…
+                    </Typography>
                   </Box>
                 ) : filteredUsers.length === 0 ? (
                   <Alert severity="info">
@@ -1004,9 +1091,12 @@ export default function AdminPage() {
                       <TableBody>
                         {filteredUsers.map((targetUser) => {
                           const hasDisplayName =
-                            targetUser.displayName && targetUser.displayName.trim().length > 0;
+                            targetUser.displayName &&
+                            targetUser.displayName.trim().length > 0;
                           const isCurrentUser = targetUser.id === user?.uid;
-                          const isLastAdmin = targetUser.role === USER_ROLES.ADMIN && adminCount <= 1;
+                          const isLastAdmin =
+                            targetUser.role === USER_ROLES.ADMIN &&
+                            adminCount <= 1;
 
                           return (
                             <TableRow
@@ -1019,13 +1109,20 @@ export default function AdminPage() {
                             >
                               {/* Colonne Utilisateur */}
                               <TableCell>
-                                <Stack direction="row" spacing={2} alignItems="center">
+                                <Stack
+                                  direction="row"
+                                  spacing={2}
+                                  alignItems="center"
+                                >
                                   <Avatar
-                                    {...(targetUser.photoURL && { src: targetUser.photoURL })}
+                                    {...(targetUser.photoURL && {
+                                      src: targetUser.photoURL,
+                                    })}
                                     alt={targetUser.displayName}
                                     sx={{ width: 48, height: 48 }}
                                   >
-                                    {targetUser.displayName?.charAt(0) || targetUser.email.charAt(0)}
+                                    {targetUser.displayName?.charAt(0) ||
+                                      targetUser.email.charAt(0)}
                                   </Avatar>
                                   <Box sx={{ minWidth: 0, flex: 1 }}>
                                     <Typography
@@ -1038,7 +1135,9 @@ export default function AdminPage() {
                                         whiteSpace: "nowrap",
                                       }}
                                     >
-                                      {hasDisplayName ? targetUser.displayName : targetUser.email}
+                                      {hasDisplayName
+                                        ? targetUser.displayName
+                                        : targetUser.email}
                                     </Typography>
                                     {hasDisplayName && (
                                       <Typography
@@ -1059,18 +1158,27 @@ export default function AdminPage() {
 
                               {/* Colonne Rôle */}
                               <TableCell>
-                                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 1,
+                                  }}
+                                >
                                   <Select
                                     value={targetUser.role}
                                     onChange={(e) => {
-                                      const newRole = e.target.value as UserRole;
+                                      const newRole = e.target
+                                        .value as UserRole;
                                       if (newRole !== targetUser.role) {
                                         handleRoleChange(targetUser, newRole);
                                       }
                                     }}
                                     disabled={
                                       (roleUpdateTarget !== null &&
-                                        roleUpdateTarget.startsWith(`${targetUser.id}-`)) ||
+                                        roleUpdateTarget.startsWith(
+                                          `${targetUser.id}-`
+                                        )) ||
                                       isLastAdmin ||
                                       isCurrentUser
                                     }
@@ -1100,35 +1208,57 @@ export default function AdminPage() {
                                     </MenuItem>
                                   </Select>
                                   {roleUpdateTarget !== null &&
-                                    roleUpdateTarget.startsWith(`${targetUser.id}-`) && (
-                                      <CircularProgress size={20} />
-                                    )}
+                                    roleUpdateTarget.startsWith(
+                                      `${targetUser.id}-`
+                                    ) && <CircularProgress size={20} />}
                                 </Box>
                               </TableCell>
 
                               {/* Colonne Email vérifié */}
                               <TableCell>
                                 <Chip
-                                  label={targetUser.emailVerified ? "Vérifié" : "Non vérifié"}
-                                  color={targetUser.emailVerified ? "success" : "warning"}
+                                  label={
+                                    targetUser.emailVerified
+                                      ? "Vérifié"
+                                      : "Non vérifié"
+                                  }
+                                  color={
+                                    targetUser.emailVerified
+                                      ? "success"
+                                      : "warning"
+                                  }
                                   variant="outlined"
                                   size="small"
-                                  sx={{ fontWeight: 500, textTransform: "none" }}
+                                  sx={{
+                                    fontWeight: 500,
+                                    textTransform: "none",
+                                  }}
                                 />
                               </TableCell>
 
                               {/* Colonne Demande coach */}
                               <TableCell>
-                                {targetUser.coachRequestStatus !== COACH_REQUEST_STATUS.NONE ? (
+                                {targetUser.coachRequestStatus !==
+                                COACH_REQUEST_STATUS.NONE ? (
                                   <Chip
-                                    label={getCoachStatusLabel(targetUser.coachRequestStatus)}
-                                    color={coachRequestChipColor(targetUser.coachRequestStatus)}
+                                    label={getCoachStatusLabel(
+                                      targetUser.coachRequestStatus
+                                    )}
+                                    color={coachRequestChipColor(
+                                      targetUser.coachRequestStatus
+                                    )}
                                     variant="outlined"
                                     size="small"
-                                    sx={{ fontWeight: 500, textTransform: "none" }}
+                                    sx={{
+                                      fontWeight: 500,
+                                      textTransform: "none",
+                                    }}
                                   />
                                 ) : (
-                                  <Typography variant="body2" color="text.disabled">
+                                  <Typography
+                                    variant="body2"
+                                    color="text.disabled"
+                                  >
                                     —
                                   </Typography>
                                 )}
@@ -1139,12 +1269,12 @@ export default function AdminPage() {
                       </TableBody>
                     </Table>
                   </Card>
-        )}
+                )}
               </CardContent>
             </Card>
           </TabPanel>
-      </Box>
-    </Layout>
+        </Box>
+      </Layout>
     </AuthGuard>
   );
 }

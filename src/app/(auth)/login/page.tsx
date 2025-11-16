@@ -51,7 +51,11 @@ export default function LoginPage() {
     }
 
     try {
-      const cred = await signInWithEmailAndPassword(clientAuth, email, password);
+      const cred = await signInWithEmailAndPassword(
+        clientAuth,
+        email,
+        password
+      );
       if (!cred.user.emailVerified) {
         try {
           console.log("[Login] Sending email verification to:", email);
@@ -65,7 +69,10 @@ export default function LoginPage() {
             "Email non vérifié. Un nouveau lien de vérification vient d'être envoyé à votre adresse email. Veuillez vérifier votre boîte de réception (et vos spams)."
           );
         } catch (emailError) {
-          console.error("[Login] Error sending email verification:", emailError);
+          console.error(
+            "[Login] Error sending email verification:",
+            emailError
+          );
           setErr(
             "Email non vérifié. Impossible d'envoyer l'email de vérification. Veuillez réessayer plus tard ou contacter l'administrateur."
           );
@@ -84,7 +91,7 @@ export default function LoginPage() {
         const j = await res.json().catch(() => ({}));
         throw new Error(j.error || "Échec création session");
       }
-      
+
       // Utiliser window.location.href pour forcer un rechargement complet
       // Cela garantit que le cookie est bien envoyé au serveur et que le middleware le voit
       window.location.href = next;

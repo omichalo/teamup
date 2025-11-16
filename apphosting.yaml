@@ -59,3 +59,28 @@ env:
     secret: fftt-pwd-secret
     availability:
       - RUNTIME
+
+  - variable: PWD_FFTT
+    secret: fftt-pwd-secret
+    availability:
+      - RUNTIME
+
+  - variable: SMTP_USER
+    secret: SMTP_USER
+    availability:
+      - RUNTIME
+
+  - variable: SMTP_PASS
+    secret: SMTP_PASS
+    availability:
+      - RUNTIME
+
+  - variable: SMTP_HOST
+    secret: SMTP_HOST
+    availability:
+      - RUNTIME
+
+  - variable: SMTP_PORT
+    secret: SMTP_PORT
+    availability:
+      - RUNTIME
