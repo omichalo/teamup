@@ -363,7 +363,7 @@ export const openApiSpec = {
     },
     "/api/admin/sync-status": {
       get: {
-        tags: ["Admin", "Sync"],
+        tags: ["Sync"],
         summary: "Statut des synchronisations FFTT",
         description:
           "Retourne les dates et compteurs des dernières synchronisations des joueurs, équipes et matchs par équipe.",
@@ -378,7 +378,7 @@ export const openApiSpec = {
     },
     "/api/admin/sync-players": {
       post: {
-        tags: ["Admin", "Sync"],
+        tags: ["Sync"],
         summary: "Synchronisation des joueurs",
         description:
           "Déclenche une synchronisation des joueurs depuis la FFTT vers Firestore. Opération potentiellement longue.",
@@ -391,7 +391,7 @@ export const openApiSpec = {
     },
     "/api/admin/sync-teams": {
       post: {
-        tags: ["Admin", "Sync"],
+        tags: ["Sync"],
         summary: "Synchronisation des équipes et de leurs matchs",
         description:
           "Déclenche la synchronisation des équipes FFTT et de leurs matchs, puis sauvegarde en base.",
@@ -404,7 +404,7 @@ export const openApiSpec = {
     },
     "/api/admin/sync-team-matches": {
       post: {
-        tags: ["Admin", "Sync"],
+        tags: ["Sync"],
         summary: "Synchronisation des matchs par équipe",
         description:
           "Récupère les matchs FFTT pour toutes les équipes, les sauvegarde dans les sous-collections et met à jour les métadonnées.",
