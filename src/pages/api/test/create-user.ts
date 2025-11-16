@@ -4,9 +4,11 @@ import {
   adminAuth,
   adminDb,
 } from "@/lib/firebase-admin";
+import { withAuth, AuthenticatedRequest } from "@/lib/auth-middleware";
+import { hasAnyRole, USER_ROLES } from "@/lib/auth/roles";
 
-export default async function handler(
-  req: NextApiRequest,
+async function handler(
+  req: AuthenticatedRequest,
   res: NextApiResponse
 ) {
   if (req.method !== "POST") {
@@ -14,6 +16,9 @@ export default async function handler(
   }
 
   try {
+    if (!req.user || !hasAnyRole(req.user.role, [USER_ROLES.ADMIN])) {
+      return res.status(403).json({ error: "Accès refusé" });
+    }
     const { email, password, displayName } = req.body;
 
     if (!email || !password || !displayName) {
@@ -59,3 +64,5 @@ export default async function handler(
     });
   }
 }
+
+export default withAuth(handler);
