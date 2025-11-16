@@ -44,18 +44,25 @@ const app = (() => {
   }
 
   // Sinon, utiliser les credentials explicites si disponibles
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  // Support des deux formats : FB_* (nouveau) et FIREBASE_* (ancien)
+  const privateKey =
+    process.env.FB_PRIVATE_KEY?.replace(/\\n/g, "\n") ||
+    process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+  const clientEmail = process.env.FB_CLIENT_EMAIL || process.env.FIREBASE_CLIENT_EMAIL;
+  const projectId =
+    process.env.FB_PROJECT_ID ||
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
+    "sqyping-teamup";
 
   if (privateKey && clientEmail) {
     console.log("🔥 Initialisation Firebase Admin avec credentials explicites (variables d'environnement)");
     return initializeApp({
       credential: cert({
-        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
+        projectId,
         clientEmail,
         privateKey,
       }),
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
+      projectId,
     });
   }
 

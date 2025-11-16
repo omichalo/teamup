@@ -1,7 +1,8 @@
 import type { NextApiResponse } from "next";
 import { withAuth, AuthenticatedRequest } from "@/lib/auth-middleware";
-import { firestoreUserService } from "@/lib/services/firestore-user-service";
-import { hasAnyRole, USER_ROLES } from "@/lib/auth/roles";
+import { getFirestoreAdmin } from "@/lib/firebase-admin";
+import { hasAnyRole, USER_ROLES, COACH_REQUEST_STATUS } from "@/lib/auth/roles";
+import { FieldValue } from "firebase-admin/firestore";
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== "POST") {
@@ -19,11 +20,34 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   const { message } = req.body ?? {};
 
   try {
-    await firestoreUserService.upsertUser(req.user.uid, {
-      email: req.user.email,
-    });
+    const db = getFirestoreAdmin();
+    const userRef = db.collection("users").doc(req.user.uid);
 
-    await firestoreUserService.submitCoachRequest(req.user.uid, message);
+    // Vérifier si le document existe
+    const userDoc = await userRef.get();
+    
+    if (!userDoc.exists) {
+      // Créer le document s'il n'existe pas
+      await userRef.set({
+        email: req.user.email,
+        role: req.user.role || "player",
+        coachRequestStatus: COACH_REQUEST_STATUS.PENDING,
+        coachRequestUpdatedAt: FieldValue.serverTimestamp(),
+        coachRequestMessage: message || null,
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    } else {
+      // Mettre à jour le document existant
+      await userRef.update({
+        coachRequestStatus: COACH_REQUEST_STATUS.PENDING,
+        coachRequestUpdatedAt: FieldValue.serverTimestamp(),
+        coachRequestMessage: message || null,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+
+    console.log("[coach/request] Coach request submitted successfully", { uid: req.user.uid });
 
     return res.status(200).json({ success: true });
   } catch (error) {

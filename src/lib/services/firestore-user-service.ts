@@ -12,14 +12,7 @@ import {
 import { FirebaseError } from "firebase/app";
 import { getDbInstanceDirect } from "@/lib/firebase";
 import { User, UserProfileDocument, UserRole } from "@/types";
-import {
-  DEFAULT_COACH_REQUEST_STATUS,
-  DEFAULT_ROLE,
-  resolveCoachRequestStatus,
-  resolveRole,
-  USER_ROLES,
-  COACH_REQUEST_STATUS,
-} from "@/lib/auth/roles";
+import { resolveCoachRequestStatus, resolveRole, COACH_REQUEST_STATUS } from "@/lib/auth/roles";
 
 type FirestoreUserRaw = {
   email: string;
@@ -51,40 +44,25 @@ const timestampToDate = (value?: Timestamp | Date | null): Date => {
   return value;
 };
 
-const mapFirestoreUser = (id: string, data: FirestoreUserRaw): User => {
-  const role = resolveRole(data.role);
-  const coachRequestStatus = resolveCoachRequestStatus(
-    data.coachRequestStatus
-  );
-
+const mapFirestoreUser = (
+  uid: string,
+  data: FirestoreUserRaw
+): User => {
   return {
-    id,
+    id: uid,
     email: data.email,
     displayName: data.displayName ?? "",
-    photoURL:
-      typeof data.photoURL === "string" && data.photoURL.trim().length > 0
-        ? data.photoURL
-        : null,
-    role,
-    playerId:
-      typeof data.playerId === "string" && data.playerId.trim().length > 0
-        ? data.playerId
-        : null,
-    coachRequestStatus,
+    photoURL: data.photoURL ?? null,
+    role: resolveRole(data.role),
+    playerId: data.playerId ?? null,
+    coachRequestStatus: resolveCoachRequestStatus(
+      data.coachRequestStatus
+    ),
     coachRequestMessage: data.coachRequestMessage ?? null,
-    coachRequestUpdatedAt:
-      data.coachRequestUpdatedAt instanceof Timestamp
-        ? data.coachRequestUpdatedAt.toDate()
-        : data.coachRequestUpdatedAt ?? null,
+    coachRequestUpdatedAt: timestampToDate(data.coachRequestUpdatedAt),
     coachRequestHandledBy: data.coachRequestHandledBy ?? null,
-    coachRequestHandledAt:
-      data.coachRequestHandledAt instanceof Timestamp
-        ? data.coachRequestHandledAt.toDate()
-        : data.coachRequestHandledAt ?? null,
-    lastLoginAt:
-      data.lastLoginAt instanceof Timestamp
-        ? data.lastLoginAt.toDate()
-        : data.lastLoginAt ?? null,
+    coachRequestHandledAt: timestampToDate(data.coachRequestHandledAt),
+    lastLoginAt: timestampToDate(data.lastLoginAt),
     createdAt: timestampToDate(data.createdAt),
     updatedAt: timestampToDate(data.updatedAt),
   };
@@ -93,95 +71,92 @@ const mapFirestoreUser = (id: string, data: FirestoreUserRaw): User => {
 const buildFirestorePayload = (
   profile: Partial<UserProfileDocument>,
   options?: { merge?: boolean }
-) => {
-  const payload: Record<string, unknown> = {
-    updatedAt: serverTimestamp(),
-  };
+): Record<string, unknown> => {
+  const payload: Record<string, unknown> = {};
 
-  if (!options?.merge || profile.email !== undefined) {
-    payload.email = profile.email ?? "";
+  if (profile.email !== undefined) {
+    payload.email = profile.email;
   }
-  if (!options?.merge || profile.displayName !== undefined) {
-    payload.displayName = profile.displayName ?? "";
+  if (profile.displayName !== undefined) {
+    payload.displayName = profile.displayName;
   }
-  if (!options?.merge || profile.photoURL !== undefined) {
-    payload.photoURL = profile.photoURL ?? null;
+  if (profile.photoURL !== undefined) {
+    payload.photoURL = profile.photoURL;
   }
-  if (!options?.merge || profile.role !== undefined) {
-    payload.role = profile.role ?? DEFAULT_ROLE;
+  if (profile.role !== undefined) {
+    payload.role = profile.role;
   }
-  if (!options?.merge || profile.playerId !== undefined) {
-    payload.playerId = profile.playerId ?? null;
+  if (profile.playerId !== undefined) {
+    payload.playerId = profile.playerId;
   }
-  if (!options?.merge || profile.coachRequestStatus !== undefined) {
-    payload.coachRequestStatus =
-      profile.coachRequestStatus ?? DEFAULT_COACH_REQUEST_STATUS;
+  if (profile.coachRequestStatus !== undefined) {
+    payload.coachRequestStatus = profile.coachRequestStatus;
   }
-  if (!options?.merge || profile.coachRequestMessage !== undefined) {
-    payload.coachRequestMessage = profile.coachRequestMessage ?? null;
+  if (profile.coachRequestMessage !== undefined) {
+    payload.coachRequestMessage = profile.coachRequestMessage;
   }
-  if (!options?.merge || profile.coachRequestUpdatedAt !== undefined) {
-    payload.coachRequestUpdatedAt = profile.coachRequestUpdatedAt
-      ? Timestamp.fromDate(profile.coachRequestUpdatedAt)
-      : null;
+  if (profile.coachRequestUpdatedAt !== undefined) {
+    payload.coachRequestUpdatedAt = profile.coachRequestUpdatedAt;
   }
-  if (!options?.merge || profile.coachRequestHandledBy !== undefined) {
-    payload.coachRequestHandledBy = profile.coachRequestHandledBy ?? null;
+  if (profile.coachRequestHandledBy !== undefined) {
+    payload.coachRequestHandledBy = profile.coachRequestHandledBy;
   }
-  if (!options?.merge || profile.coachRequestHandledAt !== undefined) {
-    payload.coachRequestHandledAt = profile.coachRequestHandledAt
-      ? Timestamp.fromDate(profile.coachRequestHandledAt)
-      : null;
+  if (profile.coachRequestHandledAt !== undefined) {
+    payload.coachRequestHandledAt = profile.coachRequestHandledAt;
   }
-  if (!options?.merge || profile.lastLoginAt !== undefined) {
-    payload.lastLoginAt = profile.lastLoginAt
-      ? Timestamp.fromDate(profile.lastLoginAt)
-      : null;
+  if (profile.lastLoginAt !== undefined) {
+    payload.lastLoginAt = profile.lastLoginAt;
   }
-  if (!options?.merge || profile.createdAt !== undefined) {
-    payload.createdAt = profile.createdAt
-      ? Timestamp.fromDate(profile.createdAt)
-      : serverTimestamp();
+
+  // Toujours mettre à jour updatedAt
+  payload.updatedAt = serverTimestamp();
+
+  // Si merge est false, ajouter createdAt
+  if (options?.merge === false) {
+    payload.createdAt = serverTimestamp();
   }
 
   return payload;
 };
 
-export class FirestoreUserService {
-  private getDb() {
-    return getDbInstanceDirect();
-  }
-
+class FirestoreUserService {
   private getCollectionRef() {
-    return collection(this.getDb(), USERS_COLLECTION);
+    return collection(getDbInstanceDirect(), USERS_COLLECTION);
   }
 
   private getDocRef(uid: string) {
-    return doc(this.getDb(), USERS_COLLECTION, uid);
+    return doc(getDbInstanceDirect(), USERS_COLLECTION, uid);
   }
 
   async getUser(uid: string): Promise<User | null> {
     try {
-      const snap = await getDoc(this.getDocRef(uid));
-      if (!snap.exists()) {
+      const docRef = this.getDocRef(uid);
+      const docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists()) {
         return null;
       }
 
-      return mapFirestoreUser(uid, snap.data() as FirestoreUserRaw);
+      return mapFirestoreUser(uid, docSnap.data() as FirestoreUserRaw);
     } catch (error) {
       if (error instanceof FirebaseError) {
         if (error.code === "permission-denied") {
-          console.warn(
-            "[FirestoreUserService] getUser permission denied for uid",
-            uid
-          );
+          console.log("[FirestoreUserService] getUser permission denied for uid", {
+            uid,
+          });
           return null;
         }
         if (error.code === "not-found") {
+          console.log("[FirestoreUserService] getUser - document not found", { uid });
           return null;
         }
       }
-      console.error("[FirestoreUserService] getUser error", error);
+      console.error("[FirestoreUserService] getUser error", {
+        uid,
+        error,
+        errorCode: error instanceof Error && "code" in error ? (error as { code?: string }).code : undefined,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }
@@ -206,10 +181,36 @@ export class FirestoreUserService {
     const docRef = this.getDocRef(uid);
     const payload = buildFirestorePayload(profile, options);
 
+    console.log("[FirestoreUserService] upsertUser called", {
+      uid,
+      merge: options?.merge ?? true,
+      payloadKeys: Object.keys(payload),
+      docPath: docRef.path,
+    });
+
     try {
       await setDoc(docRef, payload, { merge: options?.merge ?? true });
+      console.log("[FirestoreUserService] upsertUser success", { uid, docPath: docRef.path });
     } catch (error) {
-      console.error("[FirestoreUserService] upsertUser error", error);
+      const errorDetails: Record<string, unknown> = {
+        uid,
+        docPath: docRef.path,
+      };
+
+      if (error instanceof Error) {
+        errorDetails.errorMessage = error.message;
+        errorDetails.errorStack = error.stack;
+        if ("code" in error) {
+          errorDetails.errorCode = (error as { code?: string }).code;
+        }
+        if ("name" in error) {
+          errorDetails.errorName = (error as { name?: string }).name;
+        }
+      } else {
+        errorDetails.error = String(error);
+      }
+
+      console.error("[FirestoreUserService] upsertUser error", errorDetails);
       throw error;
     }
   }
@@ -226,73 +227,82 @@ export class FirestoreUserService {
     }
   }
 
-  async submitCoachRequest(
-    uid: string,
-    message?: string | null
-  ): Promise<void> {
+  async submitCoachRequest(uid: string, message?: string): Promise<void> {
+    const updateData: Record<string, unknown> = {
+      coachRequestStatus: COACH_REQUEST_STATUS.PENDING,
+      coachRequestUpdatedAt: serverTimestamp(),
+      coachRequestMessage: message || null,
+      updatedAt: serverTimestamp(),
+    };
+
     try {
-      await updateDoc(this.getDocRef(uid), {
-        coachRequestStatus: COACH_REQUEST_STATUS.PENDING,
-        coachRequestMessage: message ?? null,
-        coachRequestUpdatedAt: serverTimestamp(),
-        coachRequestHandledBy: null,
-        coachRequestHandledAt: null,
-        updatedAt: serverTimestamp(),
-      });
+      await updateDoc(this.getDocRef(uid), updateData);
+      console.log("[FirestoreUserService] submitCoachRequest success", { uid });
     } catch (error) {
       console.error("[FirestoreUserService] submitCoachRequest error", error);
       throw error;
     }
   }
 
-  async approveCoachRequest(
+  async updateCoachRequestStatus(
     uid: string,
-    params: {
-      approve: boolean;
-      newRole?: UserRole;
-      adminId: string;
-    }
+    status: import("@/types").CoachRequestStatus,
+    message?: string | null,
+    handledBy?: string | null
   ): Promise<void> {
-    const { approve, newRole = USER_ROLES.COACH, adminId } = params;
-    const batch = writeBatch(this.getDb());
-    const docRef = this.getDocRef(uid);
-    const status = approve
-      ? COACH_REQUEST_STATUS.APPROVED
-      : COACH_REQUEST_STATUS.REJECTED;
-    const handledAt = serverTimestamp();
-
-    batch.update(docRef, {
+    const updateData: Record<string, unknown> = {
       coachRequestStatus: status,
       coachRequestUpdatedAt: serverTimestamp(),
-      coachRequestHandledBy: adminId,
-      coachRequestHandledAt: handledAt,
       updatedAt: serverTimestamp(),
-      ...(approve
-        ? {
-            role: newRole,
-          }
-        : {}),
-    });
+    };
 
-    await batch.commit();
+    if (message !== undefined) {
+      updateData.coachRequestMessage = message;
+    }
+
+    if (handledBy !== undefined) {
+      updateData.coachRequestHandledBy = handledBy;
+      updateData.coachRequestHandledAt = serverTimestamp();
+    }
+
+    try {
+      await updateDoc(this.getDocRef(uid), updateData);
+    } catch (error) {
+      console.error("[FirestoreUserService] updateCoachRequestStatus error", error);
+      throw error;
+    }
   }
 
-  async resetCoachRequest(uid: string): Promise<void> {
+  async updatePlayerId(uid: string, playerId: string | null): Promise<void> {
     try {
       await updateDoc(this.getDocRef(uid), {
-        coachRequestStatus: COACH_REQUEST_STATUS.NONE,
-        coachRequestMessage: null,
-        coachRequestUpdatedAt: serverTimestamp(),
-        coachRequestHandledBy: null,
-        coachRequestHandledAt: null,
+        playerId,
         updatedAt: serverTimestamp(),
       });
     } catch (error) {
-      console.error("[FirestoreUserService] resetCoachRequest error", error);
+      console.error("[FirestoreUserService] updatePlayerId error", error);
+      throw error;
+    }
+  }
+
+  async batchUpdateUsers(
+    updates: Array<{ uid: string; data: Partial<UserProfileDocument> }>
+  ): Promise<void> {
+    const batch = writeBatch(getDbInstanceDirect());
+
+    updates.forEach(({ uid, data }) => {
+      const docRef = this.getDocRef(uid);
+      const payload = buildFirestorePayload(data, { merge: true });
+      batch.update(docRef, payload);
+    });
+
+    try {
+      await batch.commit();
+    } catch (error) {
+      console.error("[FirestoreUserService] batchUpdateUsers error", error);
       throw error;
     }
   }
 }
 
 export const firestoreUserService = new FirestoreUserService();
-

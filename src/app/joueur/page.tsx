@@ -10,7 +10,9 @@ import {
   Alert,
   TextField,
   Stack,
+  CircularProgress,
   Chip,
+  Divider,
 } from "@mui/material";
 import { Layout } from "@/components/Layout";
 import { AuthGuard } from "@/components/AuthGuard";
@@ -49,7 +51,7 @@ export default function PlayerHomePage() {
 
       setSuccess("Votre demande a bien été enregistrée.");
       setMessage("");
-      await refreshUser({ forceRefresh: true });
+      await refreshUser();
     } catch (err) {
       setError(
         err instanceof Error
@@ -65,9 +67,11 @@ export default function PlayerHomePage() {
   const isApproved =
     user?.coachRequestStatus === COACH_REQUEST_STATUS.APPROVED ||
     user?.role === USER_ROLES.COACH;
+  const isRejected = user?.coachRequestStatus === COACH_REQUEST_STATUS.REJECTED;
+  const hasRequest = user?.coachRequestStatus && user.coachRequestStatus !== COACH_REQUEST_STATUS.NONE;
 
   return (
-    <AuthGuard allowedRoles={[USER_ROLES.PLAYER]}>
+    <AuthGuard allowedRoles={[USER_ROLES.PLAYER, USER_ROLES.COACH, USER_ROLES.ADMIN]}>
       <Layout>
         <Box sx={{ p: 5, maxWidth: 720, mx: "auto" }}>
           <Typography variant="h4" component="h1" gutterBottom>
@@ -83,28 +87,66 @@ export default function PlayerHomePage() {
           <Card sx={{ mb: 3 }}>
             <CardContent>
               <Stack spacing={2}>
-                <Box>
-                  <Typography variant="subtitle1" gutterBottom>
-                    Votre statut actuel
-                  </Typography>
-                  <Chip
-                    label={`Rôle : ${user?.role ?? "joueur"}`}
-                    color="primary"
-                    variant="outlined"
-                  />
-                  <Chip
-                    label={`Demande coach : ${user?.coachRequestStatus}`}
-                    color={
-                      user?.coachRequestStatus === COACH_REQUEST_STATUS.APPROVED
-                        ? "success"
-                        : user?.coachRequestStatus === COACH_REQUEST_STATUS.PENDING
-                        ? "warning"
-                        : "default"
-                    }
-                    variant="outlined"
-                    sx={{ ml: 1 }}
-                  />
-                </Box>
+                <Typography variant="subtitle1">
+                  Demander les droits d'entraîneur
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Les droits coach permettent de gérer les compositions,
+                  disponibilités et l'organisation des rencontres. Un
+                  administrateur examinera votre demande.
+                </Typography>
+
+                {hasRequest && (
+                  <>
+                    <Divider />
+                    <Box>
+                      <Typography variant="subtitle2" gutterBottom>
+                        Statut de votre demande
+                      </Typography>
+                      <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
+                        <Chip
+                          label={
+                            isPending
+                              ? "En attente"
+                              : isApproved
+                              ? "Acceptée"
+                              : isRejected
+                              ? "Refusée"
+                              : "Aucune demande"
+                          }
+                          color={
+                            isPending
+                              ? "warning"
+                              : isApproved
+                              ? "success"
+                              : isRejected
+                              ? "error"
+                              : "default"
+                          }
+                          variant="outlined"
+                        />
+                        {user?.coachRequestUpdatedAt && (
+                          <Typography variant="caption" color="text.secondary" sx={{ alignSelf: "center" }}>
+                            {new Date(user.coachRequestUpdatedAt).toLocaleDateString("fr-FR", {
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                            })}
+                          </Typography>
+                        )}
+                      </Box>
+                      {user?.coachRequestMessage && (
+                        <Box sx={{ mt: 1, p: 2, bgcolor: "action.hover", borderRadius: 1 }}>
+                          <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+                            Votre message :
+                          </Typography>
+                          <Typography variant="body2">{user.coachRequestMessage}</Typography>
+                        </Box>
+                      )}
+                    </Box>
+                    <Divider />
+                  </>
+                )}
 
                 {isApproved ? (
                   <Alert severity="success">
@@ -113,15 +155,6 @@ export default function PlayerHomePage() {
                   </Alert>
                 ) : (
                   <>
-                    <Typography variant="subtitle1">
-                      Demander les droits d'entraîneur
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Les droits coach permettent de gérer les compositions,
-                      disponibilités et l'organisation des rencontres. Un
-                      administrateur examinera votre demande.
-                    </Typography>
-
                     {error && <Alert severity="error">{error}</Alert>}
                     {success && <Alert severity="success">{success}</Alert>}
 
@@ -139,8 +172,11 @@ export default function PlayerHomePage() {
                       variant="contained"
                       onClick={handleRequestCoach}
                       disabled={submitting || isPending || isApproved}
+                      startIcon={submitting ? <CircularProgress size={20} color="inherit" /> : null}
                     >
-                      {isPending
+                      {submitting
+                        ? "Envoi en cours..."
+                        : isPending
                         ? "Demande en cours de traitement"
                         : "Demander les droits coach"}
                     </Button>

@@ -15,7 +15,6 @@ import {
 import {
   AccountCircle,
   Logout,
-  Settings,
   Event,
   AdminPanelSettings,
   Person,
@@ -76,10 +75,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       items.push({ label: "Admin", href: "/admin", icon: <AdminPanelSettings /> });
     }
 
-    if (isCoach || isAdmin) {
-      items.push({ label: "Paramètres", href: "/settings", icon: <Settings /> });
-    }
-
     return items;
   }, [isAdmin, isCoach, isPlayer, user]);
 
@@ -93,12 +88,13 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const handleSignOut = async () => {
     try {
+      handleClose();
       await signOut();
-      router.push("/auth");
+      // La redirection sera gérée automatiquement par AuthGuard
+      router.push("/login");
     } catch (error) {
       console.error("Sign out error:", error);
     }
-    handleClose();
   };
 
   return (
@@ -108,6 +104,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <Box
             component={Link}
             href="/"
+            onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+              // S'assurer que le lien reste sur l'onglet actuel
+              e.preventDefault();
+              router.push("/");
+            }}
             sx={{
               display: "flex",
               alignItems: "center",
@@ -115,6 +116,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               textDecoration: "none",
               flexGrow: 1,
               gap: 1,
+              cursor: "pointer",
             }}
           >
             <Box
@@ -133,7 +135,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               }}
             >
               <Image
-                src="/icon.png"
+                src="/sqyping-logo.jpg"
                 alt="SQY Ping"
                 width={40}
                 height={40}

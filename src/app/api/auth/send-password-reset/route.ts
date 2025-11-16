@@ -1,0 +1,65 @@
+import { NextResponse } from "next/server";
+import { adminAuth } from "@/lib/firebase-admin";
+import { sendMail } from "@/lib/mailer";
+import { readFile } from "fs/promises";
+import path from "path";
+
+export async function POST(req: Request) {
+  try {
+    const { email } = await req.json();
+    if (!email || typeof email !== "string") {
+      return NextResponse.json({ error: "Email requis" }, { status: 400 });
+    }
+
+    // Déterminer l'URL de base (prod > env var > origine requête)
+    const envBase = process.env.NEXT_PUBLIC_APP_URL;
+    const forwardedProto = req.headers.get("x-forwarded-proto") || "http";
+    const host = req.headers.get("host") || "localhost:3000";
+    const origin = envBase || `${forwardedProto}://${host}`;
+
+    // Générer le lien de réinitialisation via Firebase Admin vers la bonne page
+    const link = await adminAuth.generatePasswordResetLink(email, {
+      url: `${origin}/reset-password`,
+      handleCodeInApp: true,
+    });
+
+    // Charger le template HTML et injecter le lien
+    const templatePath = path.join(
+      process.cwd(),
+      "emails",
+      "password-reset.html"
+    );
+    const logoPath = path.join(process.cwd(), "public", "sqyping-logo.jpg");
+    const htmlTemplate = await readFile(templatePath, "utf8");
+    const html = htmlTemplate
+      .replace(/{{actionUrl}}/g, link)
+      .replace(
+        /https:\/\/sqyping-live-scoring\.web\.app\/sqyping-logo\.jpg/g,
+        "cid:logo-sqyping"
+      )
+      .replace(/\/sqyping-logo\.jpg/g, "cid:logo-sqyping");
+
+    await sendMail({
+      to: email,
+      subject: "Réinitialisation de votre mot de passe",
+      html,
+      attachments: [
+        {
+          filename: "sqyping-logo.jpg",
+          path: logoPath,
+          cid: "logo-sqyping",
+          contentType: "image/jpeg",
+        },
+      ],
+      text: `Bonjour,\n\nPour réinitialiser votre mot de passe, cliquez sur ce lien: ${link}\n\nSQY Ping TeamUp`,
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("[send-password-reset] error", error);
+    return NextResponse.json(
+      { error: "Impossible d'envoyer l'email" },
+      { status: 500 }
+    );
+  }
+}

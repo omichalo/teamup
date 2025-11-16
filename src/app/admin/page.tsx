@@ -14,8 +14,15 @@ import {
   Chip,
   CircularProgress,
   InputAdornment,
+  MenuItem,
+  Select,
   Stack,
   Tab,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
   Tabs,
   TextField,
   Typography,
@@ -78,7 +85,7 @@ interface SyncStatus {
 }
 
 export default function AdminPage() {
-  const { firebaseUser } = useAuth();
+  const { user } = useAuth();
 
   const [tabValue, setTabValue] = useState(0);
 
@@ -101,7 +108,7 @@ export default function AdminPage() {
   const [roleUpdateTarget, setRoleUpdateTarget] = useState<string | null>(null);
 
   const fetchSyncStatus = useCallback(async () => {
-    if (!firebaseUser) {
+    if (!user) {
       return;
     }
 
@@ -109,10 +116,10 @@ export default function AdminPage() {
     setSyncError(null);
 
     try {
-        const token = await firebaseUser.getIdToken();
         const response = await fetch("/api/admin/sync-status", {
+          method: "GET",
+          credentials: "include",
           headers: {
-            Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
         });
@@ -150,10 +157,10 @@ export default function AdminPage() {
       } finally {
       setSyncLoading(false);
     }
-  }, [firebaseUser]);
+  }, [user]);
 
   const handleSyncPlayers = useCallback(async () => {
-    if (!firebaseUser) {
+    if (!user) {
       return;
     }
 
@@ -163,12 +170,11 @@ export default function AdminPage() {
     }));
 
     try {
-      const token = await firebaseUser.getIdToken();
       const response = await fetch("/api/admin/sync-players", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
       });
       const result = await response.json();
@@ -204,10 +210,10 @@ export default function AdminPage() {
         },
       }));
     }
-  }, [firebaseUser]);
+  }, [user]);
 
   const handleSyncTeams = useCallback(async () => {
-    if (!firebaseUser) {
+    if (!user) {
       return;
     }
 
@@ -217,12 +223,11 @@ export default function AdminPage() {
     }));
 
     try {
-      const token = await firebaseUser.getIdToken();
       const response = await fetch("/api/admin/sync-teams", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
       });
       const result = await response.json();
@@ -258,10 +263,10 @@ export default function AdminPage() {
         },
       }));
     }
-  }, [firebaseUser]);
+  }, [user]);
 
   const handleSyncTeamMatches = useCallback(async () => {
-    if (!firebaseUser) {
+    if (!user) {
       return;
     }
 
@@ -271,12 +276,11 @@ export default function AdminPage() {
     }));
 
     try {
-      const token = await firebaseUser.getIdToken();
       const response = await fetch("/api/admin/sync-team-matches", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
       });
       const result = await response.json();
@@ -312,10 +316,10 @@ export default function AdminPage() {
         },
       }));
     }
-  }, [firebaseUser]);
+  }, [user]);
 
   const fetchUsers = useCallback(async () => {
-    if (!firebaseUser) {
+    if (!user) {
       return;
     }
 
@@ -323,11 +327,11 @@ export default function AdminPage() {
     setUsersError(null);
 
     try {
-      const token = await firebaseUser.getIdToken();
       const response = await fetch("/api/admin/users", {
         method: "GET",
+        credentials: "include",
         headers: {
-          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
       });
 
@@ -348,11 +352,11 @@ export default function AdminPage() {
     } finally {
       setLoadingUsers(false);
     }
-  }, [firebaseUser]);
+  }, [user]);
 
   const handleCoachRequestAction = useCallback(
     async (targetUserId: string, action: "approve" | "reject") => {
-      if (!firebaseUser) {
+      if (!user) {
         return;
       }
 
@@ -361,24 +365,40 @@ export default function AdminPage() {
       setUserActionSuccess(null);
 
       try {
-        const token = await firebaseUser.getIdToken();
-        const response = await fetch("/api/admin/users/coach-request", {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ userId: targetUserId, action }),
-        });
+        // Si on approuve, on donne le rôle coach
+        if (action === "approve") {
+          const response = await fetch("/api/admin/users/coach-request", {
+            method: "PATCH",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ userId: targetUserId, action, role: USER_ROLES.COACH }),
+          });
 
-        if (!response.ok) {
-          const payload = await response.json().catch(() => null);
-          throw new Error(payload?.error || "Échec de la mise à jour");
+          if (!response.ok) {
+            const payload = await response.json().catch(() => null);
+            throw new Error(payload?.error || "Échec de la mise à jour");
+          }
+        } else {
+          const response = await fetch("/api/admin/users/coach-request", {
+            method: "PATCH",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ userId: targetUserId, action }),
+          });
+
+          if (!response.ok) {
+            const payload = await response.json().catch(() => null);
+            throw new Error(payload?.error || "Échec de la mise à jour");
+          }
         }
 
         setUserActionSuccess(
           action === "approve"
-            ? "Demande approuvée avec succès"
+            ? "Demande approuvée avec succès. L'utilisateur a maintenant le rôle coach."
             : "Demande rejetée"
         );
         await fetchUsers();
@@ -393,7 +413,7 @@ export default function AdminPage() {
         setProcessingUserId(null);
       }
     },
-    [fetchUsers, firebaseUser]
+    [fetchUsers, user]
   );
 
   const filteredUsers = useMemo(() => {
@@ -434,7 +454,7 @@ export default function AdminPage() {
 
   const handleRoleChange = useCallback(
     async (targetUser: User, newRole: UserRole) => {
-      if (!firebaseUser) {
+      if (!user) {
         return;
       }
 
@@ -454,12 +474,11 @@ export default function AdminPage() {
       setUserActionSuccess(null);
 
       try {
-        const token = await firebaseUser.getIdToken();
         const response = await fetch("/api/admin/users/set-role", {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             userId: targetUser.id,
@@ -485,7 +504,7 @@ export default function AdminPage() {
         setRoleUpdateTarget(null);
       }
     },
-    [adminCount, fetchUsers, firebaseUser]
+    [adminCount, fetchUsers, user]
   );
 
   const getRoleLabel = useCallback((role: UserRole) => {
@@ -516,19 +535,19 @@ export default function AdminPage() {
   );
 
   useEffect(() => {
-    if (!firebaseUser || syncInitialized) {
+    if (!user || syncInitialized) {
       return;
     }
     setSyncInitialized(true);
     void fetchSyncStatus();
-  }, [fetchSyncStatus, firebaseUser, syncInitialized]);
+  }, [fetchSyncStatus, user, syncInitialized]);
 
   useEffect(() => {
-    if (!firebaseUser || !usersInitialized || tabValue !== 1) {
+    if (!user || !usersInitialized || tabValue !== 1) {
       return;
     }
     void fetchUsers();
-  }, [fetchUsers, firebaseUser, tabValue, usersInitialized]);
+  }, [fetchUsers, user, tabValue, usersInitialized]);
 
   useEffect(() => {
     if (tabValue === 1 && !usersInitialized) {
@@ -572,36 +591,6 @@ export default function AdminPage() {
     return new Date(lastSync).toLocaleString("fr-FR");
   };
 
-  const roleButtons = useMemo<
-    Array<{
-      value: UserRole;
-      label: string;
-      activeLabel: string;
-      color: "primary" | "secondary" | "success";
-    }>
-  >(
-    () => [
-      {
-        value: USER_ROLES.PLAYER,
-        label: "Définir joueur",
-        activeLabel: "Déjà joueur",
-        color: "primary",
-      },
-      {
-        value: USER_ROLES.COACH,
-        label: "Définir coach",
-        activeLabel: "Déjà coach",
-        color: "success",
-      },
-      {
-        value: USER_ROLES.ADMIN,
-        label: "Définir admin",
-        activeLabel: "Déjà admin",
-        color: "secondary",
-      },
-    ],
-    []
-  );
 
   return (
     <AuthGuard
@@ -994,146 +983,162 @@ export default function AdminPage() {
                       : "Aucun utilisateur trouvé."}
                   </Alert>
                 ) : (
-                  <Stack spacing={2}>
-                    {filteredUsers.map((user) => {
-                      const hasDisplayName =
-                        user.displayName && user.displayName.trim().length > 0;
+                  <Card variant="outlined">
+                    <Table>
+                      <TableHead>
+                        <TableRow sx={{ backgroundColor: "action.hover" }}>
+                          <TableCell sx={{ fontWeight: 700, minWidth: 280 }}>
+                            Utilisateur
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 700, minWidth: 180 }}>
+                            Rôle
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 700, minWidth: 140 }}>
+                            Email vérifié
+                          </TableCell>
+                          <TableCell sx={{ fontWeight: 700 }}>
+                            Demande coach
+                          </TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {filteredUsers.map((targetUser) => {
+                          const hasDisplayName =
+                            targetUser.displayName && targetUser.displayName.trim().length > 0;
+                          const isCurrentUser = targetUser.id === user?.uid;
+                          const isLastAdmin = targetUser.role === USER_ROLES.ADMIN && adminCount <= 1;
 
-                      return (
-                        <Box
-                          key={user.id}
-                          sx={{
-                            display: "flex",
-                            flexDirection: { xs: "column", lg: "row" },
-                            alignItems: { lg: "center" },
-                            gap: { xs: 2, lg: 3 },
-                            border: "1px solid",
-                            borderColor: "divider",
-                            borderRadius: 2,
-                            px: { xs: 1.5, lg: 2 },
-                            py: { xs: 1.5, lg: 1.5 },
-                            backgroundColor: "background.paper",
-                          }}
-                        >
-                          <Stack
-                            direction="row"
-                            spacing={2}
-                            alignItems="center"
-                            flexShrink={0}
-                            sx={{ minWidth: { lg: 220 } }}
-                          >
-                            <Avatar
-                              {...(user.photoURL && { src: user.photoURL })}
-                              alt={user.displayName}
-                              sx={{ width: 40, height: 40 }}
+                          return (
+                            <TableRow
+                              key={targetUser.id}
+                              sx={{
+                                "&:hover": {
+                                  backgroundColor: "action.hover",
+                                },
+                              }}
                             >
-                              {user.displayName?.charAt(0) || user.email.charAt(0)}
-                            </Avatar>
-                            <Box>
-                              <Typography
-                                variant="subtitle1"
-                                fontWeight={600}
-                                sx={{ lineHeight: 1.2 }}
-                              >
-                                {hasDisplayName ? user.displayName : user.email}
-                              </Typography>
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                                sx={{ opacity: hasDisplayName ? 1 : 0.65 }}
-                              >
-                                {user.email}
-                              </Typography>
-                            </Box>
-                          </Stack>
+                              {/* Colonne Utilisateur */}
+                              <TableCell>
+                                <Stack direction="row" spacing={2} alignItems="center">
+                                  <Avatar
+                                    {...(targetUser.photoURL && { src: targetUser.photoURL })}
+                                    alt={targetUser.displayName}
+                                    sx={{ width: 48, height: 48 }}
+                                  >
+                                    {targetUser.displayName?.charAt(0) || targetUser.email.charAt(0)}
+                                  </Avatar>
+                                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                                    <Typography
+                                      variant="subtitle1"
+                                      fontWeight={600}
+                                      sx={{
+                                        lineHeight: 1.2,
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      {hasDisplayName ? targetUser.displayName : targetUser.email}
+                                    </Typography>
+                                    {hasDisplayName && (
+                                      <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                        sx={{
+                                          overflow: "hidden",
+                                          textOverflow: "ellipsis",
+                                          whiteSpace: "nowrap",
+                                        }}
+                                      >
+                                        {targetUser.email}
+                                      </Typography>
+                                    )}
+                                  </Box>
+                                </Stack>
+                              </TableCell>
 
-                          <Stack
-                            direction="row"
-                            spacing={1}
-                            flexWrap="wrap"
-                            useFlexGap
-                          >
-                            <Chip
-                              label={`Rôle : ${getRoleLabel(user.role)}`}
-                              color={
-                                user.role === USER_ROLES.ADMIN
-                                  ? "secondary"
-                                  : user.role === USER_ROLES.COACH
-                                  ? "success"
-                                  : "default"
-                              }
-                              size="small"
-                              sx={{ fontWeight: 600, textTransform: "none" }}
-                            />
-                            <Chip
-                              label={`Demande coach : ${getCoachStatusLabel(
-                                user.coachRequestStatus
-                              )}`}
-                              color={coachRequestChipColor(user.coachRequestStatus)}
-                              variant="outlined"
-                              size="small"
-                              sx={{ fontWeight: 500, textTransform: "none" }}
-                            />
-                          </Stack>
+                              {/* Colonne Rôle */}
+                              <TableCell>
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                  <Select
+                                    value={targetUser.role}
+                                    onChange={(e) => {
+                                      const newRole = e.target.value as UserRole;
+                                      if (newRole !== targetUser.role) {
+                                        handleRoleChange(targetUser, newRole);
+                                      }
+                                    }}
+                                    disabled={
+                                      (roleUpdateTarget !== null &&
+                                        roleUpdateTarget.startsWith(`${targetUser.id}-`)) ||
+                                      isLastAdmin ||
+                                      isCurrentUser
+                                    }
+                                    size="small"
+                                    sx={{
+                                      minWidth: 150,
+                                      textTransform: "none",
+                                      "& .MuiSelect-select": {
+                                        fontWeight: 600,
+                                      },
+                                    }}
+                                  >
+                                    <MenuItem value={USER_ROLES.PLAYER}>
+                                      {getRoleLabel(USER_ROLES.PLAYER)}
+                                    </MenuItem>
+                                    <MenuItem value={USER_ROLES.COACH}>
+                                      {getRoleLabel(USER_ROLES.COACH)}
+                                    </MenuItem>
+                                    <MenuItem
+                                      value={USER_ROLES.ADMIN}
+                                      disabled={
+                                        targetUser.role === USER_ROLES.ADMIN &&
+                                        adminCount <= 1
+                                      }
+                                    >
+                                      {getRoleLabel(USER_ROLES.ADMIN)}
+                                    </MenuItem>
+                                  </Select>
+                                  {roleUpdateTarget !== null &&
+                                    roleUpdateTarget.startsWith(`${targetUser.id}-`) && (
+                                      <CircularProgress size={20} />
+                                    )}
+                                </Box>
+                              </TableCell>
 
-                          <Stack
-                            direction="row"
-                            spacing={1}
-                            flexWrap="wrap"
-                            useFlexGap
-                            justifyContent={{ xs: "flex-start", lg: "flex-end" }}
-                            sx={{ width: { lg: "100%" } }}
-                          >
-                            {roleButtons.map((option) => {
-                              const buttonKey = `${user.id}-${option.value}`;
-                              const isCurrentRole = user.role === option.value;
-                              const isUpdatingThis = roleUpdateTarget === buttonKey;
-                              const wouldDemoteLastAdmin =
-                                user.role === USER_ROLES.ADMIN &&
-                                option.value !== USER_ROLES.ADMIN &&
-                                adminCount <= 1;
-                              const isDisabled =
-                                isCurrentRole ||
-                                wouldDemoteLastAdmin ||
-                                (roleUpdateTarget !== null && !isUpdatingThis);
-
-                              return (
-                                <Button
-                                  key={option.value}
-                                  variant={isCurrentRole ? "contained" : "outlined"}
-                                  color={option.color}
+                              {/* Colonne Email vérifié */}
+                              <TableCell>
+                                <Chip
+                                  label={targetUser.emailVerified ? "Vérifié" : "Non vérifié"}
+                                  color={targetUser.emailVerified ? "success" : "warning"}
+                                  variant="outlined"
                                   size="small"
-                                  onClick={() => handleRoleChange(user, option.value)}
-                                  disabled={isDisabled}
-                                  startIcon={
-                                    isUpdatingThis ? (
-                                      <CircularProgress size={16} color="inherit" />
-                                    ) : undefined
-                                  }
-                                  sx={{
-                                    textTransform: "none",
-                                    fontWeight: 600,
-                                    height: 34,
-                                    px: 1.8,
-                                    borderRadius: 999,
-                                    color: isCurrentRole ? "common.white" : undefined,
-                                    opacity: wouldDemoteLastAdmin ? 0.6 : 1,
-                                  }}
-                                  title={
-                                    wouldDemoteLastAdmin
-                                      ? "Au moins un administrateur doit rester actif."
-                                      : undefined
-                                  }
-                                >
-                                  {isCurrentRole ? option.activeLabel : option.label}
-                                </Button>
-                              );
-                            })}
-                          </Stack>
-                        </Box>
-                      );
-                    })}
-                  </Stack>
+                                  sx={{ fontWeight: 500, textTransform: "none" }}
+                                />
+                              </TableCell>
+
+                              {/* Colonne Demande coach */}
+                              <TableCell>
+                                {targetUser.coachRequestStatus !== COACH_REQUEST_STATUS.NONE ? (
+                                  <Chip
+                                    label={getCoachStatusLabel(targetUser.coachRequestStatus)}
+                                    color={coachRequestChipColor(targetUser.coachRequestStatus)}
+                                    variant="outlined"
+                                    size="small"
+                                    sx={{ fontWeight: 500, textTransform: "none" }}
+                                  />
+                                ) : (
+                                  <Typography variant="body2" color="text.disabled">
+                                    —
+                                  </Typography>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </Card>
         )}
               </CardContent>
             </Card>

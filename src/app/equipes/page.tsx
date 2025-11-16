@@ -70,10 +70,10 @@ export default function EquipesPage() {
       const femB = b.toLowerCase().includes("féminin") || b.toLowerCase().includes("dames");
 
       if (femA !== femB) {
-        return femA ? -1 : 1;
+        return femA ? 1 : -1; // Inversé : masculin en premier
       }
 
-      return a.localeCompare(b);
+      return b.localeCompare(a); // Inversé : ordre alphabétique inversé
     });
   }, [equipesByEpreuve]);
 

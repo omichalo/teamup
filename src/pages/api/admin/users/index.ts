@@ -94,6 +94,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           typeof profile.playerId === "string" && profile.playerId.trim().length > 0
             ? profile.playerId
             : null,
+        emailVerified: firebaseUser.emailVerified ?? false,
         coachRequestStatus,
         coachRequestMessage:
           typeof profile.coachRequestMessage === "string"

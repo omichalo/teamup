@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { DecodedIdToken } from "firebase-admin/auth";
-import { initializeFirebaseAdmin, adminAuth } from "./firebase-admin";
+import { adminAuth } from "./firebase-admin";
 import {
   resolveCoachRequestStatus,
   resolveRole,
@@ -22,22 +22,20 @@ export function withAuth(
 ) {
   return async (req: NextApiRequest, res: NextApiResponse) => {
     try {
-      // Vérifier l&apos;authentification via le header Authorization
-      const authHeader = req.headers.authorization;
-      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      // Vérifier l'authentification via le cookie __session
+      const sessionCookie = req.cookies.__session;
+      if (!sessionCookie) {
         return res.status(401).json({
-          error: "Token d&apos;authentification requis",
+          error: "Session cookie requis",
           message: "Cette API nécessite une authentification valide",
         });
       }
 
-      const token = authHeader.split(" ")[1];
-
-      // Initialiser Firebase Admin si nécessaire
-      await initializeFirebaseAdmin();
-
-      // Vérifier le token Firebase
-      const decodedToken = await adminAuth.verifyIdToken(token);
+      // Vérifier le cookie de session Firebase
+      const decodedToken = await adminAuth.verifySessionCookie(
+        sessionCookie,
+        true
+      );
       const role = resolveRole(decodedToken.role as string | undefined);
       const coachRequestStatus = resolveCoachRequestStatus(
         decodedToken.coachRequestStatus as string | undefined
@@ -55,18 +53,18 @@ export function withAuth(
       // Appeler le handler original
       await handler(req as AuthenticatedRequest, res);
     } catch (error) {
-      console.error("❌ Erreur d&apos;authentification:", error);
+      console.error("❌ Erreur d'authentification:", error);
 
-      // Si c&apos;est une erreur d&apos;authentification
+      // Si c'est une erreur d'authentification
       if (error instanceof Error && error.message.includes("auth")) {
         return res.status(401).json({
-          error: "Token d&apos;authentification invalide",
+          error: "Session invalide",
           details: error.message,
         });
       }
 
       return res.status(500).json({
-        error: "Erreur d&apos;authentification",
+        error: "Erreur d'authentification",
         details: error instanceof Error ? error.message : "Unknown error",
       });
     }
@@ -78,17 +76,15 @@ export function withOptionalAuth(
 ) {
   return async (req: NextApiRequest, res: NextApiResponse) => {
     try {
-      // Vérifier l&apos;authentification via le header Authorization
-      const authHeader = req.headers.authorization;
+      // Vérifier l'authentification via le cookie __session
+      const sessionCookie = req.cookies.__session;
 
-      if (authHeader && authHeader.startsWith("Bearer ")) {
-        const token = authHeader.split(" ")[1];
-
-        // Initialiser Firebase Admin si nécessaire
-        await initializeFirebaseAdmin();
-
-        // Vérifier le token Firebase
-        const decodedToken = await adminAuth.verifyIdToken(token);
+      if (sessionCookie) {
+        // Vérifier le cookie de session Firebase
+        const decodedToken = await adminAuth.verifySessionCookie(
+          sessionCookie,
+          true
+        );
         const role = resolveRole(decodedToken.role as string | undefined);
         const coachRequestStatus = resolveCoachRequestStatus(
           decodedToken.coachRequestStatus as string | undefined
@@ -107,10 +103,11 @@ export function withOptionalAuth(
       // Appeler le handler original (avec ou sans authentification)
       await handler(req as AuthenticatedRequest, res);
     } catch (error) {
-      console.error("❌ Erreur d&apos;authentification optionnelle:", error);
+      console.error("❌ Erreur d'authentification optionnelle:", error);
 
-      // En cas d&apos;erreur, continuer sans authentification
+      // En cas d'erreur, continuer sans authentification
       await handler(req as AuthenticatedRequest, res);
     }
   };
 }
+

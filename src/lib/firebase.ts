@@ -1,5 +1,10 @@
-import { initializeApp, getApps, FirebaseApp } from "firebase/app";
-import { getAuth, Auth } from "firebase/auth";
+import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
+import {
+  getAuth,
+  Auth,
+  setPersistence,
+  browserLocalPersistence,
+} from "firebase/auth";
 import { getFirestore, Firestore } from "firebase/firestore";
 import { getStorage, FirebaseStorage } from "firebase/storage";
 
@@ -62,11 +67,12 @@ let dbInstance: Firestore | undefined;
 let storageInstance: FirebaseStorage | undefined;
 
 function initializeFirebase() {
-  if (app) {
+  // Si déjà initialisé, retourner les instances existantes
+  if (app && authInstance && dbInstance) {
     return {
       app,
-      auth: authInstance!,
-      db: dbInstance!,
+      auth: authInstance,
+      db: dbInstance,
       storage: storageInstance!,
     };
   }
@@ -81,12 +87,34 @@ function initializeFirebase() {
   }
 
   // Initialiser Firebase uniquement s'il n'est pas déjà initialisé
-  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+  // Utiliser getApp() si une app existe déjà (évite les doublons)
+  if (getApps().length === 0) {
+    app = initializeApp(firebaseConfig);
+  } else {
+    app = getApp(); // Récupère l'app par défaut (évite les doublons)
+  }
 
-  // Initialiser les services Firebase
+  // Toujours récupérer les instances depuis l'app (garantit l'unicité)
   authInstance = getAuth(app);
   dbInstance = getFirestore(app);
   storageInstance = getStorage(app);
+
+  // Persistance explicite : évite des surprises selon l'environnement
+  if (typeof window !== "undefined") {
+    setPersistence(authInstance, browserLocalPersistence).catch((error) => {
+      console.warn("[firebase] Failed to set persistence:", error);
+    });
+  }
+
+  // DEBUG : Log pour vérifier l'unicité
+  if (typeof window !== "undefined") {
+    console.log(
+      "[firebase] Initialized - app.name =",
+      app.name,
+      "projectId =",
+      app.options.projectId
+    );
+  }
 
   return { app, auth: authInstance, db: dbInstance, storage: storageInstance };
 }
@@ -101,7 +129,7 @@ function isStaticBuild(): boolean {
 }
 
 // Fonctions getter pour une initialisation lazy
-function getApp(): FirebaseApp {
+function getFirebaseAppInstance(): FirebaseApp {
   if (isStaticBuild()) {
     throw new Error("Firebase cannot be initialized during static build");
   }
@@ -161,7 +189,7 @@ function getStorageInstance(): FirebaseStorage {
 
 // Exporter les getters publics
 export function getFirebaseApp(): FirebaseApp {
-  return getApp();
+  return getFirebaseAppInstance();
 }
 
 export function getFirebaseAuth(): Auth {
@@ -271,5 +299,5 @@ export default (() => {
   if (isStaticBuild()) {
     return {} as FirebaseApp;
   }
-  return app || getApp();
+  return app || getFirebaseAppInstance();
 })();

@@ -150,6 +150,7 @@ export interface User {
   photoURL?: string | null;
   role: UserRole;
   playerId?: string | null; // Si c&apos;est un joueur
+  emailVerified?: boolean; // État de vérification de l'email
   coachRequestStatus: CoachRequestStatus;
   coachRequestMessage?: string | null;
   coachRequestUpdatedAt?: Date | null;

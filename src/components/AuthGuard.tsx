@@ -1,124 +1,117 @@
 "use client";
 
-import React, { useEffect, useMemo } from "react";
-import { Box, CircularProgress, Typography } from "@mui/material";
+import { useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
+import { Box, CircularProgress } from "@mui/material";
 import { useAuth } from "@/hooks/useAuth";
-import { useRouter } from "next/navigation";
-import { UserRole } from "@/types";
-import { isAdmin } from "@/lib/auth/roles";
 
 interface AuthGuardProps {
   children: React.ReactNode;
   requireAuth?: boolean;
-  redirectTo?: string;
-  fallback?: React.ReactNode;
-  loadingFallback?: React.ReactNode;
-  allowedRoles?: UserRole[];
-  redirectWhenUnauthorized?: string;
+  allowedRoles?: string[];
   redirectWhenAuthenticated?: string;
+  redirectWhenUnauthorized?: string;
+  loadingFallback?: React.ReactNode;
 }
 
+// Stub minimal pour compatibilité avec l'ancien code
+// La protection réelle est gérée par le middleware Next.js
 export const AuthGuard: React.FC<AuthGuardProps> = ({
   children,
   requireAuth = true,
-  redirectTo = "/auth",
-  fallback,
-  loadingFallback,
   allowedRoles,
-  redirectWhenUnauthorized = "/",
   redirectWhenAuthenticated = "/",
+  redirectWhenUnauthorized = "/login",
+  loadingFallback,
 }) => {
   const { user, loading } = useAuth();
   const router = useRouter();
-
-  const hasAccess = useMemo(() => {
-    if (!requireAuth) {
-      return true;
-    }
-
-    if (!user) {
-      return false;
-    }
-
-    if (!allowedRoles || allowedRoles.length === 0) {
-      return true;
-    }
-
-    if (allowedRoles.includes(user.role)) {
-      return true;
-    }
-
-    return isAdmin(user.role);
-  }, [allowedRoles, requireAuth, user]);
+  const pathname = usePathname();
 
   useEffect(() => {
-    if (loading) {
-      return;
-    }
+    if (loading) return;
 
+    // Si la page nécessite une authentification et l'utilisateur n'est pas connecté
     if (requireAuth && !user) {
-      router.push(redirectTo);
+      router.push(`${redirectWhenUnauthorized}?next=${encodeURIComponent(pathname || "/")}`);
       return;
     }
 
-    if (user && !hasAccess) {
-      router.push(redirectWhenUnauthorized);
-    }
-  }, [
-    hasAccess,
-    loading,
-    redirectTo,
-    redirectWhenUnauthorized,
-    requireAuth,
-    router,
-    user,
-  ]);
-
-  useEffect(() => {
-    if (loading) {
-      return;
-    }
-
+    // Si la page est publique et l'utilisateur est connecté, rediriger
     if (!requireAuth && user) {
       router.push(redirectWhenAuthenticated);
+      return;
     }
-  }, [loading, redirectWhenAuthenticated, requireAuth, router, user]);
+
+    // Vérifier les rôles si spécifiés
+    if (allowedRoles && user && !allowedRoles.includes(user.role)) {
+      // Redirection intelligente vers une page autorisée selon le rôle
+      const role = user.role;
+      const fallbackByRole: Record<string, string> = {
+        player: "/joueur",
+        coach: "/",
+        admin: "/",
+      };
+      const target = fallbackByRole[role] || (redirectWhenUnauthorized || "/");
+      router.push(target);
+      return;
+    }
+  }, [user, loading, requireAuth, allowedRoles, redirectWhenAuthenticated, redirectWhenUnauthorized, router, pathname]);
 
   if (loading && requireAuth) {
-    if (loadingFallback) {
-      return <>{loadingFallback}</>;
-    }
+    return (
+      <>
+        {loadingFallback || (
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              minHeight: "100vh",
+            }}
+          >
+            <CircularProgress />
+          </Box>
+        )}
+      </>
+    );
+  }
 
+  if (requireAuth && !user) {
+    return (
+      <>
+        {loadingFallback || (
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              minHeight: "100vh",
+            }}
+          >
+            <CircularProgress />
+          </Box>
+        )}
+      </>
+    );
+  }
+
+  if (allowedRoles && user && !allowedRoles.includes(user.role)) {
+    // Afficher un loader pendant la redirection au lieu d'un message
     return (
       <Box
         sx={{
           display: "flex",
-          flexDirection: "column",
           justifyContent: "center",
           alignItems: "center",
           minHeight: "100vh",
-          gap: 2,
         }}
       >
-        <CircularProgress size={48} />
-        <Typography variant="h6" color="text.secondary">
-          Chargement...
-        </Typography>
+        <CircularProgress />
       </Box>
     );
   }
 
-  if (requireAuth && !loading && !user) {
-    return fallback || null;
-  }
-
-  if (requireAuth && user && !hasAccess) {
-    return fallback || null;
-  }
-
-  if (!requireAuth && user) {
-    return loadingFallback || null;
-  }
-
   return <>{children}</>;
 };
+
