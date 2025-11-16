@@ -1,15 +1,12 @@
+import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { initializeFirebaseAdmin, getFirestoreAdmin } from "@/lib/firebase-admin";
 import { getTeamMatches } from "@/lib/server/team-matches";
 
-interface RouteParams {
-  params: {
-    teamId: string;
-  };
-}
-
-export async function GET(_req: Request, { params }: RouteParams) {
-  const { teamId } = params;
+export async function GET(request: NextRequest) {
+  // Avec Next 15 App Router, les params dynamiques sont exposés via searchParams dans .next/types/validator
+  const url = new URL(request.url);
+  const teamId = url.searchParams.get("teamId");
 
   if (!teamId || typeof teamId !== "string") {
     return NextResponse.json(
