@@ -1,52 +1,19 @@
+/** @see /api/openapi pour la spec JSON brute */
 "use client";
 
-import { useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
+import "swagger-ui-react/swagger-ui.css";
 import { Box, Typography } from "@mui/material";
 import { Layout } from "@/components/Layout";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const SwaggerUI = dynamic<any>(() => import("swagger-ui-react"), {
+  ssr: false,
+});
+
 export default function SwaggerPage() {
-  const uiRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!uiRef.current) return;
-
-    // Ajouter la feuille de style Swagger UI si elle n'est pas déjà présente
-    const existingCss = document.getElementById("swagger-ui-css");
-    if (!existingCss) {
-      const link = document.createElement("link");
-      link.id = "swagger-ui-css";
-      link.rel = "stylesheet";
-      link.href = "https://unpkg.com/swagger-ui-dist@5/swagger-ui.css";
-      document.head.appendChild(link);
-    }
-
-    const initSwagger = () => {
-      if (typeof window === "undefined" || !window.SwaggerUIBundle || !uiRef.current) {
-        return;
-      }
-      window.SwaggerUIBundle({
-        url: "/api/openapi",
-        domNode: uiRef.current,
-        presets: [window.SwaggerUIBundle.presets.apis],
-        layout: "BaseLayout",
-      });
-    };
-
-    // Charger le script Swagger UI s'il n'est pas déjà présent
-    const existingScript = document.getElementById("swagger-ui-script");
-    if (!existingScript) {
-      const script = document.createElement("script");
-      script.id = "swagger-ui-script";
-      script.src = "https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js";
-      script.onload = initSwagger;
-      document.body.appendChild(script);
-    } else {
-      initSwagger();
-    }
-  }, []);
-
   return (
     <AuthGuard allowedRoles={[USER_ROLES.ADMIN]}>
       <Layout>
@@ -66,7 +33,7 @@ export default function SwaggerPage() {
               border: (theme) => `1px solid ${theme.palette.divider}`,
             }}
           >
-            <div ref={uiRef} />
+            <SwaggerUI url="/api/openapi" docExpansion="none" />
           </Box>
         </Box>
       </Layout>
