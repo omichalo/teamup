@@ -60,11 +60,6 @@ env:
     availability:
       - RUNTIME
 
-  - variable: PWD_FFTT
-    secret: fftt-pwd-secret
-    availability:
-      - RUNTIME
-
   - variable: SMTP_USER
     secret: SMTP_USER
     availability:
