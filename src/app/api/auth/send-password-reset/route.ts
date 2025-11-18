@@ -14,14 +14,23 @@ export async function POST(req: Request) {
 
     // Déterminer l'URL de base (prod > env var > origine requête)
     const envBase = process.env.NEXT_PUBLIC_APP_URL;
-    const forwardedProto = req.headers.get("x-forwarded-proto") || "http";
-    const host = req.headers.get("host") || "localhost:3000";
+    const forwardedProto = req.headers.get("x-forwarded-proto") || "https";
+    const host = req.headers.get("host") || req.headers.get("x-forwarded-host") || "localhost:3000";
     const origin = envBase || `${forwardedProto}://${host}`;
+    
+    // Firebase Auth nécessite que l'URL de redirection utilise un domaine autorisé
+    // Utiliser le domaine de l'application (App Hosting) qui doit être dans la liste des domaines autorisés
+    const redirectUrl = `${origin}/reset-password`;
+    console.log("[send-password-reset] Origin:", origin);
+    console.log("[send-password-reset] Redirect URL:", redirectUrl);
+    console.log("[send-password-reset] Host:", host);
 
     // Générer le lien de réinitialisation via Firebase Admin vers la bonne page
+    // Note: L'URL doit pointer vers un domaine autorisé dans Firebase Console
+    // Authentication > Settings > Authorized domains
     const link = await adminAuth.generatePasswordResetLink(email, {
-      url: `${origin}/reset-password`,
-      handleCodeInApp: true,
+      url: redirectUrl,
+      handleCodeInApp: false, // Désactiver handleCodeInApp pour éviter les problèmes de domaine
     });
 
     // Charger le template HTML et injecter le lien
@@ -58,7 +67,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[send-password-reset] error", error);
+    console.error("[send-password-reset] error details:", JSON.stringify(error, null, 2));
     const errorMessage = getFirebaseErrorMessage(error);
+    
+    // Log supplémentaire pour déboguer le problème de domaine
+    if (errorMessage.includes("Domain not allowlisted") || errorMessage.includes("domain")) {
+      const envBase = process.env.NEXT_PUBLIC_APP_URL;
+      const host = req.headers.get("host") || req.headers.get("x-forwarded-host");
+      console.error("[send-password-reset] Domain debug:", {
+        envBase,
+        host,
+        origin: envBase || `https://${host}`,
+      });
+    }
+    
     return NextResponse.json(
       { error: errorMessage },
       { status: 500 }

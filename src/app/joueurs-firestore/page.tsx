@@ -25,7 +25,6 @@ import {
   InputAdornment,
 } from "@mui/material";
 import { Search, Refresh, Person, SportsTennis } from "@mui/icons-material";
-import { Layout } from "@/components/Layout";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
 import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
@@ -137,8 +136,7 @@ export default function JoueursFirestorePage() {
       allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.COACH]}
       redirectWhenUnauthorized="/joueur"
     >
-      <Layout>
-        <Box sx={{ p: 5 }}>
+      <Box sx={{ p: 5 }}>
           <Typography variant="h4" component="h1" gutterBottom>
             Joueurs SQY Ping - Firestore
           </Typography>
@@ -261,7 +259,6 @@ export default function JoueursFirestorePage() {
             </CardContent>
           </Card>
         </Box>
-      </Layout>
     </AuthGuard>
   );
 }

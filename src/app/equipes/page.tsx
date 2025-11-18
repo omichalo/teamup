@@ -35,7 +35,6 @@ import {
 } from "@mui/icons-material";
 import { useEquipesWithMatches } from "@/hooks/useEquipesWithMatches";
 import { Match } from "@/types";
-import { Layout } from "@/components/Layout";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
 
@@ -145,21 +144,19 @@ export default function EquipesPage() {
         allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.COACH]}
         redirectWhenUnauthorized="/joueur"
       >
-        <Layout>
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              minHeight: "50vh",
-            }}
-          >
-            <CircularProgress />
-            <Typography variant="h6" sx={{ ml: 2 }}>
-              Chargement des équipes et matchs...
-            </Typography>
-          </Box>
-        </Layout>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            minHeight: "50vh",
+          }}
+        >
+          <CircularProgress />
+          <Typography variant="h6" sx={{ ml: 2 }}>
+            Chargement des équipes et matchs...
+          </Typography>
+        </Box>
       </AuthGuard>
     );
   }
@@ -170,13 +167,11 @@ export default function EquipesPage() {
         allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.COACH]}
         redirectWhenUnauthorized="/joueur"
       >
-        <Layout>
-          <Box sx={{ p: 3 }}>
-            <Alert severity="error">
-              Erreur lors du chargement des données : {error}
-            </Alert>
-          </Box>
-        </Layout>
+        <Box sx={{ p: 3 }}>
+          <Alert severity="error">
+            Erreur lors du chargement des données : {error}
+          </Alert>
+        </Box>
       </AuthGuard>
     );
   }
@@ -186,8 +181,7 @@ export default function EquipesPage() {
       allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.COACH]}
       redirectWhenUnauthorized="/joueur"
     >
-      <Layout>
-        <Box sx={{ p: 5 }}>
+      <Box sx={{ p: 5 }}>
           <Typography variant="h4" component="h1" gutterBottom>
             Équipes SQY Ping
           </Typography>
@@ -1047,7 +1041,6 @@ export default function EquipesPage() {
             </DialogActions>
           </Dialog>
         </Box>
-      </Layout>
     </AuthGuard>
   );
 }

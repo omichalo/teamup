@@ -14,7 +14,6 @@ import {
   Chip,
   Divider,
 } from "@mui/material";
-import { Layout } from "@/components/Layout";
 import { AuthGuard } from "@/components/AuthGuard";
 import { useAuth } from "@/hooks/useAuth";
 import { USER_ROLES, COACH_REQUEST_STATUS } from "@/lib/auth/roles";
@@ -72,8 +71,7 @@ export default function PlayerHomePage() {
 
   return (
     <AuthGuard allowedRoles={[USER_ROLES.PLAYER, USER_ROLES.COACH, USER_ROLES.ADMIN]}>
-      <Layout>
-        <Box sx={{ p: 5, maxWidth: 720, mx: "auto" }}>
+      <Box sx={{ p: 5, maxWidth: 720, mx: "auto" }}>
           <Typography variant="h4" component="h1" gutterBottom>
             Bienvenue sur l'espace joueur
           </Typography>
@@ -200,7 +198,6 @@ export default function PlayerHomePage() {
             </CardContent>
           </Card>
         </Box>
-      </Layout>
     </AuthGuard>
   );
 }

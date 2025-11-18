@@ -104,11 +104,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           <Box
             component={Link}
             href="/"
-            onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
-              // S'assurer que le lien reste sur l'onglet actuel
-              e.preventDefault();
-              router.push("/");
-            }}
             sx={{
               display: "flex",
               alignItems: "center",

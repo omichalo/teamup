@@ -4,7 +4,6 @@
 import dynamic from "next/dynamic";
 import "swagger-ui-react/swagger-ui.css";
 import { Box, Typography } from "@mui/material";
-import { Layout } from "@/components/Layout";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
 
@@ -16,8 +15,7 @@ const SwaggerUI = dynamic<any>(() => import("swagger-ui-react"), {
 export default function SwaggerPage() {
   return (
     <AuthGuard allowedRoles={[USER_ROLES.ADMIN]}>
-      <Layout>
-        <Box sx={{ p: 3 }}>
+      <Box sx={{ p: 3 }}>
           <Typography variant="h4" component="h1" gutterBottom>
             Documentation API (Swagger)
           </Typography>
@@ -36,7 +34,6 @@ export default function SwaggerPage() {
             <SwaggerUI url="/api/openapi" docExpansion="none" />
           </Box>
         </Box>
-      </Layout>
     </AuthGuard>
   );
 }

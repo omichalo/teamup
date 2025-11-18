@@ -40,7 +40,6 @@ import { AvailabilityService } from "@/lib/services/availability-service";
 import { CompositionService } from "@/lib/services/composition-service";
 import { CompositionDefaultsService } from "@/lib/services/composition-defaults-service";
 import { Player } from "@/types/team-management";
-import { Layout } from "@/components/Layout";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
 import { getCurrentPhase } from "@/lib/shared/phase-utils";
@@ -1468,16 +1467,14 @@ export default function CompositionsPage() {
 
   if (loadingEquipes || loadingPlayers) {
     return (
-      <Layout>
-        <Box
-          display="flex"
-          justifyContent="center"
-          alignItems="center"
-          minHeight="400px"
-        >
-          <CircularProgress />
-        </Box>
-      </Layout>
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="400px"
+      >
+        <CircularProgress />
+      </Box>
     );
   }
 
@@ -1486,8 +1483,7 @@ export default function CompositionsPage() {
       allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.COACH]}
       redirectWhenUnauthorized="/joueur"
     >
-      <Layout>
-        <Box sx={{ p: 5 }}>
+      <Box sx={{ p: 5 }}>
           <Dialog
             open={confirmationDialog.open}
             onClose={handleCancelConfirmation}
@@ -2204,7 +2200,6 @@ export default function CompositionsPage() {
             </Card>
           )}
         </Box>
-      </Layout>
     </AuthGuard>
   );
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { Layout } from "@/components/Layout";
 import {
   Box,
   Typography,
@@ -163,7 +162,6 @@ export default function DemoThemePage() {
   // };
 
   return (
-    <Layout>
       <Box sx={{ p: 5 }}>
         <Typography variant="h1" gutterBottom>
           SQY Ping Theme Showcase
@@ -1166,6 +1164,5 @@ export default function DemoThemePage() {
           </Box>
         )}
       </Box>
-    </Layout>
   );
 }

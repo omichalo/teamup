@@ -47,6 +47,12 @@ env:
       - BUILD
       - RUNTIME
 
+  - variable: NEXT_PUBLIC_APP_URL
+    value: https://teamup--sqyping-teamup.us-east4.hosted.app
+    availability:
+      - BUILD
+      - RUNTIME
+
   # FFTT API Configuration (privées, côté serveur uniquement)
   # Utilisation de Cloud Secret Manager pour la sécurité
   # Voir CONFIG_SECRETS_FFTT.md pour la configuration

@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 import { useEffect } from "react";
-import { Layout } from "@/components/Layout";
 import { useAuth } from "@/hooks/useAuth";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
@@ -29,6 +28,7 @@ import {
 } from "@mui/icons-material";
 import { alpha } from "@mui/material/styles";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 type QuickLinkColor = "primary" | "secondary" | "success" | "info" | "warning";
 
@@ -127,8 +127,7 @@ export default function DashboardPage() {
     <AuthGuard
       allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.COACH]}
     >
-      <Layout>
-        <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 3, sm: 4 } }}>
+      <Box sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 3, sm: 4 } }}>
           <Box
             sx={{
               borderRadius: 3,
@@ -279,7 +278,8 @@ export default function DashboardPage() {
                       fullWidth
                       variant="contained"
                       color={link.color}
-                      onClick={() => router.push(link.href)}
+                      component={Link}
+                      href={link.href}
                     >
                       {link.cta}
                     </Button>
@@ -289,7 +289,6 @@ export default function DashboardPage() {
             ))}
           </Grid>
         </Box>
-      </Layout>
     </AuthGuard>
   );
 }

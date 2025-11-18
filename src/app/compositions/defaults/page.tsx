@@ -27,7 +27,6 @@ import {
   Switch,
 } from "@mui/material";
 import { DragIndicator } from "@mui/icons-material";
-import { Layout } from "@/components/Layout";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
 import {
@@ -898,8 +897,7 @@ export default function DefaultCompositionsPage() {
       allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.COACH]}
       redirectWhenUnauthorized="/joueur"
     >
-      <Layout>
-        <Box sx={{ p: 5 }}>
+      <Box sx={{ p: 5 }}>
           <Stack
             direction={{ xs: "column", md: "row" }}
             justifyContent="space-between"
@@ -1463,7 +1461,6 @@ export default function DefaultCompositionsPage() {
             </>
           )}
         </Box>
-      </Layout>
     </AuthGuard>
   );
 }

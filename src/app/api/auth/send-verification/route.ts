@@ -14,9 +14,11 @@ export async function POST(req: Request) {
 
     // Déterminer l'URL de base (prod > env var > origine requête)
     const envBase = process.env.NEXT_PUBLIC_APP_URL;
-    const forwardedProto = req.headers.get("x-forwarded-proto") || "http";
-    const host = req.headers.get("host") || "localhost:3000";
+    const forwardedProto = req.headers.get("x-forwarded-proto") || "https";
+    const host = req.headers.get("host") || req.headers.get("x-forwarded-host") || "localhost:3000";
     const origin = envBase || `${forwardedProto}://${host}`;
+    
+    console.log("[send-verification] Origin:", origin);
 
     // Générer le lien de vérification via Firebase Admin avec actionCodeSettings explicites
     const link = await adminAuth.generateEmailVerificationLink(email, {

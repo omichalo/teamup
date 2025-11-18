@@ -30,7 +30,6 @@ import {
 } from "@mui/icons-material";
 import { Player } from "@/types/team-management";
 import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
-import { Layout } from "@/components/Layout";
 import { AuthGuard } from "@/components/AuthGuard";
 import { useEquipesWithMatches } from "@/hooks/useEquipesWithMatches";
 import { getCurrentPhase } from "@/lib/shared/phase-utils";
@@ -241,8 +240,7 @@ export default function JoueursPage() {
       allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.COACH]}
       redirectWhenUnauthorized="/joueur"
     >
-      <Layout>
-        <Box sx={{ p: 5 }}>
+      <Box sx={{ p: 5 }}>
           <Typography variant="h4" gutterBottom>
             Gestion des Joueurs
           </Typography>
@@ -964,7 +962,6 @@ export default function JoueursPage() {
             )}
           </TabPanel>
         </Box>
-      </Layout>
     </AuthGuard>
   );
 }

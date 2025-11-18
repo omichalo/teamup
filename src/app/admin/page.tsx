@@ -38,7 +38,6 @@ import {
   Search as SearchIcon,
   Sports as SportsIcon,
 } from "@mui/icons-material";
-import { Layout } from "@/components/Layout";
 import { AuthGuard } from "@/components/AuthGuard";
 import { useAuth } from "@/hooks/useAuth";
 import { COACH_REQUEST_STATUS, USER_ROLES } from "@/lib/auth/roles";
@@ -635,8 +634,7 @@ export default function AdminPage() {
       allowedRoles={[USER_ROLES.ADMIN]}
       redirectWhenUnauthorized="/joueur"
     >
-      <Layout>
-        <Box sx={{ p: 5 }}>
+      <Box sx={{ p: 5 }}>
           <Typography variant="h4" gutterBottom>
             Administration
           </Typography>
@@ -1307,7 +1305,6 @@ export default function AdminPage() {
             </Card>
           </TabPanel>
         </Box>
-      </Layout>
     </AuthGuard>
   );
 }

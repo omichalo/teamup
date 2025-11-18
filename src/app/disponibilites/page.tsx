@@ -38,7 +38,6 @@ import { FirestorePlayerService } from "@/lib/services/firestore-player-service"
 import { AvailabilityService } from "@/lib/services/availability-service";
 import { CompositionService } from "@/lib/services/composition-service";
 import { Player } from "@/types/team-management";
-import { Layout } from "@/components/Layout";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
 import { getCurrentPhase } from "@/lib/shared/phase-utils";
@@ -755,7 +754,6 @@ export default function DisponibilitesPage() {
 
   if (loadingEquipes || loadingPlayers) {
     return (
-      <Layout>
       <Box
         display="flex"
         justifyContent="center"
@@ -764,7 +762,6 @@ export default function DisponibilitesPage() {
       >
         <CircularProgress />
       </Box>
-      </Layout>
     );
   }
 
@@ -773,8 +770,7 @@ export default function DisponibilitesPage() {
       allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.COACH]}
       redirectWhenUnauthorized="/joueur"
     >
-    <Layout>
-        <Box sx={{ p: 5 }}>
+      <Box sx={{ p: 5 }}>
           <Snackbar
             open={Boolean(availabilityWarning)}
             autoHideDuration={6000}
@@ -998,7 +994,6 @@ export default function DisponibilitesPage() {
             </>
           )}
         </Box>
-      </Layout>
     </AuthGuard>
   );
 }
