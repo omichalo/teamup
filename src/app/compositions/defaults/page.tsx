@@ -246,7 +246,18 @@ export default function DefaultCompositionsPage() {
     [players, championshipPlayers, includeAllPlayers]
   );
 
-  const availablePlayers = playerPool;
+  // Filtrer les joueurs selon le type de championnat
+  // Masculin : hommes ET femmes
+  // Féminin : uniquement les femmes
+  const availablePlayers = useMemo(() => {
+    if (defaultCompositionTab === "masculin") {
+      // Championnat masculin : afficher tous les joueurs (hommes et femmes)
+      return playerPool;
+    } else {
+      // Championnat féminin : afficher uniquement les femmes
+      return playerPool.filter((player) => player.gender === "F");
+    }
+  }, [playerPool, defaultCompositionTab]);
 
   const filteredAvailablePlayers = useMemo(() => {
     if (!searchQuery.trim()) {
