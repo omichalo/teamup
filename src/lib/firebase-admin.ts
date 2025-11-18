@@ -51,13 +51,11 @@ const app = (() => {
       }
 
       const serviceAccount = JSON.parse(fs.readFileSync(resolvedPath, "utf8"));
-      const projectId = serviceAccount.project_id || 
-        process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 
-        "sqyping-teamup";
+      const serviceAccountProjectId = serviceAccount.project_id || projectId;
       
       return initializeApp({
         credential: cert(serviceAccount),
-        projectId,
+        projectId: serviceAccountProjectId,
       });
     } catch (error) {
       console.error("❌ Erreur lors de l'initialisation avec GOOGLE_APPLICATION_CREDENTIALS:", error);
@@ -71,20 +69,20 @@ const app = (() => {
     process.env.FB_PRIVATE_KEY?.replace(/\\n/g, "\n") ||
     process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
   const clientEmail = process.env.FB_CLIENT_EMAIL || process.env.FIREBASE_CLIENT_EMAIL;
-  const projectId =
+  const explicitProjectId =
     process.env.FB_PROJECT_ID ||
     process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
-    "sqyping-teamup";
+    projectId;
 
   if (privateKey && clientEmail) {
     console.log("🔥 Initialisation Firebase Admin avec credentials explicites (variables d'environnement)");
     return initializeApp({
       credential: cert({
-        projectId,
+        projectId: explicitProjectId,
         clientEmail,
         privateKey,
       }),
-      projectId,
+      projectId: explicitProjectId,
     });
   }
 
