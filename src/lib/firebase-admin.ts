@@ -4,36 +4,39 @@ import { getAuth } from "firebase-admin/auth";
 import * as fs from "fs";
 import * as path from "path";
 
-// Détecter si on est sur Google Cloud (App Hosting, Cloud Run, etc.)
-// Sur Google Cloud, on utilise les Application Default Credentials
-// Note: On utilise uniquement les variables spécifiques à Google Cloud Runtime
-const isGoogleCloud = 
-  !!process.env.K_SERVICE || // Cloud Run
-  !!process.env.FUNCTION_TARGET; // Cloud Functions
-
 // Initialiser Firebase Admin (une seule fois)
 const app = (() => {
   if (getApps().length > 0) {
     return getApps()[0];
   }
 
-  // Sur Google Cloud (App Hosting), utiliser les credentials par défaut
-  if (isGoogleCloud) {
-    const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 
-      process.env.GCLOUD_PROJECT || 
-      process.env.GOOGLE_CLOUD_PROJECT || 
-      "sqyping-teamup";
-    console.log("🔥 Initialisation Firebase Admin avec Application Default Credentials (Google Cloud)");
-    return initializeApp({
-      credential: applicationDefault(),
-      projectId,
-    });
-  }
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 
+    process.env.GCLOUD_PROJECT || 
+    process.env.GOOGLE_CLOUD_PROJECT || 
+    "sqyping-teamup";
 
   // Vérifier si un fichier de service account est spécifié via GOOGLE_APPLICATION_CREDENTIALS
   const rawServiceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
   console.log("🔍 DEBUG GOOGLE_APPLICATION_CREDENTIALS:", rawServiceAccountPath);
   const serviceAccountPath = rawServiceAccountPath?.trim().replace(/^["']|["']$/g, "");
+  
+  // Si GOOGLE_APPLICATION_CREDENTIALS n'est pas défini, on est probablement sur Google Cloud
+  // (App Hosting, Cloud Run, etc.) où les Application Default Credentials sont disponibles
+  if (!serviceAccountPath) {
+    console.log("🔥 Initialisation Firebase Admin avec Application Default Credentials (Google Cloud)");
+    try {
+      return initializeApp({
+        credential: applicationDefault(),
+        projectId,
+      });
+    } catch (error) {
+      console.error("❌ Erreur lors de l'initialisation avec Application Default Credentials:", error);
+      // Continue avec les autres méthodes
+    }
+  }
+  
+  // Si GOOGLE_APPLICATION_CREDENTIALS est défini, on est probablement en local
+  // Lire le fichier de service account
   if (serviceAccountPath) {
     console.log(`🔥 Initialisation Firebase Admin avec fichier service account: ${serviceAccountPath}`);
     try {
