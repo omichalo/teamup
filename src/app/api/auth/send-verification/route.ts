@@ -13,22 +13,29 @@ export async function POST(req: Request) {
     }
 
     // Déterminer l'URL de base
-    // Priorité: NEXT_PUBLIC_APP_URL > headers > localhost
-    const envBase = process.env.NEXT_PUBLIC_APP_URL;
+    // Priorité: APP_URL (serveur) > NEXT_PUBLIC_APP_URL > headers > localhost
+    const appUrl = process.env.APP_URL; // Variable serveur (sans NEXT_PUBLIC_)
+    const envBase = process.env.NEXT_PUBLIC_APP_URL; // Variable client (peut ne pas être disponible au runtime serveur)
     const forwardedProto = req.headers.get("x-forwarded-proto") || "https";
     const host = req.headers.get("host") || req.headers.get("x-forwarded-host");
     
     let origin: string;
     
-    // Forcer l'utilisation de NEXT_PUBLIC_APP_URL si elle est définie
-    if (envBase && envBase.trim() !== "") {
-      origin = envBase.trim().replace(/\/$/, ""); // Nettoyer les espaces et trailing slash
-    } else if (host) {
-      // Utiliser les headers si disponibles
+    // Priorité 1: APP_URL (variable serveur, toujours disponible au runtime)
+    if (appUrl && appUrl.trim() !== "") {
+      origin = appUrl.trim().replace(/\/$/, "");
+    }
+    // Priorité 2: NEXT_PUBLIC_APP_URL (peut ne pas être disponible au runtime serveur)
+    else if (envBase && envBase.trim() !== "") {
+      origin = envBase.trim().replace(/\/$/, "");
+    }
+    // Priorité 3: Headers de la requête
+    else if (host) {
       const proto = host.includes("localhost") ? "http" : forwardedProto;
       origin = `${proto}://${host}`;
-    } else {
-      // Fallback localhost uniquement en développement
+    }
+    // Priorité 4: Fallback localhost uniquement en développement
+    else {
       origin = "http://localhost:3000";
     }
     
@@ -36,6 +43,7 @@ export async function POST(req: Request) {
     const redirectUrl = `${origin}/auth/verify-email`;
     
     console.log("[send-verification] Environment variables:", {
+      APP_URL: process.env.APP_URL,
       NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
       NODE_ENV: process.env.NODE_ENV,
     });

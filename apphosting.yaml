@@ -53,6 +53,12 @@ env:
       - BUILD
       - RUNTIME
 
+  # URL de l'application pour les routes API (serveur uniquement)
+  - variable: APP_URL
+    value: https://teamup--sqyping-teamup.us-east4.hosted.app
+    availability:
+      - RUNTIME
+
   # FFTT API Configuration (privées, côté serveur uniquement)
   # Utilisation de Cloud Secret Manager pour la sécurité
   # Voir CONFIG_SECRETS_FFTT.md pour la configuration
