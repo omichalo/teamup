@@ -12,25 +12,48 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Email requis" }, { status: 400 });
     }
 
-    // Déterminer l'URL de base (prod > env var > origine requête)
+    // Déterminer l'URL de base
+    // Priorité: NEXT_PUBLIC_APP_URL > headers > localhost
     const envBase = process.env.NEXT_PUBLIC_APP_URL;
     const forwardedProto = req.headers.get("x-forwarded-proto") || "https";
-    const host = req.headers.get("host") || req.headers.get("x-forwarded-host") || "localhost:3000";
-    const origin = envBase || `${forwardedProto}://${host}`;
+    const host = req.headers.get("host") || req.headers.get("x-forwarded-host");
     
-    // Firebase Auth nécessite que l'URL de redirection utilise un domaine autorisé
-    // Utiliser le domaine de l'application (App Hosting) qui doit être dans la liste des domaines autorisés
+    let origin: string;
+    
+    // Forcer l'utilisation de NEXT_PUBLIC_APP_URL si elle est définie
+    if (envBase && envBase.trim() !== "") {
+      origin = envBase.trim().replace(/\/$/, ""); // Nettoyer les espaces et trailing slash
+    } else if (host) {
+      // Utiliser les headers si disponibles
+      const proto = host.includes("localhost") ? "http" : forwardedProto;
+      origin = `${proto}://${host}`;
+    } else {
+      // Fallback localhost uniquement en développement
+      origin = "http://localhost:3000";
+    }
+    
+    // S'assurer que l'URL est bien formatée
     const redirectUrl = `${origin}/reset-password`;
-    console.log("[send-password-reset] Origin:", origin);
+    
+    console.log("[send-password-reset] Environment variables:", {
+      NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+      NODE_ENV: process.env.NODE_ENV,
+    });
+    console.log("[send-password-reset] Headers:", {
+      host: req.headers.get("host"),
+      "x-forwarded-host": req.headers.get("x-forwarded-host"),
+      "x-forwarded-proto": req.headers.get("x-forwarded-proto"),
+    });
+    console.log("[send-password-reset] Final origin:", origin);
     console.log("[send-password-reset] Redirect URL:", redirectUrl);
-    console.log("[send-password-reset] Host:", host);
 
     // Générer le lien de réinitialisation via Firebase Admin vers la bonne page
     // Note: L'URL doit pointer vers un domaine autorisé dans Firebase Console
     // Authentication > Settings > Authorized domains
+    // Le domaine doit être exactement: teamup--sqyping-teamup.us-east4.hosted.app
     const link = await adminAuth.generatePasswordResetLink(email, {
       url: redirectUrl,
-      handleCodeInApp: false, // Désactiver handleCodeInApp pour éviter les problèmes de domaine
+      handleCodeInApp: false,
     });
 
     // Charger le template HTML et injecter le lien

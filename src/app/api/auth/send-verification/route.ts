@@ -12,18 +12,45 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Email requis" }, { status: 400 });
     }
 
-    // Déterminer l'URL de base (prod > env var > origine requête)
+    // Déterminer l'URL de base
+    // Priorité: NEXT_PUBLIC_APP_URL > headers > localhost
     const envBase = process.env.NEXT_PUBLIC_APP_URL;
     const forwardedProto = req.headers.get("x-forwarded-proto") || "https";
-    const host = req.headers.get("host") || req.headers.get("x-forwarded-host") || "localhost:3000";
-    const origin = envBase || `${forwardedProto}://${host}`;
+    const host = req.headers.get("host") || req.headers.get("x-forwarded-host");
     
-    console.log("[send-verification] Origin:", origin);
+    let origin: string;
+    
+    // Forcer l'utilisation de NEXT_PUBLIC_APP_URL si elle est définie
+    if (envBase && envBase.trim() !== "") {
+      origin = envBase.trim().replace(/\/$/, ""); // Nettoyer les espaces et trailing slash
+    } else if (host) {
+      // Utiliser les headers si disponibles
+      const proto = host.includes("localhost") ? "http" : forwardedProto;
+      origin = `${proto}://${host}`;
+    } else {
+      // Fallback localhost uniquement en développement
+      origin = "http://localhost:3000";
+    }
+    
+    // S'assurer que l'URL est bien formatée
+    const redirectUrl = `${origin}/auth/verify-email`;
+    
+    console.log("[send-verification] Environment variables:", {
+      NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+      NODE_ENV: process.env.NODE_ENV,
+    });
+    console.log("[send-verification] Headers:", {
+      host: req.headers.get("host"),
+      "x-forwarded-host": req.headers.get("x-forwarded-host"),
+      "x-forwarded-proto": req.headers.get("x-forwarded-proto"),
+    });
+    console.log("[send-verification] Final origin:", origin);
+    console.log("[send-verification] Redirect URL:", redirectUrl);
 
     // Générer le lien de vérification via Firebase Admin avec actionCodeSettings explicites
     const link = await adminAuth.generateEmailVerificationLink(email, {
-      url: `${origin}/auth/verify-email`,
-      handleCodeInApp: true,
+      url: redirectUrl,
+      handleCodeInApp: false,
     });
 
     // Charger le template HTML et injecter le lien
