@@ -3,6 +3,7 @@ import { adminAuth } from "@/lib/firebase-admin";
 import { sendMail } from "@/lib/mailer";
 import { readFile } from "fs/promises";
 import path from "path";
+import { getFirebaseErrorMessage } from "@/lib/firebase-error-utils";
 
 export async function POST(req: Request) {
   try {
@@ -58,8 +59,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[send-verification] error", error);
+    const errorMessage = getFirebaseErrorMessage(error);
     return NextResponse.json(
-      { error: "Impossible d'envoyer l'email" },
+      { error: errorMessage },
       { status: 500 }
     );
   }

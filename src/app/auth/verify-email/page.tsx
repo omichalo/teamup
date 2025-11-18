@@ -16,6 +16,7 @@ import { CheckCircle, Error as ErrorIcon } from "@mui/icons-material";
 import Image from "next/image";
 import { clientAuth } from "@/lib/firebase.client";
 import { applyActionCode, checkActionCode } from "firebase/auth";
+import { getFirebaseErrorMessage } from "@/lib/firebase-error-utils";
 
 export default function VerifyEmailPage() {
   const router = useRouter();
@@ -54,21 +55,10 @@ export default function VerifyEmailPage() {
         setTimeout(() => {
           router.push("/login?next=/joueur");
         }, 2000);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("[Verify Email] Error:", error);
         setStatus("error");
-        
-        if (error.code === "auth/expired-action-code") {
-          setMessage("Le lien de vérification a expiré. Veuillez demander un nouveau lien.");
-        } else if (error.code === "auth/invalid-action-code") {
-          // Le code peut être déjà utilisé (email déjà vérifié). Pour une meilleure UX,
-          // on affiche un message plus précis si possible.
-          const alreadyVerifiedMsg =
-            "Le lien est invalide ou déjà utilisé. Si votre email est déjà vérifié, vous pouvez vous connecter.";
-          setMessage(alreadyVerifiedMsg);
-        } else {
-          setMessage("Une erreur est survenue lors de la vérification de l'email.");
-        }
+        setMessage(getFirebaseErrorMessage(error));
       }
     };
 

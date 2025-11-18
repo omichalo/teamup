@@ -1,12 +1,15 @@
 import { initializeApp, getApps, cert, applicationDefault } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
+import * as fs from "fs";
+import * as path from "path";
 
 // Détecter si on est sur Google Cloud (App Hosting, Cloud Run, etc.)
 // Sur Google Cloud, on utilise les Application Default Credentials
-const isGoogleCloud = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || 
-  process.env.K_SERVICE || process.env.FUNCTION_TARGET || 
-  process.env.FIREBASE_CONFIG || process.env.FIREBASE_WEBAPP_CONFIG;
+// Note: On utilise uniquement les variables spécifiques à Google Cloud Runtime
+const isGoogleCloud = 
+  !!process.env.K_SERVICE || // Cloud Run
+  !!process.env.FUNCTION_TARGET; // Cloud Functions
 
 // Initialiser Firebase Admin (une seule fois)
 const app = (() => {
@@ -28,14 +31,30 @@ const app = (() => {
   }
 
   // Vérifier si un fichier de service account est spécifié via GOOGLE_APPLICATION_CREDENTIALS
-  const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  const rawServiceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  console.log("🔍 DEBUG GOOGLE_APPLICATION_CREDENTIALS:", rawServiceAccountPath);
+  const serviceAccountPath = rawServiceAccountPath?.trim().replace(/^["']|["']$/g, "");
   if (serviceAccountPath) {
     console.log(`🔥 Initialisation Firebase Admin avec fichier service account: ${serviceAccountPath}`);
     try {
-      // Utiliser applicationDefault() qui lit automatiquement GOOGLE_APPLICATION_CREDENTIALS
+      // Lire directement le fichier JSON au lieu d'utiliser applicationDefault()
+      // qui essaie de se connecter à metadata.google.internal
+      const resolvedPath = path.isAbsolute(serviceAccountPath) 
+        ? serviceAccountPath 
+        : path.resolve(process.cwd(), serviceAccountPath);
+      
+      if (!fs.existsSync(resolvedPath)) {
+        throw new Error(`Service account file not found: ${resolvedPath}`);
+      }
+
+      const serviceAccount = JSON.parse(fs.readFileSync(resolvedPath, "utf8"));
+      const projectId = serviceAccount.project_id || 
+        process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 
+        "sqyping-teamup";
+      
       return initializeApp({
-        credential: applicationDefault(),
-        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "sqyping-teamup",
+        credential: cert(serviceAccount),
+        projectId,
       });
     } catch (error) {
       console.error("❌ Erreur lors de l'initialisation avec GOOGLE_APPLICATION_CREDENTIALS:", error);
@@ -66,22 +85,14 @@ const app = (() => {
     });
   }
 
-  // Fallback: utiliser les credentials par défaut même en local
-  // Cela peut échouer en local si les credentials ne sont pas configurés
-  console.log("⚠️ Aucune credential explicite trouvée, tentative d'utilisation des Application Default Credentials");
-  try {
-    return initializeApp({
-      credential: applicationDefault(),
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "sqyping-teamup",
-    });
-  } catch (error) {
-    console.error("❌ Erreur lors de l'initialisation de Firebase Admin:", error);
-    throw new Error(
-      "Firebase Admin credentials not configured. " +
-      "Pour le développement local, configurez les variables d'environnement FIREBASE_PRIVATE_KEY et FIREBASE_CLIENT_EMAIL, " +
-      "ou utilisez 'gcloud auth application-default login' pour configurer les credentials par défaut."
-    );
-  }
+  // Aucune credential trouvée - erreur explicite
+  console.error("❌ Aucune credential Firebase Admin trouvée");
+  throw new Error(
+    "Firebase Admin credentials not configured. " +
+    "Pour le développement local, configurez l'une des options suivantes:\n" +
+    "1. Variables d'environnement: FIREBASE_PRIVATE_KEY et FIREBASE_CLIENT_EMAIL (ou FB_PRIVATE_KEY et FB_CLIENT_EMAIL)\n" +
+    "2. Fichier service account: définissez GOOGLE_APPLICATION_CREDENTIALS avec le chemin vers le fichier JSON"
+  );
 })();
 
 // Exporter l&apos;instance Firebase Admin

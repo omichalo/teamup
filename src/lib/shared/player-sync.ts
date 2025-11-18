@@ -1,7 +1,7 @@
 import { FFTTAPI } from "@omichalo/ffttapi-node";
 import { getFFTTConfig } from "./fftt-utils";
 import { FFTTJoueurDetails } from "./fftt-types";
-import type { Firestore } from "firebase-admin/firestore";
+import type { Firestore, DocumentReference } from "firebase-admin/firestore";
 import { Timestamp } from "firebase-admin/firestore";
 
 export interface PlayerSyncResult {
@@ -268,13 +268,14 @@ export class PlayerSyncService {
 
   /**
    * Sauvegarde les joueurs enrichis dans Firestore
+   * Optimisé : récupère tous les documents existants en une seule requête par batch
    */
   async savePlayersToFirestore(
     players: FFTTJoueurDetails[],
     db: Firestore
   ): Promise<{ saved: number; errors: number }> {
     let saved = 0;
-    const errors = 0;
+    let errors = 0;
 
     try {
       console.log(
@@ -284,60 +285,109 @@ export class PlayerSyncService {
       // Traitement par batch pour éviter les limites Firestore
       const batchSize = 500;
       for (let i = 0; i < players.length; i += batchSize) {
-        const batch = db.batch();
         const batchEnd = Math.min(i + batchSize, players.length);
+        const batchPlayers = players.slice(i, batchEnd);
 
-        for (let j = i; j < batchEnd; j++) {
-          const player = players[j];
-          const docRef = db.collection("players").doc(player.licence);
-
-          // Récupérer les données existantes pour préserver les champs de gestion
-          const existingDoc = await docRef.get();
-          const existingData = existingDoc.exists ? existingDoc.data() : {};
-
-          // Filtrer les valeurs undefined et préparer les données pour Firestore
-          const playerData = Object.fromEntries(
-            Object.entries(player).filter(([, value]) => value !== undefined)
-          );
-
-          // Préserver UNIQUEMENT les champs de gestion qui ne viennent pas de l&apos;API FFTT
-          // Ces champs sont gérés manuellement par l&apos;utilisateur et ne doivent pas être écrasés
-          // Les autres champs (points, classement, etc.) peuvent changer entre 2 synchronisations
-          // et c&apos;est normal - ils reflètent l&apos;état actuel de l&apos;API FFTT
-          const userManagedFields = [
-            "participation",
-            "preferredTeams",
-            "isTemporary",
-            "hasPlayedAtLeastOneMatch", // Préservé car géré par la synchro des matchs
-            "highestMasculineTeamNumberByPhase", // Préservé car géré par la synchro des matchs (règles de brûlage par phase)
-            "highestFeminineTeamNumberByPhase", // Préservé car géré par la synchro des matchs (règles de brûlage par phase)
-            "masculineMatchesByTeamByPhase", // Préservé car géré par la synchro des matchs (affichage du brûlage par phase)
-            "feminineMatchesByTeamByPhase", // Préservé car géré par la synchro des matchs (affichage du brûlage par phase)
-          ];
-
-          userManagedFields.forEach((field) => {
-            if (existingData && existingData[field]) {
-              playerData[field] = existingData[field];
-            }
+        // OPTIMISATION : Récupérer tous les documents existants en une seule requête
+        // au lieu de faire une requête par joueur
+        // Note: getAll() peut récupérer jusqu'à 10 documents à la fois
+        const docRefs = batchPlayers.map((player) =>
+          db.collection("players").doc(player.licence)
+        );
+        
+        console.log(
+          `📥 Récupération des données existantes pour le batch ${
+            Math.floor(i / batchSize) + 1
+          } (${docRefs.length} documents)...`
+        );
+        
+        // Créer une Map pour un accès rapide aux données existantes
+        const existingDataMap = new Map<string, Record<string, unknown>>();
+        
+        // getAll() peut récupérer jusqu'à 10 documents à la fois
+        // Diviser en sous-batches de 10 et les traiter en parallèle pour optimiser
+        const getAllBatchSize = 10;
+        const getAllBatches: Array<Array<DocumentReference>> = [];
+        
+        for (let k = 0; k < docRefs.length; k += getAllBatchSize) {
+          getAllBatches.push(docRefs.slice(k, k + getAllBatchSize));
+        }
+        
+        // Traiter les batches getAll() en parallèle (max 5 à la fois pour ne pas surcharger)
+        const maxConcurrentGetAll = 5;
+        for (let k = 0; k < getAllBatches.length; k += maxConcurrentGetAll) {
+          const concurrentBatches = getAllBatches.slice(k, k + maxConcurrentGetAll);
+          const getAllPromises = concurrentBatches.map((batch) => db.getAll(...batch));
+          
+          const results = await Promise.all(getAllPromises);
+          
+          results.forEach((docs) => {
+            docs.forEach((doc) => {
+              if (doc.exists) {
+                existingDataMap.set(doc.id, doc.data() as Record<string, unknown>);
+              }
+            });
           });
-
-          // Convertir les dates en Timestamp Firestore
-          if (playerData.createdAt) {
-            playerData.createdAt = Timestamp.fromDate(playerData.createdAt);
-          }
-          if (playerData.updatedAt) {
-            playerData.updatedAt = Timestamp.fromDate(playerData.updatedAt);
-          }
-
-          batch.set(docRef, playerData, { merge: true });
-          saved++;
         }
 
+        // Préparer le batch d'écriture
+        const batch = db.batch();
+
+        // Préserver UNIQUEMENT les champs de gestion qui ne viennent pas de l'API FFTT
+        // Ces champs sont gérés manuellement par l'utilisateur et ne doivent pas être écrasés
+        const userManagedFields = [
+          "participation",
+          "preferredTeams",
+          "isTemporary",
+          "hasPlayedAtLeastOneMatch", // Préservé car géré par la synchro des matchs
+          "highestMasculineTeamNumberByPhase", // Préservé car géré par la synchro des matchs (règles de brûlage par phase)
+          "highestFeminineTeamNumberByPhase", // Préservé car géré par la synchro des matchs (règles de brûlage par phase)
+          "masculineMatchesByTeamByPhase", // Préservé car géré par la synchro des matchs (affichage du brûlage par phase)
+          "feminineMatchesByTeamByPhase", // Préservé car géré par la synchro des matchs (affichage du brûlage par phase)
+        ];
+
+        for (const player of batchPlayers) {
+          try {
+            const docRef = db.collection("players").doc(player.licence);
+            const existingData = existingDataMap.get(player.licence) || {};
+
+            // Filtrer les valeurs undefined et préparer les données pour Firestore
+            const playerData = Object.fromEntries(
+              Object.entries(player).filter(([, value]) => value !== undefined)
+            );
+
+            // Préserver les champs de gestion
+            userManagedFields.forEach((field) => {
+              if (existingData && existingData[field]) {
+                playerData[field] = existingData[field];
+              }
+            });
+
+            // Convertir les dates en Timestamp Firestore
+            if (playerData.createdAt instanceof Date) {
+              playerData.createdAt = Timestamp.fromDate(playerData.createdAt);
+            }
+            if (playerData.updatedAt instanceof Date) {
+              playerData.updatedAt = Timestamp.fromDate(playerData.updatedAt);
+            }
+
+            batch.set(docRef, playerData, { merge: true });
+            saved++;
+          } catch (playerError) {
+            console.error(
+              `❌ Erreur lors de la préparation du joueur ${player.licence}:`,
+              playerError
+            );
+            errors++;
+          }
+        }
+
+        // Commiter le batch
         await batch.commit();
         console.log(
           `✅ Batch ${
             Math.floor(i / batchSize) + 1
-          } sauvegardé (${saved} joueurs enrichis)`
+          } sauvegardé (${saved} joueurs enrichis, ${errors} erreurs)`
         );
       }
 

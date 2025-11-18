@@ -24,6 +24,7 @@ import {
   CheckCircle,
 } from "@mui/icons-material";
 import Image from "next/image";
+import { getFirebaseErrorMessage } from "@/lib/firebase-error-utils";
 // SMTP-based reset handled by API route; no direct Firebase call here
 
 export default function ResetPage() {
@@ -48,8 +49,8 @@ export default function ResetPage() {
         throw new Error(j.error || "Échec d'envoi de l'email de réinitialisation");
       }
       setMsg("Email de réinitialisation envoyé. Vérifiez votre boîte de réception (et vos spams).");
-    } catch (e: any) {
-      setErr(e?.message ?? "Erreur");
+    } catch (e: unknown) {
+      setErr(getFirebaseErrorMessage(e));
     } finally {
       setLoading(false);
     }

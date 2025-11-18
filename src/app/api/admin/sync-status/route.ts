@@ -55,14 +55,17 @@ export async function GET() {
           players: {
             lastSync: metadata?.players?.toDate?.()?.toISOString() || null,
             count: playersCount,
+            duration: metadata?.playersDuration || null,
           },
           teams: {
             lastSync: metadata?.teams?.toDate?.()?.toISOString() || null,
             count: teamsCount,
+            duration: metadata?.teamsDuration || null,
           },
           teamMatches: {
             lastSync: metadata?.teamMatches?.toDate?.()?.toISOString() || null,
             count: teamMatchesCount,
+            duration: metadata?.teamMatchesDuration || null,
           },
         },
       },

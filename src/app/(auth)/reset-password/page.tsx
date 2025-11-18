@@ -29,6 +29,7 @@ import {
 } from "firebase/auth";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PasswordRequirements } from "@/components/PasswordRequirements";
+import { getFirebaseErrorMessage } from "@/lib/firebase-error-utils";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -59,22 +60,9 @@ export default function ResetPasswordPage() {
         setEmail(email);
         setVerifying(false);
         setLoading(false);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Error verifying password reset code:", error);
-        if (error.code === "auth/invalid-action-code") {
-          setErr(
-            "Le lien de réinitialisation est invalide ou a expiré. Veuillez demander un nouveau lien."
-          );
-        } else if (error.code === "auth/expired-action-code") {
-          setErr(
-            "Le lien de réinitialisation a expiré. Veuillez demander un nouveau lien."
-          );
-        } else {
-          setErr(
-            error.message ||
-              "Une erreur est survenue lors de la vérification du lien."
-          );
-        }
+        setErr(getFirebaseErrorMessage(error));
         setVerifying(false);
         setLoading(false);
       }
@@ -108,22 +96,9 @@ export default function ResetPasswordPage() {
       setTimeout(() => {
         router.push("/login");
       }, 2000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error resetting password:", error);
-      if (error.code === "auth/invalid-action-code") {
-        setErr(
-          "Le lien de réinitialisation est invalide ou a expiré. Veuillez demander un nouveau lien."
-        );
-      } else if (error.code === "auth/expired-action-code") {
-        setErr(
-          "Le lien de réinitialisation a expiré. Veuillez demander un nouveau lien."
-        );
-      } else {
-        setErr(
-          error.message ||
-            "Une erreur est survenue lors de la réinitialisation du mot de passe."
-        );
-      }
+      setErr(getFirebaseErrorMessage(error));
     } finally {
       setLoading(false);
     }

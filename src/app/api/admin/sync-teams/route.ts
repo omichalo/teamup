@@ -40,6 +40,7 @@ export async function POST() {
     await initializeFirebaseAdmin();
     const db = getFirestoreAdmin();
 
+    const startTime = Date.now();
     const { TeamSyncService } = await import("@/lib/shared/team-sync");
     const teamSyncService = new TeamSyncService();
     const syncResult = await teamSyncService.syncTeamsAndMatches();
@@ -60,6 +61,17 @@ export async function POST() {
       db
     );
 
+    const duration = Date.now() - startTime;
+    const durationSeconds = Math.round(duration / 1000);
+
+    // Sauvegarder la durée dans les métadonnées
+    await db.collection("metadata").doc("lastSync").set(
+      {
+        teamsDuration: durationSeconds,
+      },
+      { merge: true }
+    );
+
     return NextResponse.json(
       {
         success: true,
@@ -67,6 +79,7 @@ export async function POST() {
         data: {
           teamsCount: saveResult.saved,
           errors: saveResult.errors,
+          duration: durationSeconds,
         },
       },
       { status: 200 }

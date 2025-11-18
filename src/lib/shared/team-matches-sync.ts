@@ -7,7 +7,7 @@ import {
   FFTTJoueur,
 } from "./fftt-types";
 import { createBaseMatch, isFemaleTeam } from "./fftt-utils";
-import type { Firestore } from "firebase-admin/firestore";
+import type { Firestore, DocumentReference } from "firebase-admin/firestore";
 import { Timestamp, FieldValue } from "firebase-admin/firestore";
 
 // Type pour les joueurs dans les recherches
@@ -1189,11 +1189,49 @@ export class TeamMatchesSyncService {
       const playerIds = Array.from(allPlayerIds);
       const playersToUpdate = [];
 
+      // OPTIMISATION : Récupérer tous les documents en une seule fois avec getAll()
+      // au lieu de faire une requête par joueur
+      console.log(
+        `📥 Récupération des données de ${playerIds.length} joueurs pour mise à jour...`
+      );
+      
+      const docRefs = playerIds.map((playerId) =>
+        db.collection("players").doc(playerId)
+      );
+      
+      // getAll() peut récupérer jusqu'à 10 documents à la fois
+      // Diviser en sous-batches de 10 et les traiter en parallèle
+      const getAllBatchSize = 10;
+      const getAllBatches: Array<Array<DocumentReference>> = [];
+      
+      for (let k = 0; k < docRefs.length; k += getAllBatchSize) {
+        getAllBatches.push(docRefs.slice(k, k + getAllBatchSize));
+      }
+      
+      // Créer une Map pour un accès rapide aux données existantes
+      const playerDataMap = new Map<string, Record<string, unknown>>();
+      
+      // Traiter les batches getAll() en parallèle (max 5 à la fois pour ne pas surcharger)
+      const maxConcurrentGetAll = 5;
+      for (let k = 0; k < getAllBatches.length; k += maxConcurrentGetAll) {
+        const concurrentBatches = getAllBatches.slice(k, k + maxConcurrentGetAll);
+        const getAllPromises = concurrentBatches.map((batch) => db.getAll(...batch));
+        
+        const results = await Promise.all(getAllPromises);
+        
+        results.forEach((docs) => {
+          docs.forEach((doc) => {
+            if (doc.exists) {
+              playerDataMap.set(doc.id, doc.data() as Record<string, unknown>);
+            }
+          });
+        });
+      }
+
       for (const playerId of playerIds) {
         try {
-          const playerDoc = await db.collection("players").doc(playerId).get();
-          if (playerDoc.exists) {
-            const playerData = playerDoc.data();
+          const playerData = playerDataMap.get(playerId);
+          if (playerData) {
             const updates: Record<string, unknown> = {};
 
             // Mettre à jour hasPlayedAtLeastOneMatch si pas déjà true
@@ -1202,7 +1240,8 @@ export class TeamMatchesSyncService {
             }
 
             // Mettre à jour participation.championnat si pas déjà true
-            if (!playerData?.participation?.championnat) {
+            const participation = playerData?.participation as { championnat?: boolean } | undefined;
+            if (!participation?.championnat) {
               updates["participation.championnat"] = true;
             }
 
@@ -1215,7 +1254,7 @@ export class TeamMatchesSyncService {
             if (highestMasculineBurnedTeamByPhase) {
               // Le joueur est brûlé en masculin pour au moins une phase
               const currentHighestByPhase =
-                playerData?.highestMasculineTeamNumberByPhase || {};
+                (playerData?.highestMasculineTeamNumberByPhase as { aller?: number; retour?: number } | undefined) || {};
 
               const newHighestByPhase: {
                 aller?: number;
@@ -1247,7 +1286,7 @@ export class TeamMatchesSyncService {
               }
             } else if (!hasMasculineMatches) {
               // Le joueur n'a plus de matchs masculins, supprimer le brûlage si le champ existe
-              if (playerData?.highestMasculineTeamNumberByPhase) {
+              if ((playerData?.highestMasculineTeamNumberByPhase as unknown) !== undefined) {
                 updates.highestMasculineTeamNumberByPhase =
                   FieldValue.delete() as any;
               }
@@ -1262,7 +1301,7 @@ export class TeamMatchesSyncService {
             if (highestFeminineBurnedTeamByPhase) {
               // Le joueur est brûlé en féminin pour au moins une phase
               const currentHighestByPhase =
-                playerData?.highestFeminineTeamNumberByPhase || {};
+                (playerData?.highestFeminineTeamNumberByPhase as { aller?: number; retour?: number } | undefined) || {};
 
               const newHighestByPhase: {
                 aller?: number;
@@ -1294,7 +1333,7 @@ export class TeamMatchesSyncService {
               }
             } else if (!hasFeminineMatches) {
               // Le joueur n'a plus de matchs féminins, supprimer le brûlage si le champ existe
-              if (playerData?.highestFeminineTeamNumberByPhase) {
+              if ((playerData?.highestFeminineTeamNumberByPhase as unknown) !== undefined) {
                 updates.highestFeminineTeamNumberByPhase =
                   FieldValue.delete() as any;
               }
@@ -1444,11 +1483,16 @@ export class TeamMatchesSyncService {
       console.log(`📊 ${matchesByTeam.size} équipes avec des matchs`);
       console.log(`📊 Équipes: ${Array.from(matchesByTeam.keys()).join(", ")}`);
 
+      // OPTIMISATION : Paralléliser les commits de batch pour différentes équipes
       // Sauvegarder par batch
       const batchSize = 500;
+      
+      // Préparer tous les batches pour toutes les équipes
+      const batchPromises: Array<Promise<void>> = [];
+      
       for (const [teamId, teamMatches] of matchesByTeam) {
         console.log(
-          `💾 Sauvegarde de ${teamMatches.length} matchs pour ${teamId}...`
+          `💾 Préparation de ${teamMatches.length} matchs pour ${teamId}...`
         );
 
         for (let i = 0; i < teamMatches.length; i += batchSize) {
@@ -1499,10 +1543,10 @@ export class TeamMatchesSyncService {
                 })) || [],
             };
 
-            // Forcer la mise à jour des champs importants même s&apos;ils étaient vides avant
+            // Forcer la mise à jour des champs importants même s'ils étaient vides avant
             const updateData = {
               ...serializableMatchData,
-              // Toujours mettre à jour ces champs même s&apos;ils étaient vides
+              // Toujours mettre à jour ces champs même s'ils étaient vides
               joueursSQY: serializableMatchData.joueursSQY || [],
               joueursAdversaires:
                 serializableMatchData.joueursAdversaires || [],
@@ -1515,9 +1559,29 @@ export class TeamMatchesSyncService {
             saved++;
           }
 
-          await batch.commit();
+          // Ajouter la promesse de commit au tableau pour parallélisation
+          // Capturer les valeurs dans une closure pour éviter les problèmes de référence
+          const currentTeamId = teamId;
+          const currentBatchSize = batchEnd - i;
+          
+          batchPromises.push(
+            batch.commit().then(() => {
+              console.log(
+                `✅ Batch sauvegardé pour ${currentTeamId} (${currentBatchSize} matchs)`
+              );
+            }).catch((error) => {
+              console.error(
+                `❌ Erreur lors du commit du batch pour ${currentTeamId}:`,
+                error
+              );
+              throw error;
+            })
+          );
         }
       }
+
+      // Attendre que tous les batches soient committés en parallèle
+      await Promise.all(batchPromises);
 
       console.log(`✅ Synchronisation terminée: ${saved} matchs sauvegardés`);
       return { saved, errors };

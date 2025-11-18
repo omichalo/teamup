@@ -25,6 +25,7 @@ import { signupSchema } from "@/lib/validators";
 import { clientAuth } from "@/lib/firebase.client";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { PasswordRequirements } from "@/components/PasswordRequirements";
+import { getFirebaseErrorMessage } from "@/lib/firebase-error-utils";
 
 export default function SignupPage() {
   const [loading, setLoading] = useState(false);
@@ -75,8 +76,8 @@ export default function SignupPage() {
           "Compte créé ! Cependant, l'envoi de l'email de vérification a échoué. Tu peux te connecter et demander un nouvel email de vérification."
         );
       }
-    } catch (e: any) {
-      setErr(e?.message ?? "Erreur à l'inscription");
+    } catch (e: unknown) {
+      setErr(getFirebaseErrorMessage(e));
     } finally {
       setLoading(false);
     }

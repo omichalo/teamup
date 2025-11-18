@@ -69,18 +69,21 @@ interface SyncStatus {
     count: number;
     status: "idle" | "syncing" | "success" | "error";
     error: string | null;
+    duration: number | null;
   };
   teams: {
     lastSync: string | null;
     count: number;
     status: "idle" | "syncing" | "success" | "error";
     error: string | null;
+    duration: number | null;
   };
   teamMatches: {
     lastSync: string | null;
     count: number;
     status: "idle" | "syncing" | "success" | "error";
     error: string | null;
+    duration: number | null;
   };
 }
 
@@ -90,9 +93,9 @@ export default function AdminPage() {
   const [tabValue, setTabValue] = useState(0);
 
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
-    players: { lastSync: null, count: 0, status: "idle", error: null },
-    teams: { lastSync: null, count: 0, status: "idle", error: null },
-    teamMatches: { lastSync: null, count: 0, status: "idle", error: null },
+    players: { lastSync: null, count: 0, status: "idle", error: null, duration: null },
+    teams: { lastSync: null, count: 0, status: "idle", error: null, duration: null },
+    teamMatches: { lastSync: null, count: 0, status: "idle", error: null, duration: null },
   });
   const [syncLoading, setSyncLoading] = useState(true);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -134,18 +137,21 @@ export default function AdminPage() {
             count: result.data?.players?.count || 0,
             status: "idle",
             error: null,
+            duration: result.data?.players?.duration || null,
           },
           teams: {
             lastSync: result.data?.teams?.lastSync || null,
             count: result.data?.teams?.count || 0,
             status: "idle",
             error: null,
+            duration: result.data?.teams?.duration || null,
           },
           teamMatches: {
             lastSync: result.data?.teamMatches?.lastSync || null,
             count: result.data?.teamMatches?.count || 0,
             status: "idle",
             error: null,
+            duration: result.data?.teamMatches?.duration || null,
           },
         });
       } else {
@@ -188,9 +194,10 @@ export default function AdminPage() {
           players: {
             ...prev.players,
             lastSync: new Date().toISOString(),
-            count: result.data?.playersCount || 0,
+            count: result.data?.playersCount || result.playersCount || 0,
             status: "success",
             error: null,
+            duration: result.data?.duration || result.duration || null,
           },
         }));
       } else {
@@ -244,6 +251,7 @@ export default function AdminPage() {
             count: result.data?.teamsCount || 0,
             status: "success",
             error: null,
+            duration: result.data?.duration || null,
           },
         }));
       } else {
@@ -297,6 +305,7 @@ export default function AdminPage() {
             count: result.data?.matchesCount || 0,
             status: "success",
             error: null,
+            duration: result.data?.duration || null,
           },
         }));
       } else {
@@ -602,6 +611,18 @@ export default function AdminPage() {
     }
   };
 
+  const formatDuration = (durationSeconds: number | null): string => {
+    if (durationSeconds === null || durationSeconds === undefined) {
+      return "N/A";
+    }
+    if (durationSeconds < 60) {
+      return `${durationSeconds}s`;
+    }
+    const minutes = Math.floor(durationSeconds / 60);
+    const seconds = durationSeconds % 60;
+    return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+  };
+
   const formatLastSync = (lastSync: string | null): string => {
     if (!lastSync) {
       return "Jamais";
@@ -700,6 +721,10 @@ export default function AdminPage() {
                         {formatLastSync(syncStatus.players.lastSync)}
                       </Typography>
                       <Typography variant="body2">
+                        <strong>Durée :</strong>{" "}
+                        {formatDuration(syncStatus.players.duration)}
+                      </Typography>
+                      <Typography variant="body2">
                         <strong>Nombre de joueurs :</strong>{" "}
                         {syncStatus.players.count}
                       </Typography>
@@ -763,6 +788,10 @@ export default function AdminPage() {
                         {formatLastSync(syncStatus.teams.lastSync)}
                       </Typography>
                       <Typography variant="body2">
+                        <strong>Durée :</strong>{" "}
+                        {formatDuration(syncStatus.teams.duration)}
+                      </Typography>
+                      <Typography variant="body2">
                         <strong>Nombre d&apos;équipes :</strong>{" "}
                         {syncStatus.teams.count}
                       </Typography>
@@ -824,6 +853,10 @@ export default function AdminPage() {
                       <Typography variant="body2">
                         <strong>Dernière synchronisation :</strong>{" "}
                         {formatLastSync(syncStatus.teamMatches.lastSync)}
+                      </Typography>
+                      <Typography variant="body2">
+                        <strong>Durée :</strong>{" "}
+                        {formatDuration(syncStatus.teamMatches.duration)}
                       </Typography>
                       <Typography variant="body2">
                         <strong>Nombre de matchs :</strong>{" "}

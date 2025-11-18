@@ -25,6 +25,7 @@ import { loginSchema } from "@/lib/validators";
 import { clientAuth } from "@/lib/firebase.client";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { useSearchParams } from "next/navigation";
+import { getFirebaseErrorMessage } from "@/lib/firebase-error-utils";
 
 export default function LoginPage() {
   const params = useSearchParams();
@@ -95,8 +96,8 @@ export default function LoginPage() {
       // Utiliser window.location.href pour forcer un rechargement complet
       // Cela garantit que le cookie est bien envoyé au serveur et que le middleware le voit
       window.location.href = next;
-    } catch (e: any) {
-      setErr(e?.message ?? "Erreur de connexion");
+    } catch (e: unknown) {
+      setErr(getFirebaseErrorMessage(e));
       setLoading(false);
     }
   }
