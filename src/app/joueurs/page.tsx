@@ -107,6 +107,70 @@ export default function JoueursPage() {
     }
   }, [playerService]);
 
+  // Calculer les joueurs filtrés pour chaque onglet (pour afficher les compteurs)
+  const getFilteredCountForTab = useCallback((tabIndex: number) => {
+    let sourcePlayers: Player[] = [];
+    
+    switch (tabIndex) {
+      case 0: // Joueurs actifs
+        sourcePlayers = players;
+        break;
+      case 1: // Sans licence
+        sourcePlayers = playersWithoutLicense;
+        break;
+      case 2: // Temporaires
+        sourcePlayers = temporaryPlayers;
+        break;
+      default:
+        sourcePlayers = players;
+    }
+
+    let filtered = sourcePlayers;
+
+    // Filtre par recherche
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (player) =>
+          player.name.toLowerCase().includes(query) ||
+          player.firstName.toLowerCase().includes(query) ||
+          player.license.includes(query)
+      );
+    }
+
+    // Filtres par critères
+    if (filters.gender) {
+      filtered = filtered.filter(
+        (player) => player.gender === filters.gender
+      );
+    }
+
+    if (filters.nationality) {
+      filtered = filtered.filter(
+        (player) => player.nationality === filters.nationality
+      );
+    }
+
+    // Filtre par "a déjà joué un match"
+    if (filters.hasPlayedMatch !== "") {
+      const hasPlayed = filters.hasPlayedMatch === "true";
+      filtered = filtered.filter(
+        (player) => (player.hasPlayedAtLeastOneMatch || false) === hasPlayed
+      );
+    }
+
+    // Filtre par "inscrit en championnat"
+    if (filters.inChampionship !== "") {
+      const inChampionship = filters.inChampionship === "true";
+      filtered = filtered.filter(
+        (player) =>
+          (player.participation?.championnat || false) === inChampionship
+      );
+    }
+
+    return filtered.length;
+  }, [players, playersWithoutLicense, temporaryPlayers, searchQuery, filters]);
+
   const filterPlayers = useCallback(async () => {
     try {
       setSearching(true);
@@ -372,9 +436,9 @@ export default function JoueursPage() {
               value={selectedTab}
               onChange={(_e, newValue) => setSelectedTab(newValue)}
             >
-              <Tab label={`Joueurs actifs (${filteredPlayers.length})`} />
-              <Tab label="Sans licence" />
-              <Tab label="Temporaires" />
+              <Tab label={`Joueurs actifs (${getFilteredCountForTab(0)})`} />
+              <Tab label={`Sans licence (${getFilteredCountForTab(1)})`} />
+              <Tab label={`Temporaires (${getFilteredCountForTab(2)})`} />
             </Tabs>
           </Box>
 
