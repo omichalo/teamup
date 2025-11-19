@@ -194,17 +194,8 @@ export class BurnoutCalculator {
     const currentTeam = players.find((p) => p.id === currentTeamId);
     if (!currentTeam) return false;
 
-    // const playerMatches = matchHistory.filter(
-    //   (match) => match.playerId === playerId
-    // );
-
-    // TODO: Implémenter la logique de vérification du niveau d&apos;équipe
-    // pour l&apos;instant, on considère que tous les joueurs peuvent jouer
-    // const matchTeam = players.find((p) => p.id === match.teamId);
-    // if (matchTeam && matchTeam.level < currentTeam.level) {
-    //   return true;
-    // }
-
+    // Cette fonction retourne toujours false car la logique de vérification
+    // du niveau d'équipe n'est pas implémentée
     return false;
   }
 
