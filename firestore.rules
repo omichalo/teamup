@@ -137,6 +137,16 @@ service cloud.firestore {
     }
     
     // ============================================
+    // Collection: locations
+    // ============================================
+    // Lecture pour tous les utilisateurs authentifiés
+    // Écriture uniquement pour les admins
+    match /locations/{locationId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    
+    // ============================================
     // Collection: metadata
     // ============================================
     // Métadonnées de synchronisation - accès strictement réservé aux admins

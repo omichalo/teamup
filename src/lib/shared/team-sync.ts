@@ -160,13 +160,25 @@ export class TeamSyncService {
         const batch = db.batch();
         const batchEnd = Math.min(i + batchSize, teamsData.length);
 
+        // Récupérer les données existantes pour préserver les champs gérés par l'utilisateur
+        const docRefs = teamsData.slice(i, batchEnd).map(team => 
+          db.collection("teams").doc(team.id)
+        );
+        const existingDocs = await db.getAll(...docRefs);
+        const existingDataMap = new Map(
+          existingDocs.map(doc => [doc.id, doc.exists ? doc.data() : null])
+        );
+
         for (let j = i; j < batchEnd; j++) {
           const team = teamsData[j];
           const docRef = db.collection("teams").doc(team.id);
+          const existingData = existingDataMap.get(team.id);
 
           // Préparer les données pour Firestore
+          // Préserver le champ 'location' s'il existe déjà (géré manuellement par l'utilisateur)
           const teamData = {
             ...team,
+            location: existingData?.location, // Préserver le lieu existant
             createdAt: Timestamp.fromDate(team.createdAt),
             updatedAt: Timestamp.fromDate(team.updatedAt),
           };

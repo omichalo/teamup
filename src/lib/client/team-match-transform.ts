@@ -20,6 +20,7 @@ interface AggregatedTeamEntry {
     division?: string;
     isFemale?: boolean;
     teamNumber?: number;
+    location?: string;
     createdAt?: string | Date;
     updatedAt?: string | Date;
   };
@@ -45,6 +46,7 @@ export const transformAggregatedTeamEntry = (
     number: teamNumber,
     name: team.name,
     division: team.division || "Division inconnue",
+    location: team.location,
     players: [],
     createdAt: toDate(team.createdAt),
     updatedAt: toDate(team.updatedAt),

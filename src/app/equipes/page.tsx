@@ -21,6 +21,10 @@ import {
   DialogActions,
   Button,
   Divider,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
   // List,
   // ListItem,
   // ListItemText,
@@ -32,20 +36,43 @@ import {
   FlightTakeoff,
   Close,
   Info,
+  Edit as EditIcon,
 } from "@mui/icons-material";
 import { useEquipesWithMatches } from "@/hooks/useEquipesWithMatches";
 import { Match } from "@/types";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function EquipesPage() {
-  const { equipes, loading, error } = useEquipesWithMatches();
+  const { user } = useAuth();
+  const { equipes: initialEquipes, loading, error } = useEquipesWithMatches();
+  const [equipes, setEquipes] = React.useState(initialEquipes);
   const [tabValue, setTabValue] = React.useState(0);
   const [selectedMatch, setSelectedMatch] = React.useState<Match | null>(null);
   const [modalOpen, setModalOpen] = React.useState(false);
+  const [locations, setLocations] = React.useState<Array<{ id: string; name: string }>>([]);
+  const [loadingLocations, setLoadingLocations] = React.useState(false);
+  const [editingTeamLocation, setEditingTeamLocation] = React.useState<string | null>(null);
+  const [selectedLocationId, setSelectedLocationId] = React.useState<string | null>(null);
+  const [updatingLocation, setUpdatingLocation] = React.useState<string | null>(null);
+  const [filterLocationId, setFilterLocationId] = React.useState<string | null>(null);
+
+  // Synchroniser l'état local avec les équipes initiales
+  React.useEffect(() => {
+    setEquipes(initialEquipes);
+  }, [initialEquipes]);
+
+  // Filtrer les équipes selon le lieu sélectionné
+  const filteredEquipes = React.useMemo(() => {
+    if (!filterLocationId) {
+      return equipes;
+    }
+    return equipes.filter(equipe => equipe.team.location === filterLocationId);
+  }, [equipes, filterLocationId]);
 
   // Grouper les équipes par épreuve en utilisant le vrai libellé de l&apos;API
-  const equipesByEpreuve = equipes.reduce((acc, equipe) => {
+  const equipesByEpreuve = filteredEquipes.reduce((acc, equipe) => {
     if (equipe.matches.length > 0) {
       // Utiliser le libellé d&apos;épreuve réel de l&apos;API FFTT
       const epreuve =
@@ -61,7 +88,7 @@ export default function EquipesPage() {
       acc[epreuve].push(equipe);
     }
     return acc;
-  }, {} as Record<string, typeof equipes>);
+  }, {} as Record<string, typeof filteredEquipes>);
 
   const epreuves = React.useMemo(() => {
     return Object.keys(equipesByEpreuve).sort((a, b) => {
@@ -91,6 +118,88 @@ export default function EquipesPage() {
     setModalOpen(false);
     setSelectedMatch(null);
   };
+
+  // Charger les lieux disponibles
+  React.useEffect(() => {
+    const loadLocations = async () => {
+      try {
+        setLoadingLocations(true);
+        const response = await fetch("/api/admin/locations", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            setLocations(result.locations || []);
+          }
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des lieux:", error);
+      } finally {
+        setLoadingLocations(false);
+      }
+    };
+    void loadLocations();
+  }, []);
+
+  const handleUpdateTeamLocation = React.useCallback(async (teamId: string, locationId: string | null) => {
+    if (!user) return;
+
+    setUpdatingLocation(teamId);
+    try {
+      const response = await fetch(`/api/teams/${teamId}/location`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ location: locationId }),
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || "Erreur lors de la mise à jour du lieu");
+      }
+
+      // Mettre à jour l'état local des équipes sans recharger la page
+      setEquipes(prevEquipes => 
+        prevEquipes.map(equipe => 
+          equipe.team.id === teamId
+            ? {
+                ...equipe,
+                team: {
+                  ...equipe.team,
+                  location: locationId || undefined,
+                },
+              }
+            : equipe
+        )
+      );
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour du lieu:", error);
+      alert(error instanceof Error ? error.message : "Erreur lors de la mise à jour du lieu");
+    } finally {
+      setUpdatingLocation(null);
+      setEditingTeamLocation(null);
+      setSelectedLocationId(null);
+    }
+  }, [user]);
+
+  const handleOpenLocationDialog = React.useCallback((teamId: string) => {
+    const equipe = equipes.find(e => e.team.id === teamId);
+    setSelectedLocationId(equipe?.team.location || null);
+    setEditingTeamLocation(teamId);
+  }, [equipes]);
+
+  const handleSaveLocation = React.useCallback(() => {
+    if (editingTeamLocation) {
+      void handleUpdateTeamLocation(editingTeamLocation, selectedLocationId);
+    }
+  }, [editingTeamLocation, selectedLocationId, handleUpdateTeamLocation]);
 
   const formatDate = (date: string | Date) => {
     return new Intl.DateTimeFormat("fr-FR", {
@@ -185,14 +294,43 @@ export default function EquipesPage() {
           <Typography variant="h4" component="h1" gutterBottom>
             Équipes SQY Ping
           </Typography>
-          <Typography variant="subtitle1" color="text.secondary" gutterBottom>
-            Consultez les matchs de chaque équipe
-          </Typography>
 
           {equipes.length === 0 ? (
             <Alert severity="info">Aucune équipe trouvée.</Alert>
           ) : (
             <Box sx={{ mt: 3 }}>
+              {/* Filtre par lieu */}
+              <Box sx={{ mb: 3, display: "flex", alignItems: "center", gap: 2 }}>
+                <FormControl size="small" sx={{ minWidth: 200 }}>
+                  <InputLabel>Filtrer par lieu</InputLabel>
+                  <Select
+                    value={filterLocationId || ""}
+                    label="Filtrer par lieu"
+                    onChange={(e) => {
+                      setFilterLocationId(e.target.value === "" ? null : e.target.value);
+                      setTabValue(0); // Réinitialiser l'onglet lors du changement de filtre
+                    }}
+                  >
+                    <MenuItem value="">
+                      <em>Tous les lieux</em>
+                    </MenuItem>
+                    {locations.map((location) => (
+                      <MenuItem key={location.id} value={location.id}>
+                        {location.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                {filterLocationId && (
+                  <Chip
+                    label={`${filteredEquipes.length} équipe${filteredEquipes.length > 1 ? "s" : ""}`}
+                    color="primary"
+                    size="small"
+                    onDelete={() => setFilterLocationId(null)}
+                  />
+                )}
+              </Box>
+
               <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 3 }}>
                 {epreuves.map((epreuve) => (
                   <Tab
@@ -271,17 +409,50 @@ export default function EquipesPage() {
                                     >
                                       {equipeWithMatches.team.division}
                                     </Typography>
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5 }}>
+                                      <Typography variant="caption" color="text.secondary">
+                                        Lieu:{" "}
+                                        {equipeWithMatches.team.location
+                                          ? locations.find(l => l.id === equipeWithMatches.team.location)?.name || equipeWithMatches.team.location
+                                          : "Non défini"}
+                                      </Typography>
+                                    </Box>
                                   </Box>
-                                  <Chip
-                                    label={`${equipeWithMatches.matches.length} matchs`}
-                                    color={
-                                      epreuve.includes("Féminin")
-                                        ? "secondary"
-                                        : "primary"
-                                    }
-                                    size="small"
-                                    sx={{ mr: 2 }}
-                                  />
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                    {user && (user.role === USER_ROLES.ADMIN || user.role === USER_ROLES.COACH) && (
+                                      <Box
+                                        component="div"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleOpenLocationDialog(equipeWithMatches.team.id);
+                                        }}
+                                        sx={{
+                                          display: "inline-flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          width: 32,
+                                          height: 32,
+                                          cursor: "pointer",
+                                          borderRadius: "50%",
+                                          "&:hover": {
+                                            backgroundColor: "action.hover",
+                                          },
+                                        }}
+                                        title="Modifier le lieu"
+                                      >
+                                        <EditIcon fontSize="small" />
+                                      </Box>
+                                    )}
+                                    <Chip
+                                      label={`${equipeWithMatches.matches.length} matchs`}
+                                      color={
+                                        epreuve.includes("Féminin")
+                                          ? "secondary"
+                                          : "primary"
+                                      }
+                                      size="small"
+                                    />
+                                  </Box>
                                 </Box>
                               </AccordionSummary>
                               <AccordionDetails>
@@ -1037,6 +1208,71 @@ export default function EquipesPage() {
             <DialogActions>
               <Button onClick={handleCloseModal} variant="contained">
                 Fermer
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Dialog de modification du lieu d'une équipe */}
+          <Dialog
+            open={editingTeamLocation !== null}
+            onClose={() => {
+              if (!updatingLocation) {
+                setEditingTeamLocation(null);
+                setSelectedLocationId(null);
+              }
+            }}
+            maxWidth="sm"
+            fullWidth
+          >
+            <DialogTitle>Modifier le lieu de l&apos;équipe</DialogTitle>
+            <DialogContent>
+              {editingTeamLocation && (
+                <Box sx={{ pt: 2 }}>
+                  <FormControl fullWidth>
+                    <InputLabel>Lieu</InputLabel>
+                    <Select
+                      value={selectedLocationId || ""}
+                      label="Lieu"
+                      onChange={(e) => {
+                        const locationId = e.target.value === "" ? null : e.target.value;
+                        setSelectedLocationId(locationId);
+                      }}
+                      disabled={updatingLocation === editingTeamLocation}
+                    >
+                      <MenuItem value="">
+                        <em>Aucun lieu</em>
+                      </MenuItem>
+                      {locations.map((location) => (
+                        <MenuItem key={location.id} value={location.id}>
+                          {location.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  {updatingLocation === editingTeamLocation && (
+                    <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
+                      <CircularProgress size={24} />
+                    </Box>
+                  )}
+                </Box>
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button
+                onClick={() => {
+                  setEditingTeamLocation(null);
+                  setSelectedLocationId(null);
+                }}
+                disabled={updatingLocation === editingTeamLocation}
+              >
+                Annuler
+              </Button>
+              <Button
+                onClick={handleSaveLocation}
+                variant="contained"
+                disabled={updatingLocation === editingTeamLocation}
+              >
+                {updatingLocation === editingTeamLocation ? "Enregistrement..." : "Enregistrer"}
               </Button>
             </DialogActions>
           </Dialog>

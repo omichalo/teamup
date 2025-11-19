@@ -41,6 +41,7 @@ export interface Team {
   division: string;
   discordChannelId?: string;
   discordWebhookUrl?: string;
+  location?: string; // ID du lieu (ville) associé à l'équipe
   players: string[]; // IDs des joueurs
   createdAt: Date;
   updatedAt: Date;

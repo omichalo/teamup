@@ -66,6 +66,7 @@ export interface Team {
   gender: "M" | "F";
   level: number; // 1 = équipe 1, 2 = équipe 2, etc.
   isActive: boolean;
+  location?: string; // ID du lieu (ville) associé à l'équipe
 }
 
 export interface Availability {

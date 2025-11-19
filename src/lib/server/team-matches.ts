@@ -35,6 +35,7 @@ export interface TeamSummary {
   division: string;
   isFemale?: boolean;
   teamNumber: number;
+  location?: string; // ID du lieu (ville) associé à l'équipe
   createdAt: Date;
   updatedAt: Date;
 }
@@ -51,6 +52,7 @@ export async function getTeams(firestore: Firestore): Promise<TeamSummary[]> {
       division: data.division,
       isFemale: data.isFemale,
       teamNumber: data.number || data.teamNumber,
+      location: data.location,
       createdAt: data.createdAt?.toDate?.() || data.createdAt || new Date(),
       updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || new Date(),
     });
