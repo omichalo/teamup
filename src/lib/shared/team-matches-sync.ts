@@ -469,16 +469,6 @@ export class TeamMatchesSyncService {
       const matchPromises = equipes.map(async (equipe) => {
       const isDebugTeam = equipe.idEquipe === DEBUG_TEAM_ID;
       
-      // Vérifier si c'est une équipe féminine pour debug
-      const isFemaleForDebug = equipe.isFemale !== undefined 
-        ? equipe.isFemale 
-        : isFemaleTeam(
-            equipe.libelle,
-            equipe.division,
-            equipe.libelleEpreuve,
-            equipe.idEpreuve
-          );
-      
       try {
         const rencontres = await this.ffttApi.getRencontrePouleByLienDivision(
           equipe.lienDivision

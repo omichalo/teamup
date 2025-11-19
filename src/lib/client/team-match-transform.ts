@@ -46,7 +46,7 @@ export const transformAggregatedTeamEntry = (
     number: teamNumber,
     name: team.name,
     division: team.division || "Division inconnue",
-    location: team.location,
+    ...(team.location && { location: team.location }),
     players: [],
     createdAt: toDate(team.createdAt),
     updatedAt: toDate(team.updatedAt),

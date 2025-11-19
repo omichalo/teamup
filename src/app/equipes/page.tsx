@@ -52,7 +52,6 @@ export default function EquipesPage() {
   const [selectedMatch, setSelectedMatch] = React.useState<Match | null>(null);
   const [modalOpen, setModalOpen] = React.useState(false);
   const [locations, setLocations] = React.useState<Array<{ id: string; name: string }>>([]);
-  const [loadingLocations, setLoadingLocations] = React.useState(false);
   const [editingTeamLocation, setEditingTeamLocation] = React.useState<string | null>(null);
   const [selectedLocationId, setSelectedLocationId] = React.useState<string | null>(null);
   const [updatingLocation, setUpdatingLocation] = React.useState<string | null>(null);
@@ -123,7 +122,6 @@ export default function EquipesPage() {
   React.useEffect(() => {
     const loadLocations = async () => {
       try {
-        setLoadingLocations(true);
         const response = await fetch("/api/admin/locations", {
           method: "GET",
           credentials: "include",
@@ -139,8 +137,6 @@ export default function EquipesPage() {
         }
       } catch (error) {
         console.error("Erreur lors du chargement des lieux:", error);
-      } finally {
-        setLoadingLocations(false);
       }
     };
     void loadLocations();
@@ -173,8 +169,8 @@ export default function EquipesPage() {
                 ...equipe,
                 team: {
                   ...equipe.team,
-                  location: locationId || undefined,
-                },
+                  location: locationId ?? undefined,
+                } as typeof equipe.team,
               }
             : equipe
         )
