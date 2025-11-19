@@ -264,7 +264,6 @@ export class TeamMatchesSyncService {
       for (const rencontre of sqyPingMatches) {
         try {
           // Récupérer les détails de la rencontre pour avoir les joueurs
-          console.log(`🔍 Récupération des détails pour ${rencontre.lien}:`);
 
           // Extraire les numéros de club depuis le lien (comme dans real-matches-optimized.ts)
           const clubnum1Match = rencontre.lien.match(/clubnum_1=([^&]+)/);
@@ -480,7 +479,6 @@ export class TeamMatchesSyncService {
             equipe.idEpreuve
           );
       
-      console.log(`Récupération des matchs pour l'équipe: ${equipe.libelle} (ID: ${equipe.idEquipe}, Féminin: ${isFemaleForDebug})`);
       try {
         const rencontres = await this.ffttApi.getRencontrePouleByLienDivision(
           equipe.lienDivision
@@ -512,9 +510,6 @@ export class TeamMatchesSyncService {
         for (const rencontre of sqyPingMatches) {
           try {
             // Récupérer les détails de la rencontre pour avoir les joueurs
-            if (isDebugTeam) {
-              console.log(`🔍 Récupération des détails pour ${rencontre.lien}:`);
-            }
 
             // Extraire les numéros de club depuis le lien (comme dans real-matches-optimized.ts)
             const clubnum1Match = rencontre.lien.match(/clubnum_1=([^&]+)/);
@@ -553,10 +548,6 @@ export class TeamMatchesSyncService {
               );
             }
 
-            if (isDebugTeam) {
-              console.log(`  - clubEquipeA: ${clubEquipeA}`);
-              console.log(`  - clubEquipeB: ${clubEquipeB}`);
-            }
 
             const detailsRencontre =
               await this.ffttApi.getDetailsRencontreByLien(
@@ -565,82 +556,9 @@ export class TeamMatchesSyncService {
                 clubEquipeB || ""
               );
 
-            if (isDebugTeam) {
-              console.log(
-                `  - detailsRencontre:`,
-                detailsRencontre ? "présent" : "absent"
-              );
-            }
-
-            // Logger tous les matchs pour analyser pourquoi certains ne sont pas détectés (uniquement pour l'équipe debug)
-            if (detailsRencontre && isDebugTeam) {
-              const hasScore =
-                detailsRencontre.scoreEquipeA > 0 ||
-                detailsRencontre.scoreEquipeB > 0;
-              const hasJoueurs =
-                (detailsRencontre.joueursA &&
-                  Object.keys(detailsRencontre.joueursA).length > 0) ||
-                (detailsRencontre.joueursB &&
-                  Object.keys(detailsRencontre.joueursB).length > 0);
-
-              console.log(
-                `  - Match: ${detailsRencontre.nomEquipeA} vs ${detailsRencontre.nomEquipeB}`
-              );
-              console.log(
-                `  - Scores: ${detailsRencontre.scoreEquipeA}-${detailsRencontre.scoreEquipeB} (hasScore: ${hasScore})`
-              );
-              console.log(
-                `  - Joueurs: A=${
-                  Object.keys(detailsRencontre.joueursA || {}).length
-                }, B=${
-                  Object.keys(detailsRencontre.joueursB || {}).length
-                } (hasJoueurs: ${hasJoueurs})`
-              );
-
-              if (hasScore && hasJoueurs) {
-                console.log(
-                  `  - ✅ MATCH JOUÉ DÉTECTÉ:`,
-                  JSON.stringify(detailsRencontre, null, 2)
-                );
-              } else if (hasScore && !hasJoueurs) {
-                console.log(
-                  `  - ⚠️  MATCH AVEC SCORE MAIS SANS JOUEURS:`,
-                  JSON.stringify(detailsRencontre, null, 2)
-                );
-              } else if (!hasScore && hasJoueurs) {
-                console.log(
-                  `  - ⚠️  MATCH AVEC JOUEURS MAIS SANS SCORE:`,
-                  JSON.stringify(detailsRencontre, null, 2)
-                );
-              }
-            }
 
             // Convertir les détails avant de créer le match
             const convertedDetails = convertToFFTTDetailsRencontre(detailsRencontre);
-            
-            // Logger les joueurs avant conversion dans createBaseMatch (uniquement pour l'équipe debug)
-            if (detailsRencontre && isDebugTeam) {
-              console.log(
-                `  - 🔍 DEBUG: Avant createBaseMatch - joueursA type: ${Array.isArray(convertedDetails.joueursA) ? "array" : typeof convertedDetails.joueursA}, count: ${convertedDetails.joueursA?.length || 0}`
-              );
-              console.log(
-                `  - 🔍 DEBUG: Avant createBaseMatch - joueursB type: ${Array.isArray(convertedDetails.joueursB) ? "array" : typeof convertedDetails.joueursB}, count: ${convertedDetails.joueursB?.length || 0}`
-              );
-            }
-            
-            // Logger le libellé pour debug (uniquement pour l'équipe debug)
-            if (isDebugTeam && (rencontre as FFTTRencontre).libelle) {
-              console.log(
-                `  - 🔍 DEBUG: Libellé de la rencontre: "${(rencontre as FFTTRencontre).libelle}"`
-              );
-            }
-            
-            // Logger l'équipe utilisée pour créer le match (uniquement pour l'équipe debug)
-            if (isDebugTeam) {
-              console.log(
-                `  - 🔍 DEBUG: Équipe utilisée pour createBaseMatch - libelle: "${equipe.libelle}", equipe.isFemale: ${equipe.isFemale}`
-              );
-            }
             
             const matchData = createBaseMatch(
               rencontre as FFTTRencontre,
@@ -648,43 +566,6 @@ export class TeamMatchesSyncService {
               this.clubCode,
               convertedDetails
             );
-            
-            // Logger le résultat de createBaseMatch (uniquement pour l'équipe debug)
-            if (isDebugTeam) {
-              console.log(
-                `  - 🔍 DEBUG: Après createBaseMatch - matchData.isFemale: ${matchData.isFemale}, teamNumber: ${matchData.teamNumber}`
-              );
-            }
-            
-            // Logger les informations du match avec le nom de l'équipe et le nombre de joueurs (uniquement pour l'équipe debug)
-            if (isDebugTeam) {
-              console.log(
-                `  - 🔍 DEBUG: Journée extraite: ${matchData.journee}`
-              );
-              const joueursSQYCount = matchData.joueursSQY?.length || 0;
-              const joueursAdversairesCount = matchData.joueursAdversaires?.length || 0;
-              const matchDate = new Date(matchData.date).toLocaleDateString('fr-FR');
-              
-              console.log(
-                `\n  📋 Match ${equipe.libelle} (Équipe ${matchData.teamNumber}):`
-              );
-              console.log(
-                `     Date: ${matchDate} | Opposant: ${matchData.opponent} | Score: ${matchData.score || "N/A"}`
-              );
-              console.log(
-                `     👥 Joueurs SQY Ping: ${joueursSQYCount} | Joueurs adversaires: ${joueursAdversairesCount}`
-              );
-              
-              if (joueursSQYCount > 0 && matchData.joueursSQY) {
-                console.log(`     🔹 Joueurs SQY Ping:`);
-                matchData.joueursSQY.forEach((joueur, idx) => {
-                  const licenceInfo = joueur.licence ? `(licence: ${joueur.licence})` : "(licence: VIDE)";
-                  console.log(
-                    `        ${idx + 1}. ${joueur.prenom || ""} ${joueur.nom || ""} ${licenceInfo}`
-                  );
-                });
-              }
-            }
             
             processedMatches.push(matchData);
           } catch (error) {
@@ -904,26 +785,6 @@ export class TeamMatchesSyncService {
         }
 
         if (hasPlayers || hasResults || hasScore) {
-          // Logs détaillés uniquement pour l'équipe debug (33882)
-          const DEBUG_TEAM_ID = 33882;
-          const isDebugTeam = match.teamId === DEBUG_TEAM_ID.toString();
-          
-          if (isDebugTeam) {
-            // Récupérer le nom de l'équipe depuis teamId ou matchData
-            const teamName = `Équipe ${match.teamNumber}${match.isFemale ? " (DAMES)" : " (MASCULINE)"}`;
-            const matchDate = new Date(match.date).toLocaleDateString('fr-FR');
-            
-            console.log(
-              `\n🎾 Match joué détecté - ${teamName}:`
-            );
-            console.log(
-              `   📅 Date: ${matchDate} | Opposant: ${match.opponent} | Score: ${match.score || "0-0"}`
-            );
-            console.log(
-              `   👥 Joueurs SQY Ping: ${match.joueursSQY?.length || 0} | Résultats individuels: ${match.resultatsIndividuels?.length || 0}`
-            );
-          }
-
           // Note: resultatsIndividuels ne contient pas de licence, on utilise joueursSQY
 
           // Vérifier aussi joueursSQY (nouveau format)
@@ -931,13 +792,6 @@ export class TeamMatchesSyncService {
             for (const joueur of match.joueursSQY!) {
               if (joueur.licence && joueur.licence.trim() !== "") {
                 participatingPlayers.add(joueur.licence);
-                console.log(
-                  `  ✅ Joueur ajouté: ${joueur.nom || ""} ${joueur.prenom || ""} (licence: ${joueur.licence})`
-                );
-              } else {
-                console.log(
-                  `  ⚠️  Joueur sans licence ignoré: ${joueur.nom || ""} ${joueur.prenom || ""} - Date: ${match.date} - Opponent: ${match.opponent}`
-                );
               }
             }
           }
@@ -945,14 +799,11 @@ export class TeamMatchesSyncService {
       }
 
       console.log(
-        `\n📊 Résumé: ${participatingPlayers.size} joueurs participants identifiés au total`
+        `📊 ${participatingPlayers.size} joueurs participants identifiés`
       );
-      console.log(`   Licences: ${Array.from(participatingPlayers).join(", ")}`);
 
       // Calculer les équipes de brûlage séparément pour masculin et féminin
-      console.log(
-        "\n🔄 Calcul des équipes de brûlage (masculin et féminin)..."
-      );
+      console.log("🔄 Calcul des équipes de brûlage...");
 
       // Structures séparées pour masculin et féminin: Map<licence, Map<phase, Map<teamNumber, count>>>
       const matchCountByPlayerPhaseTeamMasculin = new Map<
@@ -967,7 +818,6 @@ export class TeamMatchesSyncService {
       // Compter les matchs par joueur, phase et équipe (séparer masculin et féminin)
       let debugCountMasculin = 0;
       let debugCountFeminin = 0;
-      const DEBUG_LICENCE = "7872755"; // Licence pour debug
       
       for (const match of enrichedMatches) {
         const isFeminin = match.isFemale;
@@ -1008,12 +858,6 @@ export class TeamMatchesSyncService {
               continue;
             }
 
-            // Log pour debug de la licence spécifique
-            if (playerLicence === DEBUG_LICENCE) {
-              console.log(
-                `🔍 DEBUG ${DEBUG_LICENCE}: Match ${isFeminin ? "FÉMININ" : "MASCULIN"} - Équipe ${teamNumber}, Phase ${phase}`
-              );
-            }
 
             // Initialiser les structures si nécessaire
             if (!matchCountMap.has(playerLicence)) {
@@ -1081,16 +925,26 @@ export class TeamMatchesSyncService {
             }
 
             // Déterminer l'équipe de brûlage pour cette phase
-            // Règle : Si un joueur a joué >= 2 matchs dans cette phase, il est brûlé
-            // dans la plus basse équipe (numéro le plus élevé) où il a joué dans cette phase
+            // Règle FFTT : Un joueur est brûlé dans l'équipe où il a joué son 2ème match
+            // (en comptant tous les matchs dans l'ordre croissant des numéros d'équipe)
+            // Exemple : {1: 3, 2: 1} -> liste triée : [1, 1, 1, 2] -> 2ème match = équipe 1
             let highestBurnedTeamInPhase: number | null = null;
 
-            if (totalMatchesInPhase >= 2) {
-              // Le joueur est brûlé dans la plus basse équipe (numéro le plus élevé) où il a joué dans cette phase
-              const teamNumbers = Array.from(matchesByTeamInPhase.keys());
-              if (teamNumbers.length > 0) {
-                highestBurnedTeamInPhase = Math.max(...teamNumbers);
+            // Créer une liste de tous les matchs triés par numéro d'équipe croissant
+            const allMatches: number[] = [];
+            for (const [teamNumber, matchCount] of matchesByTeamInPhase) {
+              // Ajouter le numéro d'équipe autant de fois qu'il y a de matchs
+              for (let i = 0; i < matchCount; i++) {
+                allMatches.push(teamNumber);
               }
+            }
+
+            // Trier par numéro d'équipe croissant
+            allMatches.sort((a, b) => a - b);
+
+            // Si le joueur a joué au moins 2 matchs, il est brûlé dans l'équipe du 2ème match
+            if (allMatches.length >= 2) {
+              highestBurnedTeamInPhase = allMatches[1]; // 2ème élément (index 1)
             }
 
             // Si le joueur est brûlé dans cette phase, enregistrer
@@ -1118,33 +972,8 @@ export class TeamMatchesSyncService {
         }
 
         console.log(
-          `✅ ${highestBurnedTeamByPlayerByPhase.size} joueurs avec brûlage identifiés en ${typeName} (${totalBurnedPlayers} brûlages au total toutes phases confondues)`
+          `✅ ${highestBurnedTeamByPlayerByPhase.size} joueurs brûlés en ${typeName}`
         );
-
-        // Log pour debug de la licence spécifique
-        const DEBUG_LICENCE = "7872755";
-        if (matchesByTeamByPlayerByPhase.has(DEBUG_LICENCE)) {
-          const matchesByPhase = matchesByTeamByPlayerByPhase.get(
-            DEBUG_LICENCE
-          )!;
-          const burnoutByPhase =
-            highestBurnedTeamByPlayerByPhase.get(DEBUG_LICENCE) || new Map();
-          console.log(
-            `🔍 DEBUG ${DEBUG_LICENCE} (${typeName}):`
-          );
-          for (const [phase, matches] of matchesByPhase) {
-            const totalMatches = Array.from(matches.values()).reduce(
-              (a, b) => a + b,
-              0
-            );
-            const burnedTeam = burnoutByPhase.get(phase);
-            console.log(
-              `  Phase ${phase}: Total matchs: ${totalMatches}, Équipes: ${Array.from(matches.entries())
-                .map(([t, c]) => `${t}:${c}`)
-                .join(", ")}, Brûlé: ${burnedTeam || "non"}`
-            );
-          }
-        }
 
         return {
           highestBurnedTeamByPlayerByPhase,
@@ -1152,12 +981,6 @@ export class TeamMatchesSyncService {
         };
       };
 
-      console.log(
-        `📊 Répartition des matchs: ${debugCountMasculin} masculins, ${debugCountFeminin} féminins`
-      );
-      console.log(
-        `📊 Joueurs avec matchs masculins: ${matchCountByPlayerPhaseTeamMasculin.size}, avec matchs féminins: ${matchCountByPlayerPhaseTeamFeminin.size}`
-      );
 
       // Calculer les brûlages séparément pour masculin et féminin
       const {
@@ -1190,10 +1013,7 @@ export class TeamMatchesSyncService {
       const playersToUpdate = [];
 
       // OPTIMISATION : Récupérer tous les documents en une seule fois avec getAll()
-      // au lieu de faire une requête par joueur
-      console.log(
-        `📥 Récupération des données de ${playerIds.length} joueurs pour mise à jour...`
-      );
+      console.log(`📥 Récupération de ${playerIds.length} joueurs...`);
       
       const docRefs = playerIds.map((playerId) =>
         db.collection("players").doc(playerId)
@@ -1266,9 +1086,9 @@ export class TeamMatchesSyncService {
                 if (phase === "aller" || phase === "retour") {
                   const currentHighest = currentHighestByPhase[phase] ?? null;
 
-                  // Mettre à jour uniquement si la nouvelle valeur est plus restrictive
-                  // (équipe plus basse, donc numéro plus élevé) ou si la valeur actuelle est absente
-                  if (currentHighest === null || burnedTeam > currentHighest) {
+                  // Mettre à jour si la valeur actuelle est absente ou si la nouvelle valeur est différente
+                  // La valeur calculée est la source de vérité basée sur les matchs réels
+                  if (currentHighest === null || burnedTeam !== currentHighest) {
                     newHighestByPhase[phase] = burnedTeam;
                   }
                 }
@@ -1313,9 +1133,9 @@ export class TeamMatchesSyncService {
                 if (phase === "aller" || phase === "retour") {
                   const currentHighest = currentHighestByPhase[phase] ?? null;
 
-                  // Mettre à jour uniquement si la nouvelle valeur est plus restrictive
-                  // (équipe plus basse, donc numéro plus élevé) ou si la valeur actuelle est absente
-                  if (currentHighest === null || burnedTeam > currentHighest) {
+                  // Mettre à jour si la valeur actuelle est absente ou si la nouvelle valeur est différente
+                  // La valeur calculée est la source de vérité basée sur les matchs réels
+                  if (currentHighest === null || burnedTeam !== currentHighest) {
                     newHighestByPhase[phase] = burnedTeam;
                   }
                 }

@@ -18,9 +18,9 @@ export async function POST(req: Request) {
     const envBase = process.env.NEXT_PUBLIC_APP_URL; // Variable client (peut ne pas être disponible au runtime serveur)
     const forwardedProto = req.headers.get("x-forwarded-proto") || "https";
     const host = req.headers.get("host") || req.headers.get("x-forwarded-host");
-    
+
     let origin: string;
-    
+
     // Priorité 1: APP_URL (variable serveur, toujours disponible au runtime)
     if (appUrl && appUrl.trim() !== "") {
       origin = appUrl.trim().replace(/\/$/, "");
@@ -38,10 +38,10 @@ export async function POST(req: Request) {
     else {
       origin = "http://localhost:3000";
     }
-    
+
     // S'assurer que l'URL est bien formatée
     const redirectUrl = `${origin}/reset-password`;
-    
+
     console.log("[send-password-reset] Environment variables:", {
       APP_URL: process.env.APP_URL,
       NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
@@ -59,10 +59,16 @@ export async function POST(req: Request) {
     // Note: L'URL doit pointer vers un domaine autorisé dans Firebase Console
     // Authentication > Settings > Authorized domains
     // Le domaine doit être exactement: teamup--sqyping-teamup.us-east4.hosted.app
+    // L'URL passée ici override l'URL configurée dans Firebase Console
+    console.log(
+      "[send-password-reset] Generating link with redirectUrl:",
+      redirectUrl
+    );
     const link = await adminAuth.generatePasswordResetLink(email, {
       url: redirectUrl,
       handleCodeInApp: false,
     });
+    console.log("[send-password-reset] Generated link:", link);
 
     // Charger le template HTML et injecter le lien
     const templatePath = path.join(
@@ -98,23 +104,27 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("[send-password-reset] error", error);
-    console.error("[send-password-reset] error details:", JSON.stringify(error, null, 2));
+    console.error(
+      "[send-password-reset] error details:",
+      JSON.stringify(error, null, 2)
+    );
     const errorMessage = getFirebaseErrorMessage(error);
-    
+
     // Log supplémentaire pour déboguer le problème de domaine
-    if (errorMessage.includes("Domain not allowlisted") || errorMessage.includes("domain")) {
+    if (
+      errorMessage.includes("Domain not allowlisted") ||
+      errorMessage.includes("domain")
+    ) {
       const envBase = process.env.NEXT_PUBLIC_APP_URL;
-      const host = req.headers.get("host") || req.headers.get("x-forwarded-host");
+      const host =
+        req.headers.get("host") || req.headers.get("x-forwarded-host");
       console.error("[send-password-reset] Domain debug:", {
         envBase,
         host,
         origin: envBase || `https://${host}`,
       });
     }
-    
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: 500 }
-    );
+
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

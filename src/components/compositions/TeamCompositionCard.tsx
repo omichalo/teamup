@@ -173,20 +173,28 @@ export const TeamCompositionCard: React.FC<TeamCompositionCardProps> = ({
           </Typography>
         )}
 
-        {dropReason && isDragOver && !canDrop && (
+        {dropReason && isDragOver && (
           <Box
             sx={{
               py: 1,
               px: 2,
               mb: 2,
-              backgroundColor: "error.main",
-              color: "error.contrastText",
+              backgroundColor: canDrop
+                ? dropReason.includes("⚠️") || dropReason.includes("Attention")
+                  ? "warning.main"
+                  : "info.main"
+                : "error.main",
+              color: canDrop
+                ? dropReason.includes("⚠️") || dropReason.includes("Attention")
+                  ? "warning.contrastText"
+                  : "info.contrastText"
+                : "error.contrastText",
               borderRadius: 1,
               textAlign: "center",
             }}
           >
             <Typography variant="caption" fontWeight="bold">
-              ❌ {dropReason}
+              {!canDrop ? "❌" : dropReason.includes("⚠️") ? "⚠️" : "ℹ️"} {dropReason}
             </Typography>
           </Box>
         )}

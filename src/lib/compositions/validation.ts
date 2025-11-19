@@ -25,6 +25,8 @@ export interface AssignmentValidationResult {
   canAssign: boolean;
   reason?: string;
   simulatedPlayers: Player[];
+  willBeBurned?: boolean; // Indique si le joueur sera brûlé en l'assignant à cette équipe
+  burnedTeamNumber?: number; // Numéro de l'équipe dans laquelle il sera brûlé
 }
 
 export interface TeamCompositionValidationParams {
@@ -300,6 +302,14 @@ export const canAssignPlayerToTeam = (
     compositions
   );
 
+  // Vérifier si le joueur sera brûlé en l'assignant à cette équipe
+  // Un joueur est brûlé s'il a déjà joué 1 match dans cette équipe et qu'on l'ajoute (donc 2 matchs au total)
+  const matchesByTeamByPhase = isFemaleTeam
+    ? player.feminineMatchesByTeamByPhase?.[phase]
+    : player.masculineMatchesByTeamByPhase?.[phase];
+  const currentMatchesInTeam = matchesByTeamByPhase?.[teamNumber] || 0;
+  const willBeBurned = currentMatchesInTeam === 1; // Si déjà 1 match, en ajoutant il aura 2 matchs = brûlé
+
   if (!isFemaleTeam) {
     const femalePlayersCount = simulatedTeamPlayers.filter(
       (p) => p.gender === "F"
@@ -361,10 +371,18 @@ export const canAssignPlayerToTeam = (
     }
   }
 
-  return {
+  // Si le joueur sera brûlé, ajouter cette information dans le résultat
+  const result: AssignmentValidationResult = {
     canAssign: true,
     simulatedPlayers: simulatedTeamPlayers,
   };
+
+  if (willBeBurned) {
+    result.willBeBurned = true;
+    result.burnedTeamNumber = teamNumber;
+  }
+
+  return result;
 };
 
 export const validateTeamCompositionState = (

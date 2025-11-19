@@ -56,10 +56,13 @@ export async function POST(req: Request) {
     console.log("[send-verification] Redirect URL:", redirectUrl);
 
     // Générer le lien de vérification via Firebase Admin avec actionCodeSettings explicites
+    // L'URL passée ici override l'URL configurée dans Firebase Console
+    console.log("[send-verification] Generating link with redirectUrl:", redirectUrl);
     const link = await adminAuth.generateEmailVerificationLink(email, {
       url: redirectUrl,
       handleCodeInApp: false,
     });
+    console.log("[send-verification] Generated link:", link);
 
     // Charger le template HTML et injecter le lien
     const templatePath = path.join(

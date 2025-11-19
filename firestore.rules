@@ -1,80 +1,154 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // ============================================
+    // Fonctions helper
+    // ============================================
+    
+    // Vérifie si l'utilisateur est authentifié
     function isAuthenticated() {
       return request.auth != null;
     }
     
+    // Récupère le rôle de l'utilisateur depuis les custom claims
     function authRole() {
       return request.auth != null && request.auth.token.role != null
         ? request.auth.token.role
         : "player";
     }
-
+    
+    // Vérifie si l'utilisateur est admin
     function isAdmin() {
       return authRole() == "admin";
     }
-
+    
+    // Vérifie si l'utilisateur est coach ou admin
     function isCoach() {
       return isAdmin() || authRole() == "coach";
     }
-
     
-    // Règles pour les utilisateurs
+    // ============================================
+    // Collection: users
+    // ============================================
+    // Les utilisateurs peuvent créer/mettre à jour leur propre profil
+    // Seuls les admins peuvent lire/supprimer les profils d'autres utilisateurs
     match /users/{userId} {
+      // Création et mise à jour : uniquement son propre profil
       allow create, update: if isAuthenticated() && request.auth.uid == userId;
-      allow read, delete:
-        if isAuthenticated() &&
-          (isAdmin() || request.auth.uid == userId);
+      
+      // Lecture : son propre profil ou admin
+      allow read: if isAuthenticated() && (isAdmin() || request.auth.uid == userId);
+      
+      // Suppression : uniquement admin
+      allow delete: if isAdmin();
     }
     
-    // Règles pour les joueurs (lecture pour tous, écriture pour les coaches)
+    // ============================================
+    // Collection: players
+    // ============================================
+    // Lecture pour tous les utilisateurs authentifiés
+    // Écriture uniquement pour les admins/coaches (synchronisation FFTT)
     match /players/{playerId} {
       allow read: if isAuthenticated();
       allow write: if isCoach();
     }
     
-    // Règles pour les équipes
+    // ============================================
+    // Collection: teams
+    // ============================================
+    // Lecture pour tous les utilisateurs authentifiés
+    // Écriture uniquement pour les admins/coaches
     match /teams/{teamId} {
       allow read: if isAuthenticated();
       allow write: if isCoach();
+      
+      // Sous-collection: teams/{teamId}/matches
+      // Même règles que la collection parente
+      match /matches/{matchId} {
+        allow read: if isAuthenticated();
+        allow write: if isCoach();
+      }
     }
     
-    // Règles pour les matches
+    // ============================================
+    // Collection: matches (collection principale, peut être obsolète)
+    // ============================================
+    // Lecture pour tous les utilisateurs authentifiés
+    // Écriture uniquement pour les admins/coaches
     match /matches/{matchId} {
       allow read: if isAuthenticated();
       allow write: if isCoach();
     }
     
-    // Règles pour les compositions
+    // ============================================
+    // Collection: compositions
+    // ============================================
+    // Lecture pour tous les utilisateurs authentifiés
+    // Écriture uniquement pour les admins/coaches
     match /compositions/{compositionId} {
       allow read: if isAuthenticated();
       allow write: if isCoach();
     }
-
-    // Règles pour les compositions par défaut
+    
+    // ============================================
+    // Collection: compositionDefaults
+    // ============================================
+    // Lecture pour tous les utilisateurs authentifiés
+    // Écriture uniquement pour les admins/coaches
     match /compositionDefaults/{defaultsId} {
       allow read: if isAuthenticated();
       allow write: if isCoach();
     }
- 
-    // Règles pour les disponibilités
+    
+    // ============================================
+    // Collection: availabilities
+    // ============================================
+    // Lecture pour tous les utilisateurs authentifiés
+    // Écriture pour tous les utilisateurs authentifiés (les joueurs peuvent mettre à jour leurs disponibilités)
     match /availabilities/{availabilityId} {
       allow read: if isAuthenticated();
-      // Les joueurs peuvent gérer leurs disponibilités
       allow write: if isAuthenticated();
     }
     
-    // Règles pour les enregistrements de brûlage
+    // ============================================
+    // Collection: burnRecords
+    // ============================================
+    // Lecture pour tous les utilisateurs authentifiés
+    // Écriture uniquement pour les admins/coaches
     match /burnRecords/{burnRecordId} {
       allow read: if isAuthenticated();
       allow write: if isCoach();
     }
     
-    // Règles pour les paramètres du club
+    // ============================================
+    // Collection: clubSettings (ou club_settings)
+    // ============================================
+    // Lecture pour tous les utilisateurs authentifiés
+    // Écriture uniquement pour les admins
     match /clubSettings/{settingsId} {
       allow read: if isAuthenticated();
-      allow write: if isCoach();
+      allow write: if isAdmin();
+    }
+    
+    // Alias pour club_settings (si utilisé)
+    match /club_settings/{settingsId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    
+    // ============================================
+    // Collection: metadata
+    // ============================================
+    // Métadonnées de synchronisation - accès strictement réservé aux admins
+    match /metadata/{document} {
+      allow read, write: if isAdmin();
+    }
+    
+    // ============================================
+    // Règle par défaut : refuser tout accès non explicitement autorisé
+    // ============================================
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

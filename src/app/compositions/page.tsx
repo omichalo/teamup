@@ -1822,10 +1822,15 @@ export default function CompositionsPage() {
                                   canAssign: true,
                                   reason: undefined,
                                   simulatedPlayers: teamPlayersData,
+                                  willBeBurned: false,
                                 };
                           const canDrop = matchPlayed
                             ? false
                             : dropCheck.canAssign;
+                          
+                          // Construire le message de dropReason (sans l'information de brûlage lors du drag)
+                          // L'information de brûlage sera affichée uniquement si le joueur est déjà dans l'équipe
+                          const dropReasonWithBurning = dropCheck.reason;
                           const dragHandlers = matchPlayed
                             ? undefined
                             : {
@@ -1856,7 +1861,7 @@ export default function CompositionsPage() {
                                 onPlayerDragEnd={handleDragEnd}
                                 isDragOver={Boolean(isDragOver)}
                                 canDrop={canDrop}
-                                dropReason={dropCheck.reason}
+                                dropReason={dropReasonWithBurning}
                                 draggedPlayerId={draggedPlayerId}
                                 dragOverTeamId={dragOverTeamId}
                                 matchPlayed={matchPlayed}
@@ -1872,10 +1877,20 @@ export default function CompositionsPage() {
                                 }
                                 renderPlayerIndicators={(player) => {
                                   const phase = selectedPhase || "aller";
+                                  const championshipType = tabValue === 0 ? "masculin" : "feminin";
                                   const burnedTeam =
-                                    player.highestMasculineTeamNumberByPhase?.[
-                                      phase
-                                    ];
+                                    championshipType === "masculin"
+                                      ? player.highestMasculineTeamNumberByPhase?.[phase]
+                                      : player.highestFeminineTeamNumberByPhase?.[phase];
+                                  
+                                  // Vérifier si le joueur sera brûlé dans cette équipe (déjà 1 match, donc 2ème match = brûlé)
+                                  const teamNumber = extractTeamNumber(equipe.team.name);
+                                  const matchesByTeamByPhase = championshipType === "masculin"
+                                    ? player.masculineMatchesByTeamByPhase?.[phase]
+                                    : player.feminineMatchesByTeamByPhase?.[phase];
+                                  const currentMatchesInTeam = matchesByTeamByPhase?.[teamNumber] || 0;
+                                  const willBeBurned = teamNumber > 0 && currentMatchesInTeam === 1;
+                                  
                                   const availability =
                                     teamAvailabilityMap[player.id];
                                   const isPlayerAvailable =
@@ -1927,6 +1942,19 @@ export default function CompositionsPage() {
                                             }}
                                           />
                                         )}
+                                      {willBeBurned && (
+                                        <Chip
+                                          label={`Sera brûlé Éq. ${teamNumber}`}
+                                          size="small"
+                                          color="warning"
+                                          variant="outlined"
+                                          sx={{
+                                            height: 18,
+                                            fontSize: "0.65rem",
+                                          }}
+                                          title="Ce joueur sera brûlé dans cette équipe (2ème match)"
+                                        />
+                                      )}
                                       {showUnavailableIndicator && (
                                         <Chip
                                           label="Indispo"
@@ -2023,10 +2051,15 @@ export default function CompositionsPage() {
                                   canAssign: true,
                                   reason: undefined,
                                   simulatedPlayers: teamPlayersData,
+                                  willBeBurned: false,
                                 };
                           const canDrop = matchPlayed
                             ? false
                             : dropCheck.canAssign;
+                          
+                          // Construire le message de dropReason (sans l'information de brûlage lors du drag)
+                          // L'information de brûlage sera affichée uniquement si le joueur est déjà dans l'équipe
+                          const dropReasonWithBurning = dropCheck.reason;
                           const dragHandlers = matchPlayed
                             ? undefined
                             : {
@@ -2060,7 +2093,7 @@ export default function CompositionsPage() {
                                 onPlayerDragEnd={handleDragEnd}
                                 isDragOver={Boolean(isDragOver)}
                                 canDrop={canDrop}
-                                dropReason={dropCheck.reason}
+                                dropReason={dropReasonWithBurning}
                                 draggedPlayerId={draggedPlayerId}
                                 dragOverTeamId={dragOverTeamId}
                                 matchPlayed={matchPlayed}
