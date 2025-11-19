@@ -23,10 +23,21 @@ import {
   Tabs,
   Tab,
   Tooltip,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  MenuItem,
+  Select,
+  InputLabel,
 } from "@mui/material";
 import {
   Search as SearchIcon,
   SportsTennis as SportsTennisIcon,
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
 } from "@mui/icons-material";
 import { Player } from "@/types/team-management";
 import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
@@ -34,6 +45,8 @@ import { AuthGuard } from "@/components/AuthGuard";
 import { useEquipesWithMatches } from "@/hooks/useEquipesWithMatches";
 import { getCurrentPhase } from "@/lib/shared/phase-utils";
 import { USER_ROLES } from "@/lib/auth/roles";
+import { doc, getDoc } from "firebase/firestore";
+import { getDbInstanceDirect } from "@/lib/firebase";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -76,6 +89,23 @@ export default function JoueursPage() {
     hasPlayedMatch: "", // "" = tous, "true" = a joué, "false" = n'a pas joué
     inChampionship: "", // "" = tous, "true" = inscrit, "false" = pas inscrit
   });
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [newPlayer, setNewPlayer] = useState({
+    firstName: "",
+    name: "",
+    license: "",
+    gender: "M" as "M" | "F",
+    nationality: "FR" as "FR" | "C" | "ETR",
+    points: 500,
+    inChampionship: true,
+  });
+  const [licenseExists, setLicenseExists] = useState(false);
+  const [licenseExistsForOther, setLicenseExistsForOther] = useState(false);
 
   const playerService = useMemo(() => new FirestorePlayerService(), []);
 
@@ -257,6 +287,204 @@ export default function JoueursPage() {
     filterPlayers();
   }, [filterPlayers]);
 
+  const checkLicenseExists = useCallback(async (license: string, excludePlayerId?: string) => {
+    if (!license.trim()) {
+      setLicenseExists(false);
+      setLicenseExistsForOther(false);
+      return;
+    }
+    try {
+      const exists = await playerService.checkPlayerExists(license.trim());
+      // Si on est en mode édition et que la licence existe mais correspond au joueur en cours d'édition, ce n'est pas une erreur
+      if (excludePlayerId && exists) {
+        const playerRef = doc(getDbInstanceDirect(), "players", license.trim());
+        const playerSnap = await getDoc(playerRef);
+        if (playerSnap.exists() && playerSnap.id === excludePlayerId) {
+          setLicenseExists(false);
+          setLicenseExistsForOther(false);
+          return;
+        }
+      }
+      setLicenseExists(exists);
+      setLicenseExistsForOther(exists && excludePlayerId ? exists : false);
+    } catch (error) {
+      console.error("Erreur lors de la vérification de la licence:", error);
+      setLicenseExists(false);
+      setLicenseExistsForOther(false);
+    }
+  }, [playerService]);
+
+  const handleCreateTemporaryPlayer = async () => {
+    if (!newPlayer.firstName.trim() || !newPlayer.name.trim()) {
+      alert("Le prénom et le nom sont obligatoires");
+      return;
+    }
+
+    if (newPlayer.license.trim() && licenseExists) {
+      alert("Un joueur avec ce numéro de licence existe déjà");
+      return;
+    }
+
+    try {
+      setCreating(true);
+      
+      // Normaliser les noms : nom en majuscules, prénom avec première lettre en majuscule
+      const normalizedName = newPlayer.name.trim().toUpperCase();
+      const normalizedFirstName = newPlayer.firstName.trim().charAt(0).toUpperCase() + 
+        newPlayer.firstName.trim().slice(1).toLowerCase();
+
+      await playerService.createTemporaryPlayer({
+        firstName: normalizedFirstName,
+        name: normalizedName,
+        license: newPlayer.license.trim() || "",
+        gender: newPlayer.gender,
+        nationality: newPlayer.nationality,
+        isActive: false,
+        isTemporary: true,
+        typeLicence: "",
+        points: newPlayer.points || 500,
+        preferredTeams: {
+          masculine: [],
+          feminine: [],
+        },
+        participation: {
+          championnat: newPlayer.inChampionship,
+        },
+        hasPlayedAtLeastOneMatch: false,
+      });
+
+      // Réinitialiser le formulaire
+      setNewPlayer({
+        firstName: "",
+        name: "",
+        license: "",
+        gender: "M",
+        nationality: "FR",
+        points: 500,
+        inChampionship: true,
+      });
+      setLicenseExists(false);
+      setCreateDialogOpen(false);
+
+      // Recharger les joueurs
+      await loadPlayers();
+    } catch (error) {
+      console.error("Erreur lors de la création du joueur temporaire:", error);
+      const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
+      if (errorMessage.includes("existe déjà")) {
+        alert("Un joueur avec ce numéro de licence existe déjà");
+      } else {
+        alert("Erreur lors de la création du joueur temporaire");
+      }
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleEditPlayer = (player: Player) => {
+    setEditingPlayer(player);
+    setNewPlayer({
+      firstName: player.firstName,
+      name: player.name,
+      license: player.license || "",
+      gender: player.gender,
+      nationality: player.nationality,
+      points: player.points || 500,
+      inChampionship: player.participation?.championnat || false,
+    });
+    setLicenseExists(false);
+    setLicenseExistsForOther(false);
+    setEditDialogOpen(true);
+  };
+
+  const handleUpdateTemporaryPlayer = async () => {
+    if (!editingPlayer) return;
+    if (!newPlayer.firstName.trim() || !newPlayer.name.trim()) {
+      alert("Le prénom et le nom sont obligatoires");
+      return;
+    }
+
+    if (newPlayer.license.trim() && licenseExistsForOther) {
+      alert("Un joueur avec ce numéro de licence existe déjà. Un joueur temporaire ne peut pas correspondre à un joueur existant.");
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      
+      // Normaliser les noms
+      const normalizedName = newPlayer.name.trim().toUpperCase();
+      const normalizedFirstName = newPlayer.firstName.trim().charAt(0).toUpperCase() + 
+        newPlayer.firstName.trim().slice(1).toLowerCase();
+
+      await playerService.updateTemporaryPlayer(editingPlayer.id, {
+        firstName: normalizedFirstName,
+        name: normalizedName,
+        license: newPlayer.license.trim() || "",
+        gender: newPlayer.gender,
+        nationality: newPlayer.nationality,
+        isActive: false,
+        isTemporary: true,
+        typeLicence: editingPlayer.typeLicence || "",
+        points: newPlayer.points || 500,
+        preferredTeams: editingPlayer.preferredTeams || {
+          masculine: [],
+          feminine: [],
+        },
+        participation: {
+          championnat: newPlayer.inChampionship,
+        },
+        hasPlayedAtLeastOneMatch: editingPlayer.hasPlayedAtLeastOneMatch || false,
+      });
+
+      // Réinitialiser le formulaire
+      setNewPlayer({
+        firstName: "",
+        name: "",
+        license: "",
+        gender: "M",
+        nationality: "FR",
+        points: 500,
+        inChampionship: true,
+      });
+      setEditingPlayer(null);
+      setLicenseExists(false);
+      setLicenseExistsForOther(false);
+      setEditDialogOpen(false);
+
+      // Recharger les joueurs
+      await loadPlayers();
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour du joueur temporaire:", error);
+      const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
+      if (errorMessage.includes("existe déjà")) {
+        alert("Un joueur avec ce numéro de licence existe déjà");
+      } else {
+        alert("Erreur lors de la mise à jour du joueur temporaire");
+      }
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleDeletePlayer = async (player: Player) => {
+    const confirmDelete = confirm(
+      `Êtes-vous sûr de vouloir supprimer le joueur temporaire ${player.firstName} ${player.name} ?`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      setDeleting(player.id);
+      await playerService.deletePlayer(player.id);
+      await loadPlayers();
+    } catch (error) {
+      console.error("Erreur lors de la suppression du joueur:", error);
+      alert("Erreur lors de la suppression du joueur");
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   const handleToggleParticipation = async (
     player: Player,
     isParticipating: boolean
@@ -270,7 +498,7 @@ export default function JoueursPage() {
         },
       });
       // Mettre à jour l&apos;état local immédiatement pour un feedback visuel rapide
-      const updatedPlayers = players.map((p) =>
+      const updatePlayerInList = (p: Player) =>
         p.id === player.id
           ? {
               ...p,
@@ -279,18 +507,66 @@ export default function JoueursPage() {
                 championnat: isParticipating,
               },
             }
-          : p
-      );
+          : p;
+
+      const updatedPlayers = players.map(updatePlayerInList);
+      const updatedTemporaryPlayers = temporaryPlayers.map(updatePlayerInList);
+      const updatedPlayersWithoutLicense = playersWithoutLicense.map(updatePlayerInList);
+
       setPlayers(updatedPlayers);
-      setFilteredPlayers(
-        updatedPlayers.filter((p) =>
-          selectedTab === 0
-            ? p.isActive
-            : selectedTab === 1
-            ? !p.isActive && !p.isTemporary
-            : p.isTemporary
-        )
-      );
+      setTemporaryPlayers(updatedTemporaryPlayers);
+      setPlayersWithoutLicense(updatedPlayersWithoutLicense);
+      
+      // Recalculer les joueurs filtrés selon l'onglet actif
+      let sourcePlayers: Player[] = [];
+      switch (selectedTab) {
+        case 0:
+          sourcePlayers = updatedPlayers;
+          break;
+        case 1:
+          sourcePlayers = updatedPlayersWithoutLicense;
+          break;
+        case 2:
+          sourcePlayers = updatedTemporaryPlayers;
+          break;
+        default:
+          sourcePlayers = updatedPlayers;
+      }
+
+      // Appliquer les filtres
+      let filtered = sourcePlayers;
+      if (searchQuery.trim()) {
+        const normalized = searchQuery.trim().toLowerCase();
+        filtered = filtered.filter(
+          (p) =>
+            `${p.firstName} ${p.name}`.toLowerCase().includes(normalized) ||
+            p.license.toLowerCase().includes(normalized)
+        );
+      }
+
+      if (filters.gender) {
+        filtered = filtered.filter((p) => p.gender === filters.gender);
+      }
+
+      if (filters.nationality) {
+        filtered = filtered.filter((p) => p.nationality === filters.nationality);
+      }
+
+      if (filters.hasPlayedMatch !== "") {
+        const hasPlayed = filters.hasPlayedMatch === "true";
+        filtered = filtered.filter(
+          (p) => (p.hasPlayedAtLeastOneMatch || false) === hasPlayed
+        );
+      }
+
+      if (filters.inChampionship !== "") {
+        const inChampionship = filters.inChampionship === "true";
+        filtered = filtered.filter(
+          (p) => (p.participation?.championnat || false) === inChampionship
+        );
+      }
+
+      setFilteredPlayers(filtered);
     } catch (error) {
       console.error(
         "Erreur lors de la mise à jour de la participation:",
@@ -886,9 +1162,38 @@ export default function JoueursPage() {
           </TabPanel>
 
           <TabPanel value={selectedTab} index={2}>
-            <Typography variant="h6" gutterBottom>
-              Joueurs temporaires
-            </Typography>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                mb: 2,
+              }}
+            >
+              <Typography variant="h6">
+                Joueurs temporaires
+              </Typography>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => {
+                  // Réinitialiser le formulaire avant d'ouvrir le dialog
+                  setNewPlayer({
+                    firstName: "",
+                    name: "",
+                    license: "",
+                    gender: "M",
+                    nationality: "FR",
+                    points: 500,
+                    inChampionship: true,
+                  });
+                  setLicenseExists(false);
+                  setCreateDialogOpen(true);
+                }}
+              >
+                Créer un joueur temporaire
+              </Button>
+            </Box>
             <Alert severity="info" sx={{ mb: 2 }}>
               Ces joueurs ont été créés temporairement en attendant leur licence
               FFTT. Ils apparaissent clairement comme temporaires.
@@ -916,6 +1221,7 @@ export default function JoueursPage() {
                       <TableCell>Genre</TableCell>
                       <TableCell>Nationalité</TableCell>
                       <TableCell>Participation</TableCell>
+                      <TableCell>Actions</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -1018,6 +1324,28 @@ export default function JoueursPage() {
                             </Typography>
                           </Box>
                         </TableCell>
+                        <TableCell>
+                          <Box display="flex" gap={1}>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<EditIcon />}
+                              onClick={() => handleEditPlayer(player)}
+                            >
+                              Modifier
+                            </Button>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="error"
+                              startIcon={<DeleteIcon />}
+                              onClick={() => handleDeletePlayer(player)}
+                              disabled={deleting === player.id}
+                            >
+                              {deleting === player.id ? "Suppression..." : "Supprimer"}
+                            </Button>
+                          </Box>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -1025,6 +1353,296 @@ export default function JoueursPage() {
               </TableContainer>
             )}
           </TabPanel>
+
+          {/* Dialog de création de joueur temporaire */}
+          <Dialog
+            open={createDialogOpen}
+            onClose={() => {
+              if (!creating) {
+                setCreateDialogOpen(false);
+                // Réinitialiser le formulaire à la fermeture
+                setNewPlayer({
+                  firstName: "",
+                  name: "",
+                  license: "",
+                  gender: "M",
+                  nationality: "FR",
+                  points: 500,
+                  inChampionship: true,
+                });
+                setLicenseExists(false);
+              }
+            }}
+            maxWidth="sm"
+            fullWidth
+          >
+            <DialogTitle>Créer un joueur temporaire</DialogTitle>
+            <DialogContent>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 2 }}>
+                <TextField
+                  label="Prénom"
+                  value={newPlayer.firstName}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Première lettre en majuscule, reste en minuscules
+                    const normalized = value.length > 0 
+                      ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase()
+                      : value;
+                    setNewPlayer({ ...newPlayer, firstName: normalized });
+                  }}
+                  required
+                  fullWidth
+                />
+                <TextField
+                  label="Nom"
+                  value={newPlayer.name}
+                  onChange={(e) => {
+                    // Tout en majuscules
+                    setNewPlayer({ ...newPlayer, name: e.target.value.toUpperCase() });
+                  }}
+                  required
+                  fullWidth
+                />
+                <TextField
+                  label="Licence (optionnel)"
+                  value={newPlayer.license}
+                  onChange={async (e) => {
+                    const license = e.target.value.trim();
+                    setNewPlayer({ ...newPlayer, license: e.target.value });
+                    if (license) {
+                      await checkLicenseExists(license, editingPlayer?.id);
+                    } else {
+                      setLicenseExists(false);
+                      setLicenseExistsForOther(false);
+                    }
+                  }}
+                  fullWidth
+                  error={licenseExists || licenseExistsForOther}
+                  helperText={
+                    licenseExistsForOther
+                      ? "Un joueur avec ce numéro de licence existe déjà. Un joueur temporaire ne peut pas correspondre à un joueur existant."
+                      : licenseExists
+                      ? "Un joueur avec ce numéro de licence existe déjà. Un joueur temporaire ne peut pas correspondre à un joueur existant."
+                      : "Laisser vide si pas encore de licence FFTT"
+                  }
+                />
+                <FormControl fullWidth>
+                  <InputLabel>Genre</InputLabel>
+                  <Select
+                    value={newPlayer.gender}
+                    label="Genre"
+                    onChange={(e) =>
+                      setNewPlayer({
+                        ...newPlayer,
+                        gender: e.target.value as "M" | "F",
+                      })
+                    }
+                  >
+                    <MenuItem value="M">Masculin</MenuItem>
+                    <MenuItem value="F">Féminin</MenuItem>
+                  </Select>
+                </FormControl>
+                <FormControl fullWidth>
+                  <InputLabel>Nationalité</InputLabel>
+                  <Select
+                    value={newPlayer.nationality}
+                    label="Nationalité"
+                    onChange={(e) =>
+                      setNewPlayer({
+                        ...newPlayer,
+                        nationality: e.target.value as "FR" | "C" | "ETR",
+                      })
+                    }
+                  >
+                    <MenuItem value="FR">Française</MenuItem>
+                    <MenuItem value="C">Européenne</MenuItem>
+                    <MenuItem value="ETR">Étrangère</MenuItem>
+                  </Select>
+                </FormControl>
+                <TextField
+                  label="Points"
+                  type="number"
+                  value={newPlayer.points}
+                  onChange={(e) =>
+                    setNewPlayer({
+                      ...newPlayer,
+                      points: parseInt(e.target.value) || 500,
+                    })
+                  }
+                  fullWidth
+                  inputProps={{ min: 0 }}
+                />
+                <FormControl fullWidth>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <Switch
+                      checked={newPlayer.inChampionship}
+                      onChange={(e) =>
+                        setNewPlayer({
+                          ...newPlayer,
+                          inChampionship: e.target.checked,
+                        })
+                      }
+                    />
+                    <FormLabel>Participation au championnat</FormLabel>
+                  </Box>
+                </FormControl>
+              </Box>
+            </DialogContent>
+            <DialogActions>
+              <Button
+                onClick={() => setCreateDialogOpen(false)}
+                disabled={creating}
+              >
+                Annuler
+              </Button>
+              <Button
+                onClick={handleCreateTemporaryPlayer}
+                variant="contained"
+                disabled={creating || !newPlayer.firstName.trim() || !newPlayer.name.trim() || licenseExists}
+              >
+                {creating ? "Création..." : "Créer"}
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Dialog d'édition de joueur temporaire */}
+          <Dialog
+            open={editDialogOpen}
+            onClose={() => !updating && setEditDialogOpen(false)}
+            maxWidth="sm"
+            fullWidth
+          >
+            <DialogTitle>Modifier un joueur temporaire</DialogTitle>
+            <DialogContent>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 2 }}>
+                <TextField
+                  label="Prénom"
+                  value={newPlayer.firstName}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    const normalized = value.length > 0 
+                      ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase()
+                      : value;
+                    setNewPlayer({ ...newPlayer, firstName: normalized });
+                  }}
+                  required
+                  fullWidth
+                />
+                <TextField
+                  label="Nom"
+                  value={newPlayer.name}
+                  onChange={(e) => {
+                    setNewPlayer({ ...newPlayer, name: e.target.value.toUpperCase() });
+                  }}
+                  required
+                  fullWidth
+                />
+                <TextField
+                  label="Licence (optionnel)"
+                  value={newPlayer.license}
+                  onChange={async (e) => {
+                    const license = e.target.value.trim();
+                    setNewPlayer({ ...newPlayer, license: e.target.value });
+                    if (license) {
+                      await checkLicenseExists(license, editingPlayer?.id);
+                    } else {
+                      setLicenseExists(false);
+                      setLicenseExistsForOther(false);
+                    }
+                  }}
+                  fullWidth
+                  error={licenseExists || licenseExistsForOther}
+                  helperText={
+                    licenseExistsForOther
+                      ? "Un joueur avec ce numéro de licence existe déjà. Un joueur temporaire ne peut pas correspondre à un joueur existant."
+                      : licenseExists
+                      ? "Un joueur avec ce numéro de licence existe déjà. Un joueur temporaire ne peut pas correspondre à un joueur existant."
+                      : "Laisser vide si pas encore de licence FFTT"
+                  }
+                />
+                <FormControl fullWidth>
+                  <InputLabel>Genre</InputLabel>
+                  <Select
+                    value={newPlayer.gender}
+                    label="Genre"
+                    onChange={(e) =>
+                      setNewPlayer({
+                        ...newPlayer,
+                        gender: e.target.value as "M" | "F",
+                      })
+                    }
+                  >
+                    <MenuItem value="M">Masculin</MenuItem>
+                    <MenuItem value="F">Féminin</MenuItem>
+                  </Select>
+                </FormControl>
+                <FormControl fullWidth>
+                  <InputLabel>Nationalité</InputLabel>
+                  <Select
+                    value={newPlayer.nationality}
+                    label="Nationalité"
+                    onChange={(e) =>
+                      setNewPlayer({
+                        ...newPlayer,
+                        nationality: e.target.value as "FR" | "C" | "ETR",
+                      })
+                    }
+                  >
+                    <MenuItem value="FR">Française</MenuItem>
+                    <MenuItem value="C">Européenne</MenuItem>
+                    <MenuItem value="ETR">Étrangère</MenuItem>
+                  </Select>
+                </FormControl>
+                <TextField
+                  label="Points"
+                  type="number"
+                  value={newPlayer.points}
+                  onChange={(e) =>
+                    setNewPlayer({
+                      ...newPlayer,
+                      points: parseInt(e.target.value) || 500,
+                    })
+                  }
+                  fullWidth
+                  inputProps={{ min: 0 }}
+                />
+                <FormControl fullWidth>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <Switch
+                      checked={newPlayer.inChampionship}
+                      onChange={(e) =>
+                        setNewPlayer({
+                          ...newPlayer,
+                          inChampionship: e.target.checked,
+                        })
+                      }
+                    />
+                    <FormLabel>Participation au championnat</FormLabel>
+                  </Box>
+                </FormControl>
+              </Box>
+            </DialogContent>
+            <DialogActions>
+              <Button
+                onClick={() => {
+                  setEditDialogOpen(false);
+                  setEditingPlayer(null);
+                  setLicenseExists(false);
+                  setLicenseExistsForOther(false);
+                }}
+                disabled={updating}
+              >
+                Annuler
+              </Button>
+              <Button
+                onClick={handleUpdateTemporaryPlayer}
+                variant="contained"
+                disabled={updating || !newPlayer.firstName.trim() || !newPlayer.name.trim() || licenseExists}
+              >
+                {updating ? "Mise à jour..." : "Enregistrer"}
+              </Button>
+            </DialogActions>
+          </Dialog>
         </Box>
     </AuthGuard>
   );

@@ -1746,6 +1746,18 @@ export default function CompositionsPage() {
                                       }}
                                     />
                                   )}
+                                {player.isTemporary && (
+                                  <Chip
+                                    label="Temporaire"
+                                    size="small"
+                                    color="error"
+                                    variant="outlined"
+                                    sx={{
+                                      height: 20,
+                                      fontSize: "0.7rem",
+                                    }}
+                                  />
+                                )}
                               </Box>
                             }
                             secondary={
@@ -1979,6 +1991,18 @@ export default function CompositionsPage() {
                                           }}
                                         />
                                       )}
+                                      {player.isTemporary && (
+                                        <Chip
+                                          label="Temporaire"
+                                          size="small"
+                                          color="error"
+                                          variant="outlined"
+                                          sx={{
+                                            height: 18,
+                                            fontSize: "0.65rem",
+                                          }}
+                                        />
+                                      )}
                                     </>
                                   );
                                 }}
@@ -2182,6 +2206,18 @@ export default function CompositionsPage() {
                                           size="small"
                                           color="error"
                                           variant="filled"
+                                          sx={{
+                                            height: 18,
+                                            fontSize: "0.65rem",
+                                          }}
+                                        />
+                                      )}
+                                      {player.isTemporary && (
+                                        <Chip
+                                          label="Temporaire"
+                                          size="small"
+                                          color="error"
+                                          variant="outlined"
                                           sx={{
                                             height: 18,
                                             fontSize: "0.65rem",

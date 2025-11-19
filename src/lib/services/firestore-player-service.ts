@@ -4,6 +4,9 @@ import {
   doc,
   updateDoc,
   addDoc,
+  setDoc,
+  getDoc,
+  deleteDoc,
   query,
   orderBy,
 } from "firebase/firestore";
@@ -247,20 +250,55 @@ export class FirestorePlayerService {
     }
   }
 
+  // Vérifier si un joueur existe déjà avec cette licence
+  async checkPlayerExists(license: string): Promise<boolean> {
+    try {
+      if (!license || license.trim() === "") {
+        return false;
+      }
+      const playerRef = doc(getDbInstanceDirect(), this.collectionName, license.trim());
+      const playerSnap = await getDoc(playerRef);
+      return playerSnap.exists();
+    } catch (error) {
+      console.error("Erreur lors de la vérification de l'existence du joueur:", error);
+      throw error;
+    }
+  }
+
   // Créer un joueur temporaire
   async createTemporaryPlayer(
     playerData: Omit<Player, "id" | "createdAt" | "updatedAt">
   ): Promise<string> {
     try {
-      const playersRef = collection(getDbInstanceDirect(), this.collectionName);
+      // Déterminer l'ID du document : licence si fournie, sinon générer un ID
+      const documentId = playerData.license && playerData.license.trim() !== ""
+        ? playerData.license.trim()
+        : undefined; // Si pas de licence, Firestore générera un ID
+
+      // Si une licence est fournie, vérifier qu'elle n'existe pas déjà
+      if (documentId) {
+        const exists = await this.checkPlayerExists(documentId);
+        if (exists) {
+          throw new Error(`Un joueur avec la licence ${documentId} existe déjà`);
+        }
+      }
 
       const newPlayer = {
         nom: playerData.name,
         prenom: playerData.firstName,
         licence: playerData.license || "",
+        typeLicence: playerData.typeLicence || "",
         sexe: playerData.gender,
-        nationalite: playerData.nationality,
-        isTemporary: true,
+        nationalite: playerData.nationality === "FR" ? "F" : playerData.nationality === "C" ? "C" : "ETR",
+        isTemporary: true, // Impératif : marquer comme temporaire
+        preferredTeams: playerData.preferredTeams || {
+          masculine: [],
+          feminine: [],
+        },
+        participation: playerData.participation || {
+          championnat: false,
+        },
+        hasPlayedAtLeastOneMatch: playerData.hasPlayedAtLeastOneMatch || false,
         createdAt: new Date(),
         updatedAt: new Date(),
         // Champs additionnels
@@ -283,10 +321,135 @@ export class FirestorePlayerService {
         isHomme: playerData.isHomme || false,
       };
 
-      const docRef = await addDoc(playersRef, newPlayer);
-      return docRef.id;
+      // Si une licence est fournie, utiliser setDoc avec l'ID de la licence
+      // Sinon, utiliser addDoc pour générer un ID automatique
+      if (documentId) {
+        const playerRef = doc(getDbInstanceDirect(), this.collectionName, documentId);
+        await setDoc(playerRef, newPlayer);
+        return documentId;
+      } else {
+        const playersRef = collection(getDbInstanceDirect(), this.collectionName);
+        const docRef = await addDoc(playersRef, newPlayer);
+        return docRef.id;
+      }
     } catch (error) {
       console.error("Erreur lors de la création du joueur temporaire:", error);
+      throw error;
+    }
+  }
+
+  // Supprimer un joueur
+  async deletePlayer(playerId: string): Promise<void> {
+    try {
+      const playerRef = doc(getDbInstanceDirect(), this.collectionName, playerId);
+      await deleteDoc(playerRef);
+    } catch (error) {
+      console.error("Erreur lors de la suppression du joueur:", error);
+      throw error;
+    }
+  }
+
+  // Mettre à jour un joueur temporaire avec gestion des changements de clé
+  async updateTemporaryPlayer(
+    currentPlayerId: string,
+    playerData: Omit<Player, "id" | "createdAt" | "updatedAt">
+  ): Promise<{ newPlayerId: string; oldPlayerIdDeleted: boolean }> {
+    try {
+      // Récupérer les données actuelles du joueur
+      const currentPlayerRef = doc(getDbInstanceDirect(), this.collectionName, currentPlayerId);
+      const currentPlayerSnap = await getDoc(currentPlayerRef);
+      
+      if (!currentPlayerSnap.exists()) {
+        throw new Error(`Joueur avec l'ID ${currentPlayerId} introuvable`);
+      }
+
+      const currentData = currentPlayerSnap.data();
+      const currentLicense = currentData?.licence || "";
+      const newLicense = playerData.license?.trim() || "";
+
+      // Déterminer le nouvel ID du document
+      // Si une licence est fournie, utiliser la licence comme ID
+      // Sinon, on devra générer un nouvel ID (car on ne peut pas avoir un document sans ID)
+      const newDocumentId = newLicense !== "" ? newLicense : undefined;
+
+      // Déterminer si la clé doit changer
+      // Cas 1: L'ancien ID était une licence et la nouvelle est différente (ou vide)
+      // Cas 2: L'ancien ID était généré et une licence est ajoutée
+      // Cas 3: L'ancien ID était une licence et elle est supprimée (nouvelle vide)
+      const keyChanged = 
+        (currentLicense !== newLicense) && // La licence a changé
+        (currentPlayerId !== newDocumentId); // Et l'ID serait différent
+
+      // Préparer les données mises à jour
+      const updatedPlayer = {
+        nom: playerData.name,
+        prenom: playerData.firstName,
+        licence: newLicense,
+        typeLicence: playerData.typeLicence || "",
+        sexe: playerData.gender,
+        nationalite: playerData.nationality === "FR" ? "F" : playerData.nationality === "C" ? "C" : "ETR",
+        isTemporary: true, // Reste temporaire
+        preferredTeams: playerData.preferredTeams || currentData.preferredTeams || {
+          masculine: [],
+          feminine: [],
+        },
+        participation: playerData.participation || currentData.participation || {
+          championnat: false,
+        },
+        hasPlayedAtLeastOneMatch: playerData.hasPlayedAtLeastOneMatch ?? currentData.hasPlayedAtLeastOneMatch ?? false,
+        createdAt: currentData.createdAt || new Date(), // Préserver la date de création
+        updatedAt: new Date(),
+        // Champs additionnels
+        numClub: playerData.numClub || currentData.numClub || "",
+        club: playerData.club || currentData.club || "",
+        classement: playerData.classement || currentData.classement || 0,
+        points: playerData.points ?? currentData.points ?? 0,
+        categorie: playerData.categorie || currentData.categorie || "",
+        dateNaissance: playerData.dateNaissance || currentData.dateNaissance || "",
+        lieuNaissance: playerData.lieuNaissance || currentData.lieuNaissance || "",
+        datePremiereLicence: playerData.datePremiereLicence || currentData.datePremiereLicence || "",
+        clubPrecedent: playerData.clubPrecedent || currentData.clubPrecedent || "",
+        certificat: playerData.certificat ?? currentData.certificat ?? false,
+        pointsMensuel: playerData.pointsMensuel || currentData.pointsMensuel || 0,
+        pointsMensuelAnciens: playerData.pointsMensuelAnciens || currentData.pointsMensuelAnciens || 0,
+        pointDebutSaison: playerData.pointDebutSaison || currentData.pointDebutSaison || 0,
+        pointsLicence: playerData.pointsLicence || currentData.pointsLicence || 0,
+        idLicence: playerData.idLicence || currentData.idLicence || "",
+        nomClub: playerData.nomClub || currentData.nomClub || "",
+        isHomme: playerData.isHomme ?? currentData.isHomme ?? false,
+      };
+
+      if (keyChanged) {
+        // Si une nouvelle licence est fournie, vérifier qu'elle n'existe pas déjà
+        if (newDocumentId && newDocumentId !== currentPlayerId) {
+          const exists = await this.checkPlayerExists(newDocumentId);
+          if (exists) {
+            throw new Error(`Un joueur avec la licence ${newDocumentId} existe déjà. Un joueur temporaire ne peut pas correspondre à un joueur existant.`);
+          }
+        }
+
+        // Créer le nouveau document avec la nouvelle clé
+        if (newDocumentId) {
+          const newPlayerRef = doc(getDbInstanceDirect(), this.collectionName, newDocumentId);
+          await setDoc(newPlayerRef, updatedPlayer);
+        } else {
+          // Pas de licence : générer un nouvel ID
+          const playersRef = collection(getDbInstanceDirect(), this.collectionName);
+          const docRef = await addDoc(playersRef, updatedPlayer);
+          await this.deletePlayer(currentPlayerId);
+          return { newPlayerId: docRef.id, oldPlayerIdDeleted: true };
+        }
+
+        // Supprimer l'ancien document
+        await this.deletePlayer(currentPlayerId);
+        return { newPlayerId: newDocumentId, oldPlayerIdDeleted: true };
+      } else {
+        // Pas de changement de clé, juste mettre à jour
+        await updateDoc(currentPlayerRef, updatedPlayer);
+        return { newPlayerId: currentPlayerId, oldPlayerIdDeleted: false };
+      }
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour du joueur temporaire:", error);
       throw error;
     }
   }

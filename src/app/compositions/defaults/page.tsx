@@ -236,7 +236,9 @@ export default function DefaultCompositionsPage() {
   const championshipPlayers = useMemo(
     () =>
       players.filter(
-        (player) => player.participation?.championnat === true && player.isActive
+        (player) => 
+          player.participation?.championnat === true && 
+          (player.isActive || player.isTemporary)
       ),
     [players]
   );
@@ -1116,11 +1118,23 @@ export default function DefaultCompositionsPage() {
                                     }}
                                   />
                                 )}
-                                {!player.isActive && (
+                                {!player.isActive && !player.isTemporary && (
                                   <Chip
                                     label="Sans licence"
                                     size="small"
                                     color="default"
+                                    variant="outlined"
+                                    sx={{
+                                      height: 20,
+                                      fontSize: "0.7rem",
+                                    }}
+                                  />
+                                )}
+                                {player.isTemporary && (
+                                  <Chip
+                                    label="Temporaire"
+                                    size="small"
+                                    color="error"
                                     variant="outlined"
                                     sx={{
                                       height: 20,
@@ -1293,6 +1307,18 @@ export default function DefaultCompositionsPage() {
                                             }}
                                           />
                                         )}
+                                      {player.isTemporary && (
+                                        <Chip
+                                          label="Temporaire"
+                                          size="small"
+                                          color="error"
+                                          variant="outlined"
+                                          sx={{
+                                            height: 18,
+                                            fontSize: "0.65rem",
+                                          }}
+                                        />
+                                      )}
                                     </>
                                   );
                                 }}
@@ -1442,6 +1468,18 @@ export default function DefaultCompositionsPage() {
                                             }}
                                           />
                                         )}
+                                      {player.isTemporary && (
+                                        <Chip
+                                          label="Temporaire"
+                                          size="small"
+                                          color="error"
+                                          variant="outlined"
+                                          sx={{
+                                            height: 18,
+                                            fontSize: "0.65rem",
+                                          }}
+                                        />
+                                      )}
                                     </>
                                   );
                                 }}

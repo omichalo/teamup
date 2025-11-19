@@ -356,12 +356,20 @@ export class PlayerSyncService {
               Object.entries(player).filter(([, value]) => value !== undefined)
             );
 
-            // Préserver les champs de gestion
-            userManagedFields.forEach((field) => {
-              if (existingData && existingData[field]) {
-                playerData[field] = existingData[field];
-              }
-            });
+            // Si le joueur existant est temporaire, tout écraser (ne pas préserver les champs userManagedFields)
+            const isExistingTemporary = existingData.isTemporary === true;
+            
+            if (!isExistingTemporary) {
+              // Préserver les champs de gestion uniquement si le joueur n'est pas temporaire
+              userManagedFields.forEach((field) => {
+                if (existingData && existingData[field]) {
+                  playerData[field] = existingData[field];
+                }
+              });
+            } else {
+              // Si le joueur est temporaire, tout écraser et marquer comme non temporaire
+              playerData.isTemporary = false;
+            }
 
             // Convertir les dates en Timestamp Firestore
             if (playerData.createdAt instanceof Date) {
