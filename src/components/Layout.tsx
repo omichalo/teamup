@@ -39,7 +39,7 @@ interface NavigationItem {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { user, signOut, isCoach, isAdmin, isPlayer } = useAuth();
+  const { user, signOut, isAdmin, isPlayer } = useAuth();
 
   const router = useRouter();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
@@ -76,7 +76,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     }
 
     return items;
-  }, [isAdmin, isCoach, isPlayer, user]);
+  }, [isAdmin, isPlayer, user]);
 
   const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);

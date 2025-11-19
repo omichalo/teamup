@@ -20,15 +20,18 @@ export const usePlayers = () => {
         const playersData = data.players || [];
 
         setPlayers(
-          playersData.map((player: any) => ({
-            ...player,
-            createdAt: player.createdAt
-              ? new Date(player.createdAt)
-              : new Date(),
-            updatedAt: player.updatedAt
-              ? new Date(player.updatedAt)
-              : new Date(),
-          }))
+          playersData.map((player: unknown) => {
+            const p = player as Partial<Player> & { createdAt?: string | Date; updatedAt?: string | Date };
+            return {
+              ...p,
+              createdAt: p.createdAt
+                ? new Date(p.createdAt)
+                : new Date(),
+              updatedAt: p.updatedAt
+                ? new Date(p.updatedAt)
+                : new Date(),
+            } as Player;
+          })
         );
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unknown error");

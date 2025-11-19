@@ -1452,8 +1452,12 @@ export default function CompositionsPage() {
 
   const handleConfirmDialog = useCallback(() => {
     const action = confirmationDialog.onConfirm;
+    if (action) {
+      void action();
+    }
     setConfirmationDialog((prev) => {
-      const { onConfirm: _ignored, ...rest } = prev;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { onConfirm, ...rest } = prev;
       return {
         ...rest,
         open: false,

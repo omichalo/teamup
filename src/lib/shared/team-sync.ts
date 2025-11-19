@@ -2,6 +2,7 @@ import { FFTTAPI } from "@omichalo/ffttapi-node";
 import { getFFTTConfig, isFemaleTeam } from "./fftt-utils";
 import type { Firestore } from "firebase-admin/firestore";
 import { Timestamp } from "firebase-admin/firestore";
+import type { FFTTEquipe } from "./fftt-types";
 
 export interface TeamSyncResult {
   success: boolean;
@@ -89,7 +90,7 @@ export class TeamSyncService {
 
       // Filtrer les équipes pour les épreuves spécifiques
       const filteredEquipes = equipes.filter(
-        (equipe: any) =>
+        (equipe: FFTTEquipe) =>
           equipe.idEpreuve === 15954 || equipe.idEpreuve === 15955
       );
       console.log(

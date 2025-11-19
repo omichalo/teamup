@@ -1133,7 +1133,7 @@ export default function AdminPage() {
                           const hasDisplayName =
                             targetUser.displayName &&
                             targetUser.displayName.trim().length > 0;
-                          const isCurrentUser = targetUser.id === user?.uid;
+                          const isCurrentUser = targetUser.id === user?.id;
                           const isLastAdmin =
                             targetUser.role === USER_ROLES.ADMIN &&
                             adminCount <= 1;

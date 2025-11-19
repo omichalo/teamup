@@ -592,9 +592,18 @@ export default function DemoThemePage() {
                       id="combo-box-demo"
                       options={top100Films}
                       sx={{ width: 300 }}
-                      renderInput={(params) => (
-                        <TextField {...(params as any)} label="Film" variant="outlined" />
-                      )}
+                      renderInput={(params) => {
+                        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                        const { size, InputLabelProps, ...restParams } = params;
+                        return (
+                          <TextField
+                            {...restParams}
+                            label="Film"
+                            variant="outlined"
+                            size={size || "medium"}
+                          />
+                        );
+                      }}
                     />
                   </Box>
                 </Box>

@@ -2,6 +2,7 @@ import {
   TeamComposition,
   TeamCompositionValidation,
   Player,
+  MatchHistory,
 } from "@/types/team-management";
 import { BurnoutCalculator } from "./burnout-calculator";
 import { AvailabilityService } from "./availability-service";
@@ -18,7 +19,7 @@ export class TeamCompositionService {
     date: string,
     playerIds: string[],
     players: Player[],
-    matchHistory: any[] = []
+    matchHistory: MatchHistory[] = []
   ): Promise<TeamCompositionValidation> {
     // Valider la composition selon les règles de brûlage
     const validation = this.burnoutCalculator.validateComposition(
@@ -84,7 +85,7 @@ export class TeamCompositionService {
     compositionId: string,
     playerIds: string[],
     players: Player[],
-    matchHistory: any[] = []
+    matchHistory: MatchHistory[] = []
   ): Promise<TeamCompositionValidation> {
     const existingComposition = await this.getTeamComposition(compositionId);
     if (!existingComposition) {
@@ -135,6 +136,7 @@ export class TeamCompositionService {
    * Récupère une composition d&apos;équipe
    */
   async getTeamComposition(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _compositionId: string
   ): Promise<TeamComposition | null> {
     // TODO: Implémenter la récupération depuis Firestore
@@ -145,7 +147,9 @@ export class TeamCompositionService {
    * Récupère les compositions d&apos;une équipe pour une date
    */
   async getTeamCompositionForDate(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _teamId: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _date: string
   ): Promise<TeamComposition | null> {
     // TODO: Implémenter la récupération depuis Firestore
@@ -155,7 +159,10 @@ export class TeamCompositionService {
   /**
    * Récupère toutes les compositions d&apos;une équipe
    */
-  async getTeamCompositions(_teamId: string): Promise<TeamComposition[]> {
+  async getTeamCompositions(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _teamId: string
+  ): Promise<TeamComposition[]> {
     // TODO: Implémenter la récupération depuis Firestore
     return [];
   }
@@ -164,6 +171,7 @@ export class TeamCompositionService {
    * Sauvegarde une composition d&apos;équipe
    */
   private async saveTeamComposition(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _composition: TeamComposition
   ): Promise<void> {
     // TODO: Implémenter la sauvegarde dans Firestore
@@ -260,8 +268,11 @@ export class TeamCompositionService {
    * Vérifie les conflits entre compositions d&apos;équipes
    */
   async checkCompositionConflicts(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _teamId: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _date: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _playerIds: string[]
   ): Promise<{
     hasConflicts: boolean;

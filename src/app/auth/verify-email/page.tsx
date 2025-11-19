@@ -83,7 +83,7 @@ export default function VerifyEmailPage() {
           style={{ marginBottom: 24 }}
         />
         <Typography variant="h4" component="h1" gutterBottom>
-          Vérification de l'email
+          Vérification de l&apos;email
         </Typography>
       </Box>
 

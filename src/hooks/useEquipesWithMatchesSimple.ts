@@ -43,7 +43,7 @@ export const useEquipesWithMatchesSimple = () => {
           throw new Error("Team not found");
         }
 
-        const transformed = transformAggregatedTeamEntry(entry as any);
+        const transformed = transformAggregatedTeamEntry(entry);
 
         setData({
           equipes: [transformed],

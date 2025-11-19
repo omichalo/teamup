@@ -332,6 +332,7 @@ export class BrulageService {
     return {
       totalMatches: allMatches.length,
       currentPhaseMatches,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       canPlayInTeam: (_teamNumber: number) => {
         const burnCount = this.getBurnCount(playerId, "current"); // Simplification
         return burnCount < 2;

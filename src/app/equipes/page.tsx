@@ -1103,18 +1103,9 @@ export default function EquipesPage() {
                       {selectedMatch.resultatsIndividuels.parties &&
                         selectedMatch.resultatsIndividuels.parties.map(
                           (
-                            partie: any,
+                            partie,
                             index: number
                           ) => {
-                            const typedPartie = partie as {
-                              joueurA: string;
-                              joueurB: string;
-                              scoreA: number;
-                              scoreB: number;
-                              adversaireA?: string;
-                              adversaireB?: string;
-                              setDetails?: string[];
-                            };
                             return (
                             <Box
                               key={index}
@@ -1148,7 +1139,7 @@ export default function EquipesPage() {
                                       textAlign: "right",
                                     }}
                                   >
-                                    {typedPartie.adversaireA || typedPartie.joueurA}
+                                    {partie.adversaireA || partie.joueurA}
                                   </Typography>
                                 </Box>
                                 <Box sx={{ width: "16.67%" }}>
@@ -1159,7 +1150,7 @@ export default function EquipesPage() {
                                       fontWeight: "bold",
                                     }}
                                   >
-                                    {typedPartie.scoreA} - {typedPartie.scoreB}
+                                    {partie.scoreA} - {partie.scoreB}
                                   </Typography>
                                 </Box>
                                 <Box sx={{ width: "41.67%" }}>
@@ -1167,18 +1158,18 @@ export default function EquipesPage() {
                                     variant="body1"
                                     sx={{ fontWeight: "bold" }}
                                   >
-                                    {typedPartie.adversaireB || typedPartie.joueurB}
+                                    {partie.adversaireB || partie.joueurB}
                                   </Typography>
                                 </Box>
                               </Box>
-                              {typedPartie.setDetails &&
-                                typedPartie.setDetails.length > 0 && (
+                              {partie.setDetails &&
+                                partie.setDetails.length > 0 && (
                                   <Box sx={{ mt: 2, textAlign: "center" }}>
                                     <Typography
                                       variant="body2"
                                       color="text.secondary"
                                     >
-                                      Sets: {typedPartie.setDetails.join(" - ")}
+                                      Sets: {partie.setDetails.join(" - ")}
                                     </Typography>
                                   </Box>
                                 )}

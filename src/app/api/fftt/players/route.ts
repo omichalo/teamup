@@ -21,12 +21,24 @@ export async function GET(req: Request) {
 
     const players: Player[] = [];
     playersSnapshot.forEach((doc) => {
-      const data = doc.data() as any;
+      const data = doc.data();
+      const createdAtValue = data.createdAt;
+      const updatedAtValue = data.updatedAt;
+      const createdAt = createdAtValue instanceof Date 
+        ? createdAtValue 
+        : (createdAtValue && typeof createdAtValue === "object" && "toDate" in createdAtValue && typeof createdAtValue.toDate === "function")
+          ? createdAtValue.toDate()
+          : new Date();
+      const updatedAt = updatedAtValue instanceof Date 
+        ? updatedAtValue 
+        : (updatedAtValue && typeof updatedAtValue === "object" && "toDate" in updatedAtValue && typeof updatedAtValue.toDate === "function")
+          ? updatedAtValue.toDate()
+          : new Date();
       players.push({
         id: doc.id,
-        ...data,
-        createdAt: data.createdAt?.toDate?.() || new Date(),
-        updatedAt: data.updatedAt?.toDate?.() || new Date(),
+        ...(data as Partial<Player>),
+        createdAt,
+        updatedAt,
       } as Player);
     });
 

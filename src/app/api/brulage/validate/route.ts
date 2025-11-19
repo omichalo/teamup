@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase-admin";
-import { hasAnyRole, USER_ROLES } from "@/lib/auth/roles";
+import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
 import { BrulageService } from "@/services/brulageService";
 import { getBurnRecords, getPlayers } from "@/services/firebase";
 
@@ -15,8 +15,8 @@ export async function POST(req: Request) {
     }
 
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    const role = (decoded.role as string) || "player";
-    if (!hasAnyRole(role as any, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
+    const role = resolveRole(decoded.role as string | undefined);
+    if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
       return NextResponse.json(
         { error: "Accès refusé", message: "Cette ressource est réservée aux administrateurs et coachs" },
         { status: 403 }

@@ -20,11 +20,14 @@ export const useTeams = () => {
         const teamsData = data.teams || [];
 
         setTeams(
-          teamsData.map((team: any) => ({
-            ...team,
-            createdAt: team.createdAt ? new Date(team.createdAt) : new Date(),
-            updatedAt: team.updatedAt ? new Date(team.updatedAt) : new Date(),
-          }))
+          teamsData.map((team: unknown) => {
+            const t = team as Partial<Team> & { createdAt?: string | Date; updatedAt?: string | Date };
+            return {
+              ...t,
+              createdAt: t.createdAt ? new Date(t.createdAt) : new Date(),
+              updatedAt: t.updatedAt ? new Date(t.updatedAt) : new Date(),
+            } as Team;
+          })
         );
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unknown error");

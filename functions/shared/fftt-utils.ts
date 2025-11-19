@@ -92,7 +92,7 @@ export const enrichPlayerData = async (
 
     // Créer une map pour un accès rapide
     const joueursMap = new Map<string, FFTTJoueur>();
-    joueursClub.forEach((joueur: any) => {
+    joueursClub.forEach((joueur: FFTTJoueur) => {
       if (joueur.licence) {
         joueursMap.set(joueur.licence, joueur as FFTTJoueur);
       }
@@ -145,8 +145,7 @@ export const enrichPlayerData = async (
 // Fonction pour créer un match de base
 export const createBaseMatch = (
   rencontre: FFTTRencontre,
-  equipe: FFTTEquipe,
-  clubCode: string
+  equipe: FFTTEquipe
 ) => {
   const teamNumber = extractTeamNumber(equipe.libelle);
   const isFemale = isFemaleTeam(equipe.libelle);

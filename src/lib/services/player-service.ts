@@ -65,8 +65,11 @@ export class PlayerService {
    * Met à jour la participation d&apos;un joueur au championnat
    */
   async updatePlayerParticipation(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _playerId: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _teamId: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _isParticipating: boolean
   ): Promise<void> {
     // TODO: Implémenter la mise à jour dans Firestore
@@ -76,7 +79,9 @@ export class PlayerService {
    * Met à jour les équipes préférées d&apos;un joueur
    */
   async updatePlayerPreferredTeams(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _playerId: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _preferredTeams: { masculine: string[]; feminine: string[] }
   ): Promise<void> {
     // TODO: Implémenter la mise à jour dans Firestore

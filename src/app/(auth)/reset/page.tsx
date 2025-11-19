@@ -45,7 +45,7 @@ export default function ResetPage() {
         body: JSON.stringify({ email }),
       });
       if (!res.ok) {
-        const j = await res.json().catch(() => ({} as any));
+        const j = await res.json().catch(() => ({} as { error?: string }));
         throw new Error(j.error || "Échec d'envoi de l'email de réinitialisation");
       }
       setMsg("Email de réinitialisation envoyé. Vérifiez votre boîte de réception (et vos spams).");

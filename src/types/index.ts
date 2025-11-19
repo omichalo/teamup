@@ -71,7 +71,21 @@ export interface Match {
   rencontreId?: string; // ID de la rencontre FFTT
   equipeIds?: { equipe1: string; equipe2: string }; // IDs des équipes
   lienDetails?: string; // Lien complet vers les détails
-  resultatsIndividuels?: any; // Résultats individuels des joueurs
+  resultatsIndividuels?: {
+    parties?: Array<{
+      joueurA: string;
+      joueurB: string;
+      scoreA: number;
+      scoreB: number;
+      adversaireA?: string;
+      adversaireB?: string;
+      setDetails?: string[];
+    }>;
+    nomEquipeA?: string;
+    nomEquipeB?: string;
+    joueursA?: Record<string, { nom: string; prenom: string; points?: number }>;
+    joueursB?: Record<string, { nom: string; prenom: string; points?: number }>;
+  }; // Résultats individuels des joueurs
   joueursSQY?: Array<{
     licence?: string;
     nom?: string;

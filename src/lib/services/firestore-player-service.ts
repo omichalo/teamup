@@ -9,6 +9,8 @@ import {
   deleteDoc,
   query,
   orderBy,
+  QueryDocumentSnapshot,
+  DocumentData,
 } from "firebase/firestore";
 import { getDbInstanceDirect } from "@/lib/firebase";
 import { Player } from "@/types/team-management";
@@ -17,7 +19,7 @@ export class FirestorePlayerService {
   private readonly collectionName = "players";
 
   // Convertir les données Firestore vers le format Player
-  private convertFirestoreToPlayer(doc: any): Player {
+  private convertFirestoreToPlayer(doc: QueryDocumentSnapshot<DocumentData>): Player {
     const data = doc.data();
     return {
       id: doc.id,

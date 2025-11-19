@@ -2,12 +2,13 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { User } from "@/types";
 
 // Stub minimal pour compatibilité avec l'ancien code
 // Le nouveau système utilise les cookies HTTP-only côté serveur
 export const useAuth = () => {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchUser = useCallback(async () => {

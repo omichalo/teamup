@@ -72,7 +72,7 @@ export class CompositionService {
       );
       const docRef = doc(getDbInstanceDirect(), this.collectionName, docId);
 
-      const dataToSave: Record<string, any> = {
+      const dataToSave: Record<string, unknown> = {
         journee: composition.journee,
         phase: composition.phase,
         championshipType: composition.championshipType,

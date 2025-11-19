@@ -13,7 +13,7 @@ const toDate = (value: unknown): Date => {
   return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
 };
 
-interface AggregatedTeamEntry {
+export interface AggregatedTeamEntry {
   team: {
     id: string;
     name: string;
@@ -124,7 +124,7 @@ export const transformAggregatedTeamEntry = (
       result.lienDetails = lienDetailsValue;
     }
 
-    if (match.resultatsIndividuels !== undefined) {
+    if (match.resultatsIndividuels !== undefined && match.resultatsIndividuels !== null) {
       result.resultatsIndividuels = match.resultatsIndividuels;
     }
 

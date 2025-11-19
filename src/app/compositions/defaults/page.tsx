@@ -587,6 +587,7 @@ export default function DefaultCompositionsPage() {
       equipes,
       players,
       canDropPlayer,
+      defaultCompositions,
       compositionDefaultsService,
       equipesByType,
     ]

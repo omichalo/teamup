@@ -73,24 +73,24 @@ export default function PlayerHomePage() {
     <AuthGuard allowedRoles={[USER_ROLES.PLAYER, USER_ROLES.COACH, USER_ROLES.ADMIN]}>
       <Box sx={{ p: 5, maxWidth: 720, mx: "auto" }}>
           <Typography variant="h4" component="h1" gutterBottom>
-            Bienvenue sur l'espace joueur
+            Bienvenue sur l&apos;espace joueur
           </Typography>
 
           <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-            Depuis cette page, vous pouvez suivre l'actualité du club et, si
-            vous souhaitez participer à l'organisation, demander des droits
-            d'entraîneur.
+            Depuis cette page, vous pouvez suivre l&apos;actualité du club et, si
+            vous souhaitez participer à l&apos;organisation, demander des droits
+            d&apos;entraîneur.
           </Typography>
 
           <Card sx={{ mb: 3 }}>
             <CardContent>
               <Stack spacing={2}>
                 <Typography variant="subtitle1">
-                  Demander les droits d'entraîneur
+                  Demander les droits d&apos;entraîneur
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Les droits coach permettent de gérer les compositions,
-                  disponibilités et l'organisation des rencontres. Un
+                  disponibilités et l&apos;organisation des rencontres. Un
                   administrateur examinera votre demande.
                 </Typography>
 
@@ -190,9 +190,9 @@ export default function PlayerHomePage() {
                 Que puis-je faire en tant que joueur ?
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Pour le moment, l'espace joueur est limité. Vous pouvez demander
+                Pour le moment, l&apos;espace joueur est limité. Vous pouvez demander
                 des droits supplémentaires via le formulaire ci-dessus pour
-                accéder à l'outil de préparation des compositions et suivre les
+                accéder à l&apos;outil de préparation des compositions et suivre les
                 disponibilités.
               </Typography>
             </CardContent>

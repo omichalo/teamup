@@ -214,6 +214,7 @@ export class BurnoutCalculator {
   private getMutationPlayersCount(
     playerIds: string[],
     players: Player[],
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _date: string
   ): number {
     // Logique pour déterminer les joueurs mutés

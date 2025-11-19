@@ -26,7 +26,7 @@ import {
 } from "@/types";
 
 // Helper function to convert Firestore timestamps to Date objects
-const convertTimestamps = (data: DocumentData): any => {
+const convertTimestamps = (data: DocumentData): Record<string, unknown> => {
   const converted = { ...data };
   Object.keys(converted).forEach((key) => {
     if (converted[key] instanceof Timestamp) {

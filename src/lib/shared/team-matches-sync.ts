@@ -12,7 +12,7 @@ import { Timestamp, FieldValue } from "firebase-admin/firestore";
 
 // Type pour les joueurs dans les recherches
 interface PlayerSearch {
-  id: string;
+  id?: string; // Optionnel car pas toujours disponible
   nom?: string;
   prenom?: string;
   licence?: string;
@@ -335,7 +335,6 @@ export class TeamMatchesSyncService {
           const matchData = createBaseMatch(
             rencontre as FFTTRencontre,
             equipe,
-            this.clubCode,
             convertToFFTTDetailsRencontre(detailsRencontre)
           );
           processedMatches.push(matchData);
@@ -347,8 +346,7 @@ export class TeamMatchesSyncService {
           // Créer le match sans les détails des joueurs
           const matchData = createBaseMatch(
             rencontre as FFTTRencontre,
-            equipe,
-            this.clubCode
+            equipe
           );
           processedMatches.push(matchData);
         }
@@ -553,7 +551,6 @@ export class TeamMatchesSyncService {
             const matchData = createBaseMatch(
               rencontre as FFTTRencontre,
               equipe,
-              this.clubCode,
               convertedDetails
             );
             
@@ -567,7 +564,7 @@ export class TeamMatchesSyncService {
             const matchData = createBaseMatch(
               rencontre as FFTTRencontre,
               equipe,
-              this.clubCode
+              undefined
             );
             processedMatches.push(matchData);
           }
@@ -806,16 +803,16 @@ export class TeamMatchesSyncService {
       >();
 
       // Compter les matchs par joueur, phase et équipe (séparer masculin et féminin)
-      let debugCountMasculin = 0;
-      let debugCountFeminin = 0;
+      // let debugCountMasculin = 0;
+      // let debugCountFeminin = 0;
       
       for (const match of enrichedMatches) {
         const isFeminin = match.isFemale;
-        if (isFeminin) {
-          debugCountFeminin++;
-        } else {
-          debugCountMasculin++;
-        }
+        // if (isFeminin) {
+        //   debugCountFeminin++;
+        // } else {
+        //   debugCountMasculin++;
+        // }
         const matchCountMap = isFeminin
           ? matchCountByPlayerPhaseTeamFeminin
           : matchCountByPlayerPhaseTeamMasculin;
@@ -901,11 +898,11 @@ export class TeamMatchesSyncService {
           // Calculer le brûlage pour chaque phase séparément
           for (const [phase, teamMap] of phaseMap) {
             // Calculer le total de matchs pour cette phase uniquement
-            let totalMatchesInPhase = 0;
+            // let totalMatchesInPhase = 0;
             const matchesByTeamInPhase = new Map<number, number>();
 
             for (const [teamNumber, matchCount] of teamMap) {
-              totalMatchesInPhase += matchCount;
+              // totalMatchesInPhase += matchCount;
               matchesByTeamInPhase.set(teamNumber, matchCount);
             }
 
@@ -956,10 +953,10 @@ export class TeamMatchesSyncService {
         }
 
         // Compter le nombre total de joueurs brûlés (toutes phases confondues pour le log)
-        let totalBurnedPlayers = 0;
-        for (const phaseMap of highestBurnedTeamByPlayerByPhase.values()) {
-          totalBurnedPlayers += phaseMap.size;
-        }
+        // let totalBurnedPlayers = 0;
+        // for (const phaseMap of highestBurnedTeamByPlayerByPhase.values()) {
+        //   totalBurnedPlayers += phaseMap.size;
+        // }
 
         console.log(
           `✅ ${highestBurnedTeamByPlayerByPhase.size} joueurs brûlés en ${typeName}`
@@ -1098,7 +1095,7 @@ export class TeamMatchesSyncService {
               // Le joueur n'a plus de matchs masculins, supprimer le brûlage si le champ existe
               if ((playerData?.highestMasculineTeamNumberByPhase as unknown) !== undefined) {
                 updates.highestMasculineTeamNumberByPhase =
-                  FieldValue.delete() as any;
+                  FieldValue.delete();
               }
             }
 
@@ -1145,7 +1142,7 @@ export class TeamMatchesSyncService {
               // Le joueur n'a plus de matchs féminins, supprimer le brûlage si le champ existe
               if ((playerData?.highestFeminineTeamNumberByPhase as unknown) !== undefined) {
                 updates.highestFeminineTeamNumberByPhase =
-                  FieldValue.delete() as any;
+                  FieldValue.delete();
               }
             }
 

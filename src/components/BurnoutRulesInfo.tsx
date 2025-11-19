@@ -22,8 +22,21 @@ import {
   ExpandMore as ExpandMoreIcon,
 } from "@mui/icons-material";
 
+interface ViolationDetails {
+  currentCount?: number;
+  maxCount?: number;
+  period?: string;
+}
+
+interface Violation {
+  rule: string;
+  message: string;
+  severity: string;
+  details?: ViolationDetails;
+}
+
 interface BurnoutRulesInfoProps {
-  violations?: Array<{ rule: string; message: string; severity: string }>;
+  violations?: Violation[];
   warnings?: Array<{ rule: string; message: string; severity: string }>;
   suggestions?: string[];
 }
@@ -161,15 +174,15 @@ export function BurnoutRulesInfo({
                         </Typography>
                       }
                       secondary={
-                        (violation as any).details && (
+                        violation.details && (
                           <Box sx={{ mt: 1 }}>
                             <Typography
                               variant="caption"
                               color="text.secondary"
                             >
-                              Détails: {(violation as any).details.currentCount}/
-                              {(violation as any).details.maxCount}(
-                              {(violation as any).details.period})
+                              Détails: {violation.details.currentCount}/
+                              {violation.details.maxCount}(
+                              {violation.details.period})
                             </Typography>
                           </Box>
                         )

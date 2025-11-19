@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Match, Team } from "@/types";
-import { transformAggregatedTeamEntry } from "@/lib/client/team-match-transform";
+import { transformAggregatedTeamEntry, type AggregatedTeamEntry } from "@/lib/client/team-match-transform";
 
 export interface EquipeWithMatches {
   team: Team;
@@ -35,7 +35,7 @@ export const useEquipesWithMatches = () => {
 
         const equipesWithMatches: EquipeWithMatches[] = aggregated.map(
           (entry: { team: unknown; matches: unknown[] }) =>
-            transformAggregatedTeamEntry(entry as any)
+            transformAggregatedTeamEntry(entry as AggregatedTeamEntry)
         );
 
         const sortedEquipes = equipesWithMatches.sort((a, b) => {

@@ -35,7 +35,7 @@ export interface FFTTJoueurDetails {
   datePremiereLicence?: string;
   clubPrecedent?: string;
   // Autres champs disponibles dans getJoueurDetailsByLicence
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface FFTTRencontre {

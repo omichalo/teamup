@@ -1,12 +1,13 @@
 import { FFTTAPI } from "@omichalo/ffttapi-node";
 import { getFFTTConfig } from "./fftt-utils";
+import type { Firestore } from "firebase-admin/firestore";
 
 export interface PlayerSyncResult {
   success: boolean;
   playersCount: number;
   message: string;
   error?: string;
-  processedPlayers?: any[];
+  processedPlayers?: Array<Record<string, unknown>>;
 }
 
 export interface FFTTJoueur {
@@ -48,7 +49,7 @@ export class PlayerSyncService {
       console.log(`✅ ${joueurs.length} joueurs récupérés depuis l'API FFTT`);
 
       // Traitement des joueurs
-      const processedPlayers = joueurs.map((joueur: any) => ({
+      const processedPlayers = joueurs.map((joueur: FFTTJoueur) => ({
         licence: joueur.licence,
         nom: joueur.nom,
         prenom: joueur.prenom,
@@ -80,11 +81,11 @@ export class PlayerSyncService {
    * Sauvegarde les joueurs dans Firestore
    */
   async savePlayersToFirestore(
-    players: any[],
-    db: any
+    players: Array<Record<string, unknown>>,
+    db: Firestore
   ): Promise<{ saved: number; errors: number }> {
     let saved = 0;
-    let errors = 0;
+    const errors = 0;
 
     try {
       console.log(
@@ -103,7 +104,7 @@ export class PlayerSyncService {
 
           // Filtrer les valeurs undefined
           const playerData = Object.fromEntries(
-            Object.entries(player).filter(([_, value]) => value !== undefined)
+            Object.entries(player).filter(([, value]) => value !== undefined)
           );
 
           batch.set(docRef, playerData);

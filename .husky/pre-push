@@ -3,3 +3,12 @@
 
 echo "🏗  Vérification complète avant push (build Next.js)..."
 npm run check
+
+# Vérifier qu'il n'y a pas de warnings ESLint
+LINT_OUTPUT=$(npm run lint 2>&1)
+WARNING_COUNT=$(echo "$LINT_OUTPUT" | grep -c "warning" || true)
+if [ "$WARNING_COUNT" -gt 0 ]; then
+  echo "❌ Des warnings ESLint ont été détectés. Veuillez les corriger avant de pousser."
+  echo "$LINT_OUTPUT" | grep "warning"
+  exit 1
+fi

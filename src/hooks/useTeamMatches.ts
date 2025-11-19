@@ -26,10 +26,13 @@ export const useTeamMatches = (teamId: string | null) => {
         const data = await response.json();
         const matchesData = data.matches || [];
 
-        const formattedMatches: Match[] = matchesData.map((match: any) => ({
-          ...match,
-          date: match.date ? new Date(match.date) : new Date(),
-        }));
+        const formattedMatches: Match[] = matchesData.map((match: unknown) => {
+          const m = match as Partial<Match> & { date?: string | Date };
+          return {
+            ...m,
+            date: m.date ? new Date(m.date) : new Date(),
+          } as Match;
+        });
 
         setMatches(formattedMatches);
       } catch (err) {
