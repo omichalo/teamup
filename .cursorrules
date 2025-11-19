@@ -1,0 +1,1 @@
+Après chaque refactor important et avant chaque commit sur le projet Next.js, exécute npm run check et corrige toutes les erreurs de build, de lint et de typage avant de t’arrêter.
