@@ -419,11 +419,24 @@ export class TeamMatchesSyncService {
       // Enrichir les matchs avec les licences des joueurs avant de mettre à jour la participation
       let enrichedMatches = matchesWithRecalculatedJournees;
       if (db && allMatches.length > 0) {
+        // OPTIMISATION : Charger tous les joueurs une seule fois et les réutiliser
+        console.log(
+          "📥 Chargement de tous les joueurs pour l'enrichissement (une seule fois)..."
+        );
+        const playersSnapshot = await db.collection("players").get();
+        const playersCache = playersSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        console.log(
+          `✅ ${playersCache.length} joueurs chargés en cache`
+        );
+
         console.log(
           "🔄 Enrichissement des matchs avec les licences des joueurs..."
         );
         enrichedMatches = await Promise.all(
-          allMatches.map((match) => this.enrichSQYPlayersFromClub(match, db))
+          allMatches.map((match) => this.enrichSQYPlayersFromClub(match, db, playersCache))
         );
         console.log(
           `✅ ${enrichedMatches.length} matchs enrichis`
@@ -434,7 +447,7 @@ export class TeamMatchesSyncService {
           "🔄 Mise à jour de la participation des joueurs basée sur les matchs enrichis..."
         );
         const participationResult =
-          await this.updatePlayerParticipationFromMatches(enrichedMatches, db);
+          await this.updatePlayerParticipationFromMatches(enrichedMatches, db, playersCache);
         console.log(
           `✅ Participation mise à jour: ${participationResult.updated} joueurs, ${participationResult.errors} erreurs`
         );
@@ -592,10 +605,14 @@ export class TeamMatchesSyncService {
 
   /**
    * Enrichit les données des joueurs SQY quand les licences sont vides
+   * @param match - Le match à enrichir
+   * @param db - Instance Firestore (optionnel si playersCache est fourni)
+   * @param playersCache - Cache optionnel des joueurs pour éviter les reads répétés
    */
   async enrichSQYPlayersFromClub(
     match: MatchData,
-    db: Firestore
+    db?: Firestore,
+    playersCache?: Array<{ id: string; [key: string]: unknown }>
   ): Promise<MatchData> {
     // Si pas de joueurs SQY, pas besoin d&apos;enrichir
     if (!match.joueursSQY || match.joueursSQY.length === 0) {
@@ -603,12 +620,22 @@ export class TeamMatchesSyncService {
     }
 
     try {
-      // Récupérer tous les joueurs du club SQY PING
-      const playersSnapshot = await db.collection("players").get();
-      const allPlayers = playersSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      // Utiliser le cache si fourni, sinon charger depuis Firestore
+      let allPlayers: Array<{ id: string; [key: string]: unknown }>;
+      
+      if (playersCache) {
+        allPlayers = playersCache;
+      } else if (db) {
+        // Récupérer tous les joueurs du club SQY PING (fallback si pas de cache)
+        const playersSnapshot = await db.collection("players").get();
+        allPlayers = playersSnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+      } else {
+        // Pas de cache ni de db, retourner le match tel quel
+        return match;
+      }
 
       // Enrichir chaque joueur individuellement s&apos;il a une licence vide
       const enrichedJoueursSQY = match.joueursSQY.map((joueur) => {
@@ -729,10 +756,14 @@ export class TeamMatchesSyncService {
 
   /**
    * Met à jour la participation des joueurs basée sur leur participation aux matchs
+   * @param matches - Les matchs à traiter
+   * @param db - Instance Firestore
+   * @param playersCache - Cache optionnel des joueurs pour éviter les reads répétés
    */
   async updatePlayerParticipationFromMatches(
     matches: MatchData[],
-    db: Firestore
+    db: Firestore,
+    playersCache?: Array<{ id: string; [key: string]: unknown }>
   ): Promise<{ updated: number; errors: number }> {
     let updated = 0;
     let errors = 0;
@@ -742,10 +773,13 @@ export class TeamMatchesSyncService {
         "🔄 Mise à jour de la participation des joueurs basée sur les matchs..."
       );
 
-      // Enrichir d&apos;abord les données des joueurs SQY
-      const enrichedMatches = await Promise.all(
-        matches.map((match) => this.enrichSQYPlayersFromClub(match, db))
-      );
+      // Les matchs sont déjà enrichis dans syncMatchesForAllTeams, donc on les utilise directement
+      // Si playersCache n'est pas fourni, on doit enrichir (cas où cette fonction est appelée seule)
+      const enrichedMatches = playersCache
+        ? matches // Déjà enrichis, pas besoin de réenrichir
+        : await Promise.all(
+            matches.map((match) => this.enrichSQYPlayersFromClub(match, db))
+          );
 
       // Collecter tous les joueurs qui participent à au moins un match
       const participatingPlayers = new Set<string>();
@@ -999,40 +1033,51 @@ export class TeamMatchesSyncService {
       const playerIds = Array.from(allPlayerIds);
       const playersToUpdate = [];
 
-      // OPTIMISATION : Récupérer tous les documents en une seule fois avec getAll()
+      // OPTIMISATION : Utiliser le cache de joueurs si fourni, sinon récupérer avec getAll()
       console.log(`📥 Récupération de ${playerIds.length} joueurs...`);
-      
-      const docRefs = playerIds.map((playerId) =>
-        db.collection("players").doc(playerId)
-      );
-      
-      // getAll() peut récupérer jusqu'à 10 documents à la fois
-      // Diviser en sous-batches de 10 et les traiter en parallèle
-      const getAllBatchSize = 10;
-      const getAllBatches: Array<Array<DocumentReference>> = [];
-      
-      for (let k = 0; k < docRefs.length; k += getAllBatchSize) {
-        getAllBatches.push(docRefs.slice(k, k + getAllBatchSize));
-      }
       
       // Créer une Map pour un accès rapide aux données existantes
       const playerDataMap = new Map<string, Record<string, unknown>>();
       
-      // Traiter les batches getAll() en parallèle (max 5 à la fois pour ne pas surcharger)
-      const maxConcurrentGetAll = 5;
-      for (let k = 0; k < getAllBatches.length; k += maxConcurrentGetAll) {
-        const concurrentBatches = getAllBatches.slice(k, k + maxConcurrentGetAll);
-        const getAllPromises = concurrentBatches.map((batch) => db.getAll(...batch));
+      if (playersCache) {
+        // Utiliser le cache de joueurs déjà chargé (évite les reads supplémentaires)
+        console.log(`✅ Utilisation du cache de joueurs (${playersCache.length} joueurs en cache)`);
+        for (const player of playersCache) {
+          if (playerIds.includes(player.id)) {
+            playerDataMap.set(player.id, player);
+          }
+        }
+      } else {
+        // Fallback : récupérer avec getAll() si pas de cache
+        const docRefs = playerIds.map((playerId) =>
+          db.collection("players").doc(playerId)
+        );
         
-        const results = await Promise.all(getAllPromises);
+        // getAll() peut récupérer jusqu'à 10 documents à la fois
+        // Diviser en sous-batches de 10 et les traiter en parallèle
+        const getAllBatchSize = 10;
+        const getAllBatches: Array<Array<DocumentReference>> = [];
         
-        results.forEach((docs) => {
-          docs.forEach((doc) => {
-            if (doc.exists) {
-              playerDataMap.set(doc.id, doc.data() as Record<string, unknown>);
-            }
+        for (let k = 0; k < docRefs.length; k += getAllBatchSize) {
+          getAllBatches.push(docRefs.slice(k, k + getAllBatchSize));
+        }
+        
+        // Traiter les batches getAll() en parallèle (max 5 à la fois pour ne pas surcharger)
+        const maxConcurrentGetAll = 5;
+        for (let k = 0; k < getAllBatches.length; k += maxConcurrentGetAll) {
+          const concurrentBatches = getAllBatches.slice(k, k + maxConcurrentGetAll);
+          const getAllPromises = concurrentBatches.map((batch) => db.getAll(...batch));
+          
+          const results = await Promise.all(getAllPromises);
+          
+          results.forEach((docs) => {
+            docs.forEach((doc) => {
+              if (doc.exists) {
+                playerDataMap.set(doc.id, doc.data() as Record<string, unknown>);
+              }
+            });
           });
-        });
+        }
       }
 
       for (const playerId of playerIds) {
@@ -1274,21 +1319,50 @@ export class TeamMatchesSyncService {
       const matchesByTeam = new Map<string, MatchData[]>();
 
       // Grouper les matchs par équipe (utiliser le champ teamId du match)
+      let matchesWithTeamId = 0;
+      let matchesWithoutTeamId = 0;
+      
       matches.forEach((match) => {
         const teamId = match.teamId;
 
-        if (teamId) {
+        if (teamId && teamId.trim() !== "") {
           if (!matchesByTeam.has(teamId)) {
             matchesByTeam.set(teamId, []);
           }
           matchesByTeam.get(teamId)!.push(match);
+          matchesWithTeamId++;
         } else {
-          console.warn(`⚠️ Match sans teamId: ${match.id}`);
+          console.warn(`⚠️ Match sans teamId: ${match.id} (teamId="${teamId}")`);
+          matchesWithoutTeamId++;
         }
       });
+      
+      console.log(`📊 Matchs avec teamId: ${matchesWithTeamId}, sans teamId: ${matchesWithoutTeamId}`);
 
       console.log(`📊 ${matchesByTeam.size} équipes avec des matchs`);
       console.log(`📊 Équipes: ${Array.from(matchesByTeam.keys()).join(", ")}`);
+      
+      // Calculer le total de matchs à sauvegarder
+      const totalMatchesToSave = Array.from(matchesByTeam.values()).reduce(
+        (sum, teamMatches) => sum + teamMatches.length,
+        0
+      );
+      console.log(`📊 Total de matchs à sauvegarder: ${totalMatchesToSave} (sur ${matches.length} matchs reçus)`);
+      
+      // Vérifier que les teamId existent dans Firestore
+      if (db && matchesByTeam.size > 0) {
+        const teamIds = Array.from(matchesByTeam.keys());
+        const teamRefs = teamIds.map(teamId => db.collection("teams").doc(teamId));
+        const teamDocs = await db.getAll(...teamRefs);
+        const existingTeamIds = teamDocs.filter(doc => doc.exists).map(doc => doc.id);
+        const missingTeamIds = teamIds.filter(id => !existingTeamIds.includes(id));
+        
+        if (missingTeamIds.length > 0) {
+          console.warn(`⚠️ ${missingTeamIds.length} équipes référencées dans les matchs n'existent pas dans Firestore: ${missingTeamIds.join(", ")}`);
+        } else {
+          console.log(`✅ Toutes les équipes référencées existent dans Firestore`);
+        }
+      }
 
       // OPTIMISATION : Paralléliser les commits de batch pour différentes équipes
       // Sauvegarder par batch
@@ -1305,6 +1379,7 @@ export class TeamMatchesSyncService {
         for (let i = 0; i < teamMatches.length; i += batchSize) {
           const batch = db.batch();
           const batchEnd = Math.min(i + batchSize, teamMatches.length);
+          const matchesInThisBatch = batchEnd - i;
 
           for (let j = i; j < batchEnd; j++) {
             const match = teamMatches[j];
@@ -1329,11 +1404,38 @@ export class TeamMatchesSyncService {
               }
             });
 
+            // Fonction helper pour nettoyer un objet joueur (supprimer les propriétés undefined)
+            const cleanPlayer = (joueur: {
+              licence?: string | undefined;
+              nom?: string | undefined;
+              prenom?: string | undefined;
+              points?: number | undefined;
+              sexe?: string | undefined;
+            }): Record<string, unknown> => {
+              const cleaned: Record<string, unknown> = {};
+              if (joueur.licence !== undefined && joueur.licence !== null) {
+                cleaned.licence = joueur.licence;
+              }
+              if (joueur.nom !== undefined && joueur.nom !== null) {
+                cleaned.nom = joueur.nom;
+              }
+              if (joueur.prenom !== undefined && joueur.prenom !== null) {
+                cleaned.prenom = joueur.prenom;
+              }
+              if (joueur.points !== undefined && joueur.points !== null) {
+                cleaned.points = joueur.points;
+              }
+              if (joueur.sexe !== undefined && joueur.sexe !== null) {
+                cleaned.sexe = joueur.sexe;
+              }
+              return cleaned;
+            };
+
             // Convertir les objets JoueurRencontre en objets simples pour Firestore
             const serializableMatchData = {
               ...matchData,
               joueursSQY:
-                matchData.joueursSQY?.map((joueur) => ({
+                matchData.joueursSQY?.map((joueur) => cleanPlayer({
                   licence: joueur.licence,
                   nom: (joueur as { nom?: string }).nom,
                   prenom: (joueur as { prenom?: string }).prenom,
@@ -1341,7 +1443,7 @@ export class TeamMatchesSyncService {
                   sexe: joueur.sexe,
                 })) || [],
               joueursAdversaires:
-                matchData.joueursAdversaires?.map((joueur) => ({
+                matchData.joueursAdversaires?.map((joueur) => cleanPlayer({
                   licence: joueur.licence,
                   nom: (joueur as { nom?: string }).nom,
                   prenom: (joueur as { prenom?: string }).prenom,
@@ -1351,7 +1453,7 @@ export class TeamMatchesSyncService {
             };
 
             // Forcer la mise à jour des champs importants même s'ils étaient vides avant
-            const updateData = {
+            const updateDataRaw = {
               ...serializableMatchData,
               // Toujours mettre à jour ces champs même s'ils étaient vides
               joueursSQY: serializableMatchData.joueursSQY || [],
@@ -1362,9 +1464,39 @@ export class TeamMatchesSyncService {
                 serializableMatchData.resultatsIndividuels || null,
             };
 
+            // Fonction récursive pour supprimer toutes les propriétés undefined
+            const removeUndefined = (obj: Record<string, unknown>): Record<string, unknown> => {
+              const cleaned: Record<string, unknown> = {};
+              for (const [key, value] of Object.entries(obj)) {
+                if (value === undefined) {
+                  continue; // Ignorer les valeurs undefined
+                }
+                if (value === null) {
+                  cleaned[key] = null; // Garder null
+                } else if (Array.isArray(value)) {
+                  // Nettoyer les tableaux
+                  cleaned[key] = value.map((item) =>
+                    typeof item === "object" && item !== null
+                      ? removeUndefined(item as Record<string, unknown>)
+                      : item
+                  );
+                } else if (typeof value === "object" && value !== null) {
+                  // Nettoyer les objets imbriqués
+                  cleaned[key] = removeUndefined(value as Record<string, unknown>);
+                } else {
+                  cleaned[key] = value;
+                }
+              }
+              return cleaned;
+            };
+
+            const updateData = removeUndefined(updateDataRaw as Record<string, unknown>);
+
             batch.set(docRef, updateData, { merge: true });
             saved++;
           }
+          
+          console.log(`  📝 Batch préparé: ${matchesInThisBatch} matchs ajoutés au batch (saved=${saved})`);
 
           // Ajouter la promesse de commit au tableau pour parallélisation
           // Capturer les valeurs dans une closure pour éviter les problèmes de référence
@@ -1390,7 +1522,10 @@ export class TeamMatchesSyncService {
       // Attendre que tous les batches soient committés en parallèle
       await Promise.all(batchPromises);
 
-      console.log(`✅ Synchronisation terminée: ${saved} matchs sauvegardés`);
+      console.log(`✅ Synchronisation terminée: ${saved} matchs sauvegardés sur ${matches.length} matchs reçus`);
+      if (saved !== matches.length) {
+        console.warn(`⚠️ Attention: ${matches.length - saved} matchs n'ont pas été sauvegardés (probablement sans teamId)`);
+      }
       return { saved, errors };
     } catch (error) {
       console.error("❌ Erreur lors de la sauvegarde:", error);

@@ -2,6 +2,7 @@ import { PlayerSyncService } from "./player-sync";
 import { TeamSyncService } from "./team-sync";
 import { TeamMatchesSyncService } from "./team-matches-sync";
 import type { Firestore } from "firebase-admin/firestore";
+import { Timestamp } from "firebase-admin/firestore";
 
 /**
  * Fonctions utilitaires partagées entre API routes et Cloud Functions
@@ -97,9 +98,11 @@ export async function syncTeamMatches(db: Firestore) {
   const duration = Date.now() - startTime;
   const durationSeconds = Math.round(duration / 1000);
 
-  // Sauvegarder la durée dans les métadonnées
+  // Sauvegarder la durée et le nombre de matchs dans les métadonnées
   await db.collection("metadata").doc("lastSync").set(
     {
+      teamMatches: Timestamp.fromDate(new Date()),
+      teamMatchesCount: saveResult.saved,
       teamMatchesDuration: durationSeconds,
     },
     { merge: true }

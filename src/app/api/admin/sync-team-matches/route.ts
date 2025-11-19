@@ -68,6 +68,8 @@ export async function POST() {
     const duration = Date.now() - startTime;
     const durationSeconds = Math.round(duration / 1000);
 
+    console.log(`💾 [sync-team-matches] Sauvegarde des métadonnées: teamMatchesCount=${saveResult.saved}, errors=${saveResult.errors}`);
+
     await db
       .collection("metadata")
       .doc("lastSync")
@@ -79,6 +81,8 @@ export async function POST() {
         },
         { merge: true }
       );
+    
+    console.log(`✅ [sync-team-matches] Métadonnées sauvegardées avec teamMatchesCount=${saveResult.saved}`);
 
     return NextResponse.json(
       {
