@@ -17,7 +17,11 @@ export async function POST(req: Request) {
         hasServerId: !!DISCORD_SERVER_ID,
       });
       return NextResponse.json(
-        { success: false, error: "Configuration Discord manquante. DISCORD_TOKEN et DISCORD_SERVER_ID doivent être configurés." },
+        {
+          success: false,
+          error:
+            "Configuration Discord manquante. DISCORD_TOKEN et DISCORD_SERVER_ID doivent être configurés.",
+        },
         { status: 500 }
       );
     }

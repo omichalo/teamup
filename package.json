@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "check": "npm run lint && npm run type-check && npm run build",
+    "check:dev": "npm run lint && npm run type-check",
     "dev": "next dev",
     "dev:no-turbo": "next dev",
     "build": "next build",

@@ -35,7 +35,7 @@ import {
   ListItemButton,
   ListItemText,
 } from "@mui/material";
-import { DragIndicator, ContentCopy, RestartAlt, Message, Close, Send } from "@mui/icons-material";
+import { DragIndicator, ContentCopy, RestartAlt, Message, Close, Send, AlternateEmail, Warning } from "@mui/icons-material";
 import {
   useEquipesWithMatches,
   type EquipeWithMatches,
@@ -315,6 +315,16 @@ export default function CompositionsPage() {
   const [mentionAnchor, setMentionAnchor] = useState<{ teamId: string; anchorEl: HTMLElement; startPos: number } | null>(null);
   const [mentionQuery, setMentionQuery] = useState<string>("");
   const saveTimeoutRef = React.useRef<Record<string, NodeJS.Timeout>>({});
+
+  // Fonction helper pour vérifier le statut Discord d'un joueur
+  const getDiscordStatus = useCallback((player: Player): "none" | "invalid" | "valid" => {
+    if (!player.discordMentions || player.discordMentions.length === 0) {
+      return "none";
+    }
+    const validMemberIds = new Set(discordMembers.map(m => m.id));
+    const hasInvalidMention = player.discordMentions.some(mentionId => !validMemberIds.has(mentionId));
+    return hasInvalidMention ? "invalid" : "valid";
+  }, [discordMembers]);
 
   const playerService = useMemo(() => new FirestorePlayerService(), []);
   const availabilityService = useMemo(() => new AvailabilityService(), []);
@@ -857,47 +867,39 @@ export default function CompositionsPage() {
       if (!selectedJournee || !selectedPhase) return;
       
       const allTeams = [...equipesByType.masculin, ...equipesByType.feminin];
-      const statusPromises = allTeams.map(async (equipe) => {
-        try {
-          const response = await fetch(
-            `/api/discord/check-message-sent?teamId=${encodeURIComponent(equipe.team.id)}&journee=${selectedJournee}&phase=${encodeURIComponent(selectedPhase)}`,
-            {
-              method: "GET",
-              credentials: "include",
-            }
-          );
-          if (response.ok) {
-            const result = await response.json();
-            if (result.success) {
-              return {
-                teamId: equipe.team.id,
-                status: { 
-                  sent: result.sent, 
-                  sentAt: result.sentAt,
-                  customMessage: result.customMessage || "",
-                },
-              };
-            }
-          }
-        } catch (error) {
-          console.error(`Erreur lors de la vérification du statut Discord pour ${equipe.team.id}:`, error);
-        }
-        return null;
-      });
+      if (allTeams.length === 0) return;
 
-      const results = await Promise.all(statusPromises);
-      const statusMap: Record<string, { sent: boolean; sentAt?: string; customMessage?: string }> = {};
-      const customMessagesMap: Record<string, string> = {};
-      results.forEach((result) => {
-        if (result) {
-          statusMap[result.teamId] = result.status;
-          if (result.status.customMessage) {
-            customMessagesMap[result.teamId] = result.status.customMessage;
+      // Un seul appel API pour toutes les équipes
+      const teamIds = allTeams.map(equipe => equipe.team.id).join(",");
+      try {
+        const response = await fetch(
+          `/api/discord/check-message-sent?teamIds=${encodeURIComponent(teamIds)}&journee=${selectedJournee}&phase=${encodeURIComponent(selectedPhase)}`,
+          {
+            method: "GET",
+            credentials: "include",
+          }
+        );
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.results) {
+            const statusMap: Record<string, { sent: boolean; sentAt?: string; customMessage?: string }> = {};
+            const customMessagesMap: Record<string, string> = {};
+            
+            Object.entries(result.results).forEach(([teamId, status]) => {
+              const statusData = status as { sent: boolean; sentAt?: string; customMessage?: string };
+              statusMap[teamId] = statusData;
+              if (statusData.customMessage) {
+                customMessagesMap[teamId] = statusData.customMessage;
+              }
+            });
+            
+            setDiscordSentStatus(statusMap);
+            setCustomMessages((prev) => ({ ...prev, ...customMessagesMap }));
           }
         }
-      });
-      setDiscordSentStatus(statusMap);
-      setCustomMessages((prev) => ({ ...prev, ...customMessagesMap }));
+      } catch (error) {
+        console.error("Erreur lors de la vérification du statut Discord:", error);
+      }
     };
 
     void checkDiscordStatus();
@@ -1097,12 +1099,17 @@ export default function CompositionsPage() {
         .join("\n");
       
       // Collecter toutes les mentions Discord de tous les joueurs
+      // Filtrer uniquement les mentions qui correspondent à des membres existants sur le serveur
       const allDiscordMentions: string[] = [];
+      const validMemberIds = new Set(discordMembers.map(m => m.id));
       teamPlayers.forEach((player) => {
         if (player.discordMentions && player.discordMentions.length > 0) {
-          // Ajouter toutes les mentions du joueur (format <@USER_ID>)
+          // Ajouter uniquement les mentions valides (format <@USER_ID>)
           player.discordMentions.forEach((mentionId) => {
-            allDiscordMentions.push(`<@${mentionId}>`);
+            // Vérifier que l'ID existe encore dans la liste des membres Discord
+            if (validMemberIds.has(mentionId)) {
+              allDiscordMentions.push(`<@${mentionId}>`);
+            }
           });
         }
       });
@@ -1122,7 +1129,7 @@ export default function CompositionsPage() {
       
       return parts.filter(Boolean).join("\n");
     },
-    [locations]
+    [locations, discordMembers]
   );
 
   // Fonction pour envoyer le message Discord
@@ -2232,6 +2239,44 @@ export default function CompositionsPage() {
                                     }}
                                   />
                                 )}
+                                {(() => {
+                                  const discordStatus = getDiscordStatus(player);
+                                  if (discordStatus === "none") {
+                                    return (
+                                      <Tooltip title="Aucun login Discord configuré">
+                                        <Chip
+                                          icon={<AlternateEmail fontSize="small" />}
+                                          label="Pas Discord"
+                                          size="small"
+                                          color="default"
+                                          variant="outlined"
+                                          sx={{
+                                            height: 20,
+                                            fontSize: "0.7rem",
+                                          }}
+                                        />
+                                      </Tooltip>
+                                    );
+                                  }
+                                  if (discordStatus === "invalid") {
+                                    return (
+                                      <Tooltip title="Au moins un login Discord n'existe plus sur le serveur">
+                                        <Chip
+                                          icon={<Warning fontSize="small" />}
+                                          label="Discord invalide"
+                                          size="small"
+                                          color="warning"
+                                          variant="outlined"
+                                          sx={{
+                                            height: 20,
+                                            fontSize: "0.7rem",
+                                          }}
+                                        />
+                                      </Tooltip>
+                                    );
+                                  }
+                                  return null;
+                                })()}
                               </Box>
                             }
                             secondary={
@@ -2525,6 +2570,44 @@ export default function CompositionsPage() {
                                           }}
                                         />
                                       )}
+                                      {(() => {
+                                        const discordStatus = getDiscordStatus(player);
+                                        if (discordStatus === "none") {
+                                          return (
+                                            <Tooltip title="Aucun login Discord configuré">
+                                              <Chip
+                                                icon={<AlternateEmail fontSize="small" />}
+                                                label="Pas Discord"
+                                                size="small"
+                                                color="default"
+                                                variant="outlined"
+                                                sx={{
+                                                  height: 18,
+                                                  fontSize: "0.65rem",
+                                                }}
+                                              />
+                                            </Tooltip>
+                                          );
+                                        }
+                                        if (discordStatus === "invalid") {
+                                          return (
+                                            <Tooltip title="Au moins un login Discord n'existe plus sur le serveur">
+                                              <Chip
+                                                icon={<Warning fontSize="small" />}
+                                                label="Discord invalide"
+                                                size="small"
+                                                color="warning"
+                                                variant="outlined"
+                                                sx={{
+                                                  height: 18,
+                                                  fontSize: "0.65rem",
+                                                }}
+                                              />
+                                            </Tooltip>
+                                          );
+                                        }
+                                        return null;
+                                      })()}
                                     </>
                                   );
                                 }}
@@ -2989,6 +3072,44 @@ export default function CompositionsPage() {
                                           }}
                                         />
                                       )}
+                                      {(() => {
+                                        const discordStatus = getDiscordStatus(player);
+                                        if (discordStatus === "none") {
+                                          return (
+                                            <Tooltip title="Aucun login Discord configuré">
+                                              <Chip
+                                                icon={<AlternateEmail fontSize="small" />}
+                                                label="Pas Discord"
+                                                size="small"
+                                                color="default"
+                                                variant="outlined"
+                                                sx={{
+                                                  height: 18,
+                                                  fontSize: "0.65rem",
+                                                }}
+                                              />
+                                            </Tooltip>
+                                          );
+                                        }
+                                        if (discordStatus === "invalid") {
+                                          return (
+                                            <Tooltip title="Au moins un login Discord n'existe plus sur le serveur">
+                                              <Chip
+                                                icon={<Warning fontSize="small" />}
+                                                label="Discord invalide"
+                                                size="small"
+                                                color="warning"
+                                                variant="outlined"
+                                                sx={{
+                                                  height: 18,
+                                                  fontSize: "0.65rem",
+                                                }}
+                                              />
+                                            </Tooltip>
+                                          );
+                                        }
+                                        return null;
+                                      })()}
                                     </>
                                   );
                                 }}

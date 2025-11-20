@@ -1,2 +1,4 @@
-Après chaque refactor important et avant chaque commit sur le projet Next.js, exécute npm run check et corrige toutes les erreurs de build, de lint et de typage avant de t’arrêter.
+Pendant le développement (quand npm run dev est actif), utilise npm run check:dev (lint + type-check sans build) pour éviter les conflits avec le serveur de développement.
+Avant chaque commit sur le projet Next.js, exécute npm run check (lint + type-check + build) et corrige toutes les erreurs de build, de lint et de typage avant de t'arrêter.
+Après un npm run check, relancer proprement le serveur de dev (arrêter puis redémarrer).
 Ne jamais faire de --no-verify sur les commandes git

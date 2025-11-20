@@ -45,6 +45,7 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   AlternateEmail as AlternateEmailIcon,
+  Warning as WarningIcon,
 } from "@mui/icons-material";
 import { Player } from "@/types/team-management";
 import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
@@ -270,6 +271,15 @@ export default function JoueursPage() {
     };
     void loadDiscordMembers();
   }, []);
+
+  // Fonction helper pour vérifier si un joueur a des IDs Discord invalides
+  const hasInvalidDiscordMentions = useCallback((player: Player): boolean => {
+    if (!player.discordMentions || player.discordMentions.length === 0) {
+      return false;
+    }
+    const validMemberIds = new Set(discordMembers.map(m => m.id));
+    return player.discordMentions.some(mentionId => !validMemberIds.has(mentionId));
+  }, [discordMembers]);
 
   // Calculer les joueurs filtrés pour chaque onglet (pour afficher les compteurs)
   const getFilteredCountForTab = useCallback((tabIndex: number) => {
@@ -797,7 +807,7 @@ export default function JoueursPage() {
       allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.COACH]}
       redirectWhenUnauthorized="/joueur"
     >
-      <Box sx={{ p: 5 }}>
+        <Box sx={{ p: 5 }}>
           <Typography variant="h4" gutterBottom>
             Gestion des Joueurs
           </Typography>
@@ -1209,7 +1219,7 @@ export default function JoueursPage() {
                         <TableCell>
                           <Badge
                             badgeContent={player.discordMentions?.length || 0}
-                            color="primary"
+                            color={hasInvalidDiscordMentions(player) ? "warning" : "primary"}
                             overlap="rectangular"
                             anchorOrigin={{
                               vertical: "top",
@@ -1375,7 +1385,7 @@ export default function JoueursPage() {
                         <TableCell>
                           <Badge
                             badgeContent={player.discordMentions?.length || 0}
-                            color="primary"
+                            color={hasInvalidDiscordMentions(player) ? "warning" : "primary"}
                             overlap="rectangular"
                             anchorOrigin={{
                               vertical: "top",
@@ -1410,8 +1420,8 @@ export default function JoueursPage() {
               }}
             >
               <Typography variant="h6">
-                Joueurs temporaires
-              </Typography>
+              Joueurs temporaires
+            </Typography>
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
@@ -1567,7 +1577,7 @@ export default function JoueursPage() {
                         <TableCell>
                           <Badge
                             badgeContent={player.discordMentions?.length || 0}
-                            color="primary"
+                            color={hasInvalidDiscordMentions(player) ? "warning" : "primary"}
                             overlap="rectangular"
                             anchorOrigin={{
                               vertical: "top",
@@ -1744,12 +1754,15 @@ export default function JoueursPage() {
                       }
                     />
                     <FormLabel>Participation au championnat</FormLabel>
-                  </Box>
+        </Box>
                 </FormControl>
                 <Box sx={{ position: "relative" }}>
                   <TextField
                     label="Discord (optionnel)"
                     fullWidth
+                    helperText={discordMentions.some(id => !discordMembers.find(m => m.id === id)) 
+                      ? "Certains IDs Discord ne correspondent plus à un utilisateur du serveur (indiqués en rouge ci-dessous)"
+                      : "Tapez @ pour mentionner un membre Discord. Vous pouvez ajouter plusieurs mentions."}
                     value={discordMentions.map(id => {
                       const member = discordMembers.find(m => m.id === id);
                       return member ? `<@${member.id}>` : `<@${id}>`;
@@ -1812,7 +1825,6 @@ export default function JoueursPage() {
                       }, 200);
                     }}
                     placeholder="Tapez @ pour mentionner un membre Discord..."
-                    helperText="Tapez @ suivi du nom d'un membre pour l'ajouter. Vous pouvez ajouter plusieurs mentions."
                   />
                   {mentionAnchor && (
                     <MentionSuggestions
@@ -1831,14 +1843,19 @@ export default function JoueursPage() {
                     <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
                       {discordMentions.map((id) => {
                         const member = discordMembers.find(m => m.id === id);
+                        const isInvalid = !member;
                         return (
                           <Chip
                             key={id}
-                            label={member ? member.displayName : id}
+                            label={member ? member.displayName : `ID: ${id}`}
+                            {...(isInvalid ? { icon: <WarningIcon /> } : {})}
+                            color={isInvalid ? "error" : "default"}
+                            variant={isInvalid ? "outlined" : "filled"}
                             onDelete={() => {
                               setDiscordMentions((prev) => prev.filter(mid => mid !== id));
                             }}
                             size="small"
+                            {...(isInvalid ? { title: "Cet ID Discord ne correspond plus à un utilisateur du serveur" } : {})}
                           />
                         );
                       })}
@@ -1991,6 +2008,9 @@ export default function JoueursPage() {
                   <TextField
                     label="Discord (optionnel)"
                     fullWidth
+                    helperText={discordMentions.some(id => !discordMembers.find(m => m.id === id)) 
+                      ? "Certains IDs Discord ne correspondent plus à un utilisateur du serveur (indiqués en rouge ci-dessous)"
+                      : "Tapez @ pour mentionner un membre Discord. Vous pouvez ajouter plusieurs mentions."}
                     value={discordMentions.map(id => {
                       const member = discordMembers.find(m => m.id === id);
                       return member ? `<@${member.id}>` : `<@${id}>`;
@@ -2053,7 +2073,6 @@ export default function JoueursPage() {
                       }, 200);
                     }}
                     placeholder="Tapez @ pour mentionner un membre Discord..."
-                    helperText="Tapez @ suivi du nom d'un membre pour l'ajouter. Vous pouvez ajouter plusieurs mentions."
                   />
                   {mentionAnchor && (
                     <MentionSuggestions
@@ -2072,14 +2091,19 @@ export default function JoueursPage() {
                     <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
                       {discordMentions.map((id) => {
                         const member = discordMembers.find(m => m.id === id);
+                        const isInvalid = !member;
                         return (
                           <Chip
                             key={id}
-                            label={member ? member.displayName : id}
+                            label={member ? member.displayName : `ID: ${id}`}
+                            {...(isInvalid ? { icon: <WarningIcon /> } : {})}
+                            color={isInvalid ? "error" : "default"}
+                            variant={isInvalid ? "outlined" : "filled"}
                             onDelete={() => {
                               setDiscordMentions((prev) => prev.filter(mid => mid !== id));
                             }}
                             size="small"
+                            {...(isInvalid ? { title: "Cet ID Discord ne correspond plus à un utilisateur du serveur" } : {})}
                           />
                         );
                       })}
