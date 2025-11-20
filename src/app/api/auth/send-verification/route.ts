@@ -98,7 +98,13 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
+    // Logger l'erreur complète côté serveur pour le débogage
     console.error("[send-verification] error", error);
+    if (error instanceof Error) {
+      console.error("[send-verification] error message:", error.message);
+      console.error("[send-verification] error stack:", error.stack);
+    }
+    // Retourner un message filtré au client
     const errorMessage = getFirebaseErrorMessage(error);
     return NextResponse.json(
       { error: errorMessage },

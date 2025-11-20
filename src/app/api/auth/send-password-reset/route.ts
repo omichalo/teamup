@@ -103,11 +103,18 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
+    // Logger l'erreur complète côté serveur pour le débogage
     console.error("[send-password-reset] error", error);
+    if (error instanceof Error) {
+      console.error("[send-password-reset] error message:", error.message);
+      console.error("[send-password-reset] error stack:", error.stack);
+    }
     console.error(
       "[send-password-reset] error details:",
       JSON.stringify(error, null, 2)
     );
+
+    // Retourner un message filtré au client
     const errorMessage = getFirebaseErrorMessage(error);
 
     // Log supplémentaire pour déboguer le problème de domaine

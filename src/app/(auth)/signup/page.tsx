@@ -68,7 +68,7 @@ export default function SignupPage() {
         });
         console.log("[Signup] Email verification sent successfully");
         setMsg(
-          "Compte créé ! Un email de vérification t'a été envoyé. Valide-le avant de te connecter. Vérifie aussi tes spams si tu ne le vois pas."
+          "Compte créé ! Un email de vérification t'a été envoyé. Valide-le avant de te connecter. Vérifie aussi tes spams si tu ne le vois pas. Si tu n'as pas reçu l'email, tu peux en demander un nouveau."
         );
       } catch (emailError) {
         console.error("[Signup] Error sending email verification:", emailError);
@@ -112,10 +112,13 @@ export default function SignupPage() {
               <Alert severity="success" sx={{ mb: 3 }}>
                 {msg}
               </Alert>
-              <Box sx={{ textAlign: "center", mt: 2 }}>
+              <Box sx={{ textAlign: "center", mt: 2, display: "flex", flexDirection: "column", gap: 1 }}>
                 <Button href="/login" variant="contained">
                   Aller à la connexion
                 </Button>
+                <Link href="/resend-verification" underline="hover">
+                  Renvoyer l&apos;email de vérification
+                </Link>
               </Box>
             </>
           )}
@@ -223,6 +226,11 @@ export default function SignupPage() {
               <Box sx={{ mt: 2, textAlign: "center" }}>
                 <Link href="/login" underline="hover">
                   Déjà inscrit ? Se connecter
+                </Link>
+              </Box>
+              <Box sx={{ mt: 1, textAlign: "center" }}>
+                <Link href="/resend-verification" underline="hover">
+                  Renvoyer l&apos;email de vérification
                 </Link>
               </Box>
             </>

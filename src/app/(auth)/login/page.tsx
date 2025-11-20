@@ -195,6 +195,11 @@ export default function LoginPage() {
               Mot de passe oublié ?
             </Link>
           </Box>
+          <Box sx={{ mt: 1, textAlign: "center" }}>
+            <Link href="/resend-verification" underline="hover">
+              Renvoyer l&apos;email de vérification
+            </Link>
+          </Box>
         </CardContent>
       </Card>
     </Container>

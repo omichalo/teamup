@@ -59,6 +59,23 @@ Ce guide vous permet de créer et configurer un projet Firebase séparé pour le
 3. Téléchargez le fichier JSON (ex: `sqyping-teamup-dev-firebase-adminsdk-xxxxx.json`)
 4. Placez-le à la racine du projet
 
+**⚠️ Important : Ajouter les permissions nécessaires au service account**
+
+Le service account généré automatiquement par Firebase n'a pas toujours toutes les permissions nécessaires. Vous devez lui ajouter les rôles suivants :
+
+1. Allez dans [Google Cloud Console - IAM](https://console.cloud.google.com/iam-admin/iam?project=sqyping-teamup-dev)
+2. Trouvez le service account (il devrait avoir un nom comme `firebase-adminsdk-xxxxx@sqyping-teamup-dev.iam.gserviceaccount.com`)
+3. Cliquez sur l'icône ✏️ (crayon) à droite
+4. Cliquez sur **Ajouter un autre rôle**
+5. Ajoutez les rôles suivants :
+   - **Administrateur Firebase** (`roles/firebase.admin`) - **Recommandé** (inclut tous les rôles nécessaires)
+   - OU les rôles spécifiques :
+     - **Service Usage Consumer** (`roles/serviceusage.serviceUsageConsumer`) - **NÉCESSAIRE** pour utiliser les APIs Firebase
+     - **Administrateur des règles Firebase** (`roles/firebaserules.admin`) - Pour déployer les règles
+6. Cliquez sur **Enregistrer**
+
+**Note** : Le rôle `Service Usage Consumer` est nécessaire pour que Firebase Admin SDK puisse utiliser les APIs comme Identity Toolkit (génération de liens de vérification d'email, reset de mot de passe, etc.).
+
 ## Étape 5 : Configurer le développement local
 
 ### Créer `.env.local`

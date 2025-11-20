@@ -177,13 +177,22 @@ export class TeamSyncService {
 
           // Préparer les données pour Firestore
           // Préserver les champs gérés manuellement par l'utilisateur (location, discordChannelId)
-          const teamData = {
+          // Ne pas inclure les champs undefined car Firestore ne les accepte pas
+          const teamData: Record<string, unknown> = {
             ...team,
-            location: existingData?.location, // Préserver le lieu existant
-            discordChannelId: existingData?.discordChannelId, // Préserver le canal Discord existant
             createdAt: Timestamp.fromDate(team.createdAt),
             updatedAt: Timestamp.fromDate(team.updatedAt),
           };
+
+          // Ajouter location seulement s'il existe
+          if (existingData?.location !== undefined) {
+            teamData.location = existingData.location;
+          }
+
+          // Ajouter discordChannelId seulement s'il existe
+          if (existingData?.discordChannelId !== undefined) {
+            teamData.discordChannelId = existingData.discordChannelId;
+          }
 
           batch.set(docRef, teamData, { merge: true });
           saved++;
