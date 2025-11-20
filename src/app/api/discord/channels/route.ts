@@ -49,16 +49,104 @@ export async function GET() {
 
     const channels = await response.json();
     
-    // Filtrer seulement les canaux textuels (type 0) et les trier par nom
-    const textChannels = channels
-      .filter((channel: { type: number }) => channel.type === 0) // Type 0 = canal textuel
-      .map((channel: { id: string; name: string }) => ({
+    // Log toutes les informations sur les canaux Discord
+    console.log("[Discord Channels] Tous les canaux récupérés:", JSON.stringify(channels, null, 2));
+    console.log("[Discord Channels] Nombre total de canaux:", channels.length);
+    
+    // Types de canaux Discord
+    // Type 0 = canal textuel (GUILD_TEXT)
+    // Type 4 = catégorie (GUILD_CATEGORY)
+    
+    interface DiscordChannel {
+      id: string;
+      name: string;
+      type: number;
+      position: number;
+      parent_id?: string | null;
+    }
+    
+    interface Category {
+      id: string;
+      name: string;
+      position: number;
+    }
+    
+    interface TextChannel {
+      id: string;
+      name: string;
+      parentId: string | null;
+      position: number;
+    }
+    
+    interface ChannelGroup {
+      category: Category | null;
+      channels: Array<{ id: string; name: string; position: number }>;
+    }
+    
+    // Séparer les catégories et les canaux textuels
+    const categories: Category[] = (channels as DiscordChannel[])
+      .filter((channel) => channel.type === 4) // Type 4 = catégorie
+      .map((category) => ({
+        id: category.id,
+        name: category.name,
+        position: category.position,
+      }))
+      .sort((a, b) => a.position - b.position);
+    
+    const textChannels: TextChannel[] = (channels as DiscordChannel[])
+      .filter((channel) => channel.type === 0) // Type 0 = canal textuel
+      .map((channel) => ({
         id: channel.id,
         name: channel.name,
-      }))
-      .sort((a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name));
+        parentId: channel.parent_id ?? null,
+        position: channel.position,
+      }));
+    
+    // Organiser les canaux par catégorie
+    const channelsByCategory: ChannelGroup[] = [];
+    
+    // Ajouter les canaux avec catégorie
+    categories.forEach((category) => {
+      const categoryChannels = textChannels
+        .filter((channel) => channel.parentId === category.id)
+        .sort((a, b) => a.position - b.position)
+        .map(({ id, name, position }) => ({ id, name, position }));
+      
+      if (categoryChannels.length > 0) {
+        channelsByCategory.push({
+          category,
+          channels: categoryChannels,
+        });
+      }
+    });
+    
+    // Ajouter les canaux sans catégorie (parent_id = null)
+    const uncategorizedChannels = textChannels
+      .filter((channel) => !channel.parentId)
+      .sort((a, b) => a.position - b.position)
+      .map(({ id, name, position }) => ({ id, name, position }));
+    
+    if (uncategorizedChannels.length > 0) {
+      channelsByCategory.push({
+        category: null,
+        channels: uncategorizedChannels,
+      });
+    }
+    
+    // Format plat pour compatibilité (tous les canaux textuels)
+    const flatChannels = textChannels
+      .map(({ id, name }) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    
+    console.log("[Discord Channels] Catégories:", JSON.stringify(categories, null, 2));
+    console.log("[Discord Channels] Structure hiérarchique:", JSON.stringify(channelsByCategory, null, 2));
+    console.log("[Discord Channels] Nombre de canaux textuels:", textChannels.length);
 
-    return NextResponse.json({ success: true, channels: textChannels });
+    return NextResponse.json({ 
+      success: true, 
+      channels: flatChannels, // Format plat pour compatibilité
+      hierarchy: channelsByCategory, // Structure hiérarchique
+    });
   } catch (error) {
     console.error("[Discord] Erreur:", error);
     return NextResponse.json(

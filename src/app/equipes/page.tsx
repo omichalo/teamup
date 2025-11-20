@@ -61,6 +61,10 @@ export default function EquipesPage() {
   const [selectedDiscordChannelId, setSelectedDiscordChannelId] = React.useState<string | null>(null);
   const [updatingDiscordChannel, setUpdatingDiscordChannel] = React.useState<string | null>(null);
   const [discordChannels, setDiscordChannels] = React.useState<Array<{ id: string; name: string }>>([]);
+  const [discordChannelsHierarchy, setDiscordChannelsHierarchy] = React.useState<Array<{
+    category: { id: string; name: string; position: number } | null;
+    channels: Array<{ id: string; name: string; position: number }>;
+  }>>([]);
   const [loadingDiscordChannels, setLoadingDiscordChannels] = React.useState(false);
 
   // Synchroniser l'état local avec les équipes initiales
@@ -167,6 +171,7 @@ export default function EquipesPage() {
           const result = await response.json();
           if (result.success) {
             setDiscordChannels(result.channels || []);
+            setDiscordChannelsHierarchy(result.hierarchy || []);
           } else {
             console.error("Erreur lors du chargement des canaux Discord:", result.error);
           }
@@ -1402,7 +1407,14 @@ export default function EquipesPage() {
             maxWidth="sm"
             fullWidth
           >
-            <DialogTitle>Modifier le canal Discord de l&apos;équipe</DialogTitle>
+            <DialogTitle>
+              {editingTeamDiscordChannel ? (() => {
+                const equipe = equipes.find(e => e.team.id === editingTeamDiscordChannel);
+                if (!equipe) return "Modifier le canal Discord de l'équipe";
+                const isFemale = equipe.matches[0]?.epreuve?.includes("Féminin") || false;
+                return `Modifier le canal Discord - ${equipe.team.name} (${isFemale ? "Féminin" : "Masculin"})`;
+              })() : "Modifier le canal Discord de l'équipe"}
+            </DialogTitle>
             <DialogContent>
               {editingTeamDiscordChannel && (
                 <Box sx={{ pt: 2 }}>
@@ -1420,11 +1432,36 @@ export default function EquipesPage() {
                       <MenuItem value="">
                         <em>Aucun canal</em>
                       </MenuItem>
-                      {discordChannels.map((channel) => (
-                        <MenuItem key={channel.id} value={channel.id}>
-                          #{channel.name}
-                        </MenuItem>
-                      ))}
+                      {discordChannelsHierarchy.length > 0
+                        ? // Afficher avec la hiérarchie (catégories)
+                          discordChannelsHierarchy.flatMap((group) => [
+                            ...(group.category
+                              ? [
+                                  <MenuItem
+                                    key={`category-${group.category.id}`}
+                                    disabled
+                                    sx={{ fontWeight: "bold", opacity: 1 }}
+                                  >
+                                    📁 {group.category.name}
+                                  </MenuItem>,
+                                ]
+                              : []),
+                            ...group.channels.map((channel) => (
+                              <MenuItem
+                                key={channel.id}
+                                value={channel.id}
+                                sx={{ pl: group.category ? 4 : 2 }}
+                              >
+                                {group.category ? "  " : ""}#{channel.name}
+                              </MenuItem>
+                            )),
+                          ])
+                        : // Fallback : affichage plat si pas de hiérarchie
+                          discordChannels.map((channel) => (
+                            <MenuItem key={channel.id} value={channel.id}>
+                              #{channel.name}
+                            </MenuItem>
+                          ))}
                     </Select>
                   </FormControl>
                   {loadingDiscordChannels && (
