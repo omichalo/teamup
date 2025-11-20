@@ -2,3 +2,4 @@ Pendant le développement (quand npm run dev est actif), utilise npm run check:d
 Avant chaque commit sur le projet Next.js, exécute npm run check (lint + type-check + build) et corrige toutes les erreurs de build, de lint et de typage avant de t'arrêter.
 Après un npm run check, relancer proprement le serveur de dev (arrêter puis redémarrer).
 Ne jamais faire de --no-verify sur les commandes git
+Toujours refuser de pousser sur git un code avec des TODO

@@ -46,11 +46,18 @@ service cloud.firestore {
     // ============================================
     // Collection: players
     // ============================================
-    // Lecture pour tous les utilisateurs authentifiés
+    // Lecture pour tous les utilisateurs authentifiés (documents individuels et list queries)
     // Écriture uniquement pour les admins/coaches (synchronisation FFTT)
     match /players/{playerId} {
       allow read: if isAuthenticated();
       allow write: if isCoach();
+    }
+    
+    // Autoriser les list queries sur la collection players (requêtes avec orderBy, where, etc.)
+    // Note: allow read dans match /players/{playerId} couvre les documents individuels,
+    // mais les list queries nécessitent une règle explicite au niveau de la collection
+    match /players/{document=**} {
+      allow list: if isAuthenticated();
     }
     
     // ============================================
