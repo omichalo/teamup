@@ -44,22 +44,39 @@ jobs:
             echo "❌ Erreur: Le secret FIREBASE_SERVICE_ACCOUNT n'est pas défini"
             exit 1
           fi
-          # Écrire le JSON dans un fichier en utilisant printf pour éviter les problèmes d'échappement
-          printf '%s\n' "$FIREBASE_SERVICE_ACCOUNT_JSON" > $HOME/firebase-service-account.json
+          # Écrire le JSON dans un fichier dans le workspace (accessible entre les étapes)
+          SERVICE_ACCOUNT_FILE="${{ github.workspace }}/firebase-service-account.json"
+          printf '%s\n' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$SERVICE_ACCOUNT_FILE"
           # Vérifier que le fichier JSON est valide
-          if ! python3 -m json.tool $HOME/firebase-service-account.json > /dev/null 2>&1; then
+          if ! python3 -m json.tool "$SERVICE_ACCOUNT_FILE" > /dev/null 2>&1; then
             echo "❌ Erreur: Le fichier JSON du service account est invalide"
             echo "Premières lignes du fichier:"
-            head -n 3 $HOME/firebase-service-account.json
+            head -n 3 "$SERVICE_ACCOUNT_FILE"
             exit 1
           fi
-          export GOOGLE_APPLICATION_CREDENTIALS=$HOME/firebase-service-account.json
-          gcloud auth activate-service-account --key-file=$HOME/firebase-service-account.json
+          # Authentifier gcloud
+          gcloud auth activate-service-account --key-file="$SERVICE_ACCOUNT_FILE"
+          # Vérifier que l'authentification fonctionne
+          echo "✅ Service account authentifié: $(gcloud config get-value account)"
+          # Exporter le chemin pour les étapes suivantes
+          echo "SERVICE_ACCOUNT_FILE=$SERVICE_ACCOUNT_FILE" >> $GITHUB_ENV
 
       - name: Deploy Firestore Rules and Indexes
         env:
-          GOOGLE_APPLICATION_CREDENTIALS: $HOME/firebase-service-account.json
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ env.SERVICE_ACCOUNT_FILE }}
         run: |
+          # Vérifier que GOOGLE_APPLICATION_CREDENTIALS est défini
+          if [ -z "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+            echo "❌ Erreur: GOOGLE_APPLICATION_CREDENTIALS n'est pas défini"
+            exit 1
+          fi
+          # Vérifier que le fichier existe
+          if [ ! -f "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+            echo "❌ Erreur: Le fichier $GOOGLE_APPLICATION_CREDENTIALS n'existe pas"
+            exit 1
+          fi
+          echo "🔍 Utilisation de: $GOOGLE_APPLICATION_CREDENTIALS"
+          # Déployer avec Firebase CLI
           firebase deploy --only firestore:rules,firestore:indexes \
             --project sqyping-teamup \
             --non-interactive
@@ -67,3 +84,12 @@ jobs:
       - name: Verify deployment
         run: |
           echo "✅ Règles et index Firestore déployés avec succès sur le projet sqyping-teamup"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          # Supprimer le fichier de service account pour des raisons de sécurité
+          if [ -f "${{ github.workspace }}/firebase-service-account.json" ]; then
+            rm -f "${{ github.workspace }}/firebase-service-account.json"
+            echo "🧹 Fichier de service account supprimé"
+          fi

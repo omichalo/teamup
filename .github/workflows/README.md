@@ -64,6 +64,7 @@ Après avoir configuré le secret, vous pouvez tester le workflow :
 4. Vérifiez que le workflow s'exécute sans erreur
 
 **Si vous obtenez une erreur 403 "The caller does not have permission"** :
+
 - Vérifiez que le service account a bien le rôle `Firebase Admin` ou `Firebase Rules Admin`
 - Allez dans [Google Cloud Console - IAM](https://console.cloud.google.com/iam-admin/iam?project=sqyping-teamup)
 - Trouvez votre service account et vérifiez ses rôles
