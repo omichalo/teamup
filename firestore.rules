@@ -155,6 +155,17 @@ service cloud.firestore {
     }
     
     // ============================================
+    // Collection: discordMessages
+    // ============================================
+    // Messages Discord envoyés pour les matchs
+    // Lecture pour tous les utilisateurs authentifiés
+    // Écriture uniquement pour les admins/coaches
+    match /discordMessages/{messageId} {
+      allow read: if isAuthenticated();
+      allow write: if isCoach();
+    }
+    
+    // ============================================
     // Règle par défaut : refuser tout accès non explicitement autorisé
     // ============================================
     match /{document=**} {

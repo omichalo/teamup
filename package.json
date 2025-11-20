@@ -8,6 +8,8 @@
     "dev": "next dev",
     "dev:no-turbo": "next dev",
     "build": "next build",
+    "deploy:firestore:prod": "firebase deploy --only firestore:rules,firestore:indexes --project sqyping-teamup",
+    "deploy:firestore:dev": "firebase deploy --only firestore:rules,firestore:indexes --project sqyping-teamup-dev",
     "build:strict": "tsc --noEmit && next build",
     "type-check": "tsc --noEmit",
     "start": "next start",
