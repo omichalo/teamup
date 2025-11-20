@@ -1034,7 +1034,8 @@ export default function CompositionsPage() {
         console.error("Erreur lors de la sauvegarde du message personnalisé:", error);
       }
     },
-    [selectedJournee, selectedPhase]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
   );
 
   // Fonction pour insérer une mention dans le message
