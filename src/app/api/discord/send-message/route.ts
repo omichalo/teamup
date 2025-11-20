@@ -5,16 +5,23 @@ import { getFirestore, Timestamp } from "firebase-admin/firestore";
 
 const db = getFirestore();
 
-// Configuration du bot Discord
-const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
-const DISCORD_SERVER_ID = process.env.DISCORD_SERVER_ID;
-
-if (!DISCORD_TOKEN || !DISCORD_SERVER_ID) {
-  throw new Error("DISCORD_TOKEN et DISCORD_SERVER_ID doivent être configurés");
-}
-
 export async function POST(req: Request) {
   try {
+    // Configuration du bot Discord (vérifier à l'intérieur de la fonction)
+    const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
+    const DISCORD_SERVER_ID = process.env.DISCORD_SERVER_ID;
+
+    if (!DISCORD_TOKEN || !DISCORD_SERVER_ID) {
+      console.error("[Discord] Variables d'environnement manquantes:", {
+        hasToken: !!DISCORD_TOKEN,
+        hasServerId: !!DISCORD_SERVER_ID,
+      });
+      return NextResponse.json(
+        { success: false, error: "Configuration Discord manquante. DISCORD_TOKEN et DISCORD_SERVER_ID doivent être configurés." },
+        { status: 500 }
+      );
+    }
+
     // Vérifier l'authentification
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
