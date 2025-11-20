@@ -26,8 +26,13 @@ Ce guide vous explique étape par étape comment configurer GitHub Actions pour 
 3. **Ajoutez les rôles nécessaires** :
 
    - Dans la section **Accorder l'accès à ce compte de service**, cliquez sur **Sélectionner un rôle**
-   - Recherchez et sélectionnez **Firebase Admin** (ou `Firebase Admin SDK Administrator Service Agent`)
-   - ⚠️ **Important** : Ce rôle est nécessaire pour déployer les règles Firestore
+   - Recherchez et sélectionnez **Administrateur Firebase** ou **Firebase Admin SDK Administrator Service Agent** (nom technique : `roles/firebase.admin`)
+   - ⚠️ **Important** : Ce rôle est recommandé car il inclut tous les rôles nécessaires (règles, index, activation des APIs)
+   - **Alternative** : Si vous préférez utiliser des rôles spécifiques, ajoutez :
+     - **Administrateur des règles Firebase** (`roles/firebaserules.admin`)
+     - **Utilisateur Cloud Datastore** (`roles/datastore.user`)
+     - **Administrateur d'index Cloud Datastore** (`roles/datastore.indexAdmin`)
+     - **Administrateur Service Usage** (`roles/serviceusage.serviceUsageAdmin`) - **NÉCESSAIRE** pour activer les APIs comme Firestore
    - Cliquez sur **Ajouter un autre rôle** si vous voulez ajouter des rôles supplémentaires
    - Cliquez sur **Continuer**
 
@@ -129,9 +134,18 @@ Ce guide vous explique étape par étape comment configurer GitHub Actions pour 
 
 **Solution** :
 
-- Vérifiez que le service account a bien le rôle **Firebase Admin** dans Google Cloud Console
+- Vérifiez que le service account a bien le rôle **Administrateur Firebase** (ou **Firebase Admin**) dans Google Cloud Console
 - Allez dans [Google Cloud Console - IAM](https://console.cloud.google.com/iam-admin/iam?project=sqyping-teamup)
-- Trouvez votre service account et ajoutez le rôle **Firebase Admin** si nécessaire
+- Trouvez votre service account et ajoutez le rôle **Administrateur Firebase** si nécessaire
+
+### Erreur : "403, Permission denied to get service [firestore.googleapis.com]"
+
+**Solution** :
+
+- Le service account n'a pas les permissions pour activer les APIs Google Cloud
+- Allez dans [Google Cloud Console - IAM](https://console.cloud.google.com/iam-admin/iam?project=sqyping-teamup)
+- Trouvez votre service account et ajoutez le rôle **Administrateur Service Usage** (`roles/serviceusage.serviceUsageAdmin`)
+- **OU** utilisez le rôle **Administrateur Firebase** qui inclut automatiquement cette permission (recommandé)
 
 ### Erreur : "Failed to authenticate, have you run firebase login?"
 

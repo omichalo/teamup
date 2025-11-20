@@ -22,13 +22,19 @@ Le workflow peut également être déclenché manuellement depuis l'onglet "Acti
 
 Ce secret doit contenir le JSON complet du service account Firebase avec les permissions suivantes :
 
-- **Recommandé** : `roles/firebase.admin` - Accès complet à Firebase (inclut tout)
+- **Recommandé** : `roles/firebase.admin` (nom français : **Administrateur Firebase** ou **Firebase Admin SDK Administrator Service Agent**) - Accès complet à Firebase (inclut tout)
 - **OU** les rôles spécifiques suivants :
-  - `roles/firebaserules.admin` - **NÉCESSAIRE** pour déployer les règles Firestore
-  - `roles/datastore.user` - Pour lire/écrire dans Firestore
-  - `roles/datastore.indexAdmin` - Pour déployer les index Firestore
+  - `roles/firebaserules.admin` (nom français : **Administrateur des règles Firebase**) - **NÉCESSAIRE** pour déployer les règles Firestore
+  - `roles/datastore.user` (nom français : **Utilisateur Cloud Datastore**) - Pour lire/écrire dans Firestore
+  - `roles/datastore.indexAdmin` (nom français : **Administrateur d'index Cloud Datastore**) - Pour déployer les index Firestore
+  - `roles/serviceusage.serviceUsageAdmin` (nom français : **Administrateur Service Usage**) - **NÉCESSAIRE** pour activer les APIs (comme Firestore API)
 
-**⚠️ Important** : Le service account doit avoir au minimum le rôle `roles/firebaserules.admin` pour pouvoir déployer les règles Firestore. Sans ce rôle, vous obtiendrez une erreur 403 "The caller does not have permission".
+**⚠️ Important** : Le service account doit avoir au minimum les rôles suivants :
+
+- `roles/firebaserules.admin` pour déployer les règles Firestore
+- `roles/serviceusage.serviceUsageAdmin` pour activer les APIs nécessaires
+
+Sans ces rôles, vous obtiendrez une erreur 403 "Permission denied".
 
 **Comment obtenir le service account** :
 
@@ -37,8 +43,12 @@ Ce secret doit contenir le JSON complet du service account Firebase avec les per
 3. Donnez-lui un nom (ex: `github-actions-firestore-deploy`)
 4. Cliquez sur **Créer et continuer**
 5. **Ajoutez les rôles suivants** (IMPORTANT) :
-   - `Firebase Admin` (ou `roles/firebase.admin`) - **Recommandé**
-   - OU `Firebase Rules Admin` (`roles/firebaserules.admin`) + `Cloud Datastore User` (`roles/datastore.user`) + `Cloud Datastore Index Admin` (`roles/datastore.indexAdmin`)
+   - **Administrateur Firebase** ou **Firebase Admin SDK Administrator Service Agent** (`roles/firebase.admin`) - **Recommandé** (inclut tous les rôles nécessaires)
+   - OU les rôles spécifiques suivants :
+     - **Administrateur des règles Firebase** (`roles/firebaserules.admin`)
+     - **Utilisateur Cloud Datastore** (`roles/datastore.user`)
+     - **Administrateur d'index Cloud Datastore** (`roles/datastore.indexAdmin`)
+     - **Administrateur Service Usage** (`roles/serviceusage.serviceUsageAdmin`) - **NÉCESSAIRE** pour activer les APIs
 6. Cliquez sur **Terminer**
 7. Cliquez sur le service account créé
 8. Allez dans l'onglet **Clés**
