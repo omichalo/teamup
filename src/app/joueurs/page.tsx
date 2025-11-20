@@ -32,11 +32,7 @@ import {
   MenuItem,
   Select,
   InputLabel,
-  Popper,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
+  Autocomplete,
 } from "@mui/material";
 import {
   Search as SearchIcon,
@@ -79,105 +75,6 @@ function TabPanel(props: TabPanelProps) {
 }
 
 // Composant pour afficher les suggestions de mentions Discord
-function MentionSuggestions({
-  members,
-  query,
-  anchorEl,
-  onSelect,
-}: {
-  members: Array<{ id: string; username: string; displayName: string }>;
-  query: string;
-  anchorEl: HTMLElement;
-  onSelect: (member: { id: string; username: string; displayName: string }) => void;
-}) {
-  const filteredMembers = members.filter((member) => {
-    const searchQuery = query.toLowerCase();
-    return (
-      member.displayName.toLowerCase().includes(searchQuery) ||
-      member.username.toLowerCase().includes(searchQuery)
-    );
-  }).slice(0, 10); // Limiter à 10 résultats
-
-  if (filteredMembers.length === 0) {
-    return null;
-  }
-
-  return (
-    <Popper
-      open={true}
-      anchorEl={anchorEl}
-      placement="bottom-start"
-      sx={{ zIndex: 1300, mt: 0.5 }}
-    >
-      <Paper
-        elevation={8}
-        sx={{
-          maxHeight: 300,
-          overflow: "auto",
-          minWidth: 280,
-          borderRadius: 2,
-          border: "1px solid",
-          borderColor: "divider",
-          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.15)",
-        }}
-      >
-        <List dense sx={{ py: 0.5 }}>
-          {filteredMembers.map((member) => (
-            <ListItem key={member.id} disablePadding>
-              <ListItemButton
-                onMouseDown={(e) => {
-                  // Empêcher le onBlur du TextField de se déclencher
-                  e.preventDefault();
-                }}
-                onClick={() => {
-                  onSelect(member);
-                }}
-                sx={{
-                  borderRadius: 1,
-                  mx: 0.5,
-                  my: 0.25,
-                  "&:hover": {
-                    backgroundColor: "action.hover",
-                  },
-                }}
-              >
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: 32,
-                    height: 32,
-                    borderRadius: "50%",
-                    backgroundColor: "primary.main",
-                    color: "primary.contrastText",
-                    mr: 1.5,
-                    fontSize: "0.875rem",
-                    fontWeight: 600,
-                  }}
-                >
-                  {member.displayName.charAt(0).toUpperCase()}
-                </Box>
-                <ListItemText
-                  primary={
-                    <Typography variant="body2" fontWeight={500}>
-                      {member.displayName}
-                    </Typography>
-                  }
-                  secondary={
-                    <Typography variant="caption" color="text.secondary">
-                      @{member.username}
-                    </Typography>
-                  }
-                />
-              </ListItemButton>
-            </ListItem>
-          ))}
-        </List>
-      </Paper>
-    </Popper>
-  );
-}
 
 export default function JoueursPage() {
   const { equipes, loading: loadingEquipes } = useEquipesWithMatches();
@@ -217,8 +114,7 @@ export default function JoueursPage() {
   const [licenseExistsForOther, setLicenseExistsForOther] = useState(false);
   const [discordMembers, setDiscordMembers] = useState<Array<{ id: string; username: string; displayName: string }>>([]);
   const [discordMentions, setDiscordMentions] = useState<string[]>([]); // IDs des membres Discord sélectionnés
-  const [mentionAnchor, setMentionAnchor] = useState<{ anchorEl: HTMLElement; startPos: number } | null>(null);
-  const [mentionQuery, setMentionQuery] = useState<string>("");
+  const [discordMentionError, setDiscordMentionError] = useState<string | null>(null);
 
   const playerService = useMemo(() => new FirestorePlayerService(), []);
 
@@ -280,6 +176,24 @@ export default function JoueursPage() {
     const validMemberIds = new Set(discordMembers.map(m => m.id));
     return player.discordMentions.some(mentionId => !validMemberIds.has(mentionId));
   }, [discordMembers]);
+
+  // Fonction pour vérifier si un Discord ID est déjà utilisé par un autre joueur
+  const isDiscordIdUsedByOtherPlayer = useCallback((discordId: string, excludePlayerId?: string): { used: boolean; playerName?: string } => {
+    const allPlayers = [...players, ...playersWithoutLicense, ...temporaryPlayers];
+    for (const player of allPlayers) {
+      // Ignorer le joueur en cours d'édition
+      if (excludePlayerId && player.id === excludePlayerId) {
+        continue;
+      }
+      if (player.discordMentions && player.discordMentions.includes(discordId)) {
+        return {
+          used: true,
+          playerName: `${player.firstName} ${player.name}`.trim() || player.license,
+        };
+      }
+    }
+    return { used: false };
+  }, [players, playersWithoutLicense, temporaryPlayers]);
 
   // Calculer les joueurs filtrés pour chaque onglet (pour afficher les compteurs)
   const getFilteredCountForTab = useCallback((tabIndex: number) => {
@@ -538,6 +452,7 @@ export default function JoueursPage() {
       inChampionship: player.participation?.championnat || false,
     });
     setDiscordMentions(player.discordMentions || []);
+    setDiscordMentionError(null);
     setLicenseExists(false);
     setLicenseExistsForOther(false);
     setEditDialogOpen(true);
@@ -545,6 +460,11 @@ export default function JoueursPage() {
 
   const handleUpdatePlayer = async () => {
     if (!editingPlayer) return;
+    
+    // Vérifier qu'il n'y a pas d'erreur de login Discord déjà utilisé
+    if (discordMentionError) {
+      return;
+    }
     
     // Pour les joueurs temporaires, vérifier les champs obligatoires
     if (editingPlayer.isTemporary) {
@@ -604,31 +524,37 @@ export default function JoueursPage() {
         if (p.id === editingPlayer.id) {
           const updatedPlayer: Player = {
             ...p,
-            ...(discordMentions.length > 0 ? { discordMentions } : {}),
+            // Toujours mettre à jour discordMentions, même s'il est vide (pour refléter la suppression)
+            discordMentions: discordMentions.length > 0 ? discordMentions : [],
           };
           return updatedPlayer;
         }
         return p;
       };
 
-      setPlayers(players.map(updatePlayerInLists));
-      setPlayersWithoutLicense(playersWithoutLicense.map(updatePlayerInLists));
-      setTemporaryPlayers(temporaryPlayers.map(updatePlayerInLists));
+      const updatedPlayers = players.map(updatePlayerInLists);
+      const updatedPlayersWithoutLicense = playersWithoutLicense.map(updatePlayerInLists);
+      const updatedTemporaryPlayers = temporaryPlayers.map(updatePlayerInLists);
+
+      setPlayers(updatedPlayers);
+      setPlayersWithoutLicense(updatedPlayersWithoutLicense);
+      setTemporaryPlayers(updatedTemporaryPlayers);
 
       // Recalculer les joueurs filtrés selon l'onglet actif
+      // Utiliser les listes déjà mises à jour
       let sourcePlayers: Player[] = [];
       switch (selectedTab) {
         case 0:
-          sourcePlayers = players.map(updatePlayerInLists);
+          sourcePlayers = updatedPlayers;
           break;
         case 1:
-          sourcePlayers = playersWithoutLicense.map(updatePlayerInLists);
+          sourcePlayers = updatedPlayersWithoutLicense;
           break;
         case 2:
-          sourcePlayers = temporaryPlayers.map(updatePlayerInLists);
+          sourcePlayers = updatedTemporaryPlayers;
           break;
         default:
-          sourcePlayers = players.map(updatePlayerInLists);
+          sourcePlayers = updatedPlayers;
       }
 
       // Appliquer les filtres
@@ -1756,104 +1682,106 @@ export default function JoueursPage() {
                     <FormLabel>Participation au championnat</FormLabel>
         </Box>
                 </FormControl>
-                <Box sx={{ position: "relative" }}>
-                  <TextField
-                    label="Discord (optionnel)"
-                    fullWidth
-                    helperText={discordMentions.some(id => !discordMembers.find(m => m.id === id)) 
-                      ? "Certains IDs Discord ne correspondent plus à un utilisateur du serveur (indiqués en rouge ci-dessous)"
-                      : "Tapez @ pour mentionner un membre Discord. Vous pouvez ajouter plusieurs mentions."}
-                    value={discordMentions.map(id => {
-                      const member = discordMembers.find(m => m.id === id);
-                      return member ? `<@${member.id}>` : `<@${id}>`;
-                    }).join(" ")}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      const cursorPos = e.target.selectionStart || 0;
-                      
-                      // Détecter si on tape "@" ou si on est en train de taper après "@"
-                      const textBeforeCursor = value.substring(0, cursorPos);
-                      const lastAtIndex = textBeforeCursor.lastIndexOf("@");
-                      
-                      if (lastAtIndex !== -1) {
-                        const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
-                        if (!textAfterAt.includes(" ") && !textAfterAt.includes("\n")) {
-                          const query = textAfterAt.toLowerCase();
-                          setMentionQuery(query);
-                          setMentionAnchor({
-                            anchorEl: e.target,
-                            startPos: lastAtIndex,
-                          });
-                        } else {
-                          setMentionAnchor(null);
-                        }
-                      } else {
-                        setMentionAnchor(null);
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (mentionAnchor) {
-                        const filteredMembers = discordMembers.filter((member) => {
-                          const query = mentionQuery.toLowerCase();
-                          return (
-                            member.displayName.toLowerCase().includes(query) ||
-                            member.username.toLowerCase().includes(query)
-                          );
-                        });
-                        
-                        if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === "Escape") {
-                          e.preventDefault();
-                          if (e.key === "Escape") {
-                            setMentionAnchor(null);
-                          } else if (e.key === "Enter" && filteredMembers.length > 0) {
-                            const selectedMember = filteredMembers[0];
-                            if (!discordMentions.includes(selectedMember.id)) {
-                              setDiscordMentions([...discordMentions, selectedMember.id]);
-                            }
-                            setMentionAnchor(null);
-                          }
+                <Autocomplete
+                  multiple
+                  options={discordMembers}
+                  getOptionLabel={(option) => option.displayName}
+                  value={discordMentions.map(id => discordMembers.find(m => m.id === id)).filter((m): m is { id: string; username: string; displayName: string } => m !== undefined)}
+                  onChange={(_, newValue) => {
+                    setDiscordMentionError(null);
+                    const newIds = newValue.map(m => m.id);
+                    // Vérifier si un des nouveaux membres est déjà utilisé
+                    for (const member of newValue) {
+                      if (!discordMentions.includes(member.id)) {
+                        const check = isDiscordIdUsedByOtherPlayer(member.id);
+                        if (check.used) {
+                          setDiscordMentionError(`Le login Discord "${member.displayName}" est déjà associé au joueur "${check.playerName}".`);
+                          return;
                         }
                       }
-                    }}
-                    onBlur={(e) => {
-                      const relatedTarget = e.relatedTarget as HTMLElement | null;
-                      if (relatedTarget && relatedTarget.closest('[role="listbox"]')) {
-                        return;
+                    }
+                    setDiscordMentions(newIds);
+                  }}
+                  filterOptions={(options, { inputValue }) => {
+                    const query = inputValue.toLowerCase();
+                    return options.filter((member) => {
+                      // Exclure les membres déjà sélectionnés
+                      if (discordMentions.includes(member.id)) {
+                        return false;
                       }
-                      setTimeout(() => {
-                        setMentionAnchor(null);
-                      }, 200);
-                    }}
-                    placeholder="Tapez @ pour mentionner un membre Discord..."
-                  />
-                  {mentionAnchor && (
-                    <MentionSuggestions
-                      members={discordMembers}
-                      query={mentionQuery}
-                      anchorEl={mentionAnchor.anchorEl}
-                      onSelect={(member) => {
-                        if (!discordMentions.includes(member.id)) {
-                          setDiscordMentions([...discordMentions, member.id]);
+                      // Filtrer par nom d'affichage ou username
+                      return (
+                        member.displayName.toLowerCase().includes(query) ||
+                        member.username.toLowerCase().includes(query)
+                      );
+                    });
+                  }}
+                  renderOption={(props, option) => {
+                    const check = isDiscordIdUsedByOtherPlayer(option.id);
+                    const isUsed = check.used;
+                    return (
+                      <Box component="li" {...props} key={option.id}>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: 32,
+                            height: 32,
+                            borderRadius: "50%",
+                            backgroundColor: isUsed ? "error.main" : "primary.main",
+                            color: "primary.contrastText",
+                            mr: 1.5,
+                            fontSize: "0.875rem",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {option.displayName.charAt(0).toUpperCase()}
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="body2" fontWeight={500}>
+                            {option.displayName}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            @{option.username}
+                            {isUsed && ` - Déjà utilisé par ${check.playerName}`}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    );
+                  }}
+                  renderInput={(params) => {
+                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                    const { size, InputLabelProps, ...restParams } = params;
+                    return (
+                      <TextField
+                        {...restParams}
+                        // @ts-expect-error - InputLabelProps from Autocomplete has incompatible types with TextField
+                        InputLabelProps={InputLabelProps}
+                        label="Discord (optionnel)"
+                        placeholder="Rechercher un membre Discord..."
+                        helperText={
+                          discordMentionError ||
+                          (discordMentions.some(id => !discordMembers.find(m => m.id === id))
+                            ? "Certains IDs Discord ne correspondent plus à un utilisateur du serveur (indiqués en rouge ci-dessous)"
+                            : "Recherchez et sélectionnez les membres Discord à associer à ce joueur")
                         }
-                        setMentionAnchor(null);
-                      }}
-                    />
-                  )}
-                  {discordMentions.length > 0 && (
-                    <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
-                      {discordMentions.map((id) => {
-                        const member = discordMembers.find(m => m.id === id);
-                        const isInvalid = !member;
+                        error={!!discordMentionError}
+                      />
+                    );
+                  }}
+                  renderTags={(value, getTagProps) => (
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 1 }}>
+                      {value.map((member, index) => {
+                        const isInvalid = !discordMembers.find(m => m.id === member.id);
                         return (
                           <Chip
-                            key={id}
-                            label={member ? member.displayName : `ID: ${id}`}
+                            {...getTagProps({ index })}
+                            key={member.id}
+                            label={member.displayName}
                             {...(isInvalid ? { icon: <WarningIcon /> } : {})}
                             color={isInvalid ? "error" : "default"}
                             variant={isInvalid ? "outlined" : "filled"}
-                            onDelete={() => {
-                              setDiscordMentions((prev) => prev.filter(mid => mid !== id));
-                            }}
                             size="small"
                             {...(isInvalid ? { title: "Cet ID Discord ne correspond plus à un utilisateur du serveur" } : {})}
                           />
@@ -1861,12 +1789,17 @@ export default function JoueursPage() {
                       })}
                     </Box>
                   )}
-                </Box>
+                  noOptionsText="Aucun membre trouvé"
+                  loading={discordMembers.length === 0}
+                />
               </Box>
             </DialogContent>
             <DialogActions>
               <Button
-                onClick={() => setCreateDialogOpen(false)}
+                onClick={() => {
+                  setCreateDialogOpen(false);
+                  setDiscordMentionError(null);
+                }}
                 disabled={creating}
               >
                 Annuler
@@ -1874,7 +1807,7 @@ export default function JoueursPage() {
               <Button
                 onClick={handleCreateTemporaryPlayer}
                 variant="contained"
-                disabled={creating || !newPlayer.firstName.trim() || !newPlayer.name.trim() || licenseExists}
+                disabled={creating || !!discordMentionError || !newPlayer.firstName.trim() || !newPlayer.name.trim() || licenseExists}
               >
                 {creating ? "Création..." : "Créer"}
               </Button>
@@ -2004,104 +1937,106 @@ export default function JoueursPage() {
                     {editingPlayer?.firstName} {editingPlayer?.name} ({editingPlayer?.license})
                   </Typography>
                 )}
-                <Box sx={{ position: "relative" }}>
-                  <TextField
-                    label="Discord (optionnel)"
-                    fullWidth
-                    helperText={discordMentions.some(id => !discordMembers.find(m => m.id === id)) 
-                      ? "Certains IDs Discord ne correspondent plus à un utilisateur du serveur (indiqués en rouge ci-dessous)"
-                      : "Tapez @ pour mentionner un membre Discord. Vous pouvez ajouter plusieurs mentions."}
-                    value={discordMentions.map(id => {
-                      const member = discordMembers.find(m => m.id === id);
-                      return member ? `<@${member.id}>` : `<@${id}>`;
-                    }).join(" ")}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      const cursorPos = e.target.selectionStart || 0;
-                      
-                      // Détecter si on tape "@" ou si on est en train de taper après "@"
-                      const textBeforeCursor = value.substring(0, cursorPos);
-                      const lastAtIndex = textBeforeCursor.lastIndexOf("@");
-                      
-                      if (lastAtIndex !== -1) {
-                        const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
-                        if (!textAfterAt.includes(" ") && !textAfterAt.includes("\n")) {
-                          const query = textAfterAt.toLowerCase();
-                          setMentionQuery(query);
-                          setMentionAnchor({
-                            anchorEl: e.target,
-                            startPos: lastAtIndex,
-                          });
-                        } else {
-                          setMentionAnchor(null);
-                        }
-                      } else {
-                        setMentionAnchor(null);
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      if (mentionAnchor) {
-                        const filteredMembers = discordMembers.filter((member) => {
-                          const query = mentionQuery.toLowerCase();
-                          return (
-                            member.displayName.toLowerCase().includes(query) ||
-                            member.username.toLowerCase().includes(query)
-                          );
-                        });
-                        
-                        if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === "Escape") {
-                          e.preventDefault();
-                          if (e.key === "Escape") {
-                            setMentionAnchor(null);
-                          } else if (e.key === "Enter" && filteredMembers.length > 0) {
-                            const selectedMember = filteredMembers[0];
-                            if (!discordMentions.includes(selectedMember.id)) {
-                              setDiscordMentions([...discordMentions, selectedMember.id]);
-                            }
-                            setMentionAnchor(null);
-                          }
+                <Autocomplete
+                  multiple
+                  options={discordMembers}
+                  getOptionLabel={(option) => option.displayName}
+                  value={discordMentions.map(id => discordMembers.find(m => m.id === id)).filter((m): m is { id: string; username: string; displayName: string } => m !== undefined)}
+                  onChange={(_, newValue) => {
+                    setDiscordMentionError(null);
+                    const newIds = newValue.map(m => m.id);
+                    // Vérifier si un des nouveaux membres est déjà utilisé
+                    for (const member of newValue) {
+                      if (!discordMentions.includes(member.id)) {
+                        const check = isDiscordIdUsedByOtherPlayer(member.id, editingPlayer?.id);
+                        if (check.used) {
+                          setDiscordMentionError(`Le login Discord "${member.displayName}" est déjà associé au joueur "${check.playerName}".`);
+                          return;
                         }
                       }
-                    }}
-                    onBlur={(e) => {
-                      const relatedTarget = e.relatedTarget as HTMLElement | null;
-                      if (relatedTarget && relatedTarget.closest('[role="listbox"]')) {
-                        return;
+                    }
+                    setDiscordMentions(newIds);
+                  }}
+                  filterOptions={(options, { inputValue }) => {
+                    const query = inputValue.toLowerCase();
+                    return options.filter((member) => {
+                      // Exclure les membres déjà sélectionnés
+                      if (discordMentions.includes(member.id)) {
+                        return false;
                       }
-                      setTimeout(() => {
-                        setMentionAnchor(null);
-                      }, 200);
-                    }}
-                    placeholder="Tapez @ pour mentionner un membre Discord..."
-                  />
-                  {mentionAnchor && (
-                    <MentionSuggestions
-                      members={discordMembers}
-                      query={mentionQuery}
-                      anchorEl={mentionAnchor.anchorEl}
-                      onSelect={(member) => {
-                        if (!discordMentions.includes(member.id)) {
-                          setDiscordMentions([...discordMentions, member.id]);
+                      // Filtrer par nom d'affichage ou username
+                      return (
+                        member.displayName.toLowerCase().includes(query) ||
+                        member.username.toLowerCase().includes(query)
+                      );
+                    });
+                  }}
+                  renderOption={(props, option) => {
+                    const check = isDiscordIdUsedByOtherPlayer(option.id, editingPlayer?.id);
+                    const isUsed = check.used;
+                    return (
+                      <Box component="li" {...props} key={option.id}>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: 32,
+                            height: 32,
+                            borderRadius: "50%",
+                            backgroundColor: isUsed ? "error.main" : "primary.main",
+                            color: "primary.contrastText",
+                            mr: 1.5,
+                            fontSize: "0.875rem",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {option.displayName.charAt(0).toUpperCase()}
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="body2" fontWeight={500}>
+                            {option.displayName}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            @{option.username}
+                            {isUsed && ` - Déjà utilisé par ${check.playerName}`}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    );
+                  }}
+                  renderInput={(params) => {
+                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                    const { size, InputLabelProps, ...restParams } = params;
+                    return (
+                      <TextField
+                        {...restParams}
+                        // @ts-expect-error - InputLabelProps from Autocomplete has incompatible types with TextField
+                        InputLabelProps={InputLabelProps}
+                        label="Discord (optionnel)"
+                        placeholder="Rechercher un membre Discord..."
+                        helperText={
+                          discordMentionError ||
+                          (discordMentions.some(id => !discordMembers.find(m => m.id === id))
+                            ? "Certains IDs Discord ne correspondent plus à un utilisateur du serveur (indiqués en rouge ci-dessous)"
+                            : "Recherchez et sélectionnez les membres Discord à associer à ce joueur")
                         }
-                        setMentionAnchor(null);
-                      }}
-                    />
-                  )}
-                  {discordMentions.length > 0 && (
-                    <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
-                      {discordMentions.map((id) => {
-                        const member = discordMembers.find(m => m.id === id);
-                        const isInvalid = !member;
+                        error={!!discordMentionError}
+                      />
+                    );
+                  }}
+                  renderTags={(value, getTagProps) => (
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 1 }}>
+                      {value.map((member, index) => {
+                        const isInvalid = !discordMembers.find(m => m.id === member.id);
                         return (
                           <Chip
-                            key={id}
-                            label={member ? member.displayName : `ID: ${id}`}
+                            {...getTagProps({ index })}
+                            key={member.id}
+                            label={member.displayName}
                             {...(isInvalid ? { icon: <WarningIcon /> } : {})}
                             color={isInvalid ? "error" : "default"}
                             variant={isInvalid ? "outlined" : "filled"}
-                            onDelete={() => {
-                              setDiscordMentions((prev) => prev.filter(mid => mid !== id));
-                            }}
                             size="small"
                             {...(isInvalid ? { title: "Cet ID Discord ne correspond plus à un utilisateur du serveur" } : {})}
                           />
@@ -2109,7 +2044,9 @@ export default function JoueursPage() {
                       })}
                     </Box>
                   )}
-                </Box>
+                  noOptionsText="Aucun membre trouvé"
+                  loading={discordMembers.length === 0}
+                />
               </Box>
             </DialogContent>
             <DialogActions>
@@ -2118,6 +2055,7 @@ export default function JoueursPage() {
                   setEditDialogOpen(false);
                   setEditingPlayer(null);
                   setDiscordMentions([]);
+                  setDiscordMentionError(null);
                   setLicenseExists(false);
                   setLicenseExistsForOther(false);
                 }}
@@ -2128,7 +2066,7 @@ export default function JoueursPage() {
               <Button
                 onClick={handleUpdatePlayer}
                 variant="contained"
-                disabled={!!(updating || (editingPlayer?.isTemporary && (!newPlayer.firstName.trim() || !newPlayer.name.trim() || licenseExists)))}
+                disabled={!!(updating || discordMentionError || (editingPlayer?.isTemporary && (!newPlayer.firstName.trim() || !newPlayer.name.trim() || licenseExists)))}
               >
                 {updating ? "Mise à jour..." : "Enregistrer"}
               </Button>
