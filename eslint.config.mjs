@@ -20,6 +20,7 @@ const eslintConfig = [
       "next-env.d.ts",
       "jest.config.js",
       "scripts/**/*.js",
+      ".history/**",
     ],
   },
 ];

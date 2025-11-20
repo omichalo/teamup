@@ -1034,7 +1034,6 @@ export default function CompositionsPage() {
         console.error("Erreur lors de la sauvegarde du message personnalisé:", error);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
 
