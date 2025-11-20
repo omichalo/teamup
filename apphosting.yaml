@@ -98,6 +98,16 @@ env:
     availability:
       - RUNTIME
 
+  - variable: DISCORD_PUBLIC_KEY
+    secret: DISCORD_PUBLIC_KEY
+    availability:
+      - RUNTIME
+
+  - variable: DISCORD_APPLICATION_ID
+    secret: DISCORD_APPLICATION_ID
+    availability:
+      - RUNTIME
+
   - variable: DISCORD_SERVER_ID
     secret: DISCORD_SERVER_ID
     availability:
