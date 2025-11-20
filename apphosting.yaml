@@ -91,3 +91,14 @@ env:
     secret: SMTP_PORT
     availability:
       - RUNTIME
+
+  # Discord Bot Configuration (privées, côté serveur uniquement)
+  - variable: DISCORD_TOKEN
+    secret: DISCORD_TOKEN
+    availability:
+      - RUNTIME
+
+  - variable: DISCORD_SERVER_ID
+    secret: DISCORD_SERVER_ID
+    availability:
+      - RUNTIME

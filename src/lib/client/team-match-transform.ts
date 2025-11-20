@@ -2,6 +2,7 @@ import { Match, Team, Composition } from "@/types";
 
 const toDate = (value: unknown): Date => {
   if (!value) {
+    console.warn("⚠️ [toDate] Valeur vide, utilisation de la date du jour");
     return new Date();
   }
 
@@ -9,8 +10,29 @@ const toDate = (value: unknown): Date => {
     return value;
   }
 
-  const parsed = new Date(value as string);
-  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  // Gérer les chaînes ISO
+  if (typeof value === "string") {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      console.warn(`⚠️ [toDate] Chaîne invalide: "${value}", utilisation de la date du jour`);
+      return new Date();
+    }
+    return parsed;
+  }
+
+  // Gérer les nombres (timestamps)
+  if (typeof value === "number") {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      console.warn(`⚠️ [toDate] Timestamp invalide: ${value}, utilisation de la date du jour`);
+      return new Date();
+    }
+    return parsed;
+  }
+
+  // Fallback
+  console.warn(`⚠️ [toDate] Type inattendu: ${typeof value}, valeur:`, value, "utilisation de la date du jour");
+  return new Date();
 };
 
 export interface AggregatedTeamEntry {
@@ -21,6 +43,7 @@ export interface AggregatedTeamEntry {
     isFemale?: boolean;
     teamNumber?: number;
     location?: string;
+    discordChannelId?: string;
     createdAt?: string | Date;
     updatedAt?: string | Date;
   };
@@ -47,6 +70,7 @@ export const transformAggregatedTeamEntry = (
     name: team.name,
     division: team.division || "Division inconnue",
     ...(team.location && { location: team.location }),
+    ...(team.discordChannelId && { discordChannelId: team.discordChannelId }),
     players: [],
     createdAt: toDate(team.createdAt),
     updatedAt: toDate(team.updatedAt),

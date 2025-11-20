@@ -176,10 +176,11 @@ export class TeamSyncService {
           const existingData = existingDataMap.get(team.id);
 
           // Préparer les données pour Firestore
-          // Préserver le champ 'location' s'il existe déjà (géré manuellement par l'utilisateur)
+          // Préserver les champs gérés manuellement par l'utilisateur (location, discordChannelId)
           const teamData = {
             ...team,
             location: existingData?.location, // Préserver le lieu existant
+            discordChannelId: existingData?.discordChannelId, // Préserver le canal Discord existant
             createdAt: Timestamp.fromDate(team.createdAt),
             updatedAt: Timestamp.fromDate(team.updatedAt),
           };

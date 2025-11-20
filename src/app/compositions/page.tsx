@@ -19,9 +19,6 @@ import {
   Tab,
   Chip,
   CircularProgress,
-  ListItem,
-  ListItemText,
-  ListItemButton,
   IconButton,
   Button,
   Dialog,
@@ -29,8 +26,16 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  TextField,
+  Tooltip,
+  Popper,
+  Paper,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemText,
 } from "@mui/material";
-import { DragIndicator, ContentCopy, RestartAlt } from "@mui/icons-material";
+import { DragIndicator, ContentCopy, RestartAlt, Message, Close, Send } from "@mui/icons-material";
 import {
   useEquipesWithMatches,
   type EquipeWithMatches,
@@ -40,6 +45,7 @@ import { AvailabilityService } from "@/lib/services/availability-service";
 import { CompositionService } from "@/lib/services/composition-service";
 import { CompositionDefaultsService } from "@/lib/services/composition-defaults-service";
 import { Player } from "@/types/team-management";
+import { Match } from "@/types";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
 import { getCurrentPhase } from "@/lib/shared/phase-utils";
@@ -82,6 +88,169 @@ function TabPanel(props: TabPanelProps) {
       {value === index && <Box sx={{ p: 5 }}>{children}</Box>}
     </div>
   );
+}
+
+// Composant pour afficher les suggestions de mentions
+function MentionSuggestions({
+  members,
+  query,
+  anchorEl,
+  onSelect,
+}: {
+  members: Array<{ id: string; username: string; displayName: string }>;
+  query: string;
+  anchorEl: HTMLElement;
+  onSelect: (member: { id: string; username: string; displayName: string }) => void;
+}) {
+  const filteredMembers = members.filter((member) => {
+    const searchQuery = query.toLowerCase();
+    return (
+      member.displayName.toLowerCase().includes(searchQuery) ||
+      member.username.toLowerCase().includes(searchQuery)
+    );
+  }).slice(0, 10); // Limiter à 10 résultats
+
+  if (filteredMembers.length === 0) {
+    return null;
+  }
+
+  return (
+    <Popper
+      open={true}
+      anchorEl={anchorEl}
+      placement="bottom-start"
+      sx={{ zIndex: 1300, mt: 0.5 }}
+    >
+      <Paper
+        elevation={8}
+        sx={{
+          maxHeight: 300,
+          overflow: "auto",
+          minWidth: 280,
+          borderRadius: 2,
+          border: "1px solid",
+          borderColor: "divider",
+          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.15)",
+        }}
+      >
+        <List dense sx={{ py: 0.5 }}>
+          {filteredMembers.map((member) => (
+            <ListItem key={member.id} disablePadding>
+              <ListItemButton
+                onMouseDown={(e) => {
+                  // Empêcher le onBlur du TextField de se déclencher
+                  e.preventDefault();
+                }}
+                onClick={() => {
+                  onSelect(member);
+                }}
+                sx={{
+                  borderRadius: 1,
+                  mx: 0.5,
+                  my: 0.25,
+                  "&:hover": {
+                    backgroundColor: "action.hover",
+                  },
+                }}
+              >
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 32,
+                    height: 32,
+                    borderRadius: "50%",
+                    backgroundColor: "primary.main",
+                    color: "primary.contrastText",
+                    mr: 1.5,
+                    fontSize: "0.875rem",
+                    fontWeight: 600,
+                  }}
+                >
+                  {member.displayName.charAt(0).toUpperCase()}
+                </Box>
+                <ListItemText
+                  primary={
+                    <Typography variant="body2" fontWeight={500}>
+                      {member.displayName}
+                    </Typography>
+                  }
+                  secondary={
+                    <Typography variant="caption" color="text.secondary">
+                      @{member.username}
+                    </Typography>
+                  }
+                />
+              </ListItemButton>
+            </ListItem>
+          ))}
+        </List>
+      </Paper>
+    </Popper>
+  );
+}
+
+// Fonction pour nettoyer le nom de l'équipe (retirer "Phase X")
+function cleanTeamName(teamName: string): string {
+  if (!teamName) return "";
+  // Retirer "Phase X" (avec ou sans tiret avant/après)
+  return teamName.replace(/\s*-\s*Phase\s+\d+\s*/gi, " ").replace(/\s*Phase\s+\d+\s*/gi, " ").trim();
+}
+
+// Fonction pour simplifier l'affichage de la division
+function formatDivision(division: string): string {
+  if (!division) return "";
+  
+  // Extraire le numéro de poule
+  const pouleMatch = division.match(/Poule\s+(\d+)/i);
+  const pouleNumber = pouleMatch ? pouleMatch[1] : "";
+  
+  // Extraire le type et le numéro de division
+  // Format: FED_Nationale X, DXX_Departementale X, LXX_RX, ou Pre-Regionale
+  let prefix = "";
+  let number = "";
+  
+  // Pre-Régionale (format: DXX_Pre-Regionale Dames, ex: D78_Pre-Regionale Dames)
+  const preRegionaleMatch = division.match(/Pre-Regionale/i);
+  if (preRegionaleMatch) {
+    prefix = "PRF";
+    number = "";
+  } else {
+    // Régionale (format: LXX_RX, ex: L08_R2)
+    const regionaleMatch = division.match(/L\d+_R(\d+)/i);
+    if (regionaleMatch) {
+      prefix = "R";
+      number = regionaleMatch[1];
+    } else {
+      // Nationale
+      const nationaleMatch = division.match(/Nationale\s+(\d+)/i);
+      if (nationaleMatch) {
+        prefix = "N";
+        number = nationaleMatch[1];
+      } else {
+        // Départementale
+        const departementaleMatch = division.match(/Departementale\s+(\d+)/i);
+        if (departementaleMatch) {
+          prefix = "D";
+          number = departementaleMatch[1];
+        }
+      }
+    }
+  }
+  
+  // Construire le résultat
+  if (prefix) {
+    if (number) {
+      return pouleNumber ? `${prefix}${number} Poule ${pouleNumber}` : `${prefix}${number}`;
+    } else {
+      // Pour Pre-Régionale (pas de numéro)
+      return pouleNumber ? `${prefix} Poule ${pouleNumber}` : prefix;
+    }
+  }
+  
+  // Si on n'a pas pu parser, retourner la division originale
+  return division;
 }
 
 export default function CompositionsPage() {
@@ -135,6 +304,17 @@ export default function CompositionsPage() {
   const [defaultCompositionsLoaded, setDefaultCompositionsLoaded] =
     useState(false);
   const [availabilitiesLoaded, setAvailabilitiesLoaded] = useState(false);
+  // État pour gérer l'affichage du message d'informations du match par équipe
+  const [showMatchInfo, setShowMatchInfo] = useState<Record<string, boolean>>({});
+  const [locations, setLocations] = useState<Array<{ id: string; name: string }>>([]);
+  const [sendingDiscord, setSendingDiscord] = useState<Record<string, boolean>>({});
+  const [discordSentStatus, setDiscordSentStatus] = useState<Record<string, { sent: boolean; sentAt?: string; customMessage?: string }>>({});
+  const [customMessages, setCustomMessages] = useState<Record<string, string>>({});
+  const [confirmResendDialog, setConfirmResendDialog] = useState<{ open: boolean; teamId: string | null; matchInfo: string | null; channelId?: string }>({ open: false, teamId: null, matchInfo: null });
+  const [discordMembers, setDiscordMembers] = useState<Array<{ id: string; username: string; displayName: string }>>([]);
+  const [mentionAnchor, setMentionAnchor] = useState<{ teamId: string; anchorEl: HTMLElement; startPos: number } | null>(null);
+  const [mentionQuery, setMentionQuery] = useState<string>("");
+  const saveTimeoutRef = React.useRef<Record<string, NodeJS.Timeout>>({});
 
   const playerService = useMemo(() => new FirestorePlayerService(), []);
   const availabilityService = useMemo(() => new AvailabilityService(), []);
@@ -313,6 +493,62 @@ export default function CompositionsPage() {
   useEffect(() => {
     loadPlayers();
   }, [loadPlayers]);
+
+  // Charger les locations via l'API route (évite les problèmes de permissions Firestore côté client)
+  useEffect(() => {
+    const loadLocations = async () => {
+      try {
+        const response = await fetch("/api/admin/locations", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            console.log("[Compositions] Locations chargées:", result.locations);
+            setLocations(result.locations || []);
+          }
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des lieux:", error);
+      }
+    };
+    void loadLocations();
+  }, []);
+
+  // Charger les membres Discord pour l'autocomplete
+  useEffect(() => {
+    const loadDiscordMembers = async () => {
+      try {
+        console.log("[Compositions] Chargement des membres Discord...");
+        const response = await fetch("/api/discord/members", {
+          method: "GET",
+          credentials: "include",
+        });
+        console.log("[Compositions] Réponse status:", response.status);
+        if (response.ok) {
+          const result = await response.json();
+          console.log("[Compositions] Résultat:", result);
+          if (result.success) {
+            console.log("[Compositions] Membres reçus:", result.members?.length || 0);
+            setDiscordMembers(result.members || []);
+          } else {
+            console.error("[Compositions] Erreur dans la réponse:", result.error);
+          }
+        } else {
+          const errorText = await response.text();
+          console.error("[Compositions] Erreur HTTP:", response.status, errorText);
+        }
+      } catch (error) {
+        console.error("[Compositions] Erreur lors du chargement des membres Discord:", error);
+      } finally {
+      }
+    };
+    void loadDiscordMembers();
+  }, []);
 
   const [availabilities, setAvailabilities] = useState<{
     masculin?: Record<string, { available?: boolean; comment?: string }>;
@@ -615,6 +851,58 @@ export default function CompositionsPage() {
     return { masculin, feminin };
   }, [equipes]);
 
+  // Vérifier le statut d'envoi des messages Discord
+  useEffect(() => {
+    const checkDiscordStatus = async () => {
+      if (!selectedJournee || !selectedPhase) return;
+      
+      const allTeams = [...equipesByType.masculin, ...equipesByType.feminin];
+      const statusPromises = allTeams.map(async (equipe) => {
+        try {
+          const response = await fetch(
+            `/api/discord/check-message-sent?teamId=${encodeURIComponent(equipe.team.id)}&journee=${selectedJournee}&phase=${encodeURIComponent(selectedPhase)}`,
+            {
+              method: "GET",
+              credentials: "include",
+            }
+          );
+          if (response.ok) {
+            const result = await response.json();
+            if (result.success) {
+              return {
+                teamId: equipe.team.id,
+                status: { 
+                  sent: result.sent, 
+                  sentAt: result.sentAt,
+                  customMessage: result.customMessage || "",
+                },
+              };
+            }
+          }
+        } catch (error) {
+          console.error(`Erreur lors de la vérification du statut Discord pour ${equipe.team.id}:`, error);
+        }
+        return null;
+      });
+
+      const results = await Promise.all(statusPromises);
+      const statusMap: Record<string, { sent: boolean; sentAt?: string; customMessage?: string }> = {};
+      const customMessagesMap: Record<string, string> = {};
+      results.forEach((result) => {
+        if (result) {
+          statusMap[result.teamId] = result.status;
+          if (result.status.customMessage) {
+            customMessagesMap[result.teamId] = result.status.customMessage;
+          }
+        }
+      });
+      setDiscordSentStatus(statusMap);
+      setCustomMessages((prev) => ({ ...prev, ...customMessagesMap }));
+    };
+
+    void checkDiscordStatus();
+  }, [selectedJournee, selectedPhase, equipesByType.masculin, equipesByType.feminin]);
+
   const hasAssignedPlayers = useMemo(
     () =>
       Object.values(compositions).some(
@@ -710,6 +998,188 @@ export default function CompositionsPage() {
       );
     },
     [selectedJournee, selectedPhase]
+  );
+
+  // Fonction pour sauvegarder le message personnalisé
+  const handleSaveCustomMessage = useCallback(
+    async (teamId: string, customMessage: string, journee: number | null, phase: string | null) => {
+      if (!journee || !phase) return;
+      
+      try {
+        const response = await fetch("/api/discord/update-custom-message", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            teamId,
+            journee,
+            phase,
+            customMessage,
+          }),
+        });
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            // Mettre à jour l'état local
+            setCustomMessages((prev) => ({ ...prev, [teamId]: customMessage }));
+            setDiscordSentStatus((prev) => ({
+              ...prev,
+              [teamId]: { ...prev[teamId], customMessage },
+            }));
+          }
+        }
+      } catch (error) {
+        console.error("Erreur lors de la sauvegarde du message personnalisé:", error);
+      }
+    },
+    [selectedJournee, selectedPhase]
+  );
+
+  // Fonction pour insérer une mention dans le message
+  const insertMention = useCallback((teamId: string, startPos: number, member: { id: string; displayName: string; username: string }) => {
+    setCustomMessages((prev) => {
+      const currentMessage = prev[teamId] || "";
+      const textBeforeAt = currentMessage.substring(0, startPos);
+      const textAfterAt = currentMessage.substring(startPos);
+      // Trouver où se termine la partie à remplacer (jusqu'au prochain espace, saut de ligne ou fin)
+      const match = textAfterAt.match(/^@[^\s\n]*/);
+      const endPos = startPos + (match ? match[0].length : 1);
+      const textAfterMention = currentMessage.substring(endPos);
+      
+      const mention = `<@${member.id}>`;
+      const newMessage = textBeforeAt + mention + textAfterMention;
+      
+      // Sauvegarder immédiatement après l'insertion
+      if (selectedJournee && selectedPhase) {
+        handleSaveCustomMessage(teamId, newMessage, selectedJournee, selectedPhase);
+      }
+      
+      return { ...prev, [teamId]: newMessage };
+    });
+    setMentionAnchor(null);
+  }, [selectedJournee, selectedPhase, handleSaveCustomMessage]);
+
+  // Fonction pour formater le message d'informations du match
+  const formatMatchInfo = useCallback(
+    (match: Match | null, teamPlayers: Player[], teamLocationId?: string, teamName?: string, isFemale?: boolean) => {
+      if (!match) return null;
+      
+      const dayNames = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+      const matchDate = match.date instanceof Date ? match.date : new Date(match.date);
+      const dayName = dayNames[matchDate.getDay()];
+      
+      // Nettoyer le nom de l'équipe et ajouter "F" pour les équipes féminines
+      let cleanName = teamName ? cleanTeamName(teamName) : "";
+      if (isFemale && cleanName && !cleanName.endsWith("F")) {
+        cleanName = `${cleanName}F`;
+      }
+      const division = formatDivision(match.division || "");
+      const opponent = match.opponent || match.opponentClub || "";
+      
+      // Utiliser le lieu de l'équipe (résoudre l'ID en nom depuis la collection locations)
+      // Ne jamais utiliser match.location car il peut contenir des données incorrectes
+      // On n'affiche rien si le lieu n'est pas trouvé dans la liste des locations
+      let location = "";
+      if (teamLocationId) {
+        const teamLocation = locations.find(l => l.id === teamLocationId);
+        if (teamLocation) {
+          location = teamLocation.name;
+        }
+        // Si le lieu n'est pas trouvé, on laisse location vide (on n'affiche rien)
+      }
+      
+      const isHome = match.isHome ? "Domicile" : "Extérieur";
+      
+      const playersList = teamPlayers
+        .map(p => `🔹 ${p.firstName} ${p.name}`)
+        .join("\n");
+      
+      // Collecter toutes les mentions Discord de tous les joueurs
+      const allDiscordMentions: string[] = [];
+      teamPlayers.forEach((player) => {
+        if (player.discordMentions && player.discordMentions.length > 0) {
+          // Ajouter toutes les mentions du joueur (format <@USER_ID>)
+          player.discordMentions.forEach((mentionId) => {
+            allDiscordMentions.push(`<@${mentionId}>`);
+          });
+        }
+      });
+      
+      // Construire le message avec les mentions Discord si elles existent
+      const parts = [
+        `${cleanName} – ${division} – ${opponent}`,
+        location,
+        `${dayName} – ${isHome}`,
+        playersList,
+      ];
+      
+      // Ajouter les mentions Discord après la liste des joueurs
+      if (allDiscordMentions.length > 0) {
+        parts.push(allDiscordMentions.join(" "));
+      }
+      
+      return parts.filter(Boolean).join("\n");
+    },
+    [locations]
+  );
+
+  // Fonction pour envoyer le message Discord
+  const handleSendDiscordMessage = useCallback(
+    async (teamId: string, content: string, journee: number | null, phase: string | null, channelId?: string) => {
+      if (!journee || !phase) return;
+      
+      setSendingDiscord((prev) => ({ ...prev, [teamId]: true }));
+      try {
+        const customMessage = customMessages[teamId] || "";
+        const response = await fetch("/api/discord/send-message", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            content,
+            teamId,
+            journee,
+            phase,
+            customMessage,
+            channelId,
+          }),
+        });
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            // Mettre à jour le statut local
+            setDiscordSentStatus((prev) => {
+              const existing = prev[teamId];
+              const newStatus: { sent: boolean; sentAt: string; customMessage?: string } = {
+                sent: true,
+                sentAt: new Date().toISOString(),
+                ...(customMessage || existing?.customMessage ? { customMessage: customMessage || existing?.customMessage || "" } : {}),
+              };
+              return {
+                ...prev,
+                [teamId]: newStatus,
+              };
+            });
+          } else {
+            const error = await response.json();
+            alert(`Erreur lors de l'envoi: ${error.error || "Erreur inconnue"}`);
+          }
+        } else {
+          const error = await response.json();
+          alert(`Erreur lors de l'envoi: ${error.error || "Erreur inconnue"}`);
+        }
+      } catch (error) {
+        console.error("Erreur lors de l'envoi du message Discord:", error);
+        alert("Erreur lors de l'envoi du message Discord");
+      } finally {
+        setSendingDiscord((prev) => ({ ...prev, [teamId]: false }));
+      }
+    },
+    [customMessages]
   );
 
   const compositionSummary = useMemo(() => {
@@ -1790,6 +2260,21 @@ export default function CompositionsPage() {
                     invalidTeams={compositionSummary.equipesInvalides}
                     matchesPlayed={compositionSummary.equipesMatchsJoues}
                     percentage={compositionSummary.percentage}
+                    discordMessagesSent={(() => {
+                      const currentTypeEquipes = tabValue === 0 ? equipesByType.masculin : equipesByType.feminin;
+                      return currentTypeEquipes.filter((equipe) => {
+                        const match = getMatchForTeam(equipe);
+                        const matchPlayed = isMatchPlayed(match);
+                        return !matchPlayed && discordSentStatus[equipe.team.id]?.sent === true;
+                      }).length;
+                    })()}
+                    discordMessagesTotal={(() => {
+                      const currentTypeEquipes = tabValue === 0 ? equipesByType.masculin : equipesByType.feminin;
+                      return currentTypeEquipes.filter((equipe) => {
+                        const match = getMatchForTeam(equipe);
+                        return !isMatchPlayed(match);
+                      }).length;
+                    })()}
                   />
 
                   <TabPanel value={tabValue} index={0}>
@@ -1863,8 +2348,12 @@ export default function CompositionsPage() {
       const validationError = validationInfo?.reason;
       const offendingPlayerIds = validationInfo?.offendingPlayerIds ?? [];
 
+                          const isFemaleTeam = equipe.matches.some((match) => match.isFemale === true);
+                          const matchInfo = formatMatchInfo(match, teamPlayersData, equipe.team.location, equipe.team.name, isFemaleTeam);
+
                           return (
-                            <Box key={equipe.team.id}>
+                            <Box key={equipe.team.id} sx={{ display: "flex", gap: 2, alignItems: "flex-start", mb: 2 }}>
+                              <Box sx={{ flex: 1 }}>
                               <TeamCompositionCard
                                 equipe={equipe}
                                 players={teamPlayersData}
@@ -1882,14 +2371,43 @@ export default function CompositionsPage() {
                                 dragOverTeamId={dragOverTeamId}
                                 matchPlayed={matchPlayed}
                                 additionalHeader={
-                                  validationError ? (
-                                    <Chip
-                                      label="Invalide"
-                                      size="small"
-                                      color="error"
-                                      variant="filled"
-                                    />
-                                  ) : undefined
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                    {validationError && (
+                                      <Chip
+                                        label="Invalide"
+                                        size="small"
+                                        color="error"
+                                        variant="filled"
+                                      />
+                                    )}
+                                    {matchInfo && !matchPlayed && (
+                                      <Tooltip
+                                        title={
+                                          !equipe.team.discordChannelId
+                                            ? "Aucun canal Discord configuré pour cette équipe. Configurez-le dans la page des équipes."
+                                            : showMatchInfo[equipe.team.id]
+                                            ? "Masquer le message"
+                                            : "Afficher le message"
+                                        }
+                                      >
+                                        <span>
+                                          <IconButton
+                                            size="small"
+                                            onClick={() => {
+                                              setShowMatchInfo((prev) => ({
+                                                ...prev,
+                                                [equipe.team.id]: !prev[equipe.team.id],
+                                              }));
+                                            }}
+                                            disabled={!equipe.team.discordChannelId}
+                                            color={showMatchInfo[equipe.team.id] ? "primary" : "default"}
+                                          >
+                                            <Message fontSize="small" />
+                                          </IconButton>
+                                        </span>
+                                      </Tooltip>
+                                    )}
+                                  </Box>
                                 }
                                 renderPlayerIndicators={(player) => {
                                   const phase = selectedPhase || "aller";
@@ -2027,6 +2545,216 @@ export default function CompositionsPage() {
                                   {validationError}
                                 </Typography>
                               )}
+                              </Box>
+                              {matchInfo && !matchPlayed && showMatchInfo[equipe.team.id] && (
+                                <Card
+                                  elevation={2}
+                                  sx={{
+                                    minWidth: 300,
+                                    maxWidth: 400,
+                                    borderLeft: "4px solid",
+                                    borderLeftColor: "primary.main",
+                                    backgroundColor: "action.hover",
+                                    position: "relative",
+                                  }}
+                                >
+                                  <Box
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "space-between",
+                                      p: 1,
+                                      pb: 0.5,
+                                      borderBottom: "1px solid",
+                                      borderBottomColor: "divider",
+                                    }}
+                                  >
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                      <Message fontSize="small" color="primary" />
+                                      <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                        sx={{ fontWeight: 500 }}
+                                      >
+                                        Message Discord
+                                      </Typography>
+                                    </Box>
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                        {discordSentStatus[equipe.team.id]?.sent && (
+                                          <Chip
+                                            label="Envoyé"
+                                            size="small"
+                                            color="success"
+                                            variant="outlined"
+                                            sx={{ height: 20, fontSize: "0.65rem" }}
+                                            title={discordSentStatus[equipe.team.id]?.sentAt ? `Envoyé le ${new Date(discordSentStatus[equipe.team.id].sentAt!).toLocaleString("fr-FR")}` : "Message déjà envoyé"}
+                                          />
+                                        )}
+                                        <Tooltip
+                                          title={
+                                            !equipe.team.discordChannelId
+                                              ? "Aucun canal Discord configuré pour cette équipe. Configurez-le dans la page des équipes."
+                                              : discordSentStatus[equipe.team.id]?.sent
+                                              ? "Renvoyer le message sur Discord"
+                                              : "Envoyer le message sur Discord"
+                                          }
+                                        >
+                                          <span>
+                                            <IconButton
+                                              size="small"
+                                              onClick={() => {
+                                                if (!matchInfo) return;
+                                                if (discordSentStatus[equipe.team.id]?.sent) {
+                                                  setConfirmResendDialog({ open: true, teamId: equipe.team.id, matchInfo, ...(equipe.team.discordChannelId ? { channelId: equipe.team.discordChannelId } : {}) });
+                                                } else {
+                                                  handleSendDiscordMessage(equipe.team.id, matchInfo, selectedJournee, selectedPhase, equipe.team.discordChannelId);
+                                                }
+                                              }}
+                                              disabled={sendingDiscord[equipe.team.id] || !matchInfo || !equipe.team.discordChannelId}
+                                              sx={{ p: 0.5 }}
+                                              color={discordSentStatus[equipe.team.id]?.sent ? "warning" : "primary"}
+                                            >
+                                              {sendingDiscord[equipe.team.id] ? (
+                                                <CircularProgress size={16} />
+                                              ) : (
+                                                <Send fontSize="small" />
+                                              )}
+                                            </IconButton>
+                                          </span>
+                                        </Tooltip>
+                                      </Box>
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => {
+                                          setShowMatchInfo((prev) => ({
+                                            ...prev,
+                                            [equipe.team.id]: false,
+                                          }));
+                                        }}
+                                        sx={{ p: 0.5 }}
+                                        title="Fermer le message"
+                                      >
+                                        <Close fontSize="small" />
+                                      </IconButton>
+                                    </Box>
+                                  </Box>
+                                  <CardContent sx={{ pt: 1.5, pb: "16px !important" }}>
+                                    <Typography
+                                      variant="body2"
+                                      component="pre"
+                                      sx={{
+                                        whiteSpace: "pre-wrap",
+                                        fontFamily: "monospace",
+                                        fontSize: "0.75rem",
+                                        lineHeight: 1.8,
+                                        m: 0,
+                                        mb: 2,
+                                        color: "text.primary",
+                                      }}
+                                    >
+                                      {matchInfo}
+                                    </Typography>
+                                    <Box sx={{ mt: 1, position: "relative" }}>
+                                      <TextField
+                                        label="Message personnalisé (optionnel)"
+                                        multiline
+                                        rows={3}
+                                        fullWidth
+                                        value={customMessages[equipe.team.id] || ""}
+                                        onChange={(e) => {
+                                          const value = e.target.value;
+                                          const cursorPos = e.target.selectionStart || 0;
+                                          
+                                          // Détecter si on tape "@" ou si on est en train de taper après "@"
+                                          const textBeforeCursor = value.substring(0, cursorPos);
+                                          const lastAtIndex = textBeforeCursor.lastIndexOf("@");
+                                          
+                                          if (lastAtIndex !== -1) {
+                                            // Vérifier qu'il n'y a pas d'espace entre "@" et le curseur
+                                            const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+                                            if (!textAfterAt.includes(" ") && !textAfterAt.includes("\n")) {
+                                              // On est en train de taper une mention
+                                              const query = textAfterAt.toLowerCase();
+                                              setMentionQuery(query);
+                                              setMentionAnchor({
+                                                teamId: equipe.team.id,
+                                                anchorEl: e.target,
+                                                startPos: lastAtIndex,
+                                              });
+                                            } else {
+                                              setMentionAnchor(null);
+                                            }
+                                          } else {
+                                            setMentionAnchor(null);
+                                          }
+                                          
+                                          setCustomMessages((prev) => ({ ...prev, [equipe.team.id]: value }));
+                                          
+                                          // Debounce pour sauvegarder automatiquement après 1 seconde d'inactivité
+                                          if (saveTimeoutRef.current[equipe.team.id]) {
+                                            clearTimeout(saveTimeoutRef.current[equipe.team.id]);
+                                          }
+                                          saveTimeoutRef.current[equipe.team.id] = setTimeout(() => {
+                                            if (selectedJournee && selectedPhase) {
+                                              handleSaveCustomMessage(equipe.team.id, value, selectedJournee, selectedPhase);
+                                            }
+                                          }, 1000);
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (mentionAnchor && mentionAnchor.teamId === equipe.team.id) {
+                                            const filteredMembers = discordMembers.filter((member) => {
+                                              const query = mentionQuery.toLowerCase();
+                                              return (
+                                                member.displayName.toLowerCase().includes(query) ||
+                                                member.username.toLowerCase().includes(query)
+                                              );
+                                            });
+                                            
+                                            if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === "Escape") {
+                                              e.preventDefault();
+                                              if (e.key === "Escape") {
+                                                setMentionAnchor(null);
+                                              } else if (e.key === "Enter" && filteredMembers.length > 0) {
+                                                // Insérer la première mention
+                                                const selectedMember = filteredMembers[0];
+                                                insertMention(equipe.team.id, mentionAnchor.startPos, selectedMember);
+                                              }
+                                            }
+                                          }
+                                        }}
+                                        onBlur={(e) => {
+                                          // Ne pas fermer si on clique sur une suggestion
+                                          // Le onMouseDown de la suggestion empêchera le blur
+                                          const relatedTarget = e.relatedTarget as HTMLElement | null;
+                                          if (relatedTarget && relatedTarget.closest('[role="listbox"]')) {
+                                            return;
+                                          }
+                                          
+                                          // Délai pour permettre le clic sur une suggestion
+                                          setTimeout(() => {
+                                            setMentionAnchor(null);
+                                            handleSaveCustomMessage(equipe.team.id, customMessages[equipe.team.id] || "", selectedJournee, selectedPhase);
+                                          }, 200);
+                                        }}
+                                        placeholder="Tapez @ pour mentionner un membre Discord..."
+                                        size="small"
+                                        helperText="Tapez @ suivi du nom d'un membre pour le mentionner"
+                                      />
+                                      {mentionAnchor && mentionAnchor.teamId === equipe.team.id && (
+                                        <MentionSuggestions
+                                          members={discordMembers}
+                                          query={mentionQuery}
+                                          anchorEl={mentionAnchor.anchorEl}
+                                          onSelect={(member) => {
+                                            insertMention(equipe.team.id, mentionAnchor.startPos, member);
+                                          }}
+                                        />
+                                      )}
+                                    </Box>
+                                  </CardContent>
+                                </Card>
+                              )}
                             </Box>
                           );
                         })}
@@ -2107,8 +2835,12 @@ export default function CompositionsPage() {
                           const offendingPlayerIds =
                             validationInfo?.offendingPlayerIds ?? [];
 
+                          const isFemaleTeam = equipe.matches.some((match) => match.isFemale === true);
+                          const matchInfo = formatMatchInfo(match, teamPlayersData, equipe.team.location, equipe.team.name, isFemaleTeam);
+
                           return (
-                            <Box key={equipe.team.id}>
+                            <Box key={equipe.team.id} sx={{ display: "flex", gap: 2, alignItems: "flex-start", mb: 2 }}>
+                              <Box sx={{ flex: 1 }}>
                               <TeamCompositionCard
                                 equipe={equipe}
                                 players={teamPlayersData}
@@ -2126,14 +2858,43 @@ export default function CompositionsPage() {
                                 dragOverTeamId={dragOverTeamId}
                                 matchPlayed={matchPlayed}
                                 additionalHeader={
-                                  validationError ? (
-                                    <Chip
-                                      label="Invalide"
-                                      size="small"
-                                      color="error"
-                                      variant="filled"
-                                    />
-                                  ) : undefined
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                    {validationError && (
+                                      <Chip
+                                        label="Invalide"
+                                        size="small"
+                                        color="error"
+                                        variant="filled"
+                                      />
+                                    )}
+                                    {matchInfo && !matchPlayed && (
+                                      <Tooltip
+                                        title={
+                                          !equipe.team.discordChannelId
+                                            ? "Aucun canal Discord configuré pour cette équipe. Configurez-le dans la page des équipes."
+                                            : showMatchInfo[equipe.team.id]
+                                            ? "Masquer le message"
+                                            : "Afficher le message"
+                                        }
+                                      >
+                                        <span>
+                                          <IconButton
+                                            size="small"
+                                            onClick={() => {
+                                              setShowMatchInfo((prev) => ({
+                                                ...prev,
+                                                [equipe.team.id]: !prev[equipe.team.id],
+                                              }));
+                                            }}
+                                            disabled={!equipe.team.discordChannelId}
+                                            color={showMatchInfo[equipe.team.id] ? "primary" : "default"}
+                                          >
+                                            <Message fontSize="small" />
+                                          </IconButton>
+                                        </span>
+                                      </Tooltip>
+                                    )}
+                                  </Box>
                                 }
                                 renderPlayerIndicators={(player) => {
                                   const phase = selectedPhase || "aller";
@@ -2248,6 +3009,216 @@ export default function CompositionsPage() {
                                   {validationError}
                                 </Typography>
                               )}
+                              </Box>
+                              {matchInfo && !matchPlayed && showMatchInfo[equipe.team.id] && (
+                                <Card
+                                  elevation={2}
+                                  sx={{
+                                    minWidth: 300,
+                                    maxWidth: 400,
+                                    borderLeft: "4px solid",
+                                    borderLeftColor: "primary.main",
+                                    backgroundColor: "action.hover",
+                                    position: "relative",
+                                  }}
+                                >
+                                  <Box
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "space-between",
+                                      p: 1,
+                                      pb: 0.5,
+                                      borderBottom: "1px solid",
+                                      borderBottomColor: "divider",
+                                    }}
+                                  >
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                      <Message fontSize="small" color="primary" />
+                                      <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                        sx={{ fontWeight: 500 }}
+                                      >
+                                        Message Discord
+                                      </Typography>
+                                    </Box>
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                        {discordSentStatus[equipe.team.id]?.sent && (
+                                          <Chip
+                                            label="Envoyé"
+                                            size="small"
+                                            color="success"
+                                            variant="outlined"
+                                            sx={{ height: 20, fontSize: "0.65rem" }}
+                                            title={discordSentStatus[equipe.team.id]?.sentAt ? `Envoyé le ${new Date(discordSentStatus[equipe.team.id].sentAt!).toLocaleString("fr-FR")}` : "Message déjà envoyé"}
+                                          />
+                                        )}
+                                        <Tooltip
+                                          title={
+                                            !equipe.team.discordChannelId
+                                              ? "Aucun canal Discord configuré pour cette équipe. Configurez-le dans la page des équipes."
+                                              : discordSentStatus[equipe.team.id]?.sent
+                                              ? "Renvoyer le message sur Discord"
+                                              : "Envoyer le message sur Discord"
+                                          }
+                                        >
+                                          <span>
+                                            <IconButton
+                                              size="small"
+                                              onClick={() => {
+                                                if (!matchInfo) return;
+                                                if (discordSentStatus[equipe.team.id]?.sent) {
+                                                  setConfirmResendDialog({ open: true, teamId: equipe.team.id, matchInfo, ...(equipe.team.discordChannelId ? { channelId: equipe.team.discordChannelId } : {}) });
+                                                } else {
+                                                  handleSendDiscordMessage(equipe.team.id, matchInfo, selectedJournee, selectedPhase, equipe.team.discordChannelId);
+                                                }
+                                              }}
+                                              disabled={sendingDiscord[equipe.team.id] || !matchInfo || !equipe.team.discordChannelId}
+                                              sx={{ p: 0.5 }}
+                                              color={discordSentStatus[equipe.team.id]?.sent ? "warning" : "primary"}
+                                            >
+                                              {sendingDiscord[equipe.team.id] ? (
+                                                <CircularProgress size={16} />
+                                              ) : (
+                                                <Send fontSize="small" />
+                                              )}
+                                            </IconButton>
+                                          </span>
+                                        </Tooltip>
+                                      </Box>
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => {
+                                          setShowMatchInfo((prev) => ({
+                                            ...prev,
+                                            [equipe.team.id]: false,
+                                          }));
+                                        }}
+                                        sx={{ p: 0.5 }}
+                                        title="Fermer le message"
+                                      >
+                                        <Close fontSize="small" />
+                                      </IconButton>
+                                    </Box>
+                                  </Box>
+                                  <CardContent sx={{ pt: 1.5, pb: "16px !important" }}>
+                                    <Typography
+                                      variant="body2"
+                                      component="pre"
+                                      sx={{
+                                        whiteSpace: "pre-wrap",
+                                        fontFamily: "monospace",
+                                        fontSize: "0.75rem",
+                                        lineHeight: 1.8,
+                                        m: 0,
+                                        mb: 2,
+                                        color: "text.primary",
+                                      }}
+                                    >
+                                      {matchInfo}
+                                    </Typography>
+                                    <Box sx={{ mt: 1, position: "relative" }}>
+                                      <TextField
+                                        label="Message personnalisé (optionnel)"
+                                        multiline
+                                        rows={3}
+                                        fullWidth
+                                        value={customMessages[equipe.team.id] || ""}
+                                        onChange={(e) => {
+                                          const value = e.target.value;
+                                          const cursorPos = e.target.selectionStart || 0;
+                                          
+                                          // Détecter si on tape "@" ou si on est en train de taper après "@"
+                                          const textBeforeCursor = value.substring(0, cursorPos);
+                                          const lastAtIndex = textBeforeCursor.lastIndexOf("@");
+                                          
+                                          if (lastAtIndex !== -1) {
+                                            // Vérifier qu'il n'y a pas d'espace entre "@" et le curseur
+                                            const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+                                            if (!textAfterAt.includes(" ") && !textAfterAt.includes("\n")) {
+                                              // On est en train de taper une mention
+                                              const query = textAfterAt.toLowerCase();
+                                              setMentionQuery(query);
+                                              setMentionAnchor({
+                                                teamId: equipe.team.id,
+                                                anchorEl: e.target,
+                                                startPos: lastAtIndex,
+                                              });
+                                            } else {
+                                              setMentionAnchor(null);
+                                            }
+                                          } else {
+                                            setMentionAnchor(null);
+                                          }
+                                          
+                                          setCustomMessages((prev) => ({ ...prev, [equipe.team.id]: value }));
+                                          
+                                          // Debounce pour sauvegarder automatiquement après 1 seconde d'inactivité
+                                          if (saveTimeoutRef.current[equipe.team.id]) {
+                                            clearTimeout(saveTimeoutRef.current[equipe.team.id]);
+                                          }
+                                          saveTimeoutRef.current[equipe.team.id] = setTimeout(() => {
+                                            if (selectedJournee && selectedPhase) {
+                                              handleSaveCustomMessage(equipe.team.id, value, selectedJournee, selectedPhase);
+                                            }
+                                          }, 1000);
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (mentionAnchor && mentionAnchor.teamId === equipe.team.id) {
+                                            const filteredMembers = discordMembers.filter((member) => {
+                                              const query = mentionQuery.toLowerCase();
+                                              return (
+                                                member.displayName.toLowerCase().includes(query) ||
+                                                member.username.toLowerCase().includes(query)
+                                              );
+                                            });
+                                            
+                                            if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === "Escape") {
+                                              e.preventDefault();
+                                              if (e.key === "Escape") {
+                                                setMentionAnchor(null);
+                                              } else if (e.key === "Enter" && filteredMembers.length > 0) {
+                                                // Insérer la première mention
+                                                const selectedMember = filteredMembers[0];
+                                                insertMention(equipe.team.id, mentionAnchor.startPos, selectedMember);
+                                              }
+                                            }
+                                          }
+                                        }}
+                                        onBlur={(e) => {
+                                          // Ne pas fermer si on clique sur une suggestion
+                                          // Le onMouseDown de la suggestion empêchera le blur
+                                          const relatedTarget = e.relatedTarget as HTMLElement | null;
+                                          if (relatedTarget && relatedTarget.closest('[role="listbox"]')) {
+                                            return;
+                                          }
+                                          
+                                          // Délai pour permettre le clic sur une suggestion
+                                          setTimeout(() => {
+                                            setMentionAnchor(null);
+                                            handleSaveCustomMessage(equipe.team.id, customMessages[equipe.team.id] || "", selectedJournee, selectedPhase);
+                                          }, 200);
+                                        }}
+                                        placeholder="Tapez @ pour mentionner un membre Discord..."
+                                        size="small"
+                                        helperText="Tapez @ suivi du nom d'un membre pour le mentionner"
+                                      />
+                                      {mentionAnchor && mentionAnchor.teamId === equipe.team.id && (
+                                        <MentionSuggestions
+                                          members={discordMembers}
+                                          query={mentionQuery}
+                                          anchorEl={mentionAnchor.anchorEl}
+                                          onSelect={(member) => {
+                                            insertMention(equipe.team.id, mentionAnchor.startPos, member);
+                                          }}
+                                        />
+                                      )}
+                                    </Box>
+                                  </CardContent>
+                                </Card>
+                              )}
                             </Box>
                           );
                         })}
@@ -2258,6 +3229,38 @@ export default function CompositionsPage() {
               </Box>
             </>
           ) : null}
+
+          {/* Dialog de confirmation pour renvoyer le message Discord */}
+          <Dialog
+            open={confirmResendDialog.open}
+            onClose={() => setConfirmResendDialog({ open: false, teamId: null, matchInfo: null })}
+          >
+            <DialogTitle>Renvoyer le message Discord ?</DialogTitle>
+            <DialogContent>
+              <DialogContentText>
+                Un message a déjà été envoyé pour ce match. Voulez-vous vraiment le renvoyer ?
+              </DialogContentText>
+            </DialogContent>
+            <DialogActions>
+              <Button
+                onClick={() => setConfirmResendDialog({ open: false, teamId: null, matchInfo: null })}
+              >
+                Annuler
+              </Button>
+              <Button
+                onClick={() => {
+                  if (confirmResendDialog.teamId && confirmResendDialog.matchInfo && selectedJournee && selectedPhase) {
+                    handleSendDiscordMessage(confirmResendDialog.teamId, confirmResendDialog.matchInfo, selectedJournee, selectedPhase, confirmResendDialog.channelId);
+                    setConfirmResendDialog({ open: false, teamId: null, matchInfo: null });
+                  }
+                }}
+                color="warning"
+                variant="contained"
+              >
+                Renvoyer
+              </Button>
+            </DialogActions>
+          </Dialog>
 
           {(!selectedJournee || !selectedPhase) && (
             <Card>

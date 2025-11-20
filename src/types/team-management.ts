@@ -57,6 +57,8 @@ export interface Player {
   idLicence?: string;
   nomClub?: string;
   isHomme?: boolean;
+  // Mentions Discord pour les notifications
+  discordMentions?: string[]; // IDs des membres Discord à notifier
 }
 
 export interface Team {

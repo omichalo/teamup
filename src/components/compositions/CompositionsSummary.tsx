@@ -14,6 +14,8 @@ export interface CompositionsSummaryProps {
   percentage?: number;
   sx?: Record<string, unknown>;
   title?: string;
+  discordMessagesSent?: number;
+  discordMessagesTotal?: number;
 }
 
 export const CompositionsSummary: React.FC<CompositionsSummaryProps> = ({
@@ -27,6 +29,8 @@ export const CompositionsSummary: React.FC<CompositionsSummaryProps> = ({
   percentage,
   sx,
   title = "Bilan des compositions",
+  discordMessagesSent = 0,
+  discordMessagesTotal = 0,
 }) => {
   const totalEditable = totalTeams;
   const computedPercentage =
@@ -80,6 +84,13 @@ export const CompositionsSummary: React.FC<CompositionsSummaryProps> = ({
             }`}
             color="info"
             variant="outlined"
+          />
+        )}
+        {discordMessagesTotal > 0 && (
+          <Chip
+            label={`${discordMessagesSent}/${discordMessagesTotal} message${discordMessagesTotal > 1 ? "s" : ""} Discord envoyé${discordMessagesTotal > 1 ? "s" : ""}`}
+            color={discordMessagesSent === discordMessagesTotal ? "success" : "primary"}
+            variant={discordMessagesSent === discordMessagesTotal ? "filled" : "outlined"}
           />
         )}
         {totalEditable > 0 && (

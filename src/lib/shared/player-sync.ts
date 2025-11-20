@@ -336,6 +336,7 @@ export class PlayerSyncService {
         // Préserver UNIQUEMENT les champs de gestion qui ne viennent pas de l'API FFTT
         // Ces champs sont gérés manuellement par l'utilisateur et ne doivent pas être écrasés
         const userManagedFields = [
+          "discordMentions",
           "participation",
           "preferredTeams",
           "isTemporary",

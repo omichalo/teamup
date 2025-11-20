@@ -3,14 +3,13 @@ import { initializeFirebaseAdmin, getFirestoreAdmin } from "@/lib/firebase-admin
 import {
   getTeams,
   getTeamMatches,
-  TeamSummary,
   TeamMatch,
 } from "@/lib/server/team-matches";
 
-interface TeamMatchesResponse {
-  team: TeamSummary;
-  matches: TeamMatch[];
-  total: number;
+interface TeamMatchSerialized extends Omit<TeamMatch, "date" | "createdAt" | "updatedAt"> {
+  date: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export async function GET(req: Request) {
@@ -37,11 +36,23 @@ export async function GET(req: Request) {
     const teamMatches = await Promise.all(
       filteredTeams.map(async (team) => {
         const matches = await getTeamMatches(firestore, team.id);
+        // Convertir les dates en ISO strings pour la sérialisation JSON
+        const matchesWithISODates: TeamMatchSerialized[] = matches.map((match) => {
+          const date = match.date instanceof Date ? match.date.toISOString() : new Date().toISOString();
+          const createdAt = match.createdAt instanceof Date ? match.createdAt.toISOString() : new Date().toISOString();
+          const updatedAt = match.updatedAt instanceof Date ? match.updatedAt.toISOString() : new Date().toISOString();
+          return {
+            ...match,
+            date,
+            createdAt,
+            updatedAt,
+          };
+        });
         return {
           team,
-          matches,
-          total: matches.length,
-        } satisfies TeamMatchesResponse;
+          matches: matchesWithISODates,
+          total: matchesWithISODates.length,
+        };
       })
     );
 

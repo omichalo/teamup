@@ -1,4 +1,42 @@
 import type { Firestore } from "firebase-admin/firestore";
+import { Timestamp } from "firebase-admin/firestore";
+
+// Fonction helper pour convertir les Timestamps Firestore en Date
+function convertFirestoreTimestamp(value: unknown): Date | null {
+  if (!value) {
+    return null;
+  }
+  
+  // Vérifier si c'est un Timestamp Firestore Admin (avec méthode toDate)
+  if (value && typeof value === "object" && "toDate" in value && typeof (value as { toDate: () => Date }).toDate === "function") {
+    return (value as { toDate: () => Date }).toDate();
+  }
+  
+  // Vérifier si c'est un Timestamp Firestore avec structure { _seconds, _nanoseconds }
+  if (value && typeof value === "object" && "_seconds" in value && typeof (value as { _seconds: number })._seconds === "number") {
+    const seconds = (value as { _seconds: number })._seconds;
+    const nanoseconds = (value as { _nanoseconds?: number })._nanoseconds || 0;
+    return new Date(seconds * 1000 + nanoseconds / 1000000);
+  }
+  
+  // Vérifier si c'est une instance Timestamp
+  if (value instanceof Timestamp) {
+    return value.toDate();
+  }
+  
+  // Vérifier si c'est déjà une Date
+  if (value instanceof Date) {
+    return value;
+  }
+  
+  // Vérifier si c'est une chaîne ISO
+  if (typeof value === "string") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  
+  return null;
+}
 
 export interface TeamMatch {
   id: string;
@@ -36,6 +74,7 @@ export interface TeamSummary {
   isFemale?: boolean;
   teamNumber: number;
   location?: string; // ID du lieu (ville) associé à l'équipe
+  discordChannelId?: string; // ID du canal Discord associé à l'équipe
   createdAt: Date;
   updatedAt: Date;
 }
@@ -53,6 +92,7 @@ export async function getTeams(firestore: Firestore): Promise<TeamSummary[]> {
       isFemale: data.isFemale,
       teamNumber: data.number || data.teamNumber,
       location: data.location,
+      discordChannelId: data.discordChannelId,
       createdAt: data.createdAt?.toDate?.() || data.createdAt || new Date(),
       updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || new Date(),
     });
@@ -77,13 +117,20 @@ export async function getTeamMatches(
 
   matchesSnapshot.forEach((doc) => {
     const data = doc.data();
+    
+    // Convertir la date correctement depuis Firestore Timestamp
+    const matchDate = convertFirestoreTimestamp(data.date) || (() => {
+      console.warn(`⚠️ [getTeamMatches] Date invalide ou manquante pour le match ${doc.id}:`, data.date);
+      return new Date();
+    })();
+    
     matches.push({
       id: doc.id,
       ffttId: data.ffttId,
       teamNumber: data.teamNumber,
       opponent: data.opponent,
       opponentClub: data.opponentClub,
-      date: data.date?.toDate?.() || data.date || new Date(),
+      date: matchDate,
       location: data.location,
       isHome: data.isHome,
       isExempt: data.isExempt,
@@ -102,8 +149,8 @@ export async function getTeamMatches(
       resultatsIndividuels: data.resultatsIndividuels,
       joueursSQY: data.joueursSQY || [],
       joueursAdversaires: data.joueursAdversaires || [],
-      createdAt: data.createdAt?.toDate?.() || data.createdAt || new Date(),
-      updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || new Date(),
+      createdAt: convertFirestoreTimestamp(data.createdAt) || new Date(),
+      updatedAt: convertFirestoreTimestamp(data.updatedAt) || new Date(),
     });
   });
 

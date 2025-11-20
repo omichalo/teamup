@@ -36,7 +36,8 @@ import {
   FlightTakeoff,
   Close,
   Info,
-  Edit as EditIcon,
+  Message,
+  LocationOn,
 } from "@mui/icons-material";
 import { useEquipesWithMatches } from "@/hooks/useEquipesWithMatches";
 import { Match } from "@/types";
@@ -56,6 +57,11 @@ export default function EquipesPage() {
   const [selectedLocationId, setSelectedLocationId] = React.useState<string | null>(null);
   const [updatingLocation, setUpdatingLocation] = React.useState<string | null>(null);
   const [filterLocationId, setFilterLocationId] = React.useState<string | null>(null);
+  const [editingTeamDiscordChannel, setEditingTeamDiscordChannel] = React.useState<string | null>(null);
+  const [selectedDiscordChannelId, setSelectedDiscordChannelId] = React.useState<string | null>(null);
+  const [updatingDiscordChannel, setUpdatingDiscordChannel] = React.useState<string | null>(null);
+  const [discordChannels, setDiscordChannels] = React.useState<Array<{ id: string; name: string }>>([]);
+  const [loadingDiscordChannels, setLoadingDiscordChannels] = React.useState(false);
 
   // Synchroniser l'état local avec les équipes initiales
   React.useEffect(() => {
@@ -142,6 +148,41 @@ export default function EquipesPage() {
     void loadLocations();
   }, []);
 
+  // Charger les canaux Discord disponibles
+  React.useEffect(() => {
+    const loadDiscordChannels = async () => {
+      if (!user || (user.role !== USER_ROLES.ADMIN && user.role !== USER_ROLES.COACH)) {
+        return;
+      }
+      try {
+        setLoadingDiscordChannels(true);
+        const response = await fetch("/api/discord/channels", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            setDiscordChannels(result.channels || []);
+          } else {
+            console.error("Erreur lors du chargement des canaux Discord:", result.error);
+          }
+        } else {
+          const errorData = await response.json();
+          console.error("Erreur HTTP lors du chargement des canaux Discord:", errorData);
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des canaux Discord:", error);
+      } finally {
+        setLoadingDiscordChannels(false);
+      }
+    };
+    void loadDiscordChannels();
+  }, [user]);
+
   const handleUpdateTeamLocation = React.useCallback(async (teamId: string, locationId: string | null) => {
     if (!user) return;
 
@@ -196,6 +237,61 @@ export default function EquipesPage() {
       void handleUpdateTeamLocation(editingTeamLocation, selectedLocationId);
     }
   }, [editingTeamLocation, selectedLocationId, handleUpdateTeamLocation]);
+
+  const handleUpdateTeamDiscordChannel = React.useCallback(async (teamId: string, channelId: string | null) => {
+    if (!user) return;
+
+    setUpdatingDiscordChannel(teamId);
+    try {
+      const response = await fetch(`/api/teams/${teamId}/discord-channel`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ discordChannelId: channelId }),
+      });
+
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || "Erreur lors de la mise à jour du canal Discord");
+      }
+
+      // Mettre à jour l'état local des équipes sans recharger la page
+      setEquipes(prevEquipes => 
+        prevEquipes.map(equipe => 
+          equipe.team.id === teamId
+            ? {
+                ...equipe,
+                team: {
+                  ...equipe.team,
+                  discordChannelId: channelId ?? undefined,
+                } as typeof equipe.team,
+              }
+            : equipe
+        )
+      );
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour du canal Discord:", error);
+      alert(error instanceof Error ? error.message : "Erreur lors de la mise à jour du canal Discord");
+    } finally {
+      setUpdatingDiscordChannel(null);
+      setEditingTeamDiscordChannel(null);
+      setSelectedDiscordChannelId(null);
+    }
+  }, [user]);
+
+  const handleOpenDiscordChannelDialog = React.useCallback((teamId: string) => {
+    const equipe = equipes.find(e => e.team.id === teamId);
+    setSelectedDiscordChannelId(equipe?.team.discordChannelId || null);
+    setEditingTeamDiscordChannel(teamId);
+  }, [equipes]);
+
+  const handleSaveDiscordChannel = React.useCallback(() => {
+    if (editingTeamDiscordChannel) {
+      void handleUpdateTeamDiscordChannel(editingTeamDiscordChannel, selectedDiscordChannelId);
+    }
+  }, [editingTeamDiscordChannel, selectedDiscordChannelId, handleUpdateTeamDiscordChannel]);
 
   const formatDate = (date: string | Date) => {
     return new Intl.DateTimeFormat("fr-FR", {
@@ -405,39 +501,69 @@ export default function EquipesPage() {
                                     >
                                       {equipeWithMatches.team.division}
                                     </Typography>
-                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5 }}>
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.5, flexWrap: "wrap" }}>
                                       <Typography variant="caption" color="text.secondary">
                                         Lieu:{" "}
                                         {equipeWithMatches.team.location
                                           ? locations.find(l => l.id === equipeWithMatches.team.location)?.name || equipeWithMatches.team.location
                                           : "Non défini"}
                                       </Typography>
+                                      <Typography variant="caption" color="text.secondary">
+                                        Discord:{" "}
+                                        {equipeWithMatches.team.discordChannelId
+                                          ? discordChannels.find(c => c.id === equipeWithMatches.team.discordChannelId)?.name || "Canal configuré"
+                                          : "Non configuré"}
+                                      </Typography>
                                     </Box>
                                   </Box>
                                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                                     {user && (user.role === USER_ROLES.ADMIN || user.role === USER_ROLES.COACH) && (
-                                      <Box
-                                        component="div"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleOpenLocationDialog(equipeWithMatches.team.id);
-                                        }}
-                                        sx={{
-                                          display: "inline-flex",
-                                          alignItems: "center",
-                                          justifyContent: "center",
-                                          width: 32,
-                                          height: 32,
-                                          cursor: "pointer",
-                                          borderRadius: "50%",
-                                          "&:hover": {
-                                            backgroundColor: "action.hover",
-                                          },
-                                        }}
-                                        title="Modifier le lieu"
-                                      >
-                                        <EditIcon fontSize="small" />
-                                      </Box>
+                                      <>
+                                        <Box
+                                          component="div"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleOpenLocationDialog(equipeWithMatches.team.id);
+                                          }}
+                                          sx={{
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            width: 32,
+                                            height: 32,
+                                            cursor: "pointer",
+                                            borderRadius: "50%",
+                                            "&:hover": {
+                                              backgroundColor: "action.hover",
+                                            },
+                                          }}
+                                          title="Modifier le lieu"
+                                        >
+                                          <LocationOn fontSize="small" />
+                                        </Box>
+                                        <Box
+                                          component="div"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleOpenDiscordChannelDialog(equipeWithMatches.team.id);
+                                          }}
+                                          sx={{
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            width: 32,
+                                            height: 32,
+                                            cursor: "pointer",
+                                            borderRadius: "50%",
+                                            "&:hover": {
+                                              backgroundColor: "action.hover",
+                                            },
+                                          }}
+                                          title="Modifier le canal Discord"
+                                        >
+                                          <Message fontSize="small" />
+                                        </Box>
+                                      </>
                                     )}
                                     <Chip
                                       label={`${equipeWithMatches.matches.length} matchs`}
@@ -1260,6 +1386,76 @@ export default function EquipesPage() {
                 disabled={updatingLocation === editingTeamLocation}
               >
                 {updatingLocation === editingTeamLocation ? "Enregistrement..." : "Enregistrer"}
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Dialog de modification du canal Discord d'une équipe */}
+          <Dialog
+            open={editingTeamDiscordChannel !== null}
+            onClose={() => {
+              if (!updatingDiscordChannel) {
+                setEditingTeamDiscordChannel(null);
+                setSelectedDiscordChannelId(null);
+              }
+            }}
+            maxWidth="sm"
+            fullWidth
+          >
+            <DialogTitle>Modifier le canal Discord de l&apos;équipe</DialogTitle>
+            <DialogContent>
+              {editingTeamDiscordChannel && (
+                <Box sx={{ pt: 2 }}>
+                  <FormControl fullWidth>
+                    <InputLabel>Canal Discord</InputLabel>
+                    <Select
+                      value={selectedDiscordChannelId || ""}
+                      label="Canal Discord"
+                      onChange={(e) => {
+                        const channelId = e.target.value === "" ? null : e.target.value;
+                        setSelectedDiscordChannelId(channelId);
+                      }}
+                      disabled={updatingDiscordChannel === editingTeamDiscordChannel || loadingDiscordChannels}
+                    >
+                      <MenuItem value="">
+                        <em>Aucun canal</em>
+                      </MenuItem>
+                      {discordChannels.map((channel) => (
+                        <MenuItem key={channel.id} value={channel.id}>
+                          #{channel.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  {loadingDiscordChannels && (
+                    <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
+                      <CircularProgress size={24} />
+                    </Box>
+                  )}
+                  {updatingDiscordChannel === editingTeamDiscordChannel && (
+                    <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
+                      <CircularProgress size={24} />
+                    </Box>
+                  )}
+                </Box>
+              )}
+            </DialogContent>
+            <DialogActions>
+              <Button
+                onClick={() => {
+                  setEditingTeamDiscordChannel(null);
+                  setSelectedDiscordChannelId(null);
+                }}
+                disabled={updatingDiscordChannel === editingTeamDiscordChannel}
+              >
+                Annuler
+              </Button>
+              <Button
+                onClick={handleSaveDiscordChannel}
+                variant="contained"
+                disabled={updatingDiscordChannel === editingTeamDiscordChannel || loadingDiscordChannels}
+              >
+                {updatingDiscordChannel === editingTeamDiscordChannel ? "Enregistrement..." : "Enregistrer"}
               </Button>
             </DialogActions>
           </Dialog>

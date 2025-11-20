@@ -24,6 +24,7 @@ import {
   Tab,
   Tooltip,
   Button,
+  Badge,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -31,6 +32,11 @@ import {
   MenuItem,
   Select,
   InputLabel,
+  Popper,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemText,
 } from "@mui/material";
 import {
   Search as SearchIcon,
@@ -38,6 +44,7 @@ import {
   Add as AddIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
+  AlternateEmail as AlternateEmailIcon,
 } from "@mui/icons-material";
 import { Player } from "@/types/team-management";
 import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
@@ -67,6 +74,107 @@ function TabPanel(props: TabPanelProps) {
     >
       {value === index && <Box sx={{ p: 5 }}>{children}</Box>}
     </div>
+  );
+}
+
+// Composant pour afficher les suggestions de mentions Discord
+function MentionSuggestions({
+  members,
+  query,
+  anchorEl,
+  onSelect,
+}: {
+  members: Array<{ id: string; username: string; displayName: string }>;
+  query: string;
+  anchorEl: HTMLElement;
+  onSelect: (member: { id: string; username: string; displayName: string }) => void;
+}) {
+  const filteredMembers = members.filter((member) => {
+    const searchQuery = query.toLowerCase();
+    return (
+      member.displayName.toLowerCase().includes(searchQuery) ||
+      member.username.toLowerCase().includes(searchQuery)
+    );
+  }).slice(0, 10); // Limiter à 10 résultats
+
+  if (filteredMembers.length === 0) {
+    return null;
+  }
+
+  return (
+    <Popper
+      open={true}
+      anchorEl={anchorEl}
+      placement="bottom-start"
+      sx={{ zIndex: 1300, mt: 0.5 }}
+    >
+      <Paper
+        elevation={8}
+        sx={{
+          maxHeight: 300,
+          overflow: "auto",
+          minWidth: 280,
+          borderRadius: 2,
+          border: "1px solid",
+          borderColor: "divider",
+          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.15)",
+        }}
+      >
+        <List dense sx={{ py: 0.5 }}>
+          {filteredMembers.map((member) => (
+            <ListItem key={member.id} disablePadding>
+              <ListItemButton
+                onMouseDown={(e) => {
+                  // Empêcher le onBlur du TextField de se déclencher
+                  e.preventDefault();
+                }}
+                onClick={() => {
+                  onSelect(member);
+                }}
+                sx={{
+                  borderRadius: 1,
+                  mx: 0.5,
+                  my: 0.25,
+                  "&:hover": {
+                    backgroundColor: "action.hover",
+                  },
+                }}
+              >
+                <Box
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 32,
+                    height: 32,
+                    borderRadius: "50%",
+                    backgroundColor: "primary.main",
+                    color: "primary.contrastText",
+                    mr: 1.5,
+                    fontSize: "0.875rem",
+                    fontWeight: 600,
+                  }}
+                >
+                  {member.displayName.charAt(0).toUpperCase()}
+                </Box>
+                <ListItemText
+                  primary={
+                    <Typography variant="body2" fontWeight={500}>
+                      {member.displayName}
+                    </Typography>
+                  }
+                  secondary={
+                    <Typography variant="caption" color="text.secondary">
+                      @{member.username}
+                    </Typography>
+                  }
+                />
+              </ListItemButton>
+            </ListItem>
+          ))}
+        </List>
+      </Paper>
+    </Popper>
   );
 }
 
@@ -106,6 +214,10 @@ export default function JoueursPage() {
   });
   const [licenseExists, setLicenseExists] = useState(false);
   const [licenseExistsForOther, setLicenseExistsForOther] = useState(false);
+  const [discordMembers, setDiscordMembers] = useState<Array<{ id: string; username: string; displayName: string }>>([]);
+  const [discordMentions, setDiscordMentions] = useState<string[]>([]); // IDs des membres Discord sélectionnés
+  const [mentionAnchor, setMentionAnchor] = useState<{ anchorEl: HTMLElement; startPos: number } | null>(null);
+  const [mentionQuery, setMentionQuery] = useState<string>("");
 
   const playerService = useMemo(() => new FirestorePlayerService(), []);
 
@@ -136,6 +248,28 @@ export default function JoueursPage() {
       setLoadingPlayers(false);
     }
   }, [playerService]);
+
+  // Charger les membres Discord
+  useEffect(() => {
+    const loadDiscordMembers = async () => {
+      try {
+        const response = await fetch("/api/discord/members", {
+          method: "GET",
+          credentials: "include",
+        });
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            setDiscordMembers(result.members || []);
+          }
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des membres Discord:", error);
+      } finally {
+      }
+    };
+    void loadDiscordMembers();
+  }, []);
 
   // Calculer les joueurs filtrés pour chaque onglet (pour afficher les compteurs)
   const getFilteredCountForTab = useCallback((tabIndex: number) => {
@@ -351,6 +485,7 @@ export default function JoueursPage() {
           championnat: newPlayer.inChampionship,
         },
         hasPlayedAtLeastOneMatch: false,
+        ...(discordMentions.length > 0 ? { discordMentions } : {}),
       });
 
       // Réinitialiser le formulaire
@@ -392,21 +527,26 @@ export default function JoueursPage() {
       points: player.points || 500,
       inChampionship: player.participation?.championnat || false,
     });
+    setDiscordMentions(player.discordMentions || []);
     setLicenseExists(false);
     setLicenseExistsForOther(false);
     setEditDialogOpen(true);
   };
 
-  const handleUpdateTemporaryPlayer = async () => {
+  const handleUpdatePlayer = async () => {
     if (!editingPlayer) return;
-    if (!newPlayer.firstName.trim() || !newPlayer.name.trim()) {
-      alert("Le prénom et le nom sont obligatoires");
-      return;
-    }
+    
+    // Pour les joueurs temporaires, vérifier les champs obligatoires
+    if (editingPlayer.isTemporary) {
+      if (!newPlayer.firstName.trim() || !newPlayer.name.trim()) {
+        alert("Le prénom et le nom sont obligatoires");
+        return;
+      }
 
-    if (newPlayer.license.trim() && licenseExistsForOther) {
-      alert("Un joueur avec ce numéro de licence existe déjà. Un joueur temporaire ne peut pas correspondre à un joueur existant.");
-      return;
+      if (newPlayer.license.trim() && licenseExistsForOther) {
+        alert("Un joueur avec ce numéro de licence existe déjà. Un joueur temporaire ne peut pas correspondre à un joueur existant.");
+        return;
+      }
     }
 
     try {
@@ -417,25 +557,104 @@ export default function JoueursPage() {
       const normalizedFirstName = newPlayer.firstName.trim().charAt(0).toUpperCase() + 
         newPlayer.firstName.trim().slice(1).toLowerCase();
 
-      await playerService.updateTemporaryPlayer(editingPlayer.id, {
-        firstName: normalizedFirstName,
-        name: normalizedName,
-        license: newPlayer.license.trim() || "",
-        gender: newPlayer.gender,
-        nationality: newPlayer.nationality,
-        isActive: false,
-        isTemporary: true,
-        typeLicence: editingPlayer.typeLicence || "",
-        points: newPlayer.points || 500,
-        preferredTeams: editingPlayer.preferredTeams || {
-          masculine: [],
-          feminine: [],
-        },
-        participation: {
-          championnat: newPlayer.inChampionship,
-        },
-        hasPlayedAtLeastOneMatch: editingPlayer.hasPlayedAtLeastOneMatch || false,
-      });
+      // Si c'est un joueur temporaire, utiliser updateTemporaryPlayer
+      if (editingPlayer.isTemporary) {
+        await playerService.updateTemporaryPlayer(editingPlayer.id, {
+          firstName: normalizedFirstName,
+          name: normalizedName,
+          license: newPlayer.license.trim() || "",
+          gender: newPlayer.gender,
+          nationality: newPlayer.nationality,
+          isActive: false,
+          isTemporary: true,
+          typeLicence: editingPlayer.typeLicence || "",
+          points: newPlayer.points || 500,
+          preferredTeams: editingPlayer.preferredTeams || {
+            masculine: [],
+            feminine: [],
+          },
+          participation: {
+            championnat: newPlayer.inChampionship,
+          },
+          hasPlayedAtLeastOneMatch: editingPlayer.hasPlayedAtLeastOneMatch || false,
+          ...(discordMentions.length > 0 ? { discordMentions } : {}),
+        });
+      } else {
+        // Pour les joueurs non-temporaires, utiliser updatePlayer (seulement pour les mentions Discord)
+        console.log(`[JoueursPage] Mise à jour des mentions Discord pour le joueur ${editingPlayer.id}`);
+        console.log(`[JoueursPage] État actuel de discordMentions:`, discordMentions);
+        // Toujours passer le tableau, même s'il est vide, pour que updatePlayer puisse le gérer
+        await playerService.updatePlayer(editingPlayer.id, {
+          discordMentions: discordMentions,
+        });
+      }
+
+      // Mettre à jour l'état local sans recharger tous les joueurs
+      const updatePlayerInLists = (p: Player): Player => {
+        if (p.id === editingPlayer.id) {
+          const updatedPlayer: Player = {
+            ...p,
+            ...(discordMentions.length > 0 ? { discordMentions } : {}),
+          };
+          return updatedPlayer;
+        }
+        return p;
+      };
+
+      setPlayers(players.map(updatePlayerInLists));
+      setPlayersWithoutLicense(playersWithoutLicense.map(updatePlayerInLists));
+      setTemporaryPlayers(temporaryPlayers.map(updatePlayerInLists));
+
+      // Recalculer les joueurs filtrés selon l'onglet actif
+      let sourcePlayers: Player[] = [];
+      switch (selectedTab) {
+        case 0:
+          sourcePlayers = players.map(updatePlayerInLists);
+          break;
+        case 1:
+          sourcePlayers = playersWithoutLicense.map(updatePlayerInLists);
+          break;
+        case 2:
+          sourcePlayers = temporaryPlayers.map(updatePlayerInLists);
+          break;
+        default:
+          sourcePlayers = players.map(updatePlayerInLists);
+      }
+
+      // Appliquer les filtres
+      let filtered = sourcePlayers;
+      if (searchQuery.trim()) {
+        const normalized = searchQuery.trim().toLowerCase();
+        filtered = filtered.filter(
+          (p) =>
+            `${p.firstName} ${p.name}`.toLowerCase().includes(normalized) ||
+            p.license.toLowerCase().includes(normalized)
+        );
+      }
+
+      if (filters.gender) {
+        filtered = filtered.filter((p) => p.gender === filters.gender);
+      }
+
+      if (filters.nationality) {
+        filtered = filtered.filter((p) => p.nationality === filters.nationality);
+      }
+
+      if (filters.hasPlayedMatch !== "") {
+        const hasPlayed = filters.hasPlayedMatch === "true";
+        filtered = filtered.filter(
+          (p) => (p.hasPlayedAtLeastOneMatch || false) === hasPlayed
+        );
+      }
+
+      if (filters.inChampionship !== "") {
+        const inChampionship = filters.inChampionship === "true";
+        filtered = filtered.filter(
+          (p) => (p.participation?.championnat || false) === inChampionship
+        );
+      }
+
+      setFilteredPlayers(filtered);
 
       // Réinitialiser le formulaire
       setNewPlayer({
@@ -447,20 +666,18 @@ export default function JoueursPage() {
         points: 500,
         inChampionship: true,
       });
+      setDiscordMentions([]);
       setEditingPlayer(null);
       setLicenseExists(false);
       setLicenseExistsForOther(false);
       setEditDialogOpen(false);
-
-      // Recharger les joueurs
-      await loadPlayers();
     } catch (error) {
-      console.error("Erreur lors de la mise à jour du joueur temporaire:", error);
+      console.error("Erreur lors de la mise à jour du joueur:", error);
       const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
       if (errorMessage.includes("existe déjà")) {
         alert("Un joueur avec ce numéro de licence existe déjà");
       } else {
-        alert("Erreur lors de la mise à jour du joueur temporaire");
+        alert(`Erreur lors de la mise à jour du joueur${editingPlayer?.isTemporary ? " temporaire" : ""}`);
       }
     } finally {
       setUpdating(false);
@@ -594,18 +811,16 @@ export default function JoueursPage() {
             <CardContent>
               <Box
                 sx={{
-                  display: "grid",
-                  gridTemplateColumns: {
-                    xs: "1fr",
-                    md: "1fr 1fr",
-                  },
+                  display: "flex",
+                  flexDirection: { xs: "column", md: "row" },
                   gap: 2,
-                  alignItems: "center",
+                  alignItems: { xs: "stretch", md: "center" },
                 }}
               >
-                <Box>
+                <Box sx={{ flex: { xs: "1 1 auto", md: "0 0 300px" } }}>
                   <TextField
                     fullWidth
+                    size="small"
                     placeholder="Rechercher un joueur..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -619,88 +834,70 @@ export default function JoueursPage() {
                   />
                 </Box>
                 <Box
-                  display="flex"
-                  gap={2}
                   sx={{
+                    display: "flex",
+                    flexDirection: { xs: "column", sm: "row" },
+                    gap: 2,
+                    flex: "1 1 auto",
                     flexWrap: "wrap",
                   }}
                 >
-                  <FormControl size="small">
-                    <FormLabel>Genre</FormLabel>
-                    <select
+                  <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: "140px" } }}>
+                    <InputLabel>Genre</InputLabel>
+                    <Select
                       value={filters.gender}
+                      label="Genre"
                       onChange={(e) =>
                         setFilters({ ...filters, gender: e.target.value })
                       }
-                      style={{
-                        padding: "8px",
-                        borderRadius: "4px",
-                        border: "1px solid #ccc",
-                        minWidth: "120px",
-                      }}
                     >
-                      <option value="">Tous</option>
-                      <option value="M">Masculin</option>
-                      <option value="F">Féminin</option>
-                    </select>
+                      <MenuItem value="">Tous</MenuItem>
+                      <MenuItem value="M">Masculin</MenuItem>
+                      <MenuItem value="F">Féminin</MenuItem>
+                    </Select>
                   </FormControl>
-                  <FormControl size="small">
-                    <FormLabel>Nationalité</FormLabel>
-                    <select
+                  <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: "160px" } }}>
+                    <InputLabel>Nationalité</InputLabel>
+                    <Select
                       value={filters.nationality}
+                      label="Nationalité"
                       onChange={(e) =>
                         setFilters({ ...filters, nationality: e.target.value })
                       }
-                      style={{
-                        padding: "8px",
-                        borderRadius: "4px",
-                        border: "1px solid #ccc",
-                        minWidth: "120px",
-                      }}
                     >
-                      <option value="">Toutes</option>
-                      <option value="FR">Française</option>
-                      <option value="C">Européenne</option>
-                      <option value="ETR">Étrangère</option>
-                    </select>
+                      <MenuItem value="">Toutes</MenuItem>
+                      <MenuItem value="FR">Française</MenuItem>
+                      <MenuItem value="C">Européenne</MenuItem>
+                      <MenuItem value="ETR">Étrangère</MenuItem>
+                    </Select>
                   </FormControl>
-                  <FormControl size="small">
-                    <FormLabel>A joué un match</FormLabel>
-                    <select
+                  <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: "180px" } }}>
+                    <InputLabel>A joué un match</InputLabel>
+                    <Select
                       value={filters.hasPlayedMatch}
+                      label="A joué un match"
                       onChange={(e) =>
                         setFilters({ ...filters, hasPlayedMatch: e.target.value })
                       }
-                      style={{
-                        padding: "8px",
-                        borderRadius: "4px",
-                        border: "1px solid #ccc",
-                        minWidth: "140px",
-                      }}
                     >
-                      <option value="">Tous</option>
-                      <option value="true">A joué</option>
-                      <option value="false">N&apos;a pas joué</option>
-                    </select>
+                      <MenuItem value="">Tous</MenuItem>
+                      <MenuItem value="true">A joué</MenuItem>
+                      <MenuItem value="false">N&apos;a pas joué</MenuItem>
+                    </Select>
                   </FormControl>
-                  <FormControl size="small">
-                    <FormLabel>Inscrit en championnat</FormLabel>
-                    <select
+                  <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: "200px" } }}>
+                    <InputLabel>Inscrit en championnat</InputLabel>
+                    <Select
                       value={filters.inChampionship}
+                      label="Inscrit en championnat"
                       onChange={(e) =>
                         setFilters({ ...filters, inChampionship: e.target.value })
                       }
-                      style={{
-                        padding: "8px",
-                        borderRadius: "4px",
-                        border: "1px solid #ccc",
-                        minWidth: "160px",
-                      }}
                     >
-                      <option value="">Tous</option>
-                      <option value="true">Inscrit</option>
-                      <option value="false">Non inscrit</option>
-                    </select>
+                      <MenuItem value="">Tous</MenuItem>
+                      <MenuItem value="true">Inscrit</MenuItem>
+                      <MenuItem value="false">Non inscrit</MenuItem>
+                    </Select>
                   </FormControl>
                 </Box>
               </Box>
@@ -744,6 +941,7 @@ export default function JoueursPage() {
                       <TableCell>Participation</TableCell>
                       <TableCell>Brûlage Masculin</TableCell>
                       <TableCell>Brûlage Féminin</TableCell>
+                      <TableCell>Discord</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -1008,6 +1206,26 @@ export default function JoueursPage() {
                             );
                           })()}
                         </TableCell>
+                        <TableCell>
+                          <Badge
+                            badgeContent={player.discordMentions?.length || 0}
+                            color="primary"
+                            overlap="rectangular"
+                            anchorOrigin={{
+                              vertical: "top",
+                              horizontal: "right",
+                            }}
+                          >
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<AlternateEmailIcon />}
+                              onClick={() => handleEditPlayer(player)}
+                            >
+                              Discord
+                            </Button>
+                          </Badge>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -1047,6 +1265,7 @@ export default function JoueursPage() {
                       <TableCell>Genre</TableCell>
                       <TableCell>Nationalité</TableCell>
                       <TableCell>Participation</TableCell>
+                      <TableCell>Discord</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -1153,6 +1372,26 @@ export default function JoueursPage() {
                             </Typography>
                           </Box>
                         </TableCell>
+                        <TableCell>
+                          <Badge
+                            badgeContent={player.discordMentions?.length || 0}
+                            color="primary"
+                            overlap="rectangular"
+                            anchorOrigin={{
+                              vertical: "top",
+                              horizontal: "right",
+                            }}
+                          >
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<AlternateEmailIcon />}
+                              onClick={() => handleEditPlayer(player)}
+                            >
+                              Discord
+                            </Button>
+                          </Badge>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -1221,6 +1460,7 @@ export default function JoueursPage() {
                       <TableCell>Genre</TableCell>
                       <TableCell>Nationalité</TableCell>
                       <TableCell>Participation</TableCell>
+                      <TableCell>Discord</TableCell>
                       <TableCell>Actions</TableCell>
                     </TableRow>
                   </TableHead>
@@ -1323,6 +1563,26 @@ export default function JoueursPage() {
                               {player.participation?.championnat ? "Oui" : "Non"}
                             </Typography>
                           </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            badgeContent={player.discordMentions?.length || 0}
+                            color="primary"
+                            overlap="rectangular"
+                            anchorOrigin={{
+                              vertical: "top",
+                              horizontal: "right",
+                            }}
+                          >
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              startIcon={<AlternateEmailIcon />}
+                              onClick={() => handleEditPlayer(player)}
+                            >
+                              Discord
+                            </Button>
+                          </Badge>
                         </TableCell>
                         <TableCell>
                           <Box display="flex" gap={1}>
@@ -1486,6 +1746,105 @@ export default function JoueursPage() {
                     <FormLabel>Participation au championnat</FormLabel>
                   </Box>
                 </FormControl>
+                <Box sx={{ position: "relative" }}>
+                  <TextField
+                    label="Discord (optionnel)"
+                    fullWidth
+                    value={discordMentions.map(id => {
+                      const member = discordMembers.find(m => m.id === id);
+                      return member ? `<@${member.id}>` : `<@${id}>`;
+                    }).join(" ")}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      const cursorPos = e.target.selectionStart || 0;
+                      
+                      // Détecter si on tape "@" ou si on est en train de taper après "@"
+                      const textBeforeCursor = value.substring(0, cursorPos);
+                      const lastAtIndex = textBeforeCursor.lastIndexOf("@");
+                      
+                      if (lastAtIndex !== -1) {
+                        const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+                        if (!textAfterAt.includes(" ") && !textAfterAt.includes("\n")) {
+                          const query = textAfterAt.toLowerCase();
+                          setMentionQuery(query);
+                          setMentionAnchor({
+                            anchorEl: e.target,
+                            startPos: lastAtIndex,
+                          });
+                        } else {
+                          setMentionAnchor(null);
+                        }
+                      } else {
+                        setMentionAnchor(null);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (mentionAnchor) {
+                        const filteredMembers = discordMembers.filter((member) => {
+                          const query = mentionQuery.toLowerCase();
+                          return (
+                            member.displayName.toLowerCase().includes(query) ||
+                            member.username.toLowerCase().includes(query)
+                          );
+                        });
+                        
+                        if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === "Escape") {
+                          e.preventDefault();
+                          if (e.key === "Escape") {
+                            setMentionAnchor(null);
+                          } else if (e.key === "Enter" && filteredMembers.length > 0) {
+                            const selectedMember = filteredMembers[0];
+                            if (!discordMentions.includes(selectedMember.id)) {
+                              setDiscordMentions([...discordMentions, selectedMember.id]);
+                            }
+                            setMentionAnchor(null);
+                          }
+                        }
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const relatedTarget = e.relatedTarget as HTMLElement | null;
+                      if (relatedTarget && relatedTarget.closest('[role="listbox"]')) {
+                        return;
+                      }
+                      setTimeout(() => {
+                        setMentionAnchor(null);
+                      }, 200);
+                    }}
+                    placeholder="Tapez @ pour mentionner un membre Discord..."
+                    helperText="Tapez @ suivi du nom d'un membre pour l'ajouter. Vous pouvez ajouter plusieurs mentions."
+                  />
+                  {mentionAnchor && (
+                    <MentionSuggestions
+                      members={discordMembers}
+                      query={mentionQuery}
+                      anchorEl={mentionAnchor.anchorEl}
+                      onSelect={(member) => {
+                        if (!discordMentions.includes(member.id)) {
+                          setDiscordMentions([...discordMentions, member.id]);
+                        }
+                        setMentionAnchor(null);
+                      }}
+                    />
+                  )}
+                  {discordMentions.length > 0 && (
+                    <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
+                      {discordMentions.map((id) => {
+                        const member = discordMembers.find(m => m.id === id);
+                        return (
+                          <Chip
+                            key={id}
+                            label={member ? member.displayName : id}
+                            onDelete={() => {
+                              setDiscordMentions((prev) => prev.filter(mid => mid !== id));
+                            }}
+                            size="small"
+                          />
+                        );
+                      })}
+                    </Box>
+                  )}
+                </Box>
               </Box>
             </DialogContent>
             <DialogActions>
@@ -1512,114 +1871,221 @@ export default function JoueursPage() {
             maxWidth="sm"
             fullWidth
           >
-            <DialogTitle>Modifier un joueur temporaire</DialogTitle>
+            <DialogTitle>{editingPlayer?.isTemporary ? "Modifier un joueur temporaire" : "Gérer Discord"}</DialogTitle>
             <DialogContent>
               <Box sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 2 }}>
-                <TextField
-                  label="Prénom"
-                  value={newPlayer.firstName}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    const normalized = value.length > 0 
-                      ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase()
-                      : value;
-                    setNewPlayer({ ...newPlayer, firstName: normalized });
-                  }}
-                  required
-                  fullWidth
-                />
-                <TextField
-                  label="Nom"
-                  value={newPlayer.name}
-                  onChange={(e) => {
-                    setNewPlayer({ ...newPlayer, name: e.target.value.toUpperCase() });
-                  }}
-                  required
-                  fullWidth
-                />
-                <TextField
-                  label="Licence (optionnel)"
-                  value={newPlayer.license}
-                  onChange={async (e) => {
-                    const license = e.target.value.trim();
-                    setNewPlayer({ ...newPlayer, license: e.target.value });
-                    if (license) {
-                      await checkLicenseExists(license, editingPlayer?.id);
-                    } else {
-                      setLicenseExists(false);
-                      setLicenseExistsForOther(false);
-                    }
-                  }}
-                  fullWidth
-                  error={licenseExists || licenseExistsForOther}
-                  helperText={
-                    licenseExistsForOther
-                      ? "Un joueur avec ce numéro de licence existe déjà. Un joueur temporaire ne peut pas correspondre à un joueur existant."
-                      : licenseExists
-                      ? "Un joueur avec ce numéro de licence existe déjà. Un joueur temporaire ne peut pas correspondre à un joueur existant."
-                      : "Laisser vide si pas encore de licence FFTT"
-                  }
-                />
-                <FormControl fullWidth>
-                  <InputLabel>Genre</InputLabel>
-                  <Select
-                    value={newPlayer.gender}
-                    label="Genre"
-                    onChange={(e) =>
-                      setNewPlayer({
-                        ...newPlayer,
-                        gender: e.target.value as "M" | "F",
-                      })
-                    }
-                  >
-                    <MenuItem value="M">Masculin</MenuItem>
-                    <MenuItem value="F">Féminin</MenuItem>
-                  </Select>
-                </FormControl>
-                <FormControl fullWidth>
-                  <InputLabel>Nationalité</InputLabel>
-                  <Select
-                    value={newPlayer.nationality}
-                    label="Nationalité"
-                    onChange={(e) =>
-                      setNewPlayer({
-                        ...newPlayer,
-                        nationality: e.target.value as "FR" | "C" | "ETR",
-                      })
-                    }
-                  >
-                    <MenuItem value="FR">Française</MenuItem>
-                    <MenuItem value="C">Européenne</MenuItem>
-                    <MenuItem value="ETR">Étrangère</MenuItem>
-                  </Select>
-                </FormControl>
-                <TextField
-                  label="Points"
-                  type="number"
-                  value={newPlayer.points}
-                  onChange={(e) =>
-                    setNewPlayer({
-                      ...newPlayer,
-                      points: parseInt(e.target.value) || 500,
-                    })
-                  }
-                  fullWidth
-                  inputProps={{ min: 0 }}
-                />
-                <FormControl fullWidth>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <Switch
-                      checked={newPlayer.inChampionship}
+                {editingPlayer?.isTemporary ? (
+                  <>
+                    <TextField
+                      label="Prénom"
+                      value={newPlayer.firstName}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        const normalized = value.length > 0 
+                          ? value.charAt(0).toUpperCase() + value.slice(1).toLowerCase()
+                          : value;
+                        setNewPlayer({ ...newPlayer, firstName: normalized });
+                      }}
+                      required
+                      fullWidth
+                    />
+                    <TextField
+                      label="Nom"
+                      value={newPlayer.name}
+                      onChange={(e) => {
+                        setNewPlayer({ ...newPlayer, name: e.target.value.toUpperCase() });
+                      }}
+                      required
+                      fullWidth
+                    />
+                    <TextField
+                      label="Licence (optionnel)"
+                      value={newPlayer.license}
+                      onChange={async (e) => {
+                        const license = e.target.value.trim();
+                        setNewPlayer({ ...newPlayer, license: e.target.value });
+                        if (license) {
+                          await checkLicenseExists(license, editingPlayer?.id);
+                        } else {
+                          setLicenseExists(false);
+                          setLicenseExistsForOther(false);
+                        }
+                      }}
+                      fullWidth
+                      error={licenseExists || licenseExistsForOther}
+                      helperText={
+                        licenseExistsForOther
+                          ? "Un joueur avec ce numéro de licence existe déjà. Un joueur temporaire ne peut pas correspondre à un joueur existant."
+                          : licenseExists
+                          ? "Un joueur avec ce numéro de licence existe déjà. Un joueur temporaire ne peut pas correspondre à un joueur existant."
+                          : "Laisser vide si pas encore de licence FFTT"
+                      }
+                    />
+                    <FormControl fullWidth>
+                      <InputLabel>Genre</InputLabel>
+                      <Select
+                        value={newPlayer.gender}
+                        label="Genre"
+                        onChange={(e) =>
+                          setNewPlayer({
+                            ...newPlayer,
+                            gender: e.target.value as "M" | "F",
+                          })
+                        }
+                      >
+                        <MenuItem value="M">Masculin</MenuItem>
+                        <MenuItem value="F">Féminin</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <FormControl fullWidth>
+                      <InputLabel>Nationalité</InputLabel>
+                      <Select
+                        value={newPlayer.nationality}
+                        label="Nationalité"
+                        onChange={(e) =>
+                          setNewPlayer({
+                            ...newPlayer,
+                            nationality: e.target.value as "FR" | "C" | "ETR",
+                          })
+                        }
+                      >
+                        <MenuItem value="FR">Française</MenuItem>
+                        <MenuItem value="C">Européenne</MenuItem>
+                        <MenuItem value="ETR">Étrangère</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <TextField
+                      label="Points"
+                      type="number"
+                      value={newPlayer.points}
                       onChange={(e) =>
                         setNewPlayer({
                           ...newPlayer,
-                          inChampionship: e.target.checked,
+                          points: parseInt(e.target.value) || 500,
                         })
                       }
+                      fullWidth
+                      inputProps={{ min: 0 }}
                     />
-                    <FormLabel>Participation au championnat</FormLabel>
-                  </Box>
-                </FormControl>
+                    <FormControl fullWidth>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <Switch
+                          checked={newPlayer.inChampionship}
+                          onChange={(e) =>
+                            setNewPlayer({
+                              ...newPlayer,
+                              inChampionship: e.target.checked,
+                            })
+                          }
+                        />
+                        <FormLabel>Participation au championnat</FormLabel>
+                      </Box>
+                    </FormControl>
+                  </>
+                ) : (
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                    {editingPlayer?.firstName} {editingPlayer?.name} ({editingPlayer?.license})
+                  </Typography>
+                )}
+                <Box sx={{ position: "relative" }}>
+                  <TextField
+                    label="Discord (optionnel)"
+                    fullWidth
+                    value={discordMentions.map(id => {
+                      const member = discordMembers.find(m => m.id === id);
+                      return member ? `<@${member.id}>` : `<@${id}>`;
+                    }).join(" ")}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      const cursorPos = e.target.selectionStart || 0;
+                      
+                      // Détecter si on tape "@" ou si on est en train de taper après "@"
+                      const textBeforeCursor = value.substring(0, cursorPos);
+                      const lastAtIndex = textBeforeCursor.lastIndexOf("@");
+                      
+                      if (lastAtIndex !== -1) {
+                        const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+                        if (!textAfterAt.includes(" ") && !textAfterAt.includes("\n")) {
+                          const query = textAfterAt.toLowerCase();
+                          setMentionQuery(query);
+                          setMentionAnchor({
+                            anchorEl: e.target,
+                            startPos: lastAtIndex,
+                          });
+                        } else {
+                          setMentionAnchor(null);
+                        }
+                      } else {
+                        setMentionAnchor(null);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (mentionAnchor) {
+                        const filteredMembers = discordMembers.filter((member) => {
+                          const query = mentionQuery.toLowerCase();
+                          return (
+                            member.displayName.toLowerCase().includes(query) ||
+                            member.username.toLowerCase().includes(query)
+                          );
+                        });
+                        
+                        if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === "Escape") {
+                          e.preventDefault();
+                          if (e.key === "Escape") {
+                            setMentionAnchor(null);
+                          } else if (e.key === "Enter" && filteredMembers.length > 0) {
+                            const selectedMember = filteredMembers[0];
+                            if (!discordMentions.includes(selectedMember.id)) {
+                              setDiscordMentions([...discordMentions, selectedMember.id]);
+                            }
+                            setMentionAnchor(null);
+                          }
+                        }
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const relatedTarget = e.relatedTarget as HTMLElement | null;
+                      if (relatedTarget && relatedTarget.closest('[role="listbox"]')) {
+                        return;
+                      }
+                      setTimeout(() => {
+                        setMentionAnchor(null);
+                      }, 200);
+                    }}
+                    placeholder="Tapez @ pour mentionner un membre Discord..."
+                    helperText="Tapez @ suivi du nom d'un membre pour l'ajouter. Vous pouvez ajouter plusieurs mentions."
+                  />
+                  {mentionAnchor && (
+                    <MentionSuggestions
+                      members={discordMembers}
+                      query={mentionQuery}
+                      anchorEl={mentionAnchor.anchorEl}
+                      onSelect={(member) => {
+                        if (!discordMentions.includes(member.id)) {
+                          setDiscordMentions([...discordMentions, member.id]);
+                        }
+                        setMentionAnchor(null);
+                      }}
+                    />
+                  )}
+                  {discordMentions.length > 0 && (
+                    <Box sx={{ mt: 1, display: "flex", flexWrap: "wrap", gap: 1 }}>
+                      {discordMentions.map((id) => {
+                        const member = discordMembers.find(m => m.id === id);
+                        return (
+                          <Chip
+                            key={id}
+                            label={member ? member.displayName : id}
+                            onDelete={() => {
+                              setDiscordMentions((prev) => prev.filter(mid => mid !== id));
+                            }}
+                            size="small"
+                          />
+                        );
+                      })}
+                    </Box>
+                  )}
+                </Box>
               </Box>
             </DialogContent>
             <DialogActions>
@@ -1627,17 +2093,18 @@ export default function JoueursPage() {
                 onClick={() => {
                   setEditDialogOpen(false);
                   setEditingPlayer(null);
+                  setDiscordMentions([]);
                   setLicenseExists(false);
                   setLicenseExistsForOther(false);
                 }}
-                disabled={updating}
+                disabled={updating || false}
               >
                 Annuler
               </Button>
               <Button
-                onClick={handleUpdateTemporaryPlayer}
+                onClick={handleUpdatePlayer}
                 variant="contained"
-                disabled={updating || !newPlayer.firstName.trim() || !newPlayer.name.trim() || licenseExists}
+                disabled={!!(updating || (editingPlayer?.isTemporary && (!newPlayer.firstName.trim() || !newPlayer.name.trim() || licenseExists)))}
               >
                 {updating ? "Mise à jour..." : "Enregistrer"}
               </Button>

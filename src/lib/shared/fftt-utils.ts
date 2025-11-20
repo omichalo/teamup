@@ -153,7 +153,7 @@ export const extractJournee = (libelle?: string, lien?: string): number => {
     }
   }
   
-  // Par défaut, retourner 1
+  // Par défaut, retourner 1 (sera recalculé plus tard si nécessaire)
   return 1;
 };
 

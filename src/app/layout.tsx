@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ClientThemeProvider } from "@/components/ClientThemeProvider";
 import { AppLayoutWrapper } from "@/components/AppLayoutWrapper";
+import { FirebaseAuthRestorer } from "@/components/FirebaseAuthRestorer";
 import "./globals.css";
 import "@fontsource-variable/figtree";
 
@@ -23,6 +24,7 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <body>
+        <FirebaseAuthRestorer />
         <ClientThemeProvider>
           <AppLayoutWrapper>{children}</AppLayoutWrapper>
         </ClientThemeProvider>

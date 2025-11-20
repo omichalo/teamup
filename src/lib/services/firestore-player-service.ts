@@ -11,6 +11,7 @@ import {
   orderBy,
   QueryDocumentSnapshot,
   DocumentData,
+  deleteField,
 } from "firebase/firestore";
 import { getDbInstanceDirect } from "@/lib/firebase";
 import { Player } from "@/types/team-management";
@@ -52,6 +53,7 @@ export class FirestorePlayerService {
       highestFeminineTeamNumberByPhase: data.highestFeminineTeamNumberByPhase,
       masculineMatchesByTeamByPhase: data.masculineMatchesByTeamByPhase || {},
       feminineMatchesByTeamByPhase: data.feminineMatchesByTeamByPhase || {},
+      discordMentions: data.discordMentions || undefined,
       // Champs additionnels de l&apos;API FFTT
       numClub: data.numClub,
       club: data.club,
@@ -154,7 +156,35 @@ export class FirestorePlayerService {
   ): Promise<void> {
     try {
       const playerRef = doc(getDbInstanceDirect(), this.collectionName, playerId);
-      await updateDoc(playerRef, updates);
+      
+      // Lire le document actuel pour préserver les autres champs
+      const currentDoc = await getDoc(playerRef);
+      if (!currentDoc.exists()) {
+        throw new Error(`Joueur ${playerId} introuvable`);
+      }
+      
+      // Convertir les champs Player vers le format Firestore
+      const firestoreUpdates: Record<string, unknown> = {
+        ...currentDoc.data(), // Préserver tous les champs existants
+      };
+      
+      // Gérer discordMentions : si le champ est présent dans updates, le traiter
+      if (updates.discordMentions !== undefined) {
+        if (updates.discordMentions.length === 0) {
+          // Tableau vide : supprimer le champ de Firestore avec deleteField()
+          firestoreUpdates.discordMentions = deleteField();
+          console.log(`[FirestorePlayerService] Suppression du champ discordMentions pour le joueur ${playerId} (tableau vide)`);
+        } else {
+          // Tableau non vide : mettre à jour avec le nouveau tableau
+          firestoreUpdates.discordMentions = updates.discordMentions;
+          console.log(`[FirestorePlayerService] Mise à jour de discordMentions pour le joueur ${playerId}:`, updates.discordMentions);
+        }
+      }
+      // Si discordMentions n'est pas dans updates, on ne le modifie pas (préserve la valeur existante)
+      
+      // Utiliser updateDoc pour permettre l'utilisation de deleteField()
+      await updateDoc(playerRef, firestoreUpdates);
+      console.log(`[FirestorePlayerService] Mise à jour réussie pour le joueur ${playerId}`);
     } catch (error) {
       console.error("Erreur lors de la mise à jour du joueur:", error);
       throw error;
@@ -399,6 +429,12 @@ export class FirestorePlayerService {
           championnat: false,
         },
         hasPlayedAtLeastOneMatch: playerData.hasPlayedAtLeastOneMatch ?? currentData.hasPlayedAtLeastOneMatch ?? false,
+        // Gérer discordMentions : inclure seulement si défini et non vide, sinon préserver la valeur existante
+        ...(playerData.discordMentions !== undefined
+          ? playerData.discordMentions.length > 0
+            ? { discordMentions: playerData.discordMentions }
+            : {} // Ne pas inclure si tableau vide (sera supprimé après)
+          : { discordMentions: currentData.discordMentions }), // Préserver si non défini
         createdAt: currentData.createdAt || new Date(), // Préserver la date de création
         updatedAt: new Date(),
         // Champs additionnels
@@ -434,10 +470,25 @@ export class FirestorePlayerService {
         if (newDocumentId) {
           const newPlayerRef = doc(getDbInstanceDirect(), this.collectionName, newDocumentId);
           await setDoc(newPlayerRef, updatedPlayer);
+          
+          // Si discordMentions était un tableau vide, supprimer le champ du nouveau document
+          if (playerData.discordMentions !== undefined && playerData.discordMentions.length === 0) {
+            await updateDoc(newPlayerRef, {
+              discordMentions: deleteField(),
+            });
+          }
         } else {
           // Pas de licence : générer un nouvel ID
           const playersRef = collection(getDbInstanceDirect(), this.collectionName);
           const docRef = await addDoc(playersRef, updatedPlayer);
+          
+          // Si discordMentions était un tableau vide, supprimer le champ du nouveau document
+          if (playerData.discordMentions !== undefined && playerData.discordMentions.length === 0) {
+            await updateDoc(docRef, {
+              discordMentions: deleteField(),
+            });
+          }
+          
           await this.deletePlayer(currentPlayerId);
           return { newPlayerId: docRef.id, oldPlayerIdDeleted: true };
         }
@@ -448,6 +499,14 @@ export class FirestorePlayerService {
       } else {
         // Pas de changement de clé, juste mettre à jour
         await updateDoc(currentPlayerRef, updatedPlayer);
+        
+        // Si discordMentions était un tableau vide, supprimer le champ
+        if (playerData.discordMentions !== undefined && playerData.discordMentions.length === 0) {
+          await updateDoc(currentPlayerRef, {
+            discordMentions: deleteField(),
+          });
+        }
+        
         return { newPlayerId: currentPlayerId, oldPlayerIdDeleted: false };
       }
     } catch (error) {
