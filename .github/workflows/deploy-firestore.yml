@@ -37,8 +37,22 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Authenticate with Firebase Service Account
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
-          echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" > $HOME/firebase-service-account.json
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT_JSON" ]; then
+            echo "❌ Erreur: Le secret FIREBASE_SERVICE_ACCOUNT n'est pas défini"
+            exit 1
+          fi
+          # Écrire le JSON dans un fichier en utilisant printf pour éviter les problèmes d'échappement
+          printf '%s\n' "$FIREBASE_SERVICE_ACCOUNT_JSON" > $HOME/firebase-service-account.json
+          # Vérifier que le fichier JSON est valide
+          if ! python3 -m json.tool $HOME/firebase-service-account.json > /dev/null 2>&1; then
+            echo "❌ Erreur: Le fichier JSON du service account est invalide"
+            echo "Premières lignes du fichier:"
+            head -n 3 $HOME/firebase-service-account.json
+            exit 1
+          fi
           export GOOGLE_APPLICATION_CREDENTIALS=$HOME/firebase-service-account.json
           gcloud auth activate-service-account --key-file=$HOME/firebase-service-account.json
 
