@@ -22,23 +22,52 @@ Le workflow peut également être déclenché manuellement depuis l'onglet "Acti
 
 Ce secret doit contenir le JSON complet du service account Firebase avec les permissions suivantes :
 
-- `roles/datastore.user` (ou `roles/firebase.admin`)
+- **Recommandé** : `roles/firebase.admin` - Accès complet à Firebase (inclut tout)
+- **OU** les rôles spécifiques suivants :
+  - `roles/firebaserules.admin` - **NÉCESSAIRE** pour déployer les règles Firestore
+  - `roles/datastore.user` - Pour lire/écrire dans Firestore
+  - `roles/datastore.indexAdmin` - Pour déployer les index Firestore
+
+**⚠️ Important** : Le service account doit avoir au minimum le rôle `roles/firebaserules.admin` pour pouvoir déployer les règles Firestore. Sans ce rôle, vous obtiendrez une erreur 403 "The caller does not have permission".
 
 **Comment obtenir le service account** :
 
-1. Allez dans la [Console Firebase](https://console.firebase.google.com/)
-2. Sélectionnez le projet `sqyping-teamup`
-3. Allez dans **Paramètres du projet** → **Comptes de service**
-4. Cliquez sur **Générer une nouvelle clé privée**
-5. Téléchargez le fichier JSON
-6. **Important** : Ouvrez le fichier JSON et copiez TOUT son contenu (de `{` jusqu'à `}`)
-7. Dans GitHub, allez dans **Settings** → **Secrets and variables** → **Actions**
-8. Cliquez sur **New repository secret**
-9. Nom : `FIREBASE_SERVICE_ACCOUNT`
-10. Valeur : collez le contenu COMPLET du fichier JSON (sans espaces avant/après)
-11. Cliquez sur **Add secret**
+1. Allez dans [Google Cloud Console](https://console.cloud.google.com/iam-admin/serviceaccounts?project=sqyping-teamup)
+2. Cliquez sur **Créer un compte de service** (ou utilisez un compte existant)
+3. Donnez-lui un nom (ex: `github-actions-firestore-deploy`)
+4. Cliquez sur **Créer et continuer**
+5. **Ajoutez les rôles suivants** (IMPORTANT) :
+   - `Firebase Admin` (ou `roles/firebase.admin`) - **Recommandé**
+   - OU `Firebase Rules Admin` (`roles/firebaserules.admin`) + `Cloud Datastore User` (`roles/datastore.user`) + `Cloud Datastore Index Admin` (`roles/datastore.indexAdmin`)
+6. Cliquez sur **Terminer**
+7. Cliquez sur le service account créé
+8. Allez dans l'onglet **Clés**
+9. Cliquez sur **Ajouter une clé** → **Créer une nouvelle clé**
+10. Sélectionnez **JSON** et cliquez sur **Créer**
+11. Téléchargez le fichier JSON
+12. **Important** : Ouvrez le fichier JSON et copiez TOUT son contenu (de `{` jusqu'à `}`)
+13. Dans GitHub, allez dans **Settings** → **Secrets and variables** → **Actions**
+14. Cliquez sur **New repository secret**
+15. Nom : `FIREBASE_SERVICE_ACCOUNT`
+16. Valeur : collez le contenu COMPLET du fichier JSON (sans espaces avant/après)
+17. Cliquez sur **Add secret**
 
 **⚠️ Vérification** : Assurez-vous que le secret contient bien un JSON valide commençant par `{` et se terminant par `}`. Le secret ne doit PAS être vide.
+
+### Vérification de la configuration
+
+Après avoir configuré le secret, vous pouvez tester le workflow :
+
+1. Allez dans l'onglet **Actions** de votre dépôt GitHub
+2. Sélectionnez le workflow **Deploy Firestore Rules and Indexes**
+3. Cliquez sur **Run workflow** → **Run workflow**
+4. Vérifiez que le workflow s'exécute sans erreur
+
+**Si vous obtenez une erreur 403 "The caller does not have permission"** :
+- Vérifiez que le service account a bien le rôle `Firebase Admin` ou `Firebase Rules Admin`
+- Allez dans [Google Cloud Console - IAM](https://console.cloud.google.com/iam-admin/iam?project=sqyping-teamup)
+- Trouvez votre service account et vérifiez ses rôles
+- Si nécessaire, ajoutez le rôle `Firebase Admin` (recommandé)
 
 ### Projet cible
 

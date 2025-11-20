@@ -60,11 +60,9 @@ jobs:
         env:
           GOOGLE_APPLICATION_CREDENTIALS: $HOME/firebase-service-account.json
         run: |
-          export FIREBASE_TOKEN=$(gcloud auth print-access-token)
           firebase deploy --only firestore:rules,firestore:indexes \
             --project sqyping-teamup \
-            --non-interactive \
-            --token "$FIREBASE_TOKEN"
+            --non-interactive
 
       - name: Verify deployment
         run: |
