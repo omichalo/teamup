@@ -4,6 +4,10 @@
  *
  * Usage:
  *   npm run discord:register-command
+ *   npm run discord:register-command -- --no-env-file
+ *
+ * Options:
+ *   --no-env-file: Utilise uniquement les variables d'environnement système, ignore les fichiers .env.local et .env
  *
  * Variables d'environnement requises:
  *   - DISCORD_TOKEN: Token du bot Discord
@@ -16,19 +20,28 @@ import * as dotenv from "dotenv";
 import * as path from "path";
 import * as fs from "fs";
 
-// Charger .env.local si disponible
-const envLocalPath = path.join(__dirname, "..", ".env.local");
-const envPath = path.join(__dirname, "..", ".env");
+// Vérifier si le flag --no-env-file est présent
+const useEnvOnly = process.argv.includes("--no-env-file");
 
-if (fs.existsSync(envLocalPath)) {
-  console.log("📄 Chargement des variables depuis .env.local");
-  dotenv.config({ path: envLocalPath });
-} else if (fs.existsSync(envPath)) {
-  console.log("📄 Chargement des variables depuis .env");
-  dotenv.config({ path: envPath });
+// Charger .env.local si disponible (sauf si --no-env-file est spécifié)
+if (!useEnvOnly) {
+  const envLocalPath = path.join(__dirname, "..", ".env.local");
+  const envPath = path.join(__dirname, "..", ".env");
+
+  if (fs.existsSync(envLocalPath)) {
+    console.log("📄 Chargement des variables depuis .env.local");
+    dotenv.config({ path: envLocalPath });
+  } else if (fs.existsSync(envPath)) {
+    console.log("📄 Chargement des variables depuis .env");
+    dotenv.config({ path: envPath });
+  } else {
+    console.log(
+      "⚠️  Aucun fichier .env.local ou .env trouvé, utilisation des variables d'environnement système"
+    );
+  }
 } else {
   console.log(
-    "⚠️  Aucun fichier .env.local ou .env trouvé, utilisation des variables d'environnement système"
+    "🔧 Mode --no-env-file activé: utilisation uniquement des variables d'environnement système"
   );
 }
 
@@ -81,10 +94,13 @@ if (!DISCORD_APPLICATION_ID) {
 }
 
 // Définition de la commande slash
+// defaultMemberPermissions: null permet à tous les membres d'utiliser les commandes
+// (par défaut, les commandes sont accessibles à tous, mais on l'explicite pour être sûr)
 const commands = [
   {
     name: "lier_licence",
     description: "Lier votre compte Discord à votre numéro de licence FFTT",
+    defaultMemberPermissions: null, // Accessible à tous les membres
     options: [
       {
         name: "licence",
@@ -98,6 +114,7 @@ const commands = [
     name: "modifier_licence",
     description:
       "Modifier votre association Discord vers une autre licence FFTT",
+    defaultMemberPermissions: null, // Accessible à tous les membres
     options: [
       {
         name: "licence",
@@ -111,18 +128,21 @@ const commands = [
     name: "supprimer_licence",
     description:
       "Supprimer l'association entre votre compte Discord et votre licence FFTT",
+    defaultMemberPermissions: null, // Accessible à tous les membres
     options: [],
   },
   {
     name: "ma_licence",
     description:
       "Afficher la licence FFTT à laquelle votre compte Discord est associé",
+    defaultMemberPermissions: null, // Accessible à tous les membres
     options: [],
   },
   // Versions anglaises optionnelles
   {
     name: "link_license",
     description: "Link your Discord account to your FFTT license number",
+    defaultMemberPermissions: null, // Accessible à tous les membres
     options: [
       {
         name: "license",
@@ -135,6 +155,7 @@ const commands = [
   {
     name: "update_license",
     description: "Update your Discord association to a different FFTT license",
+    defaultMemberPermissions: null, // Accessible à tous les membres
     options: [
       {
         name: "license",
@@ -148,12 +169,14 @@ const commands = [
     name: "unlink_license",
     description:
       "Remove the association between your Discord account and your FFTT license",
+    defaultMemberPermissions: null, // Accessible à tous les membres
     options: [],
   },
   {
     name: "my_license",
     description:
       "Display the FFTT license associated with your Discord account",
+    defaultMemberPermissions: null, // Accessible à tous les membres
     options: [],
   },
 ];
