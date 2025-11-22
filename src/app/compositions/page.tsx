@@ -35,7 +35,16 @@ import {
   ListItemButton,
   ListItemText,
 } from "@mui/material";
-import { DragIndicator, ContentCopy, RestartAlt, Message, Close, Send, AlternateEmail, Warning } from "@mui/icons-material";
+import {
+  DragIndicator,
+  ContentCopy,
+  RestartAlt,
+  Message,
+  Close,
+  Send,
+  AlternateEmail,
+  Warning,
+} from "@mui/icons-material";
 import {
   useEquipesWithMatches,
   type EquipeWithMatches,
@@ -58,6 +67,7 @@ import {
   isMatchPlayed,
   validateTeamCompositionState,
   extractTeamNumber,
+  calculateFutureBurnout,
 } from "@/lib/compositions/validation";
 import { AvailablePlayersPanel } from "@/components/compositions/AvailablePlayersPanel";
 import { TeamCompositionCard } from "@/components/compositions/TeamCompositionCard";
@@ -100,15 +110,21 @@ function MentionSuggestions({
   members: Array<{ id: string; username: string; displayName: string }>;
   query: string;
   anchorEl: HTMLElement;
-  onSelect: (member: { id: string; username: string; displayName: string }) => void;
+  onSelect: (member: {
+    id: string;
+    username: string;
+    displayName: string;
+  }) => void;
 }) {
-  const filteredMembers = members.filter((member) => {
-    const searchQuery = query.toLowerCase();
-    return (
-      member.displayName.toLowerCase().includes(searchQuery) ||
-      member.username.toLowerCase().includes(searchQuery)
-    );
-  }).slice(0, 10); // Limiter à 10 résultats
+  const filteredMembers = members
+    .filter((member) => {
+      const searchQuery = query.toLowerCase();
+      return (
+        member.displayName.toLowerCase().includes(searchQuery) ||
+        member.username.toLowerCase().includes(searchQuery)
+      );
+    })
+    .slice(0, 10); // Limiter à 10 résultats
 
   if (filteredMembers.length === 0) {
     return null;
@@ -195,22 +211,25 @@ function MentionSuggestions({
 function cleanTeamName(teamName: string): string {
   if (!teamName) return "";
   // Retirer "Phase X" (avec ou sans tiret avant/après)
-  return teamName.replace(/\s*-\s*Phase\s+\d+\s*/gi, " ").replace(/\s*Phase\s+\d+\s*/gi, " ").trim();
+  return teamName
+    .replace(/\s*-\s*Phase\s+\d+\s*/gi, " ")
+    .replace(/\s*Phase\s+\d+\s*/gi, " ")
+    .trim();
 }
 
 // Fonction pour simplifier l'affichage de la division
 function formatDivision(division: string): string {
   if (!division) return "";
-  
+
   // Extraire le numéro de poule
   const pouleMatch = division.match(/Poule\s+(\d+)/i);
   const pouleNumber = pouleMatch ? pouleMatch[1] : "";
-  
+
   // Extraire le type et le numéro de division
   // Format: FED_Nationale X, DXX_Departementale X, LXX_RX, ou Pre-Regionale
   let prefix = "";
   let number = "";
-  
+
   // Pre-Régionale (format: DXX_Pre-Regionale Dames, ex: D78_Pre-Regionale Dames)
   const preRegionaleMatch = division.match(/Pre-Regionale/i);
   if (preRegionaleMatch) {
@@ -238,17 +257,19 @@ function formatDivision(division: string): string {
       }
     }
   }
-  
+
   // Construire le résultat
   if (prefix) {
     if (number) {
-      return pouleNumber ? `${prefix}${number} Poule ${pouleNumber}` : `${prefix}${number}`;
+      return pouleNumber
+        ? `${prefix}${number} Poule ${pouleNumber}`
+        : `${prefix}${number}`;
     } else {
       // Pour Pre-Régionale (pas de numéro)
       return pouleNumber ? `${prefix} Poule ${pouleNumber}` : prefix;
     }
   }
-  
+
   // Si on n'a pas pu parser, retourner la division originale
   return division;
 }
@@ -305,26 +326,52 @@ export default function CompositionsPage() {
     useState(false);
   const [availabilitiesLoaded, setAvailabilitiesLoaded] = useState(false);
   // État pour gérer l'affichage du message d'informations du match par équipe
-  const [showMatchInfo, setShowMatchInfo] = useState<Record<string, boolean>>({});
-  const [locations, setLocations] = useState<Array<{ id: string; name: string }>>([]);
-  const [sendingDiscord, setSendingDiscord] = useState<Record<string, boolean>>({});
-  const [discordSentStatus, setDiscordSentStatus] = useState<Record<string, { sent: boolean; sentAt?: string; customMessage?: string }>>({});
-  const [customMessages, setCustomMessages] = useState<Record<string, string>>({});
-  const [confirmResendDialog, setConfirmResendDialog] = useState<{ open: boolean; teamId: string | null; matchInfo: string | null; channelId?: string }>({ open: false, teamId: null, matchInfo: null });
-  const [discordMembers, setDiscordMembers] = useState<Array<{ id: string; username: string; displayName: string }>>([]);
-  const [mentionAnchor, setMentionAnchor] = useState<{ teamId: string; anchorEl: HTMLElement; startPos: number } | null>(null);
+  const [showMatchInfo, setShowMatchInfo] = useState<Record<string, boolean>>(
+    {}
+  );
+  const [locations, setLocations] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [sendingDiscord, setSendingDiscord] = useState<Record<string, boolean>>(
+    {}
+  );
+  const [discordSentStatus, setDiscordSentStatus] = useState<
+    Record<string, { sent: boolean; sentAt?: string; customMessage?: string }>
+  >({});
+  const [customMessages, setCustomMessages] = useState<Record<string, string>>(
+    {}
+  );
+  const [confirmResendDialog, setConfirmResendDialog] = useState<{
+    open: boolean;
+    teamId: string | null;
+    matchInfo: string | null;
+    channelId?: string;
+  }>({ open: false, teamId: null, matchInfo: null });
+  const [discordMembers, setDiscordMembers] = useState<
+    Array<{ id: string; username: string; displayName: string }>
+  >([]);
+  const [mentionAnchor, setMentionAnchor] = useState<{
+    teamId: string;
+    anchorEl: HTMLElement;
+    startPos: number;
+  } | null>(null);
   const [mentionQuery, setMentionQuery] = useState<string>("");
   const saveTimeoutRef = React.useRef<Record<string, NodeJS.Timeout>>({});
 
   // Fonction helper pour vérifier le statut Discord d'un joueur
-  const getDiscordStatus = useCallback((player: Player): "none" | "invalid" | "valid" => {
-    if (!player.discordMentions || player.discordMentions.length === 0) {
-      return "none";
-    }
-    const validMemberIds = new Set(discordMembers.map(m => m.id));
-    const hasInvalidMention = player.discordMentions.some(mentionId => !validMemberIds.has(mentionId));
-    return hasInvalidMention ? "invalid" : "valid";
-  }, [discordMembers]);
+  const getDiscordStatus = useCallback(
+    (player: Player): "none" | "invalid" | "valid" => {
+      if (!player.discordMentions || player.discordMentions.length === 0) {
+        return "none";
+      }
+      const validMemberIds = new Set(discordMembers.map((m) => m.id));
+      const hasInvalidMention = player.discordMentions.some(
+        (mentionId) => !validMemberIds.has(mentionId)
+      );
+      return hasInvalidMention ? "invalid" : "valid";
+    },
+    [discordMembers]
+  );
 
   const playerService = useMemo(() => new FirestorePlayerService(), []);
   const availabilityService = useMemo(() => new AvailabilityService(), []);
@@ -543,17 +590,30 @@ export default function CompositionsPage() {
           const result = await response.json();
           console.log("[Compositions] Résultat:", result);
           if (result.success) {
-            console.log("[Compositions] Membres reçus:", result.members?.length || 0);
+            console.log(
+              "[Compositions] Membres reçus:",
+              result.members?.length || 0
+            );
             setDiscordMembers(result.members || []);
           } else {
-            console.error("[Compositions] Erreur dans la réponse:", result.error);
+            console.error(
+              "[Compositions] Erreur dans la réponse:",
+              result.error
+            );
           }
         } else {
           const errorText = await response.text();
-          console.error("[Compositions] Erreur HTTP:", response.status, errorText);
+          console.error(
+            "[Compositions] Erreur HTTP:",
+            response.status,
+            errorText
+          );
         }
       } catch (error) {
-        console.error("[Compositions] Erreur lors du chargement des membres Discord:", error);
+        console.error(
+          "[Compositions] Erreur lors du chargement des membres Discord:",
+          error
+        );
       } finally {
       }
     };
@@ -639,7 +699,10 @@ export default function CompositionsPage() {
             ? existing.reason
             : `${existing.reason} • ${reasonText}`;
           existing.offendingPlayerIds = Array.from(
-            new Set([...(existing.offendingPlayerIds ?? []), ...unavailablePlayers])
+            new Set([
+              ...(existing.offendingPlayerIds ?? []),
+              ...unavailablePlayers,
+            ])
           );
         } else {
           nextErrors[equipe.team.id] = {
@@ -865,15 +928,19 @@ export default function CompositionsPage() {
   useEffect(() => {
     const checkDiscordStatus = async () => {
       if (!selectedJournee || !selectedPhase) return;
-      
+
       const allTeams = [...equipesByType.masculin, ...equipesByType.feminin];
       if (allTeams.length === 0) return;
 
       // Un seul appel API pour toutes les équipes
-      const teamIds = allTeams.map(equipe => equipe.team.id).join(",");
+      const teamIds = allTeams.map((equipe) => equipe.team.id).join(",");
       try {
         const response = await fetch(
-          `/api/discord/check-message-sent?teamIds=${encodeURIComponent(teamIds)}&journee=${selectedJournee}&phase=${encodeURIComponent(selectedPhase)}`,
+          `/api/discord/check-message-sent?teamIds=${encodeURIComponent(
+            teamIds
+          )}&journee=${selectedJournee}&phase=${encodeURIComponent(
+            selectedPhase
+          )}`,
           {
             method: "GET",
             credentials: "include",
@@ -882,28 +949,43 @@ export default function CompositionsPage() {
         if (response.ok) {
           const result = await response.json();
           if (result.success && result.results) {
-            const statusMap: Record<string, { sent: boolean; sentAt?: string; customMessage?: string }> = {};
+            const statusMap: Record<
+              string,
+              { sent: boolean; sentAt?: string; customMessage?: string }
+            > = {};
             const customMessagesMap: Record<string, string> = {};
-            
+
             Object.entries(result.results).forEach(([teamId, status]) => {
-              const statusData = status as { sent: boolean; sentAt?: string; customMessage?: string };
+              const statusData = status as {
+                sent: boolean;
+                sentAt?: string;
+                customMessage?: string;
+              };
               statusMap[teamId] = statusData;
               if (statusData.customMessage) {
                 customMessagesMap[teamId] = statusData.customMessage;
               }
             });
-            
+
             setDiscordSentStatus(statusMap);
             setCustomMessages((prev) => ({ ...prev, ...customMessagesMap }));
           }
         }
       } catch (error) {
-        console.error("Erreur lors de la vérification du statut Discord:", error);
+        console.error(
+          "Erreur lors de la vérification du statut Discord:",
+          error
+        );
       }
     };
 
     void checkDiscordStatus();
-  }, [selectedJournee, selectedPhase, equipesByType.masculin, equipesByType.feminin]);
+  }, [
+    selectedJournee,
+    selectedPhase,
+    equipesByType.masculin,
+    equipesByType.feminin,
+  ]);
 
   const hasAssignedPlayers = useMemo(
     () =>
@@ -1004,9 +1086,14 @@ export default function CompositionsPage() {
 
   // Fonction pour sauvegarder le message personnalisé
   const handleSaveCustomMessage = useCallback(
-    async (teamId: string, customMessage: string, journee: number | null, phase: string | null) => {
+    async (
+      teamId: string,
+      customMessage: string,
+      journee: number | null,
+      phase: string | null
+    ) => {
       if (!journee || !phase) return;
-      
+
       try {
         const response = await fetch("/api/discord/update-custom-message", {
           method: "POST",
@@ -1033,45 +1120,75 @@ export default function CompositionsPage() {
           }
         }
       } catch (error) {
-        console.error("Erreur lors de la sauvegarde du message personnalisé:", error);
+        console.error(
+          "Erreur lors de la sauvegarde du message personnalisé:",
+          error
+        );
       }
     },
     []
   );
 
   // Fonction pour insérer une mention dans le message
-  const insertMention = useCallback((teamId: string, startPos: number, member: { id: string; displayName: string; username: string }) => {
-    setCustomMessages((prev) => {
-      const currentMessage = prev[teamId] || "";
-      const textBeforeAt = currentMessage.substring(0, startPos);
-      const textAfterAt = currentMessage.substring(startPos);
-      // Trouver où se termine la partie à remplacer (jusqu'au prochain espace, saut de ligne ou fin)
-      const match = textAfterAt.match(/^@[^\s\n]*/);
-      const endPos = startPos + (match ? match[0].length : 1);
-      const textAfterMention = currentMessage.substring(endPos);
-      
-      const mention = `<@${member.id}>`;
-      const newMessage = textBeforeAt + mention + textAfterMention;
-      
-      // Sauvegarder immédiatement après l'insertion
-      if (selectedJournee && selectedPhase) {
-        handleSaveCustomMessage(teamId, newMessage, selectedJournee, selectedPhase);
-      }
-      
-      return { ...prev, [teamId]: newMessage };
-    });
-    setMentionAnchor(null);
-  }, [selectedJournee, selectedPhase, handleSaveCustomMessage]);
+  const insertMention = useCallback(
+    (
+      teamId: string,
+      startPos: number,
+      member: { id: string; displayName: string; username: string }
+    ) => {
+      setCustomMessages((prev) => {
+        const currentMessage = prev[teamId] || "";
+        const textBeforeAt = currentMessage.substring(0, startPos);
+        const textAfterAt = currentMessage.substring(startPos);
+        // Trouver où se termine la partie à remplacer (jusqu'au prochain espace, saut de ligne ou fin)
+        const match = textAfterAt.match(/^@[^\s\n]*/);
+        const endPos = startPos + (match ? match[0].length : 1);
+        const textAfterMention = currentMessage.substring(endPos);
+
+        const mention = `<@${member.id}>`;
+        const newMessage = textBeforeAt + mention + textAfterMention;
+
+        // Sauvegarder immédiatement après l'insertion
+        if (selectedJournee && selectedPhase) {
+          handleSaveCustomMessage(
+            teamId,
+            newMessage,
+            selectedJournee,
+            selectedPhase
+          );
+        }
+
+        return { ...prev, [teamId]: newMessage };
+      });
+      setMentionAnchor(null);
+    },
+    [selectedJournee, selectedPhase, handleSaveCustomMessage]
+  );
 
   // Fonction pour formater le message d'informations du match
   const formatMatchInfo = useCallback(
-    (match: Match | null, teamPlayers: Player[], teamLocationId?: string, teamName?: string, isFemale?: boolean) => {
+    (
+      match: Match | null,
+      teamPlayers: Player[],
+      teamLocationId?: string,
+      teamName?: string,
+      isFemale?: boolean
+    ) => {
       if (!match) return null;
-      
-      const dayNames = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
-      const matchDate = match.date instanceof Date ? match.date : new Date(match.date);
+
+      const dayNames = [
+        "Dimanche",
+        "Lundi",
+        "Mardi",
+        "Mercredi",
+        "Jeudi",
+        "Vendredi",
+        "Samedi",
+      ];
+      const matchDate =
+        match.date instanceof Date ? match.date : new Date(match.date);
       const dayName = dayNames[matchDate.getDay()];
-      
+
       // Nettoyer le nom de l'équipe et ajouter "F" pour les équipes féminines
       let cleanName = teamName ? cleanTeamName(teamName) : "";
       if (isFemale && cleanName && !cleanName.endsWith("F")) {
@@ -1079,29 +1196,29 @@ export default function CompositionsPage() {
       }
       const division = formatDivision(match.division || "");
       const opponent = match.opponent || match.opponentClub || "";
-      
+
       // Utiliser le lieu de l'équipe (résoudre l'ID en nom depuis la collection locations)
       // Ne jamais utiliser match.location car il peut contenir des données incorrectes
       // On n'affiche rien si le lieu n'est pas trouvé dans la liste des locations
       let location = "";
       if (teamLocationId) {
-        const teamLocation = locations.find(l => l.id === teamLocationId);
+        const teamLocation = locations.find((l) => l.id === teamLocationId);
         if (teamLocation) {
           location = teamLocation.name;
         }
         // Si le lieu n'est pas trouvé, on laisse location vide (on n'affiche rien)
       }
-      
+
       const isHome = match.isHome ? "Domicile" : "Extérieur";
-      
+
       const playersList = teamPlayers
-        .map(p => `🔹 ${p.firstName} ${p.name}`)
+        .map((p) => `🔹 ${p.firstName} ${p.name}`)
         .join("\n");
-      
+
       // Collecter toutes les mentions Discord de tous les joueurs
       // Filtrer uniquement les mentions qui correspondent à des membres existants sur le serveur
       const allDiscordMentions: string[] = [];
-      const validMemberIds = new Set(discordMembers.map(m => m.id));
+      const validMemberIds = new Set(discordMembers.map((m) => m.id));
       teamPlayers.forEach((player) => {
         if (player.discordMentions && player.discordMentions.length > 0) {
           // Ajouter uniquement les mentions valides (format <@USER_ID>)
@@ -1113,7 +1230,7 @@ export default function CompositionsPage() {
           });
         }
       });
-      
+
       // Construire le message avec les mentions Discord si elles existent
       const parts = [
         `${cleanName} – ${division} – ${opponent}`,
@@ -1121,12 +1238,12 @@ export default function CompositionsPage() {
         `${dayName} – ${isHome}`,
         playersList,
       ];
-      
+
       // Ajouter les mentions Discord après la liste des joueurs
       if (allDiscordMentions.length > 0) {
         parts.push(allDiscordMentions.join(" "));
       }
-      
+
       return parts.filter(Boolean).join("\n");
     },
     [locations, discordMembers]
@@ -1134,9 +1251,15 @@ export default function CompositionsPage() {
 
   // Fonction pour envoyer le message Discord
   const handleSendDiscordMessage = useCallback(
-    async (teamId: string, content: string, journee: number | null, phase: string | null, channelId?: string) => {
+    async (
+      teamId: string,
+      content: string,
+      journee: number | null,
+      phase: string | null,
+      channelId?: string
+    ) => {
       if (!journee || !phase) return;
-      
+
       setSendingDiscord((prev) => ({ ...prev, [teamId]: true }));
       try {
         const customMessage = customMessages[teamId] || "";
@@ -1161,10 +1284,19 @@ export default function CompositionsPage() {
             // Mettre à jour le statut local
             setDiscordSentStatus((prev) => {
               const existing = prev[teamId];
-              const newStatus: { sent: boolean; sentAt: string; customMessage?: string } = {
+              const newStatus: {
+                sent: boolean;
+                sentAt: string;
+                customMessage?: string;
+              } = {
                 sent: true,
                 sentAt: new Date().toISOString(),
-                ...(customMessage || existing?.customMessage ? { customMessage: customMessage || existing?.customMessage || "" } : {}),
+                ...(customMessage || existing?.customMessage
+                  ? {
+                      customMessage:
+                        customMessage || existing?.customMessage || "",
+                    }
+                  : {}),
               };
               return {
                 ...prev,
@@ -1173,7 +1305,9 @@ export default function CompositionsPage() {
             });
           } else {
             const error = await response.json();
-            alert(`Erreur lors de l'envoi: ${error.error || "Erreur inconnue"}`);
+            alert(
+              `Erreur lors de l'envoi: ${error.error || "Erreur inconnue"}`
+            );
           }
         } else {
           const error = await response.json();
@@ -1762,9 +1896,13 @@ export default function CompositionsPage() {
             }
 
             const maxMasculine =
-              player.highestMasculineTeamNumberByPhase?.[selectedPhase || "aller"];
+              player.highestMasculineTeamNumberByPhase?.[
+                selectedPhase || "aller"
+              ];
             const maxFeminine =
-              player.highestFeminineTeamNumberByPhase?.[selectedPhase || "aller"];
+              player.highestFeminineTeamNumberByPhase?.[
+                selectedPhase || "aller"
+              ];
             const teamNumber = extractTeamNumber(
               equipes.find((eq) => eq.team.id === teamId)?.team.name || ""
             );
@@ -1965,271 +2103,259 @@ export default function CompositionsPage() {
       redirectWhenUnauthorized="/joueur"
     >
       <Box sx={{ p: 5 }}>
-          <Dialog
-            open={confirmationDialog.open}
-            onClose={handleCancelConfirmation}
-            aria-labelledby="composition-confirmation-dialog-title"
-          >
-            <DialogTitle id="composition-confirmation-dialog-title">
-              {confirmationDialog.title}
-            </DialogTitle>
-            <DialogContent>
-              <DialogContentText>
-                {confirmationDialog.description}
-              </DialogContentText>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={handleCancelConfirmation}>
-                {confirmationDialog.cancelLabel ?? "Annuler"}
-              </Button>
-              <Button
-                onClick={handleConfirmDialog}
-                variant="contained"
-                color="primary"
-              >
-                {confirmationDialog.confirmLabel ?? "Confirmer"}
-              </Button>
-            </DialogActions>
-          </Dialog>
-
-          <Typography variant="h4" gutterBottom>
-            Composition des Équipes
-          </Typography>
-
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            Composez les équipes pour une journée de championnat.
-          </Typography>
-
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
-              <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
-                <FormControl size="small" sx={{ minWidth: 150 }}>
-                  <InputLabel>Phase</InputLabel>
-                  <Select
-                    value={selectedPhase || ""}
-                    label="Phase"
-                    onChange={(e) => {
-                      const phase = e.target.value as "aller" | "retour";
-                      setSelectedPhase(phase);
-                      setSelectedJournee(null);
-                    }}
-                  >
-                    <MenuItem value="aller">Phase Aller</MenuItem>
-                    <MenuItem value="retour">Phase Retour</MenuItem>
-                  </Select>
-                </FormControl>
-                <FormControl size="small" sx={{ minWidth: 150 }}>
-                  <InputLabel>Journée</InputLabel>
-                  <Select
-                    value={selectedJournee || ""}
-                    label="Journée"
-                    onChange={(e) =>
-                      setSelectedJournee(
-                        e.target.value ? Number(e.target.value) : null
-                      )
-                    }
-                    disabled={selectedPhase === null}
-                  >
-                    {selectedPhase &&
-                      Array.from(
-                        journeesByPhase.get(selectedPhase)?.values() || []
-                      )
-                        .sort((a, b) => a.journee - b.journee)
-                        .map(({ journee, dates }) => {
-                          const datesFormatted = dates
-                            .map((date) => {
-                              return new Intl.DateTimeFormat("fr-FR", {
-                                day: "2-digit",
-                                month: "2-digit",
-                              }).format(date);
-                            })
-                            .join(", ");
-                          return (
-                            <MenuItem key={journee} value={journee}>
-                              Journée {journee} - {datesFormatted}
-                            </MenuItem>
-                          );
-                        })}
-                  </Select>
-                </FormControl>
-              </Box>
-            </CardContent>
-          </Card>
-
-          <Box
-            sx={{
-              mb: 3,
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 1.5,
-              alignItems: "center",
-            }}
-          >
-            <Button
-              component={Link}
-              href="/compositions/defaults"
-              variant="outlined"
-            >
-              Gérer les compositions par défaut
+        <Dialog
+          open={confirmationDialog.open}
+          onClose={handleCancelConfirmation}
+          aria-labelledby="composition-confirmation-dialog-title"
+        >
+          <DialogTitle id="composition-confirmation-dialog-title">
+            {confirmationDialog.title}
+          </DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              {confirmationDialog.description}
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCancelConfirmation}>
+              {confirmationDialog.cancelLabel ?? "Annuler"}
             </Button>
             <Button
+              onClick={handleConfirmDialog}
               variant="contained"
               color="primary"
-              startIcon={<ContentCopy />}
-              disabled={!canCopyDefaultsButton}
-              onClick={handleApplyDefaultsClick}
             >
-              Copier les compos par défaut (toutes équipes)
+              {confirmationDialog.confirmLabel ?? "Confirmer"}
             </Button>
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<RestartAlt />}
-              disabled={!canResetButton}
-              onClick={handleResetButtonClick}
-            >
-              Réinitialiser toutes les compos
-            </Button>
-          </Box>
+          </DialogActions>
+        </Dialog>
 
-          <CompositionRulesHelp rules={compositionRules} />
+        <Typography variant="h4" gutterBottom>
+          Composition des Équipes
+        </Typography>
 
-          {selectedJournee && selectedPhase ? (
-            <>
-              <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
-                <Tabs value={tabValue} onChange={handleTabChange}>
-                  <Tab label="Équipes Masculines" />
-                  <Tab label="Équipes Féminines" />
-                </Tabs>
-              </Box>
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+          Composez les équipes pour une journée de championnat.
+        </Typography>
 
-              <Box sx={{ display: "flex", gap: 2, position: "relative" }}>
-                <AvailablePlayersPanel
-                  title="Joueurs disponibles"
-                  subtitle={availablePlayersSubtitle}
-                  searchQuery={searchQuery}
-                  onSearchChange={setSearchQuery}
-                  totalCount={availablePlayersWithoutAssignment.length}
-                  filteredPlayers={filteredAvailablePlayersWithoutAssignment}
-                  emptyMessage="Aucun joueur disponible"
-                  noResultMessage={(query) =>
-                    `Aucun joueur trouvé pour “${query}”`
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel>Phase</InputLabel>
+                <Select
+                  value={selectedPhase || ""}
+                  label="Phase"
+                  onChange={(e) => {
+                    const phase = e.target.value as "aller" | "retour";
+                    setSelectedPhase(phase);
+                    setSelectedJournee(null);
+                  }}
+                >
+                  <MenuItem value="aller">Phase Aller</MenuItem>
+                  <MenuItem value="retour">Phase Retour</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel>Journée</InputLabel>
+                <Select
+                  value={selectedJournee || ""}
+                  label="Journée"
+                  onChange={(e) =>
+                    setSelectedJournee(
+                      e.target.value ? Number(e.target.value) : null
+                    )
                   }
-                  renderPlayerItem={(player) => {
-                    const phase = selectedPhase || "aller";
-                    const championshipType =
-                      tabValue === 0 ? "masculin" : "feminin";
-                    const burnedTeam =
-                      championshipType === "masculin"
-                        ? player.highestMasculineTeamNumberByPhase?.[phase]
-                        : player.highestFeminineTeamNumberByPhase?.[phase];
-                    const isForeign = player.nationality === "ETR";
-                    const isEuropean = player.nationality === "C";
+                  disabled={selectedPhase === null}
+                >
+                  {selectedPhase &&
+                    Array.from(
+                      journeesByPhase.get(selectedPhase)?.values() || []
+                    )
+                      .sort((a, b) => a.journee - b.journee)
+                      .map(({ journee, dates }) => {
+                        const datesFormatted = dates
+                          .map((date) => {
+                            return new Intl.DateTimeFormat("fr-FR", {
+                              day: "2-digit",
+                              month: "2-digit",
+                            }).format(date);
+                          })
+                          .join(", ");
+                        return (
+                          <MenuItem key={journee} value={journee}>
+                            Journée {journee} - {datesFormatted}
+                          </MenuItem>
+                        );
+                      })}
+                </Select>
+              </FormControl>
+            </Box>
+          </CardContent>
+        </Card>
 
-                    return (
-                      <ListItem
-                        disablePadding
-                        sx={{ mb: 1 }}
-                        secondaryAction={null}
-                      >
-                        <ListItemButton
-                          draggable
-                          onDragStart={(event) =>
-                            handleDragStart(event, player.id)
-                          }
-                          onDragEnd={handleDragEnd}
-                          sx={{
+        <Box
+          sx={{
+            mb: 3,
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 1.5,
+            alignItems: "center",
+          }}
+        >
+          <Button
+            component={Link}
+            href="/compositions/defaults"
+            variant="outlined"
+          >
+            Gérer les compositions par défaut
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<ContentCopy />}
+            disabled={!canCopyDefaultsButton}
+            onClick={handleApplyDefaultsClick}
+          >
+            Copier les compos par défaut (toutes équipes)
+          </Button>
+          <Button
+            variant="outlined"
+            color="error"
+            startIcon={<RestartAlt />}
+            disabled={!canResetButton}
+            onClick={handleResetButtonClick}
+          >
+            Réinitialiser toutes les compos
+          </Button>
+        </Box>
+
+        <CompositionRulesHelp rules={compositionRules} />
+
+        {selectedJournee && selectedPhase ? (
+          <>
+            <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
+              <Tabs value={tabValue} onChange={handleTabChange}>
+                <Tab label="Équipes Masculines" />
+                <Tab label="Équipes Féminines" />
+              </Tabs>
+            </Box>
+
+            <Box sx={{ display: "flex", gap: 2, position: "relative" }}>
+              <AvailablePlayersPanel
+                title="Joueurs disponibles"
+                subtitle={availablePlayersSubtitle}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                totalCount={availablePlayersWithoutAssignment.length}
+                filteredPlayers={filteredAvailablePlayersWithoutAssignment}
+                emptyMessage="Aucun joueur disponible"
+                noResultMessage={(query) =>
+                  `Aucun joueur trouvé pour “${query}”`
+                }
+                renderPlayerItem={(player) => {
+                  const phase = selectedPhase || "aller";
+                  const championshipType =
+                    tabValue === 0 ? "masculin" : "feminin";
+                  const burnedTeam =
+                    championshipType === "masculin"
+                      ? player.highestMasculineTeamNumberByPhase?.[phase]
+                      : player.highestFeminineTeamNumberByPhase?.[phase];
+                  const isForeign = player.nationality === "ETR";
+                  const isEuropean = player.nationality === "C";
+
+                  return (
+                    <ListItem
+                      disablePadding
+                      sx={{ mb: 1 }}
+                      secondaryAction={null}
+                    >
+                      <ListItemButton
+                        draggable
+                        onDragStart={(event) =>
+                          handleDragStart(event, player.id)
+                        }
+                        onDragEnd={handleDragEnd}
+                        sx={{
+                          cursor: "grab",
+                          border: "1px solid",
+                          borderColor: "divider",
+                          borderRadius: 1,
+                          backgroundColor: "background.paper",
+                          "&:hover": {
+                            backgroundColor: "action.hover",
+                            borderColor: "primary.main",
+                            boxShadow: 1,
                             cursor: "grab",
-                            border: "1px solid",
-                            borderColor: "divider",
-                            borderRadius: 1,
-                            backgroundColor: "background.paper",
+                          },
+                          "&:active": {
+                            cursor: "grabbing",
+                            opacity: 0.6,
+                          },
+                        }}
+                      >
+                        <IconButton
+                          edge="start"
+                          size="small"
+                          sx={{
+                            mr: 1,
+                            color: "text.secondary",
+                            cursor:
+                              draggedPlayerId === player.id
+                                ? "grabbing"
+                                : "grab",
                             "&:hover": {
-                              backgroundColor: "action.hover",
-                              borderColor: "primary.main",
-                              boxShadow: 1,
                               cursor: "grab",
                             },
                             "&:active": {
                               cursor: "grabbing",
-                              opacity: 0.6,
                             },
                           }}
+                          disabled
                         >
-                          <IconButton
-                            edge="start"
-                            size="small"
-                            sx={{
-                              mr: 1,
-                              color: "text.secondary",
-                              cursor:
-                                draggedPlayerId === player.id
-                                  ? "grabbing"
-                                  : "grab",
-                              "&:hover": {
-                                cursor: "grab",
-                              },
-                              "&:active": {
-                                cursor: "grabbing",
-                              },
-                            }}
-                            disabled
-                          >
-                            <DragIndicator fontSize="small" />
-                          </IconButton>
-                          <ListItemText
-                            primary={
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 1,
-                                  flexWrap: "wrap",
-                                }}
-                              >
-                                <Typography variant="body2" component="span">
-                                  {player.firstName} {player.name}
-                                </Typography>
-                                {isEuropean && (
+                          <DragIndicator fontSize="small" />
+                        </IconButton>
+                        <ListItemText
+                          primary={
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                flexWrap: "wrap",
+                              }}
+                            >
+                              <Typography variant="body2" component="span">
+                                {player.firstName} {player.name}
+                              </Typography>
+                              {isEuropean && (
+                                <Chip
+                                  label="EUR"
+                                  size="small"
+                                  color="info"
+                                  variant="outlined"
+                                  sx={{
+                                    height: 20,
+                                    fontSize: "0.7rem",
+                                  }}
+                                />
+                              )}
+                              {isForeign && (
+                                <Chip
+                                  label="ETR"
+                                  size="small"
+                                  color="warning"
+                                  variant="outlined"
+                                  sx={{
+                                    height: 20,
+                                    fontSize: "0.7rem",
+                                  }}
+                                />
+                              )}
+                              {burnedTeam !== undefined &&
+                                burnedTeam !== null && (
                                   <Chip
-                                    label="EUR"
-                                    size="small"
-                                    color="info"
-                                    variant="outlined"
-                                    sx={{
-                                      height: 20,
-                                      fontSize: "0.7rem",
-                                    }}
-                                  />
-                                )}
-                                {isForeign && (
-                                  <Chip
-                                    label="ETR"
-                                    size="small"
-                                    color="warning"
-                                    variant="outlined"
-                                    sx={{
-                                      height: 20,
-                                      fontSize: "0.7rem",
-                                    }}
-                                  />
-                                )}
-                                {burnedTeam !== undefined &&
-                                  burnedTeam !== null && (
-                                    <Chip
-                                      label={`Brûlé Éq. ${burnedTeam}`}
-                                      size="small"
-                                      color="error"
-                                      variant="outlined"
-                                      sx={{
-                                        height: 20,
-                                        fontSize: "0.7rem",
-                                      }}
-                                    />
-                                  )}
-                                {player.isTemporary && (
-                                  <Chip
-                                    label="Temporaire"
+                                    label={`Brûlé Éq. ${burnedTeam}`}
                                     size="small"
                                     color="error"
                                     variant="outlined"
@@ -2239,166 +2365,209 @@ export default function CompositionsPage() {
                                     }}
                                   />
                                 )}
-                                {(() => {
-                                  const discordStatus = getDiscordStatus(player);
-                                  if (discordStatus === "none") {
-                                    return (
-                                      <Tooltip title="Aucun login Discord configuré">
-                                        <Chip
-                                          icon={<AlternateEmail fontSize="small" />}
-                                          label="Pas Discord"
-                                          size="small"
-                                          color="default"
-                                          variant="outlined"
-                                          sx={{
-                                            height: 20,
-                                            fontSize: "0.7rem",
-                                          }}
-                                        />
-                                      </Tooltip>
-                                    );
-                                  }
-                                  if (discordStatus === "invalid") {
-                                    return (
-                                      <Tooltip title="Au moins un login Discord n'existe plus sur le serveur">
-                                        <Chip
-                                          icon={<Warning fontSize="small" />}
-                                          label="Discord invalide"
-                                          size="small"
-                                          color="warning"
-                                          variant="outlined"
-                                          sx={{
-                                            height: 20,
-                                            fontSize: "0.7rem",
-                                          }}
-                                        />
-                                      </Tooltip>
-                                    );
-                                  }
-                                  return null;
-                                })()}
-                              </Box>
-                            }
-                            secondary={
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                {player.points !== undefined &&
-                                player.points !== null
-                                  ? `${player.points} points`
-                                  : "Points non disponibles"}
-                              </Typography>
-                            }
-                          />
-                        </ListItemButton>
-                      </ListItem>
-                    );
-                  }}
+                              {player.isTemporary && (
+                                <Chip
+                                  label="Temporaire"
+                                  size="small"
+                                  color="error"
+                                  variant="outlined"
+                                  sx={{
+                                    height: 20,
+                                    fontSize: "0.7rem",
+                                  }}
+                                />
+                              )}
+                              {(() => {
+                                const discordStatus = getDiscordStatus(player);
+                                if (discordStatus === "none") {
+                                  return (
+                                    <Tooltip title="Aucun login Discord configuré">
+                                      <Chip
+                                        icon={
+                                          <AlternateEmail fontSize="small" />
+                                        }
+                                        label="Pas Discord"
+                                        size="small"
+                                        color="default"
+                                        variant="outlined"
+                                        sx={{
+                                          height: 20,
+                                          fontSize: "0.7rem",
+                                        }}
+                                      />
+                                    </Tooltip>
+                                  );
+                                }
+                                if (discordStatus === "invalid") {
+                                  return (
+                                    <Tooltip title="Au moins un login Discord n'existe plus sur le serveur">
+                                      <Chip
+                                        icon={<Warning fontSize="small" />}
+                                        label="Discord invalide"
+                                        size="small"
+                                        color="warning"
+                                        variant="outlined"
+                                        sx={{
+                                          height: 20,
+                                          fontSize: "0.7rem",
+                                        }}
+                                      />
+                                    </Tooltip>
+                                  );
+                                }
+                                return null;
+                              })()}
+                            </Box>
+                          }
+                          secondary={
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              {player.points !== undefined &&
+                              player.points !== null
+                                ? `${player.points} points`
+                                : "Points non disponibles"}
+                            </Typography>
+                          }
+                        />
+                      </ListItemButton>
+                    </ListItem>
+                  );
+                }}
+              />
+
+              <Box sx={{ flex: 1 }}>
+                <CompositionsSummary
+                  totalTeams={compositionSummary.totalEditable}
+                  completedTeams={compositionSummary.equipesCompletes}
+                  incompleteTeams={compositionSummary.equipesIncompletes}
+                  invalidTeams={compositionSummary.equipesInvalides}
+                  matchesPlayed={compositionSummary.equipesMatchsJoues}
+                  percentage={compositionSummary.percentage}
+                  discordMessagesSent={(() => {
+                    const currentTypeEquipes =
+                      tabValue === 0
+                        ? equipesByType.masculin
+                        : equipesByType.feminin;
+                    return currentTypeEquipes.filter((equipe) => {
+                      const match = getMatchForTeam(equipe);
+                      const matchPlayed = isMatchPlayed(match);
+                      return (
+                        !matchPlayed &&
+                        discordSentStatus[equipe.team.id]?.sent === true
+                      );
+                    }).length;
+                  })()}
+                  discordMessagesTotal={(() => {
+                    const currentTypeEquipes =
+                      tabValue === 0
+                        ? equipesByType.masculin
+                        : equipesByType.feminin;
+                    return currentTypeEquipes.filter((equipe) => {
+                      const match = getMatchForTeam(equipe);
+                      return !isMatchPlayed(match);
+                    }).length;
+                  })()}
                 />
 
-                <Box sx={{ flex: 1 }}>
-                  <CompositionsSummary
-                    totalTeams={compositionSummary.totalEditable}
-                    completedTeams={compositionSummary.equipesCompletes}
-                    incompleteTeams={compositionSummary.equipesIncompletes}
-                    invalidTeams={compositionSummary.equipesInvalides}
-                    matchesPlayed={compositionSummary.equipesMatchsJoues}
-                    percentage={compositionSummary.percentage}
-                    discordMessagesSent={(() => {
-                      const currentTypeEquipes = tabValue === 0 ? equipesByType.masculin : equipesByType.feminin;
-                      return currentTypeEquipes.filter((equipe) => {
+                <TabPanel value={tabValue} index={0}>
+                  {equipesByType.masculin.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary">
+                      Aucune équipe masculine
+                    </Typography>
+                  ) : (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 2,
+                      }}
+                    >
+                      {equipesByType.masculin.map((equipe) => {
                         const match = getMatchForTeam(equipe);
                         const matchPlayed = isMatchPlayed(match);
-                        return !matchPlayed && discordSentStatus[equipe.team.id]?.sent === true;
-                      }).length;
-                    })()}
-                    discordMessagesTotal={(() => {
-                      const currentTypeEquipes = tabValue === 0 ? equipesByType.masculin : equipesByType.feminin;
-                      return currentTypeEquipes.filter((equipe) => {
-                        const match = getMatchForTeam(equipe);
-                        return !isMatchPlayed(match);
-                      }).length;
-                    })()}
-                  />
+                        const teamPlayers = matchPlayed
+                          ? getPlayersFromMatch(match, players)
+                          : (compositions[equipe.team.id] || [])
+                              .map((playerId) =>
+                                players.find((p) => p.id === playerId)
+                              )
+                              .filter((p): p is Player => p !== undefined);
 
-                  <TabPanel value={tabValue} index={0}>
-                    {equipesByType.masculin.length === 0 ? (
-                      <Typography variant="body2" color="text.secondary">
-                        Aucune équipe masculine
-                      </Typography>
-                    ) : (
-                      <Box
-                        sx={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 2,
-                        }}
-                      >
-                        {equipesByType.masculin.map((equipe) => {
-                          const match = getMatchForTeam(equipe);
-                          const matchPlayed = isMatchPlayed(match);
-                          const teamPlayers = matchPlayed
-                            ? getPlayersFromMatch(match, players)
-                            : (compositions[equipe.team.id] || [])
-                                .map((playerId) =>
-                                  players.find((p) => p.id === playerId)
-                                )
-                                .filter((p): p is Player => p !== undefined);
+                        const teamPlayersData =
+                          Array.isArray(teamPlayers) &&
+                          teamPlayers.every((p) => "id" in p)
+                            ? teamPlayers
+                            : [];
 
-                          const teamPlayersData =
-                            Array.isArray(teamPlayers) &&
-                            teamPlayers.every((p) => "id" in p)
-                              ? teamPlayers
-                              : [];
+                        const teamAvailabilityMap =
+                          availabilities.masculin || {};
 
-                          const teamAvailabilityMap = availabilities.masculin || {};
+                        const isDragOver =
+                          !matchPlayed &&
+                          draggedPlayerId &&
+                          dragOverTeamId === equipe.team.id;
 
-                          const isDragOver =
-                            !matchPlayed &&
-                            draggedPlayerId &&
-                            dragOverTeamId === equipe.team.id;
-
-                          const dropCheck =
-                            !matchPlayed &&
-                            draggedPlayerId &&
-                            dragOverTeamId === equipe.team.id
-                              ? canDropPlayer(draggedPlayerId, equipe.team.id)
-                              : {
-                                  canAssign: true,
-                                  reason: undefined,
-                                  simulatedPlayers: teamPlayersData,
-                                  willBeBurned: false,
-                                };
-                          const canDrop = matchPlayed
-                            ? false
-                            : dropCheck.canAssign;
-                          
-                          // Construire le message de dropReason (sans l'information de brûlage lors du drag)
-                          // L'information de brûlage sera affichée uniquement si le joueur est déjà dans l'équipe
-                          const dropReasonWithBurning = dropCheck.reason;
-                          const dragHandlers = matchPlayed
-                            ? undefined
+                        const dropCheck =
+                          !matchPlayed &&
+                          draggedPlayerId &&
+                          dragOverTeamId === equipe.team.id
+                            ? canDropPlayer(draggedPlayerId, equipe.team.id)
                             : {
-                                onDragOver: (event: React.DragEvent) =>
-                                  handleDragOver(event, equipe.team.id),
-                                onDragLeave: handleDragLeave,
-                                onDrop: (event: React.DragEvent) =>
-                                  handleDrop(event, equipe.team.id),
+                                canAssign: true,
+                                reason: undefined,
+                                simulatedPlayers: teamPlayersData,
+                                willBeBurned: false,
                               };
-      const validationInfo =
-        !matchPlayed && selectedJournee !== null && selectedPhase !== null
-          ? teamValidationErrors[equipe.team.id]
-          : undefined;
-      const validationError = validationInfo?.reason;
-      const offendingPlayerIds = validationInfo?.offendingPlayerIds ?? [];
+                        const canDrop = matchPlayed
+                          ? false
+                          : dropCheck.canAssign;
 
-                          const isFemaleTeam = equipe.matches.some((match) => match.isFemale === true);
-                          const matchInfo = formatMatchInfo(match, teamPlayersData, equipe.team.location, equipe.team.name, isFemaleTeam);
+                        // Construire le message de dropReason (sans l'information de brûlage lors du drag)
+                        // L'information de brûlage sera affichée uniquement si le joueur est déjà dans l'équipe
+                        const dropReasonWithBurning = dropCheck.reason;
+                        const dragHandlers = matchPlayed
+                          ? undefined
+                          : {
+                              onDragOver: (event: React.DragEvent) =>
+                                handleDragOver(event, equipe.team.id),
+                              onDragLeave: handleDragLeave,
+                              onDrop: (event: React.DragEvent) =>
+                                handleDrop(event, equipe.team.id),
+                            };
+                        const validationInfo =
+                          !matchPlayed &&
+                          selectedJournee !== null &&
+                          selectedPhase !== null
+                            ? teamValidationErrors[equipe.team.id]
+                            : undefined;
+                        const validationError = validationInfo?.reason;
+                        const offendingPlayerIds =
+                          validationInfo?.offendingPlayerIds ?? [];
 
-                          return (
-                            <Box key={equipe.team.id} sx={{ display: "flex", gap: 2, alignItems: "flex-start", mb: 2 }}>
-                              <Box sx={{ flex: 1 }}>
+                        const isFemaleTeam = equipe.matches.some(
+                          (match) => match.isFemale === true
+                        );
+                        const matchInfo = formatMatchInfo(
+                          match,
+                          teamPlayersData,
+                          equipe.team.location,
+                          equipe.team.name,
+                          isFemaleTeam
+                        );
+
+                        return (
+                          <Box
+                            key={equipe.team.id}
+                            sx={{
+                              display: "flex",
+                              gap: 2,
+                              alignItems: "flex-start",
+                              mb: 2,
+                            }}
+                          >
+                            <Box sx={{ flex: 1 }}>
                               <TeamCompositionCard
                                 equipe={equipe}
                                 players={teamPlayersData}
@@ -2416,7 +2585,13 @@ export default function CompositionsPage() {
                                 dragOverTeamId={dragOverTeamId}
                                 matchPlayed={matchPlayed}
                                 additionalHeader={
-                                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                  <Box
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 1,
+                                    }}
+                                  >
                                     {validationError && (
                                       <Chip
                                         label="Invalide"
@@ -2441,11 +2616,18 @@ export default function CompositionsPage() {
                                             onClick={() => {
                                               setShowMatchInfo((prev) => ({
                                                 ...prev,
-                                                [equipe.team.id]: !prev[equipe.team.id],
+                                                [equipe.team.id]:
+                                                  !prev[equipe.team.id],
                                               }));
                                             }}
-                                            disabled={!equipe.team.discordChannelId}
-                                            color={showMatchInfo[equipe.team.id] ? "primary" : "default"}
+                                            disabled={
+                                              !equipe.team.discordChannelId
+                                            }
+                                            color={
+                                              showMatchInfo[equipe.team.id]
+                                                ? "primary"
+                                                : "default"
+                                            }
                                           >
                                             <Message fontSize="small" />
                                           </IconButton>
@@ -2456,20 +2638,49 @@ export default function CompositionsPage() {
                                 }
                                 renderPlayerIndicators={(player) => {
                                   const phase = selectedPhase || "aller";
-                                  const championshipType = tabValue === 0 ? "masculin" : "feminin";
+                                  const championshipType =
+                                    tabValue === 0 ? "masculin" : "feminin";
                                   const burnedTeam =
                                     championshipType === "masculin"
-                                      ? player.highestMasculineTeamNumberByPhase?.[phase]
-                                      : player.highestFeminineTeamNumberByPhase?.[phase];
-                                  
-                                  // Vérifier si le joueur sera brûlé dans cette équipe (déjà 1 match, donc 2ème match = brûlé)
-                                  const teamNumber = extractTeamNumber(equipe.team.name);
-                                  const matchesByTeamByPhase = championshipType === "masculin"
-                                    ? player.masculineMatchesByTeamByPhase?.[phase]
-                                    : player.feminineMatchesByTeamByPhase?.[phase];
-                                  const currentMatchesInTeam = matchesByTeamByPhase?.[teamNumber] || 0;
-                                  const willBeBurned = teamNumber > 0 && currentMatchesInTeam === 1;
-                                  
+                                      ? player
+                                          .highestMasculineTeamNumberByPhase?.[
+                                          phase
+                                        ]
+                                      : player
+                                          .highestFeminineTeamNumberByPhase?.[
+                                          phase
+                                        ];
+
+                                  // Calculer le brûlage futur en simulant l'ajout d'un match dans l'équipe cible
+                                  const teamNumber = extractTeamNumber(
+                                    equipe.team.name
+                                  );
+                                  const matchesByTeamByPhase =
+                                    championshipType === "masculin"
+                                      ? player.masculineMatchesByTeamByPhase?.[
+                                          phase
+                                        ]
+                                      : player.feminineMatchesByTeamByPhase?.[
+                                          phase
+                                        ];
+
+                                  const futureBurnedTeam =
+                                    teamNumber > 0
+                                      ? calculateFutureBurnout(
+                                          matchesByTeamByPhase,
+                                          teamNumber
+                                        )
+                                      : null;
+
+                                  // Le joueur sera brûlé si :
+                                  // 1. Le brûlage futur est différent du brûlage actuel (changement d'équipe brûlée)
+                                  // 2. OU le joueur devient brûlé alors qu'il ne l'était pas (actuel = null/undefined, futur ≠ null)
+                                  const willBeBurned =
+                                    futureBurnedTeam !== null &&
+                                    (burnedTeam === null ||
+                                      burnedTeam === undefined ||
+                                      futureBurnedTeam !== burnedTeam);
+
                                   const availability =
                                     teamAvailabilityMap[player.id];
                                   const isPlayerAvailable =
@@ -2478,9 +2689,9 @@ export default function CompositionsPage() {
                                     !isPlayerAvailable;
                                   const showJ2Indicator =
                                     offendingPlayerIds.includes(player.id) &&
-                                    (validationError?.toLowerCase() || "").includes(
-                                      "journée 2"
-                                    ) &&
+                                    (
+                                      validationError?.toLowerCase() || ""
+                                    ).includes("journée 2") &&
                                     isPlayerAvailable;
                                   return (
                                     <>
@@ -2521,19 +2732,25 @@ export default function CompositionsPage() {
                                             }}
                                           />
                                         )}
-                                      {willBeBurned && (
-                                        <Chip
-                                          label={`Sera brûlé Éq. ${teamNumber}`}
-                                          size="small"
-                                          color="warning"
-                                          variant="outlined"
-                                          sx={{
-                                            height: 18,
-                                            fontSize: "0.65rem",
-                                          }}
-                                          title="Ce joueur sera brûlé dans cette équipe (2ème match)"
-                                        />
-                                      )}
+                                      {willBeBurned &&
+                                        futureBurnedTeam !== null && (
+                                          <Chip
+                                            label={`Sera brûlé Éq. ${futureBurnedTeam}`}
+                                            size="small"
+                                            color="warning"
+                                            variant="outlined"
+                                            sx={{
+                                              height: 18,
+                                              fontSize: "0.65rem",
+                                            }}
+                                            title={
+                                              burnedTeam === null ||
+                                              burnedTeam === undefined
+                                                ? "Ce joueur deviendra brûlé dans cette équipe"
+                                                : `Ce joueur changera d'équipe brûlée (actuellement Éq. ${burnedTeam}, deviendra Éq. ${futureBurnedTeam})`
+                                            }
+                                          />
+                                        )}
                                       {showUnavailableIndicator && (
                                         <Chip
                                           label="Indispo"
@@ -2571,12 +2788,15 @@ export default function CompositionsPage() {
                                         />
                                       )}
                                       {(() => {
-                                        const discordStatus = getDiscordStatus(player);
+                                        const discordStatus =
+                                          getDiscordStatus(player);
                                         if (discordStatus === "none") {
                                           return (
                                             <Tooltip title="Aucun login Discord configuré">
                                               <Chip
-                                                icon={<AlternateEmail fontSize="small" />}
+                                                icon={
+                                                  <AlternateEmail fontSize="small" />
+                                                }
                                                 label="Pas Discord"
                                                 size="small"
                                                 color="default"
@@ -2593,7 +2813,9 @@ export default function CompositionsPage() {
                                           return (
                                             <Tooltip title="Au moins un login Discord n'existe plus sur le serveur">
                                               <Chip
-                                                icon={<Warning fontSize="small" />}
+                                                icon={
+                                                  <Warning fontSize="small" />
+                                                }
                                                 label="Discord invalide"
                                                 size="small"
                                                 color="warning"
@@ -2628,8 +2850,10 @@ export default function CompositionsPage() {
                                   {validationError}
                                 </Typography>
                               )}
-                              </Box>
-                              {matchInfo && !matchPlayed && showMatchInfo[equipe.team.id] && (
+                            </Box>
+                            {matchInfo &&
+                              !matchPlayed &&
+                              showMatchInfo[equipe.team.id] && (
                                 <Card
                                   elevation={2}
                                   sx={{
@@ -2652,8 +2876,17 @@ export default function CompositionsPage() {
                                       borderBottomColor: "divider",
                                     }}
                                   >
-                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                                      <Message fontSize="small" color="primary" />
+                                    <Box
+                                      sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                      }}
+                                    >
+                                      <Message
+                                        fontSize="small"
+                                        color="primary"
+                                      />
                                       <Typography
                                         variant="caption"
                                         color="text.secondary"
@@ -2662,23 +2895,50 @@ export default function CompositionsPage() {
                                         Message Discord
                                       </Typography>
                                     </Box>
-                                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                        {discordSentStatus[equipe.team.id]?.sent && (
+                                    <Box
+                                      sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 0.5,
+                                      }}
+                                    >
+                                      <Box
+                                        sx={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 0.5,
+                                        }}
+                                      >
+                                        {discordSentStatus[equipe.team.id]
+                                          ?.sent && (
                                           <Chip
                                             label="Envoyé"
                                             size="small"
                                             color="success"
                                             variant="outlined"
-                                            sx={{ height: 20, fontSize: "0.65rem" }}
-                                            title={discordSentStatus[equipe.team.id]?.sentAt ? `Envoyé le ${new Date(discordSentStatus[equipe.team.id].sentAt!).toLocaleString("fr-FR")}` : "Message déjà envoyé"}
+                                            sx={{
+                                              height: 20,
+                                              fontSize: "0.65rem",
+                                            }}
+                                            title={
+                                              discordSentStatus[equipe.team.id]
+                                                ?.sentAt
+                                                ? `Envoyé le ${new Date(
+                                                    discordSentStatus[
+                                                      equipe.team.id
+                                                    ].sentAt!
+                                                  ).toLocaleString("fr-FR")}`
+                                                : "Message déjà envoyé"
+                                            }
                                           />
                                         )}
                                         <Tooltip
                                           title={
                                             !equipe.team.discordChannelId
                                               ? "Aucun canal Discord configuré pour cette équipe. Configurez-le dans la page des équipes."
-                                              : discordSentStatus[equipe.team.id]?.sent
+                                              : discordSentStatus[
+                                                  equipe.team.id
+                                                ]?.sent
                                               ? "Renvoyer le message sur Discord"
                                               : "Envoyer le message sur Discord"
                                           }
@@ -2688,17 +2948,53 @@ export default function CompositionsPage() {
                                               size="small"
                                               onClick={() => {
                                                 if (!matchInfo) return;
-                                                if (discordSentStatus[equipe.team.id]?.sent) {
-                                                  setConfirmResendDialog({ open: true, teamId: equipe.team.id, matchInfo, ...(equipe.team.discordChannelId ? { channelId: equipe.team.discordChannelId } : {}) });
+                                                if (
+                                                  discordSentStatus[
+                                                    equipe.team.id
+                                                  ]?.sent
+                                                ) {
+                                                  setConfirmResendDialog({
+                                                    open: true,
+                                                    teamId: equipe.team.id,
+                                                    matchInfo,
+                                                    ...(equipe.team
+                                                      .discordChannelId
+                                                      ? {
+                                                          channelId:
+                                                            equipe.team
+                                                              .discordChannelId,
+                                                        }
+                                                      : {}),
+                                                  });
                                                 } else {
-                                                  handleSendDiscordMessage(equipe.team.id, matchInfo, selectedJournee, selectedPhase, equipe.team.discordChannelId);
+                                                  handleSendDiscordMessage(
+                                                    equipe.team.id,
+                                                    matchInfo,
+                                                    selectedJournee,
+                                                    selectedPhase,
+                                                    equipe.team.discordChannelId
+                                                  );
                                                 }
                                               }}
-                                              disabled={sendingDiscord[equipe.team.id] || !matchInfo || !equipe.team.discordChannelId}
+                                              disabled={
+                                                sendingDiscord[
+                                                  equipe.team.id
+                                                ] ||
+                                                !matchInfo ||
+                                                !equipe.team.discordChannelId
+                                              }
                                               sx={{ p: 0.5 }}
-                                              color={discordSentStatus[equipe.team.id]?.sent ? "warning" : "primary"}
+                                              color={
+                                                discordSentStatus[
+                                                  equipe.team.id
+                                                ]?.sent
+                                                  ? "warning"
+                                                  : "primary"
+                                              }
                                             >
-                                              {sendingDiscord[equipe.team.id] ? (
+                                              {sendingDiscord[
+                                                equipe.team.id
+                                              ] ? (
                                                 <CircularProgress size={16} />
                                               ) : (
                                                 <Send fontSize="small" />
@@ -2722,7 +3018,9 @@ export default function CompositionsPage() {
                                       </IconButton>
                                     </Box>
                                   </Box>
-                                  <CardContent sx={{ pt: 1.5, pb: "16px !important" }}>
+                                  <CardContent
+                                    sx={{ pt: 1.5, pb: "16px !important" }}
+                                  >
                                     <Typography
                                       variant="body2"
                                       component="pre"
@@ -2744,21 +3042,33 @@ export default function CompositionsPage() {
                                         multiline
                                         rows={3}
                                         fullWidth
-                                        value={customMessages[equipe.team.id] || ""}
+                                        value={
+                                          customMessages[equipe.team.id] || ""
+                                        }
                                         onChange={(e) => {
                                           const value = e.target.value;
-                                          const cursorPos = e.target.selectionStart || 0;
-                                          
+                                          const cursorPos =
+                                            e.target.selectionStart || 0;
+
                                           // Détecter si on tape "@" ou si on est en train de taper après "@"
-                                          const textBeforeCursor = value.substring(0, cursorPos);
-                                          const lastAtIndex = textBeforeCursor.lastIndexOf("@");
-                                          
+                                          const textBeforeCursor =
+                                            value.substring(0, cursorPos);
+                                          const lastAtIndex =
+                                            textBeforeCursor.lastIndexOf("@");
+
                                           if (lastAtIndex !== -1) {
                                             // Vérifier qu'il n'y a pas d'espace entre "@" et le curseur
-                                            const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
-                                            if (!textAfterAt.includes(" ") && !textAfterAt.includes("\n")) {
+                                            const textAfterAt =
+                                              textBeforeCursor.substring(
+                                                lastAtIndex + 1
+                                              );
+                                            if (
+                                              !textAfterAt.includes(" ") &&
+                                              !textAfterAt.includes("\n")
+                                            ) {
                                               // On est en train de taper une mention
-                                              const query = textAfterAt.toLowerCase();
+                                              const query =
+                                                textAfterAt.toLowerCase();
                                               setMentionQuery(query);
                                               setMentionAnchor({
                                                 teamId: equipe.team.id,
@@ -2771,37 +3081,83 @@ export default function CompositionsPage() {
                                           } else {
                                             setMentionAnchor(null);
                                           }
-                                          
-                                          setCustomMessages((prev) => ({ ...prev, [equipe.team.id]: value }));
-                                          
+
+                                          setCustomMessages((prev) => ({
+                                            ...prev,
+                                            [equipe.team.id]: value,
+                                          }));
+
                                           // Debounce pour sauvegarder automatiquement après 1 seconde d'inactivité
-                                          if (saveTimeoutRef.current[equipe.team.id]) {
-                                            clearTimeout(saveTimeoutRef.current[equipe.team.id]);
+                                          if (
+                                            saveTimeoutRef.current[
+                                              equipe.team.id
+                                            ]
+                                          ) {
+                                            clearTimeout(
+                                              saveTimeoutRef.current[
+                                                equipe.team.id
+                                              ]
+                                            );
                                           }
-                                          saveTimeoutRef.current[equipe.team.id] = setTimeout(() => {
-                                            if (selectedJournee && selectedPhase) {
-                                              handleSaveCustomMessage(equipe.team.id, value, selectedJournee, selectedPhase);
+                                          saveTimeoutRef.current[
+                                            equipe.team.id
+                                          ] = setTimeout(() => {
+                                            if (
+                                              selectedJournee &&
+                                              selectedPhase
+                                            ) {
+                                              handleSaveCustomMessage(
+                                                equipe.team.id,
+                                                value,
+                                                selectedJournee,
+                                                selectedPhase
+                                              );
                                             }
                                           }, 1000);
                                         }}
                                         onKeyDown={(e) => {
-                                          if (mentionAnchor && mentionAnchor.teamId === equipe.team.id) {
-                                            const filteredMembers = discordMembers.filter((member) => {
-                                              const query = mentionQuery.toLowerCase();
-                                              return (
-                                                member.displayName.toLowerCase().includes(query) ||
-                                                member.username.toLowerCase().includes(query)
+                                          if (
+                                            mentionAnchor &&
+                                            mentionAnchor.teamId ===
+                                              equipe.team.id
+                                          ) {
+                                            const filteredMembers =
+                                              discordMembers.filter(
+                                                (member) => {
+                                                  const query =
+                                                    mentionQuery.toLowerCase();
+                                                  return (
+                                                    member.displayName
+                                                      .toLowerCase()
+                                                      .includes(query) ||
+                                                    member.username
+                                                      .toLowerCase()
+                                                      .includes(query)
+                                                  );
+                                                }
                                               );
-                                            });
-                                            
-                                            if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === "Escape") {
+
+                                            if (
+                                              e.key === "ArrowDown" ||
+                                              e.key === "ArrowUp" ||
+                                              e.key === "Enter" ||
+                                              e.key === "Escape"
+                                            ) {
                                               e.preventDefault();
                                               if (e.key === "Escape") {
                                                 setMentionAnchor(null);
-                                              } else if (e.key === "Enter" && filteredMembers.length > 0) {
+                                              } else if (
+                                                e.key === "Enter" &&
+                                                filteredMembers.length > 0
+                                              ) {
                                                 // Insérer la première mention
-                                                const selectedMember = filteredMembers[0];
-                                                insertMention(equipe.team.id, mentionAnchor.startPos, selectedMember);
+                                                const selectedMember =
+                                                  filteredMembers[0];
+                                                insertMention(
+                                                  equipe.team.id,
+                                                  mentionAnchor.startPos,
+                                                  selectedMember
+                                                );
                                               }
                                             }
                                           }
@@ -2809,121 +3165,156 @@ export default function CompositionsPage() {
                                         onBlur={(e) => {
                                           // Ne pas fermer si on clique sur une suggestion
                                           // Le onMouseDown de la suggestion empêchera le blur
-                                          const relatedTarget = e.relatedTarget as HTMLElement | null;
-                                          if (relatedTarget && relatedTarget.closest('[role="listbox"]')) {
+                                          const relatedTarget =
+                                            e.relatedTarget as HTMLElement | null;
+                                          if (
+                                            relatedTarget &&
+                                            relatedTarget.closest(
+                                              '[role="listbox"]'
+                                            )
+                                          ) {
                                             return;
                                           }
-                                          
+
                                           // Délai pour permettre le clic sur une suggestion
                                           setTimeout(() => {
                                             setMentionAnchor(null);
-                                            handleSaveCustomMessage(equipe.team.id, customMessages[equipe.team.id] || "", selectedJournee, selectedPhase);
+                                            handleSaveCustomMessage(
+                                              equipe.team.id,
+                                              customMessages[equipe.team.id] ||
+                                                "",
+                                              selectedJournee,
+                                              selectedPhase
+                                            );
                                           }, 200);
                                         }}
                                         placeholder="Tapez @ pour mentionner un membre Discord..."
                                         size="small"
                                         helperText="Tapez @ suivi du nom d'un membre pour le mentionner"
                                       />
-                                      {mentionAnchor && mentionAnchor.teamId === equipe.team.id && (
-                                        <MentionSuggestions
-                                          members={discordMembers}
-                                          query={mentionQuery}
-                                          anchorEl={mentionAnchor.anchorEl}
-                                          onSelect={(member) => {
-                                            insertMention(equipe.team.id, mentionAnchor.startPos, member);
-                                          }}
-                                        />
-                                      )}
+                                      {mentionAnchor &&
+                                        mentionAnchor.teamId ===
+                                          equipe.team.id && (
+                                          <MentionSuggestions
+                                            members={discordMembers}
+                                            query={mentionQuery}
+                                            anchorEl={mentionAnchor.anchorEl}
+                                            onSelect={(member) => {
+                                              insertMention(
+                                                equipe.team.id,
+                                                mentionAnchor.startPos,
+                                                member
+                                              );
+                                            }}
+                                          />
+                                        )}
                                     </Box>
                                   </CardContent>
                                 </Card>
                               )}
-                            </Box>
-                          );
-                        })}
-                      </Box>
-                    )}
-                  </TabPanel>
+                          </Box>
+                        );
+                      })}
+                    </Box>
+                  )}
+                </TabPanel>
 
-                  <TabPanel value={tabValue} index={1}>
-                    {equipesByType.feminin.length === 0 ? (
-                      <Typography variant="body2" color="text.secondary">
-                        Aucune équipe féminine
-                      </Typography>
-                    ) : (
-                      <Box
-                        sx={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 2,
-                        }}
-                      >
-                        {equipesByType.feminin.map((equipe) => {
-                          const match = getMatchForTeam(equipe);
-                          const matchPlayed = isMatchPlayed(match);
-                          const teamPlayers = matchPlayed
-                            ? getPlayersFromMatch(match, players)
-                            : (compositions[equipe.team.id] || [])
-                                .map((playerId) =>
-                                  players.find((p) => p.id === playerId)
-                                )
-                                .filter((p): p is Player => p !== undefined);
+                <TabPanel value={tabValue} index={1}>
+                  {equipesByType.feminin.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary">
+                      Aucune équipe féminine
+                    </Typography>
+                  ) : (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 2,
+                      }}
+                    >
+                      {equipesByType.feminin.map((equipe) => {
+                        const match = getMatchForTeam(equipe);
+                        const matchPlayed = isMatchPlayed(match);
+                        const teamPlayers = matchPlayed
+                          ? getPlayersFromMatch(match, players)
+                          : (compositions[equipe.team.id] || [])
+                              .map((playerId) =>
+                                players.find((p) => p.id === playerId)
+                              )
+                              .filter((p): p is Player => p !== undefined);
 
-                          const teamPlayersData =
-                            Array.isArray(teamPlayers) &&
-                            teamPlayers.every((p) => "id" in p)
-                              ? teamPlayers
-                              : [];
+                        const teamPlayersData =
+                          Array.isArray(teamPlayers) &&
+                          teamPlayers.every((p) => "id" in p)
+                            ? teamPlayers
+                            : [];
 
-                          const teamAvailabilityMap = availabilities.feminin || {};
+                        const teamAvailabilityMap =
+                          availabilities.feminin || {};
 
-                          const isDragOver =
-                            !matchPlayed &&
-                            draggedPlayerId &&
-                            dragOverTeamId === equipe.team.id;
-                          const dropCheck =
-                            !matchPlayed &&
-                            draggedPlayerId &&
-                            dragOverTeamId === equipe.team.id
-                              ? canDropPlayer(draggedPlayerId, equipe.team.id)
-                              : {
-                                  canAssign: true,
-                                  reason: undefined,
-                                  simulatedPlayers: teamPlayersData,
-                                  willBeBurned: false,
-                                };
-                          const canDrop = matchPlayed
-                            ? false
-                            : dropCheck.canAssign;
-                          
-                          // Construire le message de dropReason (sans l'information de brûlage lors du drag)
-                          // L'information de brûlage sera affichée uniquement si le joueur est déjà dans l'équipe
-                          const dropReasonWithBurning = dropCheck.reason;
-                          const dragHandlers = matchPlayed
-                            ? undefined
+                        const isDragOver =
+                          !matchPlayed &&
+                          draggedPlayerId &&
+                          dragOverTeamId === equipe.team.id;
+                        const dropCheck =
+                          !matchPlayed &&
+                          draggedPlayerId &&
+                          dragOverTeamId === equipe.team.id
+                            ? canDropPlayer(draggedPlayerId, equipe.team.id)
                             : {
-                                onDragOver: (event: React.DragEvent) =>
-                                  handleDragOver(event, equipe.team.id),
-                                onDragLeave: handleDragLeave,
-                                onDrop: (event: React.DragEvent) =>
-                                  handleDrop(event, equipe.team.id),
+                                canAssign: true,
+                                reason: undefined,
+                                simulatedPlayers: teamPlayersData,
+                                willBeBurned: false,
                               };
-                          const validationInfo =
-                            !matchPlayed &&
-                            selectedJournee !== null &&
-                            selectedPhase !== null
-                              ? teamValidationErrors[equipe.team.id]
-                              : undefined;
-                          const validationError = validationInfo?.reason;
-                          const offendingPlayerIds =
-                            validationInfo?.offendingPlayerIds ?? [];
+                        const canDrop = matchPlayed
+                          ? false
+                          : dropCheck.canAssign;
 
-                          const isFemaleTeam = equipe.matches.some((match) => match.isFemale === true);
-                          const matchInfo = formatMatchInfo(match, teamPlayersData, equipe.team.location, equipe.team.name, isFemaleTeam);
+                        // Construire le message de dropReason (sans l'information de brûlage lors du drag)
+                        // L'information de brûlage sera affichée uniquement si le joueur est déjà dans l'équipe
+                        const dropReasonWithBurning = dropCheck.reason;
+                        const dragHandlers = matchPlayed
+                          ? undefined
+                          : {
+                              onDragOver: (event: React.DragEvent) =>
+                                handleDragOver(event, equipe.team.id),
+                              onDragLeave: handleDragLeave,
+                              onDrop: (event: React.DragEvent) =>
+                                handleDrop(event, equipe.team.id),
+                            };
+                        const validationInfo =
+                          !matchPlayed &&
+                          selectedJournee !== null &&
+                          selectedPhase !== null
+                            ? teamValidationErrors[equipe.team.id]
+                            : undefined;
+                        const validationError = validationInfo?.reason;
+                        const offendingPlayerIds =
+                          validationInfo?.offendingPlayerIds ?? [];
 
-                          return (
-                            <Box key={equipe.team.id} sx={{ display: "flex", gap: 2, alignItems: "flex-start", mb: 2 }}>
-                              <Box sx={{ flex: 1 }}>
+                        const isFemaleTeam = equipe.matches.some(
+                          (match) => match.isFemale === true
+                        );
+                        const matchInfo = formatMatchInfo(
+                          match,
+                          teamPlayersData,
+                          equipe.team.location,
+                          equipe.team.name,
+                          isFemaleTeam
+                        );
+
+                        return (
+                          <Box
+                            key={equipe.team.id}
+                            sx={{
+                              display: "flex",
+                              gap: 2,
+                              alignItems: "flex-start",
+                              mb: 2,
+                            }}
+                          >
+                            <Box sx={{ flex: 1 }}>
                               <TeamCompositionCard
                                 equipe={equipe}
                                 players={teamPlayersData}
@@ -2941,7 +3332,13 @@ export default function CompositionsPage() {
                                 dragOverTeamId={dragOverTeamId}
                                 matchPlayed={matchPlayed}
                                 additionalHeader={
-                                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                  <Box
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 1,
+                                    }}
+                                  >
                                     {validationError && (
                                       <Chip
                                         label="Invalide"
@@ -2966,11 +3363,18 @@ export default function CompositionsPage() {
                                             onClick={() => {
                                               setShowMatchInfo((prev) => ({
                                                 ...prev,
-                                                [equipe.team.id]: !prev[equipe.team.id],
+                                                [equipe.team.id]:
+                                                  !prev[equipe.team.id],
                                               }));
                                             }}
-                                            disabled={!equipe.team.discordChannelId}
-                                            color={showMatchInfo[equipe.team.id] ? "primary" : "default"}
+                                            disabled={
+                                              !equipe.team.discordChannelId
+                                            }
+                                            color={
+                                              showMatchInfo[equipe.team.id]
+                                                ? "primary"
+                                                : "default"
+                                            }
                                           >
                                             <Message fontSize="small" />
                                           </IconButton>
@@ -2993,9 +3397,9 @@ export default function CompositionsPage() {
                                     !isPlayerAvailable;
                                   const showJ2Indicator =
                                     offendingPlayerIds.includes(player.id) &&
-                                    (validationError?.toLowerCase() || "").includes(
-                                      "journée 2"
-                                    ) &&
+                                    (
+                                      validationError?.toLowerCase() || ""
+                                    ).includes("journée 2") &&
                                     isPlayerAvailable;
                                   return (
                                     <>
@@ -3073,12 +3477,15 @@ export default function CompositionsPage() {
                                         />
                                       )}
                                       {(() => {
-                                        const discordStatus = getDiscordStatus(player);
+                                        const discordStatus =
+                                          getDiscordStatus(player);
                                         if (discordStatus === "none") {
                                           return (
                                             <Tooltip title="Aucun login Discord configuré">
                                               <Chip
-                                                icon={<AlternateEmail fontSize="small" />}
+                                                icon={
+                                                  <AlternateEmail fontSize="small" />
+                                                }
                                                 label="Pas Discord"
                                                 size="small"
                                                 color="default"
@@ -3095,7 +3502,9 @@ export default function CompositionsPage() {
                                           return (
                                             <Tooltip title="Au moins un login Discord n'existe plus sur le serveur">
                                               <Chip
-                                                icon={<Warning fontSize="small" />}
+                                                icon={
+                                                  <Warning fontSize="small" />
+                                                }
                                                 label="Discord invalide"
                                                 size="small"
                                                 color="warning"
@@ -3130,8 +3539,10 @@ export default function CompositionsPage() {
                                   {validationError}
                                 </Typography>
                               )}
-                              </Box>
-                              {matchInfo && !matchPlayed && showMatchInfo[equipe.team.id] && (
+                            </Box>
+                            {matchInfo &&
+                              !matchPlayed &&
+                              showMatchInfo[equipe.team.id] && (
                                 <Card
                                   elevation={2}
                                   sx={{
@@ -3154,8 +3565,17 @@ export default function CompositionsPage() {
                                       borderBottomColor: "divider",
                                     }}
                                   >
-                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                                      <Message fontSize="small" color="primary" />
+                                    <Box
+                                      sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                      }}
+                                    >
+                                      <Message
+                                        fontSize="small"
+                                        color="primary"
+                                      />
                                       <Typography
                                         variant="caption"
                                         color="text.secondary"
@@ -3164,23 +3584,50 @@ export default function CompositionsPage() {
                                         Message Discord
                                       </Typography>
                                     </Box>
-                                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                                        {discordSentStatus[equipe.team.id]?.sent && (
+                                    <Box
+                                      sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 0.5,
+                                      }}
+                                    >
+                                      <Box
+                                        sx={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 0.5,
+                                        }}
+                                      >
+                                        {discordSentStatus[equipe.team.id]
+                                          ?.sent && (
                                           <Chip
                                             label="Envoyé"
                                             size="small"
                                             color="success"
                                             variant="outlined"
-                                            sx={{ height: 20, fontSize: "0.65rem" }}
-                                            title={discordSentStatus[equipe.team.id]?.sentAt ? `Envoyé le ${new Date(discordSentStatus[equipe.team.id].sentAt!).toLocaleString("fr-FR")}` : "Message déjà envoyé"}
+                                            sx={{
+                                              height: 20,
+                                              fontSize: "0.65rem",
+                                            }}
+                                            title={
+                                              discordSentStatus[equipe.team.id]
+                                                ?.sentAt
+                                                ? `Envoyé le ${new Date(
+                                                    discordSentStatus[
+                                                      equipe.team.id
+                                                    ].sentAt!
+                                                  ).toLocaleString("fr-FR")}`
+                                                : "Message déjà envoyé"
+                                            }
                                           />
                                         )}
                                         <Tooltip
                                           title={
                                             !equipe.team.discordChannelId
                                               ? "Aucun canal Discord configuré pour cette équipe. Configurez-le dans la page des équipes."
-                                              : discordSentStatus[equipe.team.id]?.sent
+                                              : discordSentStatus[
+                                                  equipe.team.id
+                                                ]?.sent
                                               ? "Renvoyer le message sur Discord"
                                               : "Envoyer le message sur Discord"
                                           }
@@ -3190,17 +3637,53 @@ export default function CompositionsPage() {
                                               size="small"
                                               onClick={() => {
                                                 if (!matchInfo) return;
-                                                if (discordSentStatus[equipe.team.id]?.sent) {
-                                                  setConfirmResendDialog({ open: true, teamId: equipe.team.id, matchInfo, ...(equipe.team.discordChannelId ? { channelId: equipe.team.discordChannelId } : {}) });
+                                                if (
+                                                  discordSentStatus[
+                                                    equipe.team.id
+                                                  ]?.sent
+                                                ) {
+                                                  setConfirmResendDialog({
+                                                    open: true,
+                                                    teamId: equipe.team.id,
+                                                    matchInfo,
+                                                    ...(equipe.team
+                                                      .discordChannelId
+                                                      ? {
+                                                          channelId:
+                                                            equipe.team
+                                                              .discordChannelId,
+                                                        }
+                                                      : {}),
+                                                  });
                                                 } else {
-                                                  handleSendDiscordMessage(equipe.team.id, matchInfo, selectedJournee, selectedPhase, equipe.team.discordChannelId);
+                                                  handleSendDiscordMessage(
+                                                    equipe.team.id,
+                                                    matchInfo,
+                                                    selectedJournee,
+                                                    selectedPhase,
+                                                    equipe.team.discordChannelId
+                                                  );
                                                 }
                                               }}
-                                              disabled={sendingDiscord[equipe.team.id] || !matchInfo || !equipe.team.discordChannelId}
+                                              disabled={
+                                                sendingDiscord[
+                                                  equipe.team.id
+                                                ] ||
+                                                !matchInfo ||
+                                                !equipe.team.discordChannelId
+                                              }
                                               sx={{ p: 0.5 }}
-                                              color={discordSentStatus[equipe.team.id]?.sent ? "warning" : "primary"}
+                                              color={
+                                                discordSentStatus[
+                                                  equipe.team.id
+                                                ]?.sent
+                                                  ? "warning"
+                                                  : "primary"
+                                              }
                                             >
-                                              {sendingDiscord[equipe.team.id] ? (
+                                              {sendingDiscord[
+                                                equipe.team.id
+                                              ] ? (
                                                 <CircularProgress size={16} />
                                               ) : (
                                                 <Send fontSize="small" />
@@ -3224,7 +3707,9 @@ export default function CompositionsPage() {
                                       </IconButton>
                                     </Box>
                                   </Box>
-                                  <CardContent sx={{ pt: 1.5, pb: "16px !important" }}>
+                                  <CardContent
+                                    sx={{ pt: 1.5, pb: "16px !important" }}
+                                  >
                                     <Typography
                                       variant="body2"
                                       component="pre"
@@ -3246,21 +3731,33 @@ export default function CompositionsPage() {
                                         multiline
                                         rows={3}
                                         fullWidth
-                                        value={customMessages[equipe.team.id] || ""}
+                                        value={
+                                          customMessages[equipe.team.id] || ""
+                                        }
                                         onChange={(e) => {
                                           const value = e.target.value;
-                                          const cursorPos = e.target.selectionStart || 0;
-                                          
+                                          const cursorPos =
+                                            e.target.selectionStart || 0;
+
                                           // Détecter si on tape "@" ou si on est en train de taper après "@"
-                                          const textBeforeCursor = value.substring(0, cursorPos);
-                                          const lastAtIndex = textBeforeCursor.lastIndexOf("@");
-                                          
+                                          const textBeforeCursor =
+                                            value.substring(0, cursorPos);
+                                          const lastAtIndex =
+                                            textBeforeCursor.lastIndexOf("@");
+
                                           if (lastAtIndex !== -1) {
                                             // Vérifier qu'il n'y a pas d'espace entre "@" et le curseur
-                                            const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
-                                            if (!textAfterAt.includes(" ") && !textAfterAt.includes("\n")) {
+                                            const textAfterAt =
+                                              textBeforeCursor.substring(
+                                                lastAtIndex + 1
+                                              );
+                                            if (
+                                              !textAfterAt.includes(" ") &&
+                                              !textAfterAt.includes("\n")
+                                            ) {
                                               // On est en train de taper une mention
-                                              const query = textAfterAt.toLowerCase();
+                                              const query =
+                                                textAfterAt.toLowerCase();
                                               setMentionQuery(query);
                                               setMentionAnchor({
                                                 teamId: equipe.team.id,
@@ -3273,37 +3770,83 @@ export default function CompositionsPage() {
                                           } else {
                                             setMentionAnchor(null);
                                           }
-                                          
-                                          setCustomMessages((prev) => ({ ...prev, [equipe.team.id]: value }));
-                                          
+
+                                          setCustomMessages((prev) => ({
+                                            ...prev,
+                                            [equipe.team.id]: value,
+                                          }));
+
                                           // Debounce pour sauvegarder automatiquement après 1 seconde d'inactivité
-                                          if (saveTimeoutRef.current[equipe.team.id]) {
-                                            clearTimeout(saveTimeoutRef.current[equipe.team.id]);
+                                          if (
+                                            saveTimeoutRef.current[
+                                              equipe.team.id
+                                            ]
+                                          ) {
+                                            clearTimeout(
+                                              saveTimeoutRef.current[
+                                                equipe.team.id
+                                              ]
+                                            );
                                           }
-                                          saveTimeoutRef.current[equipe.team.id] = setTimeout(() => {
-                                            if (selectedJournee && selectedPhase) {
-                                              handleSaveCustomMessage(equipe.team.id, value, selectedJournee, selectedPhase);
+                                          saveTimeoutRef.current[
+                                            equipe.team.id
+                                          ] = setTimeout(() => {
+                                            if (
+                                              selectedJournee &&
+                                              selectedPhase
+                                            ) {
+                                              handleSaveCustomMessage(
+                                                equipe.team.id,
+                                                value,
+                                                selectedJournee,
+                                                selectedPhase
+                                              );
                                             }
                                           }, 1000);
                                         }}
                                         onKeyDown={(e) => {
-                                          if (mentionAnchor && mentionAnchor.teamId === equipe.team.id) {
-                                            const filteredMembers = discordMembers.filter((member) => {
-                                              const query = mentionQuery.toLowerCase();
-                                              return (
-                                                member.displayName.toLowerCase().includes(query) ||
-                                                member.username.toLowerCase().includes(query)
+                                          if (
+                                            mentionAnchor &&
+                                            mentionAnchor.teamId ===
+                                              equipe.team.id
+                                          ) {
+                                            const filteredMembers =
+                                              discordMembers.filter(
+                                                (member) => {
+                                                  const query =
+                                                    mentionQuery.toLowerCase();
+                                                  return (
+                                                    member.displayName
+                                                      .toLowerCase()
+                                                      .includes(query) ||
+                                                    member.username
+                                                      .toLowerCase()
+                                                      .includes(query)
+                                                  );
+                                                }
                                               );
-                                            });
-                                            
-                                            if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === "Escape") {
+
+                                            if (
+                                              e.key === "ArrowDown" ||
+                                              e.key === "ArrowUp" ||
+                                              e.key === "Enter" ||
+                                              e.key === "Escape"
+                                            ) {
                                               e.preventDefault();
                                               if (e.key === "Escape") {
                                                 setMentionAnchor(null);
-                                              } else if (e.key === "Enter" && filteredMembers.length > 0) {
+                                              } else if (
+                                                e.key === "Enter" &&
+                                                filteredMembers.length > 0
+                                              ) {
                                                 // Insérer la première mention
-                                                const selectedMember = filteredMembers[0];
-                                                insertMention(equipe.team.id, mentionAnchor.startPos, selectedMember);
+                                                const selectedMember =
+                                                  filteredMembers[0];
+                                                insertMention(
+                                                  equipe.team.id,
+                                                  mentionAnchor.startPos,
+                                                  selectedMember
+                                                );
                                               }
                                             }
                                           }
@@ -3311,92 +3854,134 @@ export default function CompositionsPage() {
                                         onBlur={(e) => {
                                           // Ne pas fermer si on clique sur une suggestion
                                           // Le onMouseDown de la suggestion empêchera le blur
-                                          const relatedTarget = e.relatedTarget as HTMLElement | null;
-                                          if (relatedTarget && relatedTarget.closest('[role="listbox"]')) {
+                                          const relatedTarget =
+                                            e.relatedTarget as HTMLElement | null;
+                                          if (
+                                            relatedTarget &&
+                                            relatedTarget.closest(
+                                              '[role="listbox"]'
+                                            )
+                                          ) {
                                             return;
                                           }
-                                          
+
                                           // Délai pour permettre le clic sur une suggestion
                                           setTimeout(() => {
                                             setMentionAnchor(null);
-                                            handleSaveCustomMessage(equipe.team.id, customMessages[equipe.team.id] || "", selectedJournee, selectedPhase);
+                                            handleSaveCustomMessage(
+                                              equipe.team.id,
+                                              customMessages[equipe.team.id] ||
+                                                "",
+                                              selectedJournee,
+                                              selectedPhase
+                                            );
                                           }, 200);
                                         }}
                                         placeholder="Tapez @ pour mentionner un membre Discord..."
                                         size="small"
                                         helperText="Tapez @ suivi du nom d'un membre pour le mentionner"
                                       />
-                                      {mentionAnchor && mentionAnchor.teamId === equipe.team.id && (
-                                        <MentionSuggestions
-                                          members={discordMembers}
-                                          query={mentionQuery}
-                                          anchorEl={mentionAnchor.anchorEl}
-                                          onSelect={(member) => {
-                                            insertMention(equipe.team.id, mentionAnchor.startPos, member);
-                                          }}
-                                        />
-                                      )}
+                                      {mentionAnchor &&
+                                        mentionAnchor.teamId ===
+                                          equipe.team.id && (
+                                          <MentionSuggestions
+                                            members={discordMembers}
+                                            query={mentionQuery}
+                                            anchorEl={mentionAnchor.anchorEl}
+                                            onSelect={(member) => {
+                                              insertMention(
+                                                equipe.team.id,
+                                                mentionAnchor.startPos,
+                                                member
+                                              );
+                                            }}
+                                          />
+                                        )}
                                     </Box>
                                   </CardContent>
                                 </Card>
                               )}
-                            </Box>
-                          );
-                        })}
-                      </Box>
-                    )}
-                  </TabPanel>
-                </Box>
+                          </Box>
+                        );
+                      })}
+                    </Box>
+                  )}
+                </TabPanel>
               </Box>
-            </>
-          ) : null}
+            </Box>
+          </>
+        ) : null}
 
-          {/* Dialog de confirmation pour renvoyer le message Discord */}
-          <Dialog
-            open={confirmResendDialog.open}
-            onClose={() => setConfirmResendDialog({ open: false, teamId: null, matchInfo: null })}
-          >
-            <DialogTitle>Renvoyer le message Discord ?</DialogTitle>
-            <DialogContent>
-              <DialogContentText>
-                Un message a déjà été envoyé pour ce match. Voulez-vous vraiment le renvoyer ?
-              </DialogContentText>
-            </DialogContent>
-            <DialogActions>
-              <Button
-                onClick={() => setConfirmResendDialog({ open: false, teamId: null, matchInfo: null })}
-              >
-                Annuler
-              </Button>
-              <Button
-                onClick={() => {
-                  if (confirmResendDialog.teamId && confirmResendDialog.matchInfo && selectedJournee && selectedPhase) {
-                    handleSendDiscordMessage(confirmResendDialog.teamId, confirmResendDialog.matchInfo, selectedJournee, selectedPhase, confirmResendDialog.channelId);
-                    setConfirmResendDialog({ open: false, teamId: null, matchInfo: null });
-                  }
-                }}
-                color="warning"
-                variant="contained"
-              >
-                Renvoyer
-              </Button>
-            </DialogActions>
-          </Dialog>
+        {/* Dialog de confirmation pour renvoyer le message Discord */}
+        <Dialog
+          open={confirmResendDialog.open}
+          onClose={() =>
+            setConfirmResendDialog({
+              open: false,
+              teamId: null,
+              matchInfo: null,
+            })
+          }
+        >
+          <DialogTitle>Renvoyer le message Discord ?</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Un message a déjà été envoyé pour ce match. Voulez-vous vraiment
+              le renvoyer ?
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={() =>
+                setConfirmResendDialog({
+                  open: false,
+                  teamId: null,
+                  matchInfo: null,
+                })
+              }
+            >
+              Annuler
+            </Button>
+            <Button
+              onClick={() => {
+                if (
+                  confirmResendDialog.teamId &&
+                  confirmResendDialog.matchInfo &&
+                  selectedJournee &&
+                  selectedPhase
+                ) {
+                  handleSendDiscordMessage(
+                    confirmResendDialog.teamId,
+                    confirmResendDialog.matchInfo,
+                    selectedJournee,
+                    selectedPhase,
+                    confirmResendDialog.channelId
+                  );
+                  setConfirmResendDialog({
+                    open: false,
+                    teamId: null,
+                    matchInfo: null,
+                  });
+                }
+              }}
+              color="warning"
+              variant="contained"
+            >
+              Renvoyer
+            </Button>
+          </DialogActions>
+        </Dialog>
 
-          {(!selectedJournee || !selectedPhase) && (
-            <Card>
-              <CardContent>
-                <Typography
-                  variant="body1"
-                  color="text.secondary"
-                  align="center"
-                >
-                  Veuillez sélectionner une phase et une journée pour commencer
-                </Typography>
-              </CardContent>
-            </Card>
-          )}
-        </Box>
+        {(!selectedJournee || !selectedPhase) && (
+          <Card>
+            <CardContent>
+              <Typography variant="body1" color="text.secondary" align="center">
+                Veuillez sélectionner une phase et une journée pour commencer
+              </Typography>
+            </CardContent>
+          </Card>
+        )}
+      </Box>
     </AuthGuard>
   );
 }
