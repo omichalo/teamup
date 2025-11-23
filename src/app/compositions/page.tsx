@@ -350,6 +350,9 @@ export default function CompositionsPage() {
   const [discordMembers, setDiscordMembers] = useState<
     Array<{ id: string; username: string; displayName: string }>
   >([]);
+  const [discordChannels, setDiscordChannels] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
   const [mentionAnchor, setMentionAnchor] = useState<{
     teamId: string;
     anchorEl: HTMLElement;
@@ -618,6 +621,41 @@ export default function CompositionsPage() {
       }
     };
     void loadDiscordMembers();
+  }, []);
+
+  // Charger les canaux Discord
+  useEffect(() => {
+    const loadDiscordChannels = async () => {
+      try {
+        const response = await fetch("/api/discord/channels", {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            setDiscordChannels(result.channels || []);
+          } else {
+            console.error(
+              "Erreur lors du chargement des canaux Discord:",
+              result.error
+            );
+          }
+        } else {
+          const errorData = await response.json();
+          console.error(
+            "Erreur HTTP lors du chargement des canaux Discord:",
+            errorData
+          );
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des canaux Discord:", error);
+      }
+    };
+    void loadDiscordChannels();
   }, []);
 
   const [availabilities, setAvailabilities] = useState<{
@@ -2887,13 +2925,38 @@ export default function CompositionsPage() {
                                         fontSize="small"
                                         color="primary"
                                       />
-                                      <Typography
-                                        variant="caption"
-                                        color="text.secondary"
-                                        sx={{ fontWeight: 500 }}
+                                      <Box
+                                        sx={{
+                                          display: "flex",
+                                          flexDirection: "column",
+                                          gap: 0.25,
+                                        }}
                                       >
-                                        Message Discord
-                                      </Typography>
+                                        <Typography
+                                          variant="caption"
+                                          color="text.secondary"
+                                          sx={{ fontWeight: 500 }}
+                                        >
+                                          Message Discord
+                                        </Typography>
+                                        {equipe.team.discordChannelId && (
+                                          <Typography
+                                            variant="caption"
+                                            color="text.secondary"
+                                            sx={{
+                                              fontSize: "0.7rem",
+                                              fontStyle: "italic",
+                                            }}
+                                          >
+                                            Canal: #
+                                            {discordChannels.find(
+                                              (c) =>
+                                                c.id ===
+                                                equipe.team.discordChannelId
+                                            )?.name || "Canal configuré"}
+                                          </Typography>
+                                        )}
+                                      </Box>
                                     </Box>
                                     <Box
                                       sx={{
@@ -3576,13 +3639,38 @@ export default function CompositionsPage() {
                                         fontSize="small"
                                         color="primary"
                                       />
-                                      <Typography
-                                        variant="caption"
-                                        color="text.secondary"
-                                        sx={{ fontWeight: 500 }}
+                                      <Box
+                                        sx={{
+                                          display: "flex",
+                                          flexDirection: "column",
+                                          gap: 0.25,
+                                        }}
                                       >
-                                        Message Discord
-                                      </Typography>
+                                        <Typography
+                                          variant="caption"
+                                          color="text.secondary"
+                                          sx={{ fontWeight: 500 }}
+                                        >
+                                          Message Discord
+                                        </Typography>
+                                        {equipe.team.discordChannelId && (
+                                          <Typography
+                                            variant="caption"
+                                            color="text.secondary"
+                                            sx={{
+                                              fontSize: "0.7rem",
+                                              fontStyle: "italic",
+                                            }}
+                                          >
+                                            Canal: #
+                                            {discordChannels.find(
+                                              (c) =>
+                                                c.id ===
+                                                equipe.team.discordChannelId
+                                            )?.name || "Canal configuré"}
+                                          </Typography>
+                                        )}
+                                      </Box>
                                     </Box>
                                     <Box
                                       sx={{

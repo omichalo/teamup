@@ -94,6 +94,7 @@ export default function JoueursPage() {
     isActive: true,
     hasPlayedMatch: "", // "" = tous, "true" = a joué, "false" = n'a pas joué
     inChampionship: "", // "" = tous, "true" = inscrit, "false" = pas inscrit
+    hasDiscord: "", // "" = tous, "true" = avec Discord valide, "false" = sans Discord
   });
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -177,6 +178,16 @@ export default function JoueursPage() {
     return player.discordMentions.some(mentionId => !validMemberIds.has(mentionId));
   }, [discordMembers]);
 
+  // Fonction helper pour vérifier si un joueur a au moins un Discord valide
+  const hasValidDiscord = useCallback((player: Player): boolean => {
+    if (!player.discordMentions || player.discordMentions.length === 0) {
+      return false;
+    }
+    const validMemberIds = new Set(discordMembers.map(m => m.id));
+    // Un joueur a Discord si au moins un de ses discordMentions est valide
+    return player.discordMentions.some(mentionId => validMemberIds.has(mentionId));
+  }, [discordMembers]);
+
   // Fonction pour vérifier si un Discord ID est déjà utilisé par un autre joueur
   const isDiscordIdUsedByOtherPlayer = useCallback((discordId: string, excludePlayerId?: string): { used: boolean; playerName?: string } => {
     const allPlayers = [...players, ...playersWithoutLicense, ...temporaryPlayers];
@@ -256,8 +267,16 @@ export default function JoueursPage() {
       );
     }
 
+    // Filtre par Discord
+    if (filters.hasDiscord !== "") {
+      const hasDiscord = filters.hasDiscord === "true";
+      filtered = filtered.filter(
+        (player) => hasValidDiscord(player) === hasDiscord
+      );
+    }
+
     return filtered.length;
-  }, [players, playersWithoutLicense, temporaryPlayers, searchQuery, filters]);
+  }, [players, playersWithoutLicense, temporaryPlayers, searchQuery, filters, hasValidDiscord]);
 
   const filterPlayers = useCallback(async () => {
     try {
@@ -322,6 +341,14 @@ export default function JoueursPage() {
         );
       }
 
+      // Filtre par Discord
+      if (filters.hasDiscord !== "") {
+        const hasDiscord = filters.hasDiscord === "true";
+        filtered = filtered.filter(
+          (player) => hasValidDiscord(player) === hasDiscord
+        );
+      }
+
       setFilteredPlayers(filtered);
     } catch (error) {
       console.error("Erreur lors du filtrage des joueurs:", error);
@@ -335,6 +362,7 @@ export default function JoueursPage() {
     selectedTab,
     searchQuery,
     filters,
+    hasValidDiscord,
   ]);
 
   useEffect(() => {
@@ -590,6 +618,13 @@ export default function JoueursPage() {
         );
       }
 
+      if (filters.hasDiscord !== "") {
+        const hasDiscord = filters.hasDiscord === "true";
+        filtered = filtered.filter(
+          (p) => hasValidDiscord(p) === hasDiscord
+        );
+      }
+
       setFilteredPlayers(filtered);
 
       // Réinitialiser le formulaire
@@ -719,6 +754,13 @@ export default function JoueursPage() {
         );
       }
 
+      if (filters.hasDiscord !== "") {
+        const hasDiscord = filters.hasDiscord === "true";
+        filtered = filtered.filter(
+          (p) => hasValidDiscord(p) === hasDiscord
+        );
+      }
+
       setFilteredPlayers(filtered);
     } catch (error) {
       console.error(
@@ -833,6 +875,20 @@ export default function JoueursPage() {
                       <MenuItem value="">Tous</MenuItem>
                       <MenuItem value="true">Inscrit</MenuItem>
                       <MenuItem value="false">Non inscrit</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: "160px" } }}>
+                    <InputLabel>Discord</InputLabel>
+                    <Select
+                      value={filters.hasDiscord}
+                      label="Discord"
+                      onChange={(e) =>
+                        setFilters({ ...filters, hasDiscord: e.target.value })
+                      }
+                    >
+                      <MenuItem value="">Tous</MenuItem>
+                      <MenuItem value="true">Avec Discord</MenuItem>
+                      <MenuItem value="false">Sans Discord</MenuItem>
                     </Select>
                   </FormControl>
                 </Box>

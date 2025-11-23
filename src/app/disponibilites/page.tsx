@@ -32,6 +32,8 @@ import {
   HourglassEmpty,
   Search as SearchIcon,
   Group as GroupIcon,
+  Comment as CommentIcon,
+  DoneAll,
 } from "@mui/icons-material";
 import { useEquipesWithMatches } from "@/hooks/useEquipesWithMatches";
 import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
@@ -85,10 +87,12 @@ const sanitizeAvailabilityEntry = (
 
 const availabilityEntriesEqual = (
   current?: AvailabilityResponse | null,
-  next?: AvailabilityResponse | null
+  next?: AvailabilityResponse | null,
+  skipNormalization: boolean = false
 ): boolean => {
-  const normalizedCurrent = sanitizeAvailabilityEntry(current);
-  const normalizedNext = sanitizeAvailabilityEntry(next);
+  // Pour les commentaires, on compare les valeurs brutes pour permettre les espaces
+  const normalizedCurrent = skipNormalization ? current : sanitizeAvailabilityEntry(current);
+  const normalizedNext = skipNormalization ? next : sanitizeAvailabilityEntry(next);
 
   if (!normalizedCurrent && !normalizedNext) {
     return true;
@@ -109,21 +113,58 @@ const updateAvailabilityState = (
   championshipType: ChampionshipType,
   computeNextEntry: (
     currentEntry: AvailabilityResponse | undefined
-  ) => AvailabilityResponse | undefined
+  ) => AvailabilityResponse | undefined,
+  skipNormalization: boolean = false
 ): { nextState: AvailabilityState; changed: boolean } => {
   const currentPlayerState = previousState[playerId];
   const currentEntry = currentPlayerState?.[championshipType];
 
   const computedEntry = computeNextEntry(currentEntry);
-  const normalizedCurrent = sanitizeAvailabilityEntry(currentEntry);
-  const normalizedNext = sanitizeAvailabilityEntry(computedEntry);
+  
+  // Pour les commentaires, on compare les valeurs brutes pour permettre les espaces
+  // La normalisation sera faite uniquement lors de la sauvegarde
+  const normalizedCurrent = skipNormalization ? currentEntry : sanitizeAvailabilityEntry(currentEntry);
+  const normalizedNext = skipNormalization ? computedEntry : sanitizeAvailabilityEntry(computedEntry);
 
-  if (availabilityEntriesEqual(normalizedCurrent, normalizedNext)) {
+  if (availabilityEntriesEqual(normalizedCurrent, normalizedNext, skipNormalization)) {
     return { nextState: previousState, changed: false };
   }
 
   const nextState: AvailabilityState = { ...previousState };
 
+  // Si on skip la normalisation, on vérifie si l'entrée est vide différemment
+  if (skipNormalization) {
+    if (!computedEntry || (computedEntry.available === undefined && (!computedEntry.comment || computedEntry.comment.trim().length === 0))) {
+      if (!currentPlayerState) {
+        return { nextState: previousState, changed: false };
+      }
+
+      const nextPlayerState: PlayerAvailabilityByType = {
+        ...currentPlayerState,
+      };
+      delete nextPlayerState[championshipType];
+
+      if (Object.keys(nextPlayerState).length === 0) {
+        delete nextState[playerId];
+      } else {
+        nextState[playerId] = nextPlayerState;
+      }
+
+      return { nextState, changed: true };
+    }
+
+    // Stocker la valeur brute (avec espaces) pour les commentaires
+    const nextPlayerState: PlayerAvailabilityByType = {
+      ...(currentPlayerState ?? {}),
+      [championshipType]: { ...computedEntry },
+    };
+
+    nextState[playerId] = nextPlayerState;
+
+    return { nextState, changed: true };
+  }
+
+  // Comportement normal avec normalisation
   if (!normalizedNext) {
     if (!currentPlayerState) {
       return { nextState: previousState, changed: false };
@@ -379,17 +420,19 @@ export default function DisponibilitesPage() {
 
       // Pour les hommes : vérifier uniquement masculin
       // Pour les femmes : vérifier masculin ET féminin
+      // Un joueur a répondu seulement s'il a indiqué disponible/indisponible (available est un boolean)
+      // Un commentaire seul ne compte pas comme une réponse
       if (player.gender === "M") {
-        if (playerAvailabilities?.masculin !== undefined) {
+        if (typeof playerAvailabilities?.masculin?.available === "boolean") {
           responded.push(player);
         } else {
           pending.push(player);
         }
       } else {
-        // Femmes : doivent avoir répondu aux deux
+        // Femmes : doivent avoir répondu aux deux (available doit être un boolean pour les deux)
         if (
-          playerAvailabilities?.masculin !== undefined &&
-          playerAvailabilities?.feminin !== undefined
+          typeof playerAvailabilities?.masculin?.available === "boolean" &&
+          typeof playerAvailabilities?.feminin?.available === "boolean"
         ) {
           responded.push(player);
         } else {
@@ -402,6 +445,58 @@ export default function DisponibilitesPage() {
       respondedPlayers: responded,
       pendingPlayers: pending,
     };
+  }, [filteredPlayers, availabilities]);
+
+  // Joueurs ayant fait un commentaire (au moins un commentaire présent, même sans réponse)
+  const playersWithComment = useMemo(() => {
+    return filteredPlayers.filter((player) => {
+      const playerAvailabilities = availabilities[player.id];
+      const masculinComment = playerAvailabilities?.masculin?.comment?.trim();
+      const femininComment = playerAvailabilities?.feminin?.comment?.trim();
+      
+      if (player.gender === "M") {
+        return masculinComment && masculinComment.length > 0;
+      } else {
+        return (masculinComment && masculinComment.length > 0) || 
+               (femininComment && femininComment.length > 0);
+      }
+    });
+  }, [filteredPlayers, availabilities]);
+
+  // Joueurs ayant répondu OK (disponible) - au moins une catégorie avec available === true
+  // Pour les femmes : si elle a répondu OK dans une catégorie, elle apparaît dans OK
+  // (même si elle a répondu KO dans l'autre catégorie)
+  const playersWithOK = useMemo(() => {
+    return filteredPlayers.filter((player) => {
+      const playerAvailabilities = availabilities[player.id];
+      
+      if (player.gender === "M") {
+        return playerAvailabilities?.masculin?.available === true;
+      } else {
+        // Pour les femmes : au moins une catégorie avec available === true
+        // Une femme avec OK féminin et KO masculin apparaîtra dans OK
+        return playerAvailabilities?.masculin?.available === true ||
+               playerAvailabilities?.feminin?.available === true;
+      }
+    });
+  }, [filteredPlayers, availabilities]);
+
+  // Joueurs ayant répondu KO (indisponible) - au moins une catégorie avec available === false
+  // Pour les femmes : si elle a répondu KO dans une catégorie, elle apparaît dans KO
+  // (même si elle a répondu OK dans l'autre catégorie)
+  const playersWithKO = useMemo(() => {
+    return filteredPlayers.filter((player) => {
+      const playerAvailabilities = availabilities[player.id];
+      
+      if (player.gender === "M") {
+        return playerAvailabilities?.masculin?.available === false;
+      } else {
+        // Pour les femmes : au moins une catégorie avec available === false
+        // Une femme avec OK féminin et KO masculin apparaîtra dans KO
+        return playerAvailabilities?.masculin?.available === false ||
+               playerAvailabilities?.feminin?.available === false;
+      }
+    });
   }, [filteredPlayers, availabilities]);
 
   const loadPlayers = useCallback(async () => {
@@ -692,7 +787,8 @@ export default function DisponibilitesPage() {
       clearTimeout(commentSaveTimeoutRef.current[playerId][championshipType]!);
     }
 
-    const trimmedComment = comment.trim();
+    // Stocker la valeur brute pour permettre la saisie d'espaces
+    // Le trim sera fait uniquement lors de la sauvegarde
 
     let nextStateSnapshot: AvailabilityState | null = null;
     let stateChanged = false;
@@ -709,12 +805,18 @@ export default function DisponibilitesPage() {
             nextEntry.available = currentEntry.available;
           }
 
-          if (trimmedComment.length > 0) {
-            nextEntry.comment = trimmedComment;
+          // Stocker la valeur brute (avec espaces) pour permettre la saisie
+          // Le trim sera fait uniquement lors de la sauvegarde dans sanitizeAvailabilityEntry
+          if (comment.length > 0) {
+            nextEntry.comment = comment;
+          } else {
+            // Si le commentaire est vide, ne pas l'inclure dans l'entrée
+            // Cela permet de supprimer le commentaire si l'utilisateur efface tout
           }
 
           return nextEntry;
-        }
+        },
+        true // Skip la normalisation pour permettre les espaces dans les commentaires
       );
 
       if (!changed) {
@@ -926,12 +1028,27 @@ export default function DisponibilitesPage() {
                   />
                   <Tab
                     label={`Réponses (${respondedPlayers.length})`}
-                    icon={<CheckCircle fontSize="small" color="success" />}
+                    icon={<DoneAll fontSize="small" color="primary" />}
                     iconPosition="start"
                   />
                   <Tab
                     label={`En attente (${pendingPlayers.length})`}
                     icon={<HourglassEmpty fontSize="small" color="warning" />}
+                    iconPosition="start"
+                  />
+                  <Tab
+                    label={`Commentaires (${playersWithComment.length})`}
+                    icon={<CommentIcon fontSize="small" color="info" />}
+                    iconPosition="start"
+                  />
+                  <Tab
+                    label={`OK (${playersWithOK.length})`}
+                    icon={<CheckCircle fontSize="small" color="success" />}
+                    iconPosition="start"
+                  />
+                  <Tab
+                    label={`KO (${playersWithKO.length})`}
+                    icon={<Cancel fontSize="small" color="error" />}
                     iconPosition="start"
                   />
                 </Tabs>
@@ -982,13 +1099,79 @@ export default function DisponibilitesPage() {
                 </Box>
               )}
 
+              {tabValue === 3 && (
+                <Box>
+                  <Typography variant="h6" gutterBottom>
+                    Joueurs ayant fait un commentaire
+                  </Typography>
+                  {playersWithComment.length === 0 ? (
+                    <Alert severity="info">
+                      Aucun joueur n&apos;a fait de commentaire.
+                    </Alert>
+                  ) : (
+                    <PlayerList
+                      players={playersWithComment}
+                      availabilities={availabilities}
+                      onAvailabilityChange={handleAvailabilityChange}
+                      onCommentChange={handleCommentChange}
+                    />
+                  )}
+                </Box>
+              )}
+
+              {tabValue === 4 && (
+                <Box>
+                  <Typography variant="h6" gutterBottom>
+                    Joueurs ayant répondu OK (Disponible)
+                  </Typography>
+                  {playersWithOK.length === 0 ? (
+                    <Alert severity="info">
+                      Aucun joueur n&apos;a répondu disponible.
+                    </Alert>
+                  ) : (
+                    <PlayerList
+                      players={playersWithOK}
+                      availabilities={availabilities}
+                      onAvailabilityChange={handleAvailabilityChange}
+                      onCommentChange={handleCommentChange}
+                    />
+                  )}
+                </Box>
+              )}
+
+              {tabValue === 5 && (
+                <Box>
+                  <Typography variant="h6" gutterBottom>
+                    Joueurs ayant répondu KO (Indisponible)
+                  </Typography>
+                  {playersWithKO.length === 0 ? (
+                    <Alert severity="info">
+                      Aucun joueur n&apos;a répondu indisponible.
+                    </Alert>
+                  ) : (
+                    <PlayerList
+                      players={playersWithKO}
+                      availabilities={availabilities}
+                      onAvailabilityChange={handleAvailabilityChange}
+                      onCommentChange={handleCommentChange}
+                    />
+                  )}
+                </Box>
+              )}
+
               <Box sx={{ mt: 4, textAlign: "center" }}>
                 <Button
                   variant="outlined"
-                  href="/compositions/defaults"
+                  href={
+                    selectedJournee !== null && selectedPhase !== null
+                      ? `/compositions?journee=${selectedJournee}&phase=${selectedPhase}`
+                      : "/compositions"
+                  }
                   sx={{ px: 3 }}
                 >
-                  Configurer les compositions par défaut
+                  {selectedJournee !== null && selectedPhase !== null
+                    ? `Voir les compositions - J${selectedJournee} (${selectedPhase})`
+                    : "Voir les compositions"}
                 </Button>
               </Box>
             </>
@@ -1040,9 +1223,10 @@ function PlayerList({
 
         // Pour les hommes : vérifier uniquement masculin
         // Pour les femmes : vérifier masculin ET féminin
-        const hasRespondedMasculin = masculinAvailability !== undefined;
+        // Un joueur a répondu seulement s'il a indiqué disponible/indisponible (available est un boolean)
+        const hasRespondedMasculin = typeof masculinAvailability?.available === "boolean";
         const hasRespondedFeminin = isFemale
-          ? femininAvailability !== undefined
+          ? typeof femininAvailability?.available === "boolean"
           : true; // Les hommes n'ont pas de championnat féminin
 
         const isExpanded = expandedPlayer?.id === player.id;

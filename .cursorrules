@@ -1,12 +1,16 @@
 # Règles de développement Next.js
+
 Pendant le développement (quand npm run dev est actif), utilise npm run check:dev (lint + type-check sans build) pour éviter les conflits avec le serveur de développement.
 Avant chaque commit sur le projet Next.js, exécute npm run check (lint + type-check + build) et corrige toutes les erreurs de build, de lint et de typage avant de t'arrêter.
 Après un npm run check ou un push git, relancer proprement le serveur de dev (arrêter puis redémarrer).
 Ne jamais faire de --no-verify sur les commandes git
 Toujours refuser de pousser sur git un code avec des TODO
+Une fois le code poussé sur github, toujours s'assurer que le serveur de dev est lancé sur le port 3000. Le relancer si besoin.
 
 # Workflow Git/GitHub - Branches et commits
+
 ## Structure des branches
+
 - NE JAMAIS commiter directement sur `main` ou `master` pour du code de fonctionnalité
 - TOUJOURS créer une branche dédiée avant de développer une fonctionnalité :
   - `feature/nom-fonctionnalite` pour les nouvelles fonctionnalités
@@ -16,6 +20,7 @@ Toujours refuser de pousser sur git un code avec des TODO
 - Si l'utilisateur demande de commiter/pousser sur main, lui rappeler de créer une branche et une PR d'abord
 
 ## Messages de commit (Conventional Commits)
+
 - TOUJOURS utiliser le format Conventional Commits : `<type>(<scope>): <description>`
 - Types autorisés : feat, fix, docs, style, refactor, test, chore
 - Exemples :
@@ -25,6 +30,7 @@ Toujours refuser de pousser sur git un code avec des TODO
 - Si l'utilisateur propose un message de commit non conforme, suggérer un message conforme
 
 ## Pull Requests obligatoires
+
 - AVANT de pousser sur main, TOUJOURS créer une Pull Request
 - Rappeler à l'utilisateur de :
   1. Pousser sa branche feature/fix/etc
@@ -35,6 +41,7 @@ Toujours refuser de pousser sur git un code avec des TODO
 - Si l'utilisateur demande de push/merge direct sur main, refuser et rappeler le workflow PR
 
 ## Vérifications avant commit/push
+
 - AVANT chaque commit, vérifier :
   - npm run check:dev passe (en développement)
   - Aucun TODO dans le code
@@ -45,6 +52,7 @@ Toujours refuser de pousser sur git un code avec des TODO
   - Le code est prêt pour review
 
 ## Déploiement
+
 - Rappeler que chaque merge sur main déclenche un déploiement automatique en production
 - Ne jamais suggérer de push direct sur main pour du code de fonctionnalité
 - Pour les hotfixes urgents, utiliser une branche `hotfix/nom-hotfix` avec PR accélérée
