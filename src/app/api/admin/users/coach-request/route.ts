@@ -6,7 +6,6 @@ import {
   getFirestoreAdmin,
 } from "@/lib/firebase-admin";
 import { USER_ROLES, COACH_REQUEST_STATUS, hasAnyRole, resolveRole } from "@/lib/auth/roles";
-import { firestoreUserService } from "@/lib/services/firestore-user-service";
 import { FieldValue } from "firebase-admin/firestore";
 import type { CoachRequestStatus, UserRole } from "@/types";
 
@@ -66,15 +65,17 @@ export async function PATCH(req: Request) {
       });
       await adminAuth.revokeRefreshTokens(userId);
 
-      await firestoreUserService.upsertUser(
-        userId,
+      // Utiliser le SDK Admin directement pour bypass les règles Firestore
+      const userDocRef = db.collection("users").doc(userId);
+      await userDocRef.set(
         {
           role: targetRole,
           coachRequestStatus: COACH_REQUEST_STATUS.APPROVED,
-          coachRequestMessage: message ?? null,
+          coachRequestMessage: message !== undefined ? message : null,
           coachRequestHandledBy: decoded.uid,
-          coachRequestHandledAt: new Date(),
-          coachRequestUpdatedAt: new Date(),
+          coachRequestHandledAt: now,
+          coachRequestUpdatedAt: now,
+          updatedAt: now,
         },
         { merge: true }
       );
