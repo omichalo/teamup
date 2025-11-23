@@ -204,6 +204,54 @@ const buildSimulatedPlayers = (
   ];
 };
 
+/**
+ * Calcule le brûlage futur d'un joueur en simulant l'ajout d'un match dans une équipe
+ * Utilise le même algorithme que team-matches-sync.ts :
+ * - Crée une liste de tous les matchs triés par numéro d'équipe croissant
+ * - Si le joueur a joué au moins 2 matchs, il est brûlé dans l'équipe du 2ème match
+ * 
+ * @param matchesByTeamByPhase - Map actuelle des matchs par équipe pour la phase (ex: {4: 1, 6: 2})
+ * @param targetTeamNumber - Numéro de l'équipe où on ajoute le joueur
+ * @returns Le numéro d'équipe de brûlage futur, ou null si le joueur ne sera pas brûlé (< 2 matchs)
+ */
+export const calculateFutureBurnout = (
+  matchesByTeamByPhase: { [teamNumber: number]: number } | undefined,
+  targetTeamNumber: number
+): number | null => {
+  // Créer une copie des matchs actuels
+  const futureMatchesByTeam = new Map<number, number>();
+  
+  if (matchesByTeamByPhase) {
+    for (const [teamNumber, matchCount] of Object.entries(matchesByTeamByPhase)) {
+      futureMatchesByTeam.set(parseInt(teamNumber, 10), matchCount);
+    }
+  }
+  
+  // Ajouter 1 match dans l'équipe cible
+  const currentCountInTargetTeam = futureMatchesByTeam.get(targetTeamNumber) || 0;
+  futureMatchesByTeam.set(targetTeamNumber, currentCountInTargetTeam + 1);
+  
+  // Créer une liste de tous les matchs triés par numéro d'équipe croissant
+  // (même algorithme que team-matches-sync.ts lignes 954-964)
+  const allMatches: number[] = [];
+  for (const [teamNumber, matchCount] of futureMatchesByTeam) {
+    // Ajouter le numéro d'équipe autant de fois qu'il y a de matchs
+    for (let i = 0; i < matchCount; i++) {
+      allMatches.push(teamNumber);
+    }
+  }
+  
+  // Trier par numéro d'équipe croissant
+  allMatches.sort((a, b) => a - b);
+  
+  // Si le joueur a joué au moins 2 matchs, il est brûlé dans l'équipe du 2ème match
+  if (allMatches.length >= 2) {
+    return allMatches[1]; // 2ème élément (index 1)
+  }
+  
+  return null; // Pas encore brûlé (< 2 matchs)
+};
+
 export const canAssignPlayerToTeam = (
   params: AssignmentValidationParams
 ): AssignmentValidationResult => {
@@ -302,13 +350,19 @@ export const canAssignPlayerToTeam = (
     compositions
   );
 
-  // Vérifier si le joueur sera brûlé en l'assignant à cette équipe
-  // Un joueur est brûlé s'il a déjà joué 1 match dans cette équipe et qu'on l'ajoute (donc 2 matchs au total)
+  // Calculer le brûlage futur en simulant l'ajout d'un match dans l'équipe cible
   const matchesByTeamByPhase = isFemaleTeam
     ? player.feminineMatchesByTeamByPhase?.[phase]
     : player.masculineMatchesByTeamByPhase?.[phase];
-  const currentMatchesInTeam = matchesByTeamByPhase?.[teamNumber] || 0;
-  const willBeBurned = currentMatchesInTeam === 1; // Si déjà 1 match, en ajoutant il aura 2 matchs = brûlé
+  
+  const futureBurnedTeam = calculateFutureBurnout(matchesByTeamByPhase, teamNumber);
+  
+  // Le joueur sera brûlé si :
+  // 1. Le brûlage futur est différent du brûlage actuel (changement d'équipe brûlée)
+  // 2. OU le joueur devient brûlé alors qu'il ne l'était pas (actuel = null/undefined, futur ≠ null)
+  const willBeBurned = 
+    futureBurnedTeam !== null && 
+    (burnedTeam === null || burnedTeam === undefined || futureBurnedTeam !== burnedTeam);
 
   if (!isFemaleTeam) {
     const femalePlayersCount = simulatedTeamPlayers.filter(
@@ -377,9 +431,9 @@ export const canAssignPlayerToTeam = (
     simulatedPlayers: simulatedTeamPlayers,
   };
 
-  if (willBeBurned) {
+  if (willBeBurned && futureBurnedTeam !== null) {
     result.willBeBurned = true;
-    result.burnedTeamNumber = teamNumber;
+    result.burnedTeamNumber = futureBurnedTeam; // Numéro de l'équipe où il sera brûlé (pas forcément celle où on le positionne)
   }
 
   return result;

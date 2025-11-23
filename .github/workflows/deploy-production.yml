@@ -1,0 +1,89 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "**.md"
+      - ".github/workflows/*.md"
+      - "docs/**"
+      - "README.md"
+
+jobs:
+  deploy:
+    name: Deploy to Firebase App Hosting
+    runs-on: ubuntu-latest
+    # Ne déployer que si ce n'est pas un commit de merge automatique
+    if: github.event_name == 'push' && !contains(github.event.head_commit.message, 'Merge pull request')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run type-check
+        run: npm run type-check
+
+      - name: Build application
+        run: npm run build
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Authenticate with Firebase Service Account
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT_JSON" ]; then
+            echo "❌ Erreur: Le secret FIREBASE_SERVICE_ACCOUNT n'est pas défini"
+            exit 1
+          fi
+          SERVICE_ACCOUNT_FILE="${{ github.workspace }}/firebase-service-account.json"
+          printf '%s\n' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$SERVICE_ACCOUNT_FILE"
+          if ! python3 -m json.tool "$SERVICE_ACCOUNT_FILE" > /dev/null 2>&1; then
+            echo "❌ Erreur: Le fichier JSON du service account est invalide"
+            exit 1
+          fi
+          gcloud auth activate-service-account --key-file="$SERVICE_ACCOUNT_FILE"
+          echo "✅ Service account authentifié: $(gcloud config get-value account)"
+          echo "SERVICE_ACCOUNT_FILE=$SERVICE_ACCOUNT_FILE" >> $GITHUB_ENV
+
+      - name: Deploy to Firebase App Hosting
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ env.SERVICE_ACCOUNT_FILE }}
+        run: |
+          echo "🚀 Déploiement sur Firebase App Hosting..."
+          firebase deploy --only apphosting \
+            --project sqyping-teamup \
+            --non-interactive
+
+      - name: Cleanup
+        if: always()
+        run: |
+          if [ -f "${{ github.workspace }}/firebase-service-account.json" ]; then
+            rm -f "${{ github.workspace }}/firebase-service-account.json"
+            echo "🧹 Fichier de service account supprimé"
+          fi
+
+      - name: Deployment summary
+        run: |
+          echo "✅ Déploiement terminé avec succès"
+          echo "🌐 Application disponible sur: https://teamup--sqyping-teamup.us-east4.hosted.app"
+          echo "📝 Commit: ${{ github.sha }}"
+          echo "👤 Auteur: ${{ github.event.head_commit.author.name }}"
+

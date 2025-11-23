@@ -1,0 +1,45 @@
+name: CI - Lint, Type-check and Build
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+jobs:
+  check:
+    name: Lint, Type-check and Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run type-check
+        run: npm run type-check
+
+      - name: Build application
+        run: npm run build
+
+      - name: Check for TODO comments
+        run: |
+          if grep -r "TODO" --include="*.ts" --include="*.tsx" --exclude-dir=node_modules --exclude-dir=.next src/; then
+            echo "❌ Des commentaires TODO ont été trouvés dans le code"
+            echo "Veuillez les supprimer ou les remplacer par des issues GitHub"
+            exit 1
+          fi
+          echo "✅ Aucun TODO trouvé dans le code"
