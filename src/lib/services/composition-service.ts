@@ -3,6 +3,8 @@ import {
   getDoc,
   setDoc,
   Timestamp,
+  onSnapshot,
+  Unsubscribe,
 } from "firebase/firestore";
 import { getDbInstanceDirect } from "@/lib/firebase";
 
@@ -89,6 +91,71 @@ export class CompositionService {
     } catch (error) {
       console.error("Erreur lors de la sauvegarde de la composition:", error);
       throw error;
+    }
+  }
+
+  /**
+   * S'abonne aux changements de composition en temps réel
+   * @param journee - Numéro de la journée
+   * @param phase - Phase du championnat (aller/retour)
+   * @param championshipType - Type de championnat (masculin/feminin)
+   * @param callback - Fonction appelée à chaque changement
+   * @returns Fonction pour se désabonner
+   */
+  subscribeToComposition(
+    journee: number,
+    phase: "aller" | "retour",
+    championshipType: "masculin" | "feminin",
+    callback: (composition: DayComposition | null) => void
+  ): Unsubscribe {
+    try {
+      const docId = this.getDocumentId(journee, phase, championshipType);
+      const docRef = doc(getDbInstanceDirect(), this.collectionName, docId);
+
+      const unsubscribe = onSnapshot(
+        docRef,
+        (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            const composition: DayComposition = {
+              journee: data.journee,
+              phase: data.phase || phase,
+              championshipType: data.championshipType,
+              teams: data.teams || {},
+              createdAt:
+                data.createdAt instanceof Timestamp
+                  ? data.createdAt.toDate()
+                  : data.createdAt?.toDate?.() || new Date(),
+              updatedAt:
+                data.updatedAt instanceof Timestamp
+                  ? data.updatedAt.toDate()
+                  : data.updatedAt?.toDate?.() || new Date(),
+            };
+            callback(composition);
+          } else {
+            callback(null);
+          }
+        },
+        (error) => {
+          console.error(
+            `[CompositionService] Erreur lors de l'écoute de la composition (${docId}):`,
+            error
+          );
+          // En cas d'erreur, on appelle le callback avec null pour indiquer qu'il n'y a pas de données
+          callback(null);
+        }
+      );
+
+      return unsubscribe;
+    } catch (error) {
+      console.error(
+        "[CompositionService] Erreur lors de la création de l'abonnement:",
+        error
+      );
+      // Retourner une fonction no-op en cas d'erreur
+      return () => {
+        // No-op
+      };
     }
   }
 }
