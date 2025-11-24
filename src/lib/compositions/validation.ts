@@ -83,7 +83,7 @@ export const isMatchPlayed = (match: Match | null): boolean => {
     }
   }
 
-  const validResults = ["VICTOIRE", "DÉFAITE", "ÉGALITÉ", "NUL", "DEFAITE"];
+  const validResults = ["VICTOIRE", "DEFAITE", "NUL", "ÉGALITÉ"];
   const resultValue = match.result;
   const resultType = typeof resultValue;
   const resultIsString = resultType === "string";

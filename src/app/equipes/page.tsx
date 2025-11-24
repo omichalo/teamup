@@ -330,10 +330,11 @@ export default function EquipesPage() {
     if (match.result === "VICTOIRE") {
       return <Chip label="VICTOIRE" color="success" size="small" />;
     }
-    if (match.result === "DEFAITE") {
+    // Gérer les deux formats : "DEFAITE" (nouveau) et "DÉFAITE" (ancien)
+    if (match.result === "DEFAITE" || match.result === "DÉFAITE") {
       return <Chip label="DÉFAITE" color="error" size="small" />;
     }
-    if (match.result === "NUL") {
+    if (match.result === "NUL" || match.result === "ÉGALITÉ") {
       return <Chip label="NUL" color="warning" size="small" />;
     }
     if (match.result === "À VENIR") {
