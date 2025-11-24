@@ -519,24 +519,14 @@ export default function DisponibilitesPage() {
   // Écouter les disponibilités en temps réel (masculin)
   const {
     availability: masculineAvailability,
-    loading: _loadingMasculineAvailability,
     error: errorMasculineAvailability,
-  } = useAvailabilityRealtime(
-    selectedJournee,
-    selectedPhase,
-    "masculin"
-  );
+  } = useAvailabilityRealtime(selectedJournee, selectedPhase, "masculin");
 
   // Écouter les disponibilités en temps réel (féminin)
   const {
     availability: feminineAvailability,
-    loading: _loadingFeminineAvailability,
     error: errorFeminineAvailability,
-  } = useAvailabilityRealtime(
-    selectedJournee,
-    selectedPhase,
-    "feminin"
-  );
+  } = useAvailabilityRealtime(selectedJournee, selectedPhase, "feminin");
 
   // Fusionner les disponibilités masculines et féminines en temps réel
   useEffect(() => {
