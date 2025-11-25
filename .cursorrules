@@ -1,11 +1,91 @@
 # Règles de développement Next.js
 
+## Configuration et outils
+
 Pendant le développement (quand npm run dev est actif), utilise npm run check:dev (lint + type-check sans build) pour éviter les conflits avec le serveur de développement.
 Avant chaque commit sur le projet Next.js, exécute npm run check (lint + type-check + build) et corrige toutes les erreurs de build, de lint et de typage avant de t'arrêter.
 Après un npm run check ou un push git, relancer proprement le serveur de dev (arrêter puis redémarrer).
 Ne jamais faire de --no-verify sur les commandes git
 Toujours refuser de pousser sur git un code avec des TODO
 Une fois le code poussé sur github, toujours s'assurer que le serveur de dev est lancé sur le port 3000. Le relancer si besoin.
+
+## Principes généraux
+
+Tu appliques systématiquement les principes de développement DRY et SOLID.
+
+### Qualité production
+
+- Toujours respecter l'architecture existante du projet (structure des dossiers, conventions de nommage, style de code).
+- Utiliser TypeScript de manière stricte : pas de 'any' implicite, pas de 'as any' sauf cas ultra-justifié.
+- Préserver les définitions de types existantes (types, interfaces, schemas Zod, etc.) et les améliorer plutôt que les casser.
+- Ne jamais introduire de code mort, d'imports inutilisés, de console.log permanents ou de TODO laissés sans contexte.
+- Toujours garder le code lisible, modulaire et cohérent : fonctions courtes, composants simples, pas de duplication.
+
+## Next.js / App Router
+
+- Utiliser l'App Router (dossier 'app/') et respecter la séparation Server Components / Client Components.
+- Par défaut, créer des Server Components. N'ajouter 'use client' que si c'est nécessaire (state, effets, événements, hooks client).
+- Pour les routes API, utiliser les route handlers dans 'app/\*\*/route.ts' avec les bonnes signatures Request/Response.
+- Respecter les conventions Next : 'page.tsx', 'layout.tsx', 'loading.tsx', 'error.tsx', 'not-found.tsx' quand cela a du sens.
+- Utiliser le cache Next/fetch de façon explicite (cache, revalidate) et éviter les appels inutiles côté client.
+- Forcer le runtime Node.js pour les routes API nécessitant des modules Node.js : `export const runtime = "nodejs";`
+
+## React / Composants
+
+- Écrire des composants fonctionnels simples, bien typés : props claires, pas de logique métier massive dans le JSX.
+- Extraire la logique métier dans des fonctions/utilitaires ou hooks dédiés (ex: 'useXxx', fonctions dans 'lib/').
+- Respecter le principe 'single responsibility' : un composant ne fait qu'une chose (affichage / logique locale).
+- Utiliser les fragments, éviter les wrappers inutiles.
+- Utiliser React.memo, useMemo, useCallback seulement quand il y a un vrai bénéfice (liste lourde, prop stable...).
+
+## TypeScript
+
+- Toujours produire du code en TypeScript (pas en JavaScript).
+- Utiliser `strict` TypeScript (pas d'`any` implicite).
+- Toujours typer les props des composants, les retours de fonctions et les paramètres importants.
+- Préférer des types précis (discriminated unions, enums, Record, etc.) plutôt que 'string'/'any' vagues.
+- Garder les types réutilisables dans un endroit cohérent (ex: 'types/', 'lib/types.ts').
+- Respecter l'ESLint/Prettier configuré dans le projet.
+- Interdire la génération de code avec erreurs de compilation.
+
+## API, Erreurs & Validation
+
+- Pour chaque appel API (server ou client), gérer explicitement les erreurs (try/catch, check des status HTTP).
+- Pour les entrées utilisateur (formulaires, query params, body JSON), valider les données (Zod ou logique de validation explicite).
+- Toujours renvoyer des réponses HTTP cohérentes : 200, 400, 401, 403, 404, 500, avec un message d'erreur utile.
+- Ne pas exposer l'error stack complète dans la réponse JSON, seulement un message générique + éventuellement details (message d'erreur simple).
+
+## Firestore
+
+- Quand une collection est manipulée, tu t'assures systématiquement que les bonnes règles sont positionnées. Tu n'ouvres que le strict minimum pour que cela fonctionne
+
+## Performance
+
+- Ne pas sur-optimiser prématurément, mais éviter les erreurs évidentes (boucles lourdes dans le rendu, re-renders inutiles).
+- Utiliser les imports dynamiques Next.js (dynamic()) pour les composants lourds côté client si besoin.
+
+## Accessibilité & UI
+
+- Utiliser du HTML sémantique : <button> pour les actions, <a> pour les liens, <label> pour les champs de formulaire, etc.
+- Fournir des 'alt' pertinents sur les images, et les attributs ARIA si nécessaire.
+- Veiller à ce que les composants soient utilisables au clavier et lisibles par un lecteur d'écran.
+
+## Tests & Robustesse
+
+- Quand le projet contient déjà des tests, mettre à jour ou ajouter des tests unitaires / d'intégration pertinents (Jest/Vitest/RTL selon le repo).
+- Ne jamais casser la suite de tests existante : adapter le code ou les tests de manière cohérente.
+
+## Intégration dans le projet existant
+
+- Respecter la configuration ESLint/Prettier du projet (ne pas introduire un autre formatage).
+- Toujours vérifier que le code proposé pourra passer 'npm run lint' et 'npm run build'.
+- Préserver la DX : messages d'erreurs clairs, pas de magie cachée, pas de changements non nécessaires.
+
+## Quand tu écris ou modifies du code dans ce projet
+
+- Appliquer toutes ces règles par défaut.
+- Privilégier un code clair, maintenable et cohérent avec le reste du repo plutôt qu'une solution "clever".
+- Si tu proposes une refactorisation, elle doit simplifier le projet (moins de duplication, meilleure séparation des responsabilités) sans casser le comportement existant.
 
 # Workflow Git/GitHub - Branches et commits
 

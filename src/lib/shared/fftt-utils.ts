@@ -107,8 +107,8 @@ export const determineMatchResult = (
   const opponentScore = isHome ? scoreB : scoreA;
 
   if (ourScore > opponentScore) return "VICTOIRE";
-  if (ourScore < opponentScore) return "DÉFAITE";
-  return "ÉGALITÉ";
+  if (ourScore < opponentScore) return "DEFAITE";
+  return "NUL";
 };
 
 // Utilitaires pour extraire les IDs des rencontres

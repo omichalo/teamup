@@ -49,8 +49,9 @@ import {
   useEquipesWithMatches,
   type EquipeWithMatches,
 } from "@/hooks/useEquipesWithMatches";
+import { useCompositionRealtime } from "@/hooks/useCompositionRealtime";
+import { useAvailabilityRealtime } from "@/hooks/useAvailabilityRealtime";
 import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
-import { AvailabilityService } from "@/lib/services/availability-service";
 import { CompositionService } from "@/lib/services/composition-service";
 import { CompositionDefaultsService } from "@/lib/services/composition-defaults-service";
 import { Player } from "@/types/team-management";
@@ -377,7 +378,6 @@ export default function CompositionsPage() {
   );
 
   const playerService = useMemo(() => new FirestorePlayerService(), []);
-  const availabilityService = useMemo(() => new AvailabilityService(), []);
   const compositionService = useMemo(() => new CompositionService(), []);
   const compositionDefaultsService = useMemo(
     () => new CompositionDefaultsService(),
@@ -798,42 +798,47 @@ export default function CompositionsPage() {
     loadDefaults();
   }, [selectedPhase, compositionDefaultsService]);
 
-  useEffect(() => {
-    if (selectedJournee !== null && selectedPhase !== null) {
-      setAvailabilitiesLoaded(false);
-      const loadAvailability = async () => {
-        try {
-          const [masculineAvailability, feminineAvailability] =
-            await Promise.all([
-              availabilityService.getAvailability(
-                selectedJournee,
-                selectedPhase,
-                "masculin"
-              ),
-              availabilityService.getAvailability(
-                selectedJournee,
-                selectedPhase,
-                "feminin"
-              ),
-            ]);
+  // Écouter les disponibilités en temps réel (masculin)
+  const {
+    availability: masculineAvailability,
+    error: errorMasculineAvailability,
+  } = useAvailabilityRealtime(selectedJournee, selectedPhase, "masculin");
 
-          setAvailabilities({
-            masculin: masculineAvailability?.players || {},
-            feminin: feminineAvailability?.players || {},
-          });
-        } catch (error) {
-          console.error("Erreur lors du chargement des disponibilités:", error);
-          setAvailabilities({});
-        } finally {
-          setAvailabilitiesLoaded(true);
-        }
-      };
-      loadAvailability();
-    } else {
+  // Écouter les disponibilités en temps réel (féminin)
+  const {
+    availability: feminineAvailability,
+    error: errorFeminineAvailability,
+  } = useAvailabilityRealtime(selectedJournee, selectedPhase, "feminin");
+
+  // Mettre à jour les disponibilités en temps réel
+  useEffect(() => {
+    if (selectedJournee === null || selectedPhase === null) {
       setAvailabilities({});
       setAvailabilitiesLoaded(false);
+      return;
     }
-  }, [selectedJournee, selectedPhase, availabilityService]);
+
+    setAvailabilities({
+      masculin: masculineAvailability?.players || {},
+      feminin: feminineAvailability?.players || {},
+    });
+    setAvailabilitiesLoaded(true);
+  }, [
+    masculineAvailability,
+    feminineAvailability,
+    selectedJournee,
+    selectedPhase,
+  ]);
+
+  // Gérer les erreurs de chargement
+  useEffect(() => {
+    if (errorMasculineAvailability || errorFeminineAvailability) {
+      console.error(
+        "Erreur lors de l'écoute des disponibilités:",
+        errorMasculineAvailability || errorFeminineAvailability
+      );
+    }
+  }, [errorMasculineAvailability, errorFeminineAvailability]);
 
   // Filtrer les joueurs disponibles selon l'onglet sélectionné
   const availablePlayers = useMemo(() => {
@@ -872,76 +877,68 @@ export default function CompositionsPage() {
     });
   }, [availablePlayers, searchQuery]);
 
+  // Déterminer le type de championnat selon l'onglet actif
+  const championshipType = tabValue === 0 ? "masculin" : "feminin";
+
+  // Écouter les compositions en temps réel
+  const { composition: realtimeComposition, error: compositionError } =
+    useCompositionRealtime(selectedJournee, selectedPhase, championshipType);
+
+  // Mettre à jour les compositions en fonction de la composition en temps réel ou des defaults
   useEffect(() => {
     if (selectedJournee === null || selectedPhase === null) {
       setCompositions({});
       return;
     }
 
-    let isCancelled = false;
-    const championshipType = tabValue === 0 ? "masculin" : "feminin";
+    // Si une composition existe en temps réel, l'utiliser
+    if (realtimeComposition) {
+      setCompositions(realtimeComposition.teams);
+      return;
+    }
 
-    const loadComposition = async () => {
-      try {
-        const composition = await compositionService.getComposition(
-          selectedJournee,
-          selectedPhase,
-          championshipType
-        );
+    // Sinon, utiliser les defaults si disponibles
+    if (!defaultCompositionsLoaded || !availabilitiesLoaded) {
+      setCompositions({});
+      return;
+    }
 
-        if (isCancelled) {
-          return;
-        }
+    const defaultsForType = defaultCompositions[championshipType] || {};
+    const availabilityMap =
+      (championshipType === "masculin"
+        ? availabilities.masculin
+        : availabilities.feminin) || {};
 
-        if (composition) {
-          setCompositions(composition.teams);
-          return;
-        }
+    const initialTeams = Object.fromEntries(
+      Object.entries(defaultsForType).map(([teamId, playerIds]) => {
+        const availablePlayerIds = playerIds
+          .filter((id) => availabilityMap[id]?.available === true)
+          .slice(0, 4);
+        return [teamId, availablePlayerIds];
+      })
+    );
 
-        if (!defaultCompositionsLoaded || !availabilitiesLoaded) {
-          setCompositions({});
-          return;
-        }
-
-        const defaultsForType = defaultCompositions[championshipType] || {};
-        const availabilityMap =
-          (championshipType === "masculin"
-            ? availabilities.masculin
-            : availabilities.feminin) || {};
-
-        const initialTeams = Object.fromEntries(
-          Object.entries(defaultsForType).map(([teamId, playerIds]) => {
-            const availablePlayerIds = playerIds
-              .filter((id) => availabilityMap[id]?.available === true)
-              .slice(0, 4);
-            return [teamId, availablePlayerIds];
-          })
-        );
-
-        setCompositions(initialTeams);
-      } catch (error) {
-        if (!isCancelled) {
-          console.error("Erreur lors du chargement des compositions:", error);
-          setCompositions({});
-        }
-      }
-    };
-
-    loadComposition();
-
-    return () => {
-      isCancelled = true;
-    };
+    setCompositions(initialTeams);
   }, [
     selectedJournee,
     selectedPhase,
-    tabValue,
-    compositionService,
+    realtimeComposition,
+    championshipType,
     defaultCompositions,
     defaultCompositionsLoaded,
     availabilities,
     availabilitiesLoaded,
   ]);
+
+  // Gérer les erreurs de chargement
+  useEffect(() => {
+    if (compositionError) {
+      console.error(
+        "Erreur lors de l'écoute des compositions:",
+        compositionError
+      );
+    }
+  }, [compositionError]);
 
   // Grouper les équipes par type (masculin/féminin)
   const equipesByType = useMemo(() => {

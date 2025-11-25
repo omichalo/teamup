@@ -36,6 +36,7 @@ import {
   DoneAll,
 } from "@mui/icons-material";
 import { useEquipesWithMatches } from "@/hooks/useEquipesWithMatches";
+import { useAvailabilityRealtime } from "@/hooks/useAvailabilityRealtime";
 import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
 import { AvailabilityService } from "@/lib/services/availability-service";
 import { CompositionService } from "@/lib/services/composition-service";
@@ -515,69 +516,72 @@ export default function DisponibilitesPage() {
     loadPlayers();
   }, [loadPlayers]);
 
-  // Charger les disponibilités existantes pour la journée sélectionnée (masculin ET féminin)
+  // Écouter les disponibilités en temps réel (masculin)
+  const {
+    availability: masculineAvailability,
+    error: errorMasculineAvailability,
+  } = useAvailabilityRealtime(selectedJournee, selectedPhase, "masculin");
+
+  // Écouter les disponibilités en temps réel (féminin)
+  const {
+    availability: feminineAvailability,
+    error: errorFeminineAvailability,
+  } = useAvailabilityRealtime(selectedJournee, selectedPhase, "feminin");
+
+  // Fusionner les disponibilités masculines et féminines en temps réel
   useEffect(() => {
-    if (selectedJournee !== null && selectedPhase !== null) {
-      const loadAvailability = async () => {
-        try {
-          const [masculineAvailability, feminineAvailability] =
-            await Promise.all([
-              availabilityService.getAvailability(
-                selectedJournee,
-                selectedPhase,
-                "masculin"
-              ),
-              availabilityService.getAvailability(
-                selectedJournee,
-                selectedPhase,
-                "feminin"
-              ),
-            ]);
-
-          // Fusionner les deux types de disponibilités
-          const mergedAvailabilities: AvailabilityState = {};
-
-          // Ajouter les disponibilités masculines
-          if (masculineAvailability) {
-            Object.entries(masculineAvailability.players).forEach(
-              ([playerId, response]) => {
-                const sanitized = sanitizeAvailabilityEntry(response);
-                if (!sanitized) {
-                  return;
-                }
-                if (!mergedAvailabilities[playerId]) {
-                  mergedAvailabilities[playerId] = {};
-                }
-                mergedAvailabilities[playerId].masculin = sanitized;
-              }
-            );
-          }
-
-          // Ajouter les disponibilités féminines
-          if (feminineAvailability) {
-            Object.entries(feminineAvailability.players).forEach(
-              ([playerId, response]) => {
-                const sanitized = sanitizeAvailabilityEntry(response);
-                if (!sanitized) {
-                  return;
-                }
-                if (!mergedAvailabilities[playerId]) {
-                  mergedAvailabilities[playerId] = {};
-                }
-                mergedAvailabilities[playerId].feminin = sanitized;
-              }
-            );
-          }
-
-          setAvailabilities(mergedAvailabilities);
-    } catch (error) {
-          console.error("Erreur lors du chargement des disponibilités:", error);
-          setAvailabilities({});
-        }
-      };
-      loadAvailability();
+    if (selectedJournee === null || selectedPhase === null) {
+      setAvailabilities({});
+      return;
     }
-  }, [selectedJournee, selectedPhase, availabilityService]);
+
+    // Fusionner les deux types de disponibilités
+    const mergedAvailabilities: AvailabilityState = {};
+
+    // Ajouter les disponibilités masculines
+    if (masculineAvailability) {
+      Object.entries(masculineAvailability.players).forEach(
+        ([playerId, response]) => {
+          const sanitized = sanitizeAvailabilityEntry(response);
+          if (!sanitized) {
+            return;
+          }
+          if (!mergedAvailabilities[playerId]) {
+            mergedAvailabilities[playerId] = {};
+          }
+          mergedAvailabilities[playerId].masculin = sanitized;
+        }
+      );
+    }
+
+    // Ajouter les disponibilités féminines
+    if (feminineAvailability) {
+      Object.entries(feminineAvailability.players).forEach(
+        ([playerId, response]) => {
+          const sanitized = sanitizeAvailabilityEntry(response);
+          if (!sanitized) {
+            return;
+          }
+          if (!mergedAvailabilities[playerId]) {
+            mergedAvailabilities[playerId] = {};
+          }
+          mergedAvailabilities[playerId].feminin = sanitized;
+        }
+      );
+    }
+
+    setAvailabilities(mergedAvailabilities);
+  }, [masculineAvailability, feminineAvailability, selectedJournee, selectedPhase]);
+
+  // Gérer les erreurs de chargement
+  useEffect(() => {
+    if (errorMasculineAvailability || errorFeminineAvailability) {
+      console.error(
+        "Erreur lors de l'écoute des disponibilités:",
+        errorMasculineAvailability || errorFeminineAvailability
+      );
+    }
+  }, [errorMasculineAvailability, errorFeminineAvailability]);
 
   useEffect(() => {
     if (
