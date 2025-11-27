@@ -1,14 +1,30 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import type { NextRequest } from "next/server";
 import {
   initializeFirebaseAdmin,
   getFirestoreAdmin,
   adminAuth,
 } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
+import { logAuditAction, AUDIT_ACTIONS } from "@/lib/auth/audit-logger";
 
-export async function POST() {
+export const runtime = "nodejs";
+
+export async function POST(req: NextRequest) {
   try {
+    // Valider l'origine de la requête pour prévenir les attaques CSRF
+    if (!validateOrigin(req)) {
+      return NextResponse.json(
+        {
+          error: "Invalid origin",
+          message: "Requête non autorisée",
+        },
+        { status: 403 }
+      );
+    }
+
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
     if (!sessionCookie) {
@@ -24,12 +40,11 @@ export async function POST() {
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     const role = resolveRole(decoded.role as string | undefined);
 
-    if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
+    if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
       return NextResponse.json(
         {
           error: "Accès refusé",
-          message:
-            "Cette opération est réservée aux administrateurs et coachs",
+          message: "Cette opération est réservée aux administrateurs",
         },
         { status: 403 }
       );
@@ -72,7 +87,18 @@ export async function POST() {
       { merge: true }
     );
 
-    return NextResponse.json(
+    // Log d'audit pour la synchronisation
+    logAuditAction(AUDIT_ACTIONS.DATA_SYNCED, decoded.uid, {
+      resource: "teams",
+      details: {
+        teamsCount: saveResult.saved,
+        errors: saveResult.errors,
+        duration: durationSeconds,
+      },
+      success: true,
+    });
+
+    const res = NextResponse.json(
       {
         success: true,
         message: `Synchronisation des équipes réussie: ${saveResult.saved} équipes sauvegardées`,
@@ -84,6 +110,10 @@ export async function POST() {
       },
       { status: 200 }
     );
+    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.headers.set("Pragma", "no-cache");
+    res.headers.set("Expires", "0");
+    return res;
   } catch (error) {
     console.error("❌ [app/api/admin/sync-teams] Erreur lors de la synchronisation des équipes:", error);
     return NextResponse.json(

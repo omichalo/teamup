@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase-admin";
+import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
+
+export const runtime = "nodejs";
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const DISCORD_SERVER_ID = process.env.DISCORD_SERVER_ID;
@@ -18,7 +21,22 @@ export async function GET() {
       );
     }
 
-    await adminAuth.verifySessionCookie(sessionCookie, true);
+    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+    if (!decoded.email_verified) {
+      return NextResponse.json(
+        { success: false, error: "Email non vérifié" },
+        { status: 403 }
+      );
+    }
+
+    // Vérifier que l'utilisateur est admin ou coach
+    const role = resolveRole(decoded.role as string | undefined);
+    if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
+      return NextResponse.json(
+        { success: false, error: "Accès refusé" },
+        { status: 403 }
+      );
+    }
 
     if (!DISCORD_TOKEN || !DISCORD_SERVER_ID) {
       return NextResponse.json(
@@ -48,10 +66,6 @@ export async function GET() {
     }
 
     const channels = await response.json();
-    
-    // Log toutes les informations sur les canaux Discord
-    console.log("[Discord Channels] Tous les canaux récupérés:", JSON.stringify(channels, null, 2));
-    console.log("[Discord Channels] Nombre total de canaux:", channels.length);
     
     // Types de canaux Discord
     // Type 0 = canal textuel (GUILD_TEXT)
@@ -137,10 +151,6 @@ export async function GET() {
     const flatChannels = textChannels
       .map(({ id, name }) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
-    
-    console.log("[Discord Channels] Catégories:", JSON.stringify(categories, null, 2));
-    console.log("[Discord Channels] Structure hiérarchique:", JSON.stringify(channelsByCategory, null, 2));
-    console.log("[Discord Channels] Nombre de canaux textuels:", textChannels.length);
 
     return NextResponse.json({ 
       success: true, 

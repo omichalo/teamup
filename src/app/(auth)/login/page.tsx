@@ -26,10 +26,12 @@ import { clientAuth } from "@/lib/firebase.client";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { useSearchParams } from "next/navigation";
 import { getFirebaseErrorMessage } from "@/lib/firebase-error-utils";
+import { validateInternalRedirect } from "@/lib/auth/redirect-utils";
 
 export default function LoginPage() {
   const params = useSearchParams();
-  const next = params?.get("next") || "/";
+  const nextParam = params?.get("next");
+  const next = validateInternalRedirect(nextParam);
 
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);

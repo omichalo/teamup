@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import type { NextRequest } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
+
+export const runtime = "nodejs";
 
 // Rate limiting simple en mémoire (pour éviter les abus)
 // En production, utilisez un service dédié comme Redis
@@ -25,7 +29,15 @@ function checkRateLimit(uid: string): boolean {
   return true;
 }
 
-export async function GET() {
+export async function POST(req: NextRequest) {
+  // Valider l'origine de la requête pour prévenir les attaques CSRF
+  if (!validateOrigin(req)) {
+    return NextResponse.json(
+      { error: "Invalid origin" },
+      { status: 403 }
+    );
+  }
+
   const cookieStore = await cookies();
   const cookie = cookieStore.get("__session")?.value;
 

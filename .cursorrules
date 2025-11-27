@@ -52,12 +52,175 @@ Tu appliques systématiquement les principes de développement DRY et SOLID.
 
 - Pour chaque appel API (server ou client), gérer explicitement les erreurs (try/catch, check des status HTTP).
 - Pour les entrées utilisateur (formulaires, query params, body JSON), valider les données (Zod ou logique de validation explicite).
-- Toujours renvoyer des réponses HTTP cohérentes : 200, 400, 401, 403, 404, 500, avec un message d'erreur utile.
+- Toujours renvoyer des réponses HTTP cohérentes : 200, 400, 401, 403, 404, 429, 500, avec un message d'erreur utile.
 - Ne pas exposer l'error stack complète dans la réponse JSON, seulement un message générique + éventuellement details (message d'erreur simple).
+- **Gestion d'erreurs différenciée** : Utiliser les codes HTTP appropriés selon le type d'erreur :
+  - 400 : Données invalides (format email, paramètres manquants)
+  - 401 : Non authentifié (session manquante/invalide)
+  - 403 : Accès refusé (rôle insuffisant)
+  - 404 : Ressource non trouvée
+  - 429 : Trop de requêtes (rate limiting)
+  - 500 : Erreur serveur interne
+- **Validation d'entrée** : Toujours valider le format des données avant traitement (ex: regex pour emails, validation de types)
+- **Messages d'erreur utilisateur** : Fournir des messages clairs et utiles sans exposer de détails techniques ou de stack traces
 
 ## Firestore
 
 - Quand une collection est manipulée, tu t'assures systématiquement que les bonnes règles sont positionnées. Tu n'ouvres que le strict minimum pour que cela fonctionne
+
+## Sécurité des routes API
+
+### Runtime Node.js
+
+- **TOUJOURS** spécifier `export const runtime = "nodejs";` en haut des routes API qui utilisent :
+  - Des modules Node.js natifs (fs, path, crypto, etc.)
+  - Firebase Admin SDK
+  - Des bibliothèques nécessitant le runtime Node.js (tweetnacl, etc.)
+
+### Protection CSRF
+
+- **TOUJOURS** utiliser `validateOrigin(req)` sur les mutations (POST, PATCH, DELETE, PUT)
+- Importer depuis `@/lib/auth/csrf-utils`
+- Retourner 403 si l'origine est invalide
+- Exemple :
+  ```typescript
+  if (!validateOrigin(req)) {
+    return NextResponse.json({ error: "Invalid origin" }, { status: 403 });
+  }
+  ```
+
+### Rate Limiting
+
+- Appliquer le rate limiting sur les routes sensibles :
+  - Envoi d'emails (password reset, verification)
+  - Authentification (login, signup)
+  - Toute route exposée à des attaques de brute-force
+- Utiliser `checkRateLimit()` depuis `@/lib/auth/rate-limit`
+- Retourner 429 avec un message informatif si la limite est dépassée
+- Exemple :
+  ```typescript
+  const rateLimitResult = checkRateLimit(`email:${email}`, 3, 15 * 60 * 1000);
+  if (!rateLimitResult.allowed) {
+    return NextResponse.json({ error: "Trop de requêtes" }, { status: 429 });
+  }
+  ```
+
+### Headers de sécurité (Cache-Control)
+
+- **TOUJOURS** ajouter `Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate` sur les réponses sensibles :
+  - Routes de session (`/api/session/*`)
+  - Routes d'authentification (`/api/auth/*`)
+  - Routes admin (`/api/admin/*`)
+  - Toute route contenant des données utilisateur ou sensibles
+- Ajouter également `Pragma: no-cache` et `Expires: 0` pour compatibilité
+- Exemple :
+  ```typescript
+  const res = NextResponse.json(data);
+  res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.headers.set("Pragma", "no-cache");
+  res.headers.set("Expires", "0");
+  return res;
+  ```
+
+### Cookies sécurisés
+
+- **TOUJOURS** configurer les cookies de session avec :
+  - `httpOnly: true` (protection XSS)
+  - `secure: true` en production (HTTPS uniquement)
+  - `sameSite: "strict"` en production, `"lax"` en développement
+  - Configuration homogène entre création et suppression
+- Exemple :
+  ```typescript
+  const isProduction = process.env.NODE_ENV === "production";
+  res.cookies.set({
+    name: "__session",
+    value: sessionCookie,
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "strict" : "lax",
+    path: "/",
+    maxAge: 14 * 24 * 60 * 60, // 14 jours
+  });
+  ```
+
+### Audit Logging
+
+- Logger toutes les actions critiques avec `logAuditAction()` depuis `@/lib/auth/audit-logger`
+- Actions à logger :
+  - Modification de rôles utilisateur
+  - Approbation/rejet de demandes coach
+  - Synchronisation de données (joueurs, équipes, matchs)
+  - Import/export de données
+  - Suppression de ressources
+- **TOUJOURS** masquer les données sensibles (emails, tokens, secrets) dans les logs
+- Utiliser les constantes `AUDIT_ACTIONS` pour la cohérence
+- Exemple :
+  ```typescript
+  logAuditAction(AUDIT_ACTIONS.USER_ROLE_CHANGED, decoded.uid, {
+    resource: "user",
+    resourceId: userId,
+    details: { oldRole, newRole },
+    success: true,
+  });
+  ```
+
+### Logs conditionnels
+
+- **NE JAMAIS** logger de données sensibles en production :
+  - Chemins de fichiers de service account
+  - Clés privées ou tokens
+  - Liens de réinitialisation de mot de passe
+  - Variables d'environnement complètes
+- Utiliser des logs conditionnels : `if (process.env.NODE_ENV === "development" && process.env.DEBUG === "true")`
+- Masquer les valeurs sensibles même en debug (ex: `"***"` ou `value.substring(0, 10) + "***"`)
+- Exemple :
+  ```typescript
+  if (process.env.NODE_ENV === "development" && process.env.DEBUG === "true") {
+    console.log("[debug] Info non sensible:", { key: "value" });
+  }
+  ```
+
+## Sécurité et contrôle d'accès - Cohérence Client/Serveur
+
+### Règle fondamentale : Vérifications de rôles cohérentes
+
+**TOUJOURS vérifier les rôles à la fois côté client ET côté serveur.**
+
+1. **Côté client (UI)** : Utiliser `AuthGuard` avec `allowedRoles` pour protéger les pages
+   - Exemple : `<AuthGuard allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.COACH]}>`
+   - Les vérifications client sont pour l'UX (masquer/afficher), pas pour la sécurité
+
+2. **Côté serveur (API)** : TOUJOURS vérifier les rôles dans les routes API
+   - Utiliser `hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])` après vérification du cookie de session
+   - Retourner 403 si l'utilisateur n'a pas les droits
+   - Ne JAMAIS faire confiance uniquement aux vérifications client
+
+3. **Cohérence obligatoire** : Les rôles autorisés côté client DOIVENT correspondre exactement aux rôles vérifiés côté serveur
+   - Si une page est accessible aux `[ADMIN, COACH]` via `AuthGuard`, la route API correspondante DOIT vérifier `[ADMIN, COACH]`
+   - Si une route API est restreinte à `[ADMIN]` uniquement, la page UI DOIT utiliser `allowedRoles={[USER_ROLES.ADMIN]}`
+
+4. **Vérification systématique** : Avant de créer/modifier une route API ou une page protégée :
+   - Identifier les rôles nécessaires pour l'action
+   - Vérifier que `AuthGuard` (si page) et la route API utilisent les MÊMES rôles
+   - Documenter dans un commentaire les rôles autorisés si nécessaire
+
+5. **Exemples de cohérence** :
+   ```typescript
+   // ✅ BON : Cohérence client/serveur
+   // Page : <AuthGuard allowedRoles={[USER_ROLES.ADMIN]}>
+   // API : if (!hasAnyRole(role, [USER_ROLES.ADMIN])) return 403;
+   
+   // ❌ MAUVAIS : Incohérence
+   // Page : <AuthGuard allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.COACH]}>
+   // API : if (!hasAnyRole(role, [USER_ROLES.ADMIN])) return 403; // Manque COACH
+   ```
+
+6. **Routes admin** : Toutes les routes `/api/admin/*` sont réservées aux ADMIN uniquement
+   - Ne JAMAIS autoriser COACH sur les routes admin
+   - Utiliser `ADMIN_ONLY_ROLES = [USER_ROLES.ADMIN]` pour la clarté
+
+7. **Routes coach/admin** : Les routes accessibles aux coachs ET admins doivent vérifier les deux rôles
+   - Exemple : `/api/teams`, `/api/discord/channels` → `[USER_ROLES.ADMIN, USER_ROLES.COACH]`
 
 ## Performance
 

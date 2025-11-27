@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import type { NextRequest } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import {
   initializeFirebaseAdmin,
@@ -14,6 +15,8 @@ import {
   USER_ROLES,
 } from "@/lib/auth/roles";
 import type { CoachRequestStatus, UserRole } from "@/types";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
+import { logAuditAction, AUDIT_ACTIONS } from "@/lib/auth/audit-logger";
 
 interface SetRolePayload {
   userId?: string;
@@ -45,8 +48,20 @@ const resolveCoachStatusForRole = (
   return COACH_REQUEST_STATUS.NONE;
 };
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
+    // Valider l'origine de la requête pour prévenir les attaques CSRF
+    if (!validateOrigin(req)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid origin",
+          message: "Requête non autorisée",
+        },
+        { status: 403 }
+      );
+    }
+
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
     if (!sessionCookie) {
@@ -137,7 +152,19 @@ export async function POST(req: Request) {
       { merge: true }
     );
 
-    return NextResponse.json(
+    // Log d'audit pour la modification de rôle
+    logAuditAction(AUDIT_ACTIONS.USER_ROLE_CHANGED, decoded.uid, {
+      resource: "user",
+      resourceId: userId,
+      details: {
+        oldRole: userRecord.customClaims?.role,
+        newRole: resolvedRole,
+        coachRequestStatus: resolvedCoachStatus,
+      },
+      success: true,
+    });
+
+    const res = NextResponse.json(
       {
         success: true,
         data: {
@@ -148,9 +175,30 @@ export async function POST(req: Request) {
       },
       { status: 200 }
     );
+    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.headers.set("Pragma", "no-cache");
+    res.headers.set("Expires", "0");
+    return res;
   } catch (error) {
     console.error("[app/api/admin/users/set-role] error", error);
-    return NextResponse.json(
+    
+    // Log d'audit pour l'échec
+    try {
+      const cookieStore = await cookies();
+      const sessionCookie = cookieStore.get("__session")?.value;
+      if (sessionCookie) {
+        const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+        logAuditAction(AUDIT_ACTIONS.USER_ROLE_CHANGED, decoded.uid, {
+          resource: "user",
+          success: false,
+          details: { error: error instanceof Error ? error.message : "Unknown error" },
+        });
+      }
+    } catch {
+      // Ignorer les erreurs de logging d'audit
+    }
+
+    const res = NextResponse.json(
       {
         success: false,
         error: "Erreur lors de la mise à jour du rôle",
@@ -158,6 +206,8 @@ export async function POST(req: Request) {
       },
       { status: 500 }
     );
+    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    return res;
   }
 }
 

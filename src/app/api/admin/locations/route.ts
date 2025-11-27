@@ -1,9 +1,43 @@
 import { NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase-admin";
+import { cookies } from "next/headers";
+import type { NextRequest } from "next/server";
+import { adminDb, adminAuth } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
+import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
+
+export const runtime = "nodejs";
 
 export async function GET() {
   try {
+    // Vérification d'authentification
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("__session")?.value;
+    
+    if (!sessionCookie) {
+      return NextResponse.json(
+        { success: false, error: "Authentification requise" },
+        { status: 401 }
+      );
+    }
+
+    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+    if (!decoded.email_verified) {
+      return NextResponse.json(
+        { success: false, error: "Email non vérifié" },
+        { status: 403 }
+      );
+    }
+
+    // Vérifier que l'utilisateur est admin
+    const role = resolveRole(decoded.role as string | undefined);
+    if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
+      return NextResponse.json(
+        { success: false, error: "Accès refusé" },
+        { status: 403 }
+      );
+    }
+
     const locationsRef = adminDb.collection("locations");
     const snapshot = await locationsRef.orderBy("name", "asc").get();
 
@@ -24,8 +58,48 @@ export async function GET() {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
+    // Valider l'origine de la requête pour prévenir les attaques CSRF
+    if (!validateOrigin(req)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid origin",
+          message: "Requête non autorisée",
+        },
+        { status: 403 }
+      );
+    }
+
+    // Vérification d'authentification
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("__session")?.value;
+    
+    if (!sessionCookie) {
+      return NextResponse.json(
+        { success: false, error: "Authentification requise" },
+        { status: 401 }
+      );
+    }
+
+    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+    if (!decoded.email_verified) {
+      return NextResponse.json(
+        { success: false, error: "Email non vérifié" },
+        { status: 403 }
+      );
+    }
+
+    // Vérifier que l'utilisateur est admin
+    const role = resolveRole(decoded.role as string | undefined);
+    if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
+      return NextResponse.json(
+        { success: false, error: "Accès refusé" },
+        { status: 403 }
+      );
+    }
+
     const { name } = await req.json();
 
     if (!name || typeof name !== "string" || name.trim() === "") {
@@ -74,8 +148,48 @@ export async function POST(req: Request) {
   }
 }
 
-export async function DELETE(req: Request) {
+export async function DELETE(req: NextRequest) {
   try {
+    // Valider l'origine de la requête pour prévenir les attaques CSRF
+    if (!validateOrigin(req)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid origin",
+          message: "Requête non autorisée",
+        },
+        { status: 403 }
+      );
+    }
+
+    // Vérification d'authentification
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("__session")?.value;
+    
+    if (!sessionCookie) {
+      return NextResponse.json(
+        { success: false, error: "Authentification requise" },
+        { status: 401 }
+      );
+    }
+
+    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+    if (!decoded.email_verified) {
+      return NextResponse.json(
+        { success: false, error: "Email non vérifié" },
+        { status: 403 }
+      );
+    }
+
+    // Vérifier que l'utilisateur est admin
+    const role = resolveRole(decoded.role as string | undefined);
+    if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
+      return NextResponse.json(
+        { success: false, error: "Accès refusé" },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 

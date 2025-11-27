@@ -24,15 +24,21 @@ export async function POST(req: Request) {
       );
     }
 
-    // Authentification via secret partagé (optionnel mais recommandé)
-    if (DISCORD_WEBHOOK_SECRET) {
-      const authHeader = req.headers.get("authorization");
-      if (!authHeader || authHeader !== `Bearer ${DISCORD_WEBHOOK_SECRET}`) {
-        return NextResponse.json(
-          { success: false, error: "Non autorisé" },
-          { status: 401 }
-        );
-      }
+    // Authentification via secret partagé (obligatoire)
+    if (!DISCORD_WEBHOOK_SECRET) {
+      console.error("[Discord Link License] DISCORD_WEBHOOK_SECRET non configuré");
+      return NextResponse.json(
+        { success: false, error: "Configuration manquante: DISCORD_WEBHOOK_SECRET" },
+        { status: 500 }
+      );
+    }
+
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader || authHeader !== `Bearer ${DISCORD_WEBHOOK_SECRET}`) {
+      return NextResponse.json(
+        { success: false, error: "Non autorisé" },
+        { status: 401 }
+      );
     }
 
     const body = await req.json();
