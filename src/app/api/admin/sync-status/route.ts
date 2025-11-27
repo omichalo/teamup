@@ -17,12 +17,12 @@ export async function GET() {
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     const role = resolveRole(decoded.role as string | undefined);
 
-    if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
+    if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
       return NextResponse.json(
         {
           success: false,
           error: "Accès refusé",
-          message: "Cette ressource est réservée aux administrateurs et coachs",
+          message: "Cette ressource est réservée aux administrateurs",
         },
         { status: 403 }
       );

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Box, CircularProgress } from "@mui/material";
 import { useAuth } from "@/hooks/useAuth";
+import { validateInternalRedirect } from "@/lib/auth/redirect-utils";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -33,7 +34,8 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
 
     // Si la page nécessite une authentification et l'utilisateur n'est pas connecté
     if (requireAuth && !user) {
-      router.push(`${redirectWhenUnauthorized}?next=${encodeURIComponent(pathname || "/")}`);
+      const safeNext = validateInternalRedirect(pathname || "/");
+      router.push(`${redirectWhenUnauthorized}?next=${encodeURIComponent(safeNext)}`);
       return;
     }
 

@@ -1,13 +1,21 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import type { NextRequest } from "next/server";
 import {
   initializeFirebaseAdmin,
   adminAuth,
   getFirestoreAdmin,
 } from "@/lib/firebase-admin";
-import { USER_ROLES, COACH_REQUEST_STATUS, hasAnyRole, resolveRole } from "@/lib/auth/roles";
+import {
+  USER_ROLES,
+  COACH_REQUEST_STATUS,
+  hasAnyRole,
+  resolveRole,
+} from "@/lib/auth/roles";
 import { FieldValue } from "firebase-admin/firestore";
 import type { CoachRequestStatus, UserRole } from "@/types";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
+import { logAuditAction, AUDIT_ACTIONS } from "@/lib/auth/audit-logger";
 
 interface CoachRequestUpdatePayload {
   userId?: string;
@@ -16,8 +24,20 @@ interface CoachRequestUpdatePayload {
   message?: string | null;
 }
 
-export async function PATCH(req: Request) {
+export async function PATCH(req: NextRequest) {
   try {
+    // Valider l'origine de la requête pour prévenir les attaques CSRF
+    if (!validateOrigin(req)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid origin",
+          message: "Requête non autorisée",
+        },
+        { status: 403 }
+      );
+    }
+
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
     if (!sessionCookie) {
@@ -37,8 +57,12 @@ export async function PATCH(req: Request) {
       );
     }
 
-    const { userId, action, role: targetRoleRaw, message }: CoachRequestUpdatePayload =
-      await req.json();
+    const {
+      userId,
+      action,
+      role: targetRoleRaw,
+      message,
+    }: CoachRequestUpdatePayload = await req.json();
 
     if (!userId || (action !== "approve" && action !== "reject")) {
       return NextResponse.json(
@@ -54,7 +78,9 @@ export async function PATCH(req: Request) {
 
     if (action === "approve") {
       const targetRole: UserRole =
-        targetRoleRaw === USER_ROLES.ADMIN ? USER_ROLES.ADMIN : USER_ROLES.COACH;
+        targetRoleRaw === USER_ROLES.ADMIN
+          ? USER_ROLES.ADMIN
+          : USER_ROLES.COACH;
       const userRecord = await adminAuth.getUser(userId);
       const claims = userRecord.customClaims ?? {};
 
@@ -79,21 +105,52 @@ export async function PATCH(req: Request) {
         },
         { merge: true }
       );
-    } else {
-      await db.collection("users").doc(userId).set(
-        {
-          coachRequestStatus: COACH_REQUEST_STATUS.REJECTED,
-          coachRequestMessage: message ?? null,
-          coachRequestHandledBy: decoded.uid,
-          coachRequestHandledAt: now,
-          coachRequestUpdatedAt: now,
-          updatedAt: now,
+
+      // Log d'audit pour l'approbation
+      logAuditAction(AUDIT_ACTIONS.COACH_REQUEST_APPROVED, decoded.uid, {
+        resource: "user",
+        resourceId: userId,
+        details: {
+          targetRole,
+          message: message ? "***" : null, // Masquer le message
         },
-        { merge: true }
-      );
+        success: true,
+      });
+    } else {
+      await db
+        .collection("users")
+        .doc(userId)
+        .set(
+          {
+            coachRequestStatus: COACH_REQUEST_STATUS.REJECTED,
+            coachRequestMessage: message ?? null,
+            coachRequestHandledBy: decoded.uid,
+            coachRequestHandledAt: now,
+            coachRequestUpdatedAt: now,
+            updatedAt: now,
+          },
+          { merge: true }
+        );
+
+      // Log d'audit pour le rejet
+      logAuditAction(AUDIT_ACTIONS.COACH_REQUEST_REJECTED, decoded.uid, {
+        resource: "user",
+        resourceId: userId,
+        details: {
+          message: message ? "***" : null, // Masquer le message
+        },
+        success: true,
+      });
     }
 
-    return NextResponse.json({ success: true }, { status: 200 });
+    const res = NextResponse.json({ success: true }, { status: 200 });
+    res.headers.set(
+      "Cache-Control",
+      "no-store, no-cache, must-revalidate, proxy-revalidate"
+    );
+    res.headers.set("Pragma", "no-cache");
+    res.headers.set("Expires", "0");
+    return res;
   } catch (error) {
     console.error("[app/api/admin/users/coach-request] error", error);
     return NextResponse.json(
@@ -105,5 +162,3 @@ export async function PATCH(req: Request) {
     );
   }
 }
-
-

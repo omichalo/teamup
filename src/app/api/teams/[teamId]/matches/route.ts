@@ -1,12 +1,43 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { initializeFirebaseAdmin, getFirestoreAdmin } from "@/lib/firebase-admin";
+import { cookies } from "next/headers";
+import { initializeFirebaseAdmin, getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
 import { getTeamMatches } from "@/lib/server/team-matches";
 
-export async function GET(request: NextRequest) {
-  // Avec Next 15 App Router, les params dynamiques sont exposés via searchParams dans .next/types/validator
-  const url = new URL(request.url);
-  const teamId = url.searchParams.get("teamId");
+export const runtime = "nodejs";
+
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ teamId: string }> }
+) {
+  // Vérification d'authentification
+  const cookieStore = await cookies();
+  const sessionCookie = cookieStore.get("__session")?.value;
+  
+  if (!sessionCookie) {
+    return NextResponse.json(
+      { error: "Authentification requise" },
+      { status: 401 }
+    );
+  }
+
+  try {
+    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+    if (!decoded.email_verified) {
+      return NextResponse.json(
+        { error: "Email non vérifié" },
+        { status: 403 }
+      );
+    }
+  } catch {
+    return NextResponse.json(
+      { error: "Session invalide" },
+      { status: 401 }
+    );
+  }
+
+  // Récupérer teamId depuis les paramètres de route
+  const { teamId } = await params;
 
   if (!teamId || typeof teamId !== "string") {
     return NextResponse.json(

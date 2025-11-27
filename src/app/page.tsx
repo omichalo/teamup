@@ -1,7 +1,6 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
@@ -14,7 +13,6 @@ import {
   Stack,
   Chip,
   CardActions,
-  CircularProgress,
 } from "@mui/material";
 import Grid from "@mui/material/GridLegacy";
 import type { PaletteColor } from "@mui/material";
@@ -42,15 +40,8 @@ interface QuickLink {
 }
 
 export default function DashboardPage() {
-  const { isAdmin, user, loading } = useAuth();
+  const { isAdmin } = useAuth();
   const router = useRouter();
-
-  // Rediriger automatiquement les joueurs vers /joueur
-  useEffect(() => {
-    if (!loading && user && user.role === USER_ROLES.PLAYER) {
-      router.replace("/joueur");
-    }
-  }, [user, loading, router]);
 
   const quickLinks: QuickLink[] = [
     {
@@ -106,22 +97,6 @@ export default function DashboardPage() {
         ]
       : []),
   ];
-
-  // Si l'utilisateur est un joueur, on affiche un loader pendant la redirection
-  if (!loading && user && user.role === USER_ROLES.PLAYER) {
-    return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: "100vh",
-        }}
-      >
-        <CircularProgress />
-      </Box>
-    );
-  }
 
   return (
     <AuthGuard

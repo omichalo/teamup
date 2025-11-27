@@ -187,22 +187,9 @@ function getStorageInstance(): FirebaseStorage {
   return storageInstance;
 }
 
-// Exporter les getters publics
-export function getFirebaseApp(): FirebaseApp {
-  return getFirebaseAppInstance();
-}
-
-export function getFirebaseAuth(): Auth {
-  return getAuthInstance();
-}
-
-export function getFirebaseDb(): Firestore {
-  return getDbInstance();
-}
-
-export function getFirebaseStorage(): FirebaseStorage {
-  return getStorageInstance();
-}
+// Note: Les fonctions getFirebaseApp, getFirebaseAuth, getFirebaseDb, getFirebaseStorage
+// ont été supprimées car non utilisées. Le codebase utilise maintenant les exports directs
+// (auth, db, storage) et getDbInstanceDirect() pour l'accès direct à l'instance Firestore.
 
 // Exporter les instances pour compatibilité avec le code existant
 // IMPORTANT: Retourner directement les instances réelles (pas de Proxy) pour que collection() fonctionne

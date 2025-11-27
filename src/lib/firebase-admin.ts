@@ -17,13 +17,15 @@ const app = (() => {
 
   // Vérifier si un fichier de service account est spécifié via GOOGLE_APPLICATION_CREDENTIALS
   const rawServiceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-  console.log("🔍 DEBUG GOOGLE_APPLICATION_CREDENTIALS:", rawServiceAccountPath);
   const serviceAccountPath = rawServiceAccountPath?.trim().replace(/^["']|["']$/g, "");
   
   // Si GOOGLE_APPLICATION_CREDENTIALS n'est pas défini, on est probablement sur Google Cloud
   // (App Hosting, Cloud Run, etc.) où les Application Default Credentials sont disponibles
   if (!serviceAccountPath) {
-    console.log("🔥 Initialisation Firebase Admin avec Application Default Credentials (Google Cloud)");
+    // Log uniquement en mode debug
+    if (process.env.NODE_ENV === "development" && process.env.DEBUG === "true") {
+      console.log("🔥 Initialisation Firebase Admin avec Application Default Credentials (Google Cloud)");
+    }
     try {
       return initializeApp({
         credential: applicationDefault(),
@@ -38,7 +40,10 @@ const app = (() => {
   // Si GOOGLE_APPLICATION_CREDENTIALS est défini, on est probablement en local
   // Lire le fichier de service account
   if (serviceAccountPath) {
-    console.log(`🔥 Initialisation Firebase Admin avec fichier service account: ${serviceAccountPath}`);
+    // Log uniquement en mode debug (sans exposer le chemin complet)
+    if (process.env.NODE_ENV === "development" && process.env.DEBUG === "true") {
+      console.log("🔥 Initialisation Firebase Admin avec fichier service account (chemin masqué)");
+    }
     try {
       // Lire directement le fichier JSON au lieu d'utiliser applicationDefault()
       // qui essaie de se connecter à metadata.google.internal
@@ -47,7 +52,7 @@ const app = (() => {
         : path.resolve(process.cwd(), serviceAccountPath);
       
       if (!fs.existsSync(resolvedPath)) {
-        throw new Error(`Service account file not found: ${resolvedPath}`);
+        throw new Error(`Service account file not found`);
       }
 
       const serviceAccount = JSON.parse(fs.readFileSync(resolvedPath, "utf8"));
@@ -75,7 +80,10 @@ const app = (() => {
     projectId;
 
   if (privateKey && clientEmail) {
-    console.log("🔥 Initialisation Firebase Admin avec credentials explicites (variables d'environnement)");
+    // Log uniquement en mode debug (sans exposer la présence de la clé privée)
+    if (process.env.NODE_ENV === "development" && process.env.DEBUG === "true") {
+      console.log("🔥 Initialisation Firebase Admin avec credentials explicites (variables d'environnement)");
+    }
     return initializeApp({
       credential: cert({
         projectId: explicitProjectId,

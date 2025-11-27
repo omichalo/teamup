@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { adminAuth, getFirestoreAdmin } from "@/lib/firebase-admin";
 
+export const runtime = "nodejs";
+
 export async function GET() {
   const cookieStore = await cookies();
   const cookie = cookieStore.get("__session")?.value;
@@ -38,7 +40,7 @@ export async function GET() {
         }
       }
       
-      return NextResponse.json({
+      const res = NextResponse.json({
         user: {
           uid: decoded.uid,
           email: decoded.email || userData?.email,
@@ -48,10 +50,14 @@ export async function GET() {
           coachRequestUpdatedAt,
         },
       });
+      res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.headers.set("Pragma", "no-cache");
+      res.headers.set("Expires", "0");
+      return res;
     }
 
     // Si le document n'existe pas, retourner les données du token
-    return NextResponse.json({
+    const res = NextResponse.json({
       user: {
         uid: decoded.uid,
         email: decoded.email,
@@ -61,9 +67,17 @@ export async function GET() {
         coachRequestUpdatedAt: null,
       },
     });
+    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.headers.set("Pragma", "no-cache");
+    res.headers.set("Expires", "0");
+    return res;
   } catch (error) {
     console.error("[session/verify] Error:", error);
-    return NextResponse.json({ user: null }, { status: 200 });
+    const res = NextResponse.json({ user: null }, { status: 200 });
+    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.headers.set("Pragma", "no-cache");
+    res.headers.set("Expires", "0");
+    return res;
   }
 }
 
