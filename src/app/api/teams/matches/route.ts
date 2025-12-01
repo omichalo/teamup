@@ -1,10 +1,12 @@
-import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { initializeFirebaseAdmin, getFirestoreAdmin } from "@/lib/firebase-admin";
 import {
   getTeams,
   getTeamMatches,
   TeamMatch,
 } from "@/lib/server/team-matches";
+import { createSecureResponse } from "@/lib/api/response-utils";
+import { handleApiError } from "@/lib/api/error-handler";
 
 interface TeamMatchSerialized extends Omit<TeamMatch, "date" | "createdAt" | "updatedAt"> {
   date: string;
@@ -12,7 +14,7 @@ interface TeamMatchSerialized extends Omit<TeamMatch, "date" | "createdAt" | "up
   updatedAt: string;
 }
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
     await initializeFirebaseAdmin();
     const firestore = getFirestoreAdmin();
@@ -56,23 +58,19 @@ export async function GET(req: Request) {
       })
     );
 
-    return NextResponse.json(
+    return createSecureResponse(
       {
         teams: teamMatches,
         totalTeams: teamMatches.length,
         totalMatches: teamMatches.reduce((acc, entry) => acc + entry.total, 0),
       },
-      { status: 200 }
+      200
     );
   } catch (error) {
-    console.error("[app/api/teams/matches] Firestore Error:", error);
-    return NextResponse.json(
-      {
-        error: "Failed to fetch teams matches",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
-    );
+    return handleApiError(error, {
+      context: "app/api/teams/matches",
+      defaultMessage: "Failed to fetch teams matches",
+    });
   }
 }
 

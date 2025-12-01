@@ -1,42 +1,18 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
-import { adminDb, adminAuth } from "@/lib/firebase-admin";
+import { adminDb } from "@/lib/firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
-import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
-import { validateOrigin } from "@/lib/auth/csrf-utils";
+import { requireAdminWithEmailVerified } from "@/lib/api/auth-middleware";
+import { createSecureResponse } from "@/lib/api/response-utils";
+import { handleApiError, createErrorResponse } from "@/lib/api/error-handler";
+import { validateString, validateId } from "@/lib/api/validation-helpers";
+import { withRateLimit } from "@/lib/api/rate-limit-middleware";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    // Vérification d'authentification
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-    
-    if (!sessionCookie) {
-      return NextResponse.json(
-        { success: false, error: "Authentification requise" },
-        { status: 401 }
-      );
-    }
-
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    if (!decoded.email_verified) {
-      return NextResponse.json(
-        { success: false, error: "Email non vérifié" },
-        { status: 403 }
-      );
-    }
-
-    // Vérifier que l'utilisateur est admin
-    const role = resolveRole(decoded.role as string | undefined);
-    if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
-      return NextResponse.json(
-        { success: false, error: "Accès refusé" },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAdminWithEmailVerified(req);
+    if (auth instanceof Response) return auth;
 
     const locationsRef = adminDb.collection("locations");
     const snapshot = await locationsRef.orderBy("name", "asc").get();
@@ -44,172 +20,109 @@ export async function GET() {
     const locations = snapshot.docs.map((doc) => ({
       id: doc.id,
       name: doc.data().name as string,
-      createdAt: doc.data().createdAt?.toDate?.()?.toISOString() || new Date().toISOString(),
-      updatedAt: doc.data().updatedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
+      createdAt:
+        doc.data().createdAt?.toDate?.()?.toISOString() ||
+        new Date().toISOString(),
+      updatedAt:
+        doc.data().updatedAt?.toDate?.()?.toISOString() ||
+        new Date().toISOString(),
     }));
 
-    return NextResponse.json({ success: true, locations });
+    return createSecureResponse({ success: true, locations });
   } catch (error) {
-    console.error("[locations] GET error", error);
-    return NextResponse.json(
-      { success: false, error: "Erreur lors de la récupération des lieux" },
-      { status: 500 }
-    );
+    return handleApiError(error, {
+      context: "app/api/admin/locations",
+      defaultMessage: "Erreur lors de la récupération des lieux",
+    });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    // Valider l'origine de la requête pour prévenir les attaques CSRF
-    if (!validateOrigin(req)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid origin",
-          message: "Requête non autorisée",
-        },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAdminWithEmailVerified(req);
+    if (auth instanceof Response) return auth;
 
-    // Vérification d'authentification
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-    
-    if (!sessionCookie) {
-      return NextResponse.json(
-        { success: false, error: "Authentification requise" },
-        { status: 401 }
-      );
-    }
-
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    if (!decoded.email_verified) {
-      return NextResponse.json(
-        { success: false, error: "Email non vérifié" },
-        { status: 403 }
-      );
-    }
-
-    // Vérifier que l'utilisateur est admin
-    const role = resolveRole(decoded.role as string | undefined);
-    if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
-      return NextResponse.json(
-        { success: false, error: "Accès refusé" },
-        { status: 403 }
-      );
-    }
+    // Rate limiting par utilisateur (10 requêtes par minute)
+    const rateLimitError = withRateLimit({
+      key: `admin-locations-post:${auth.uid}`,
+      maxRequests: 10,
+      windowMs: 60 * 1000,
+      errorMessage: "Trop de requêtes. Veuillez patienter avant de réessayer.",
+    });
+    if (rateLimitError) return rateLimitError;
 
     const { name } = await req.json();
 
-    if (!name || typeof name !== "string" || name.trim() === "") {
-      return NextResponse.json(
-        { success: false, error: "Le nom du lieu est requis" },
-        { status: 400 }
-      );
-    }
+    const validatedName = validateString(name, "name");
+    if (validatedName instanceof Response) return validatedName;
 
     const locationsRef = adminDb.collection("locations");
     const now = new Date();
-    
+
     // Vérifier si le lieu existe déjà
     const existingSnapshot = await locationsRef
-      .where("name", "==", name.trim())
+      .where("name", "==", validatedName)
       .get();
-    
+
     if (!existingSnapshot.empty) {
-      return NextResponse.json(
-        { success: false, error: "Ce lieu existe déjà" },
-        { status: 400 }
-      );
+      return createErrorResponse("Ce lieu existe déjà", 400);
     }
 
     const docRef = await locationsRef.add({
-      name: name.trim(),
+      name: validatedName,
       createdAt: Timestamp.fromDate(now),
       updatedAt: Timestamp.fromDate(now),
     });
 
-    return NextResponse.json({
+    return createSecureResponse({
       success: true,
       location: {
         id: docRef.id,
-        name: name.trim(),
+        name: validatedName,
         createdAt: now.toISOString(),
         updatedAt: now.toISOString(),
       },
     });
   } catch (error) {
-    console.error("[locations] POST error", error);
-    return NextResponse.json(
-      { success: false, error: "Erreur lors de l'ajout du lieu" },
-      { status: 500 }
-    );
+    return handleApiError(error, {
+      context: "app/api/admin/locations",
+      defaultMessage: "Erreur lors de l'ajout du lieu",
+    });
   }
 }
 
 export async function DELETE(req: NextRequest) {
   try {
-    // Valider l'origine de la requête pour prévenir les attaques CSRF
-    if (!validateOrigin(req)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid origin",
-          message: "Requête non autorisée",
-        },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAdminWithEmailVerified(req);
+    if (auth instanceof Response) return auth;
 
-    // Vérification d'authentification
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-    
-    if (!sessionCookie) {
-      return NextResponse.json(
-        { success: false, error: "Authentification requise" },
-        { status: 401 }
-      );
-    }
-
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    if (!decoded.email_verified) {
-      return NextResponse.json(
-        { success: false, error: "Email non vérifié" },
-        { status: 403 }
-      );
-    }
-
-    // Vérifier que l'utilisateur est admin
-    const role = resolveRole(decoded.role as string | undefined);
-    if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
-      return NextResponse.json(
-        { success: false, error: "Accès refusé" },
-        { status: 403 }
-      );
-    }
+    // Rate limiting par utilisateur (10 requêtes par minute)
+    const rateLimitError = withRateLimit({
+      key: `admin-locations-delete:${auth.uid}`,
+      maxRequests: 10,
+      windowMs: 60 * 1000,
+      errorMessage: "Trop de requêtes. Veuillez patienter avant de réessayer.",
+    });
+    if (rateLimitError) return rateLimitError;
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
 
     if (!id) {
-      return NextResponse.json(
-        { success: false, error: "L'ID du lieu est requis" },
-        { status: 400 }
-      );
+      return createErrorResponse("L'ID du lieu est requis", 400);
     }
+
+    const idError = validateId(id, "id");
+    if (idError) return idError;
 
     const locationRef = adminDb.collection("locations").doc(id);
     await locationRef.delete();
 
-    return NextResponse.json({ success: true });
+    return createSecureResponse({ success: true });
   } catch (error) {
-    console.error("[locations] DELETE error", error);
-    return NextResponse.json(
-      { success: false, error: "Erreur lors de la suppression du lieu" },
-      { status: 500 }
-    );
+    return handleApiError(error, {
+      context: "app/api/admin/locations",
+      defaultMessage: "Erreur lors de la suppression du lieu",
+    });
   }
 }
-

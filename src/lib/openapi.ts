@@ -101,29 +101,6 @@ export const openApiSpec = {
           division: { type: "string" },
         },
       },
-      CompositionValidation: {
-        type: "object",
-        description: "Résultat de la validation de composition (brûlage, règles FFTT, etc.).",
-        properties: {
-          isValid: { type: "boolean" },
-          errors: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                code: { type: "string" },
-                message: { type: "string" },
-                playerIds: {
-                  type: "array",
-                  items: { type: "string" },
-                },
-              },
-              required: ["code", "message"],
-            },
-          },
-        },
-        required: ["isValid", "errors"],
-      },
       ApiError: {
         type: "object",
         properties: {
@@ -132,6 +109,34 @@ export const openApiSpec = {
           details: { type: "string" },
         },
         required: ["error"],
+      },
+      Location: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          name: { type: "string" },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+        },
+        required: ["id", "name"],
+      },
+      DiscordChannel: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          name: { type: "string" },
+        },
+        required: ["id", "name"],
+      },
+      DiscordMember: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          username: { type: "string" },
+          displayName: { type: "string" },
+          discriminator: { type: "string" },
+        },
+        required: ["id", "username", "displayName"],
       },
     },
   },
@@ -225,17 +230,40 @@ export const openApiSpec = {
         responses: {
           "200": {
             description: "Session créée, cookie __session défini sur la réponse.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    ok: { type: "boolean" },
+                  },
+                },
+              },
+            },
           },
-          "400": { description: "Token manquant." },
+          "400": { description: "Token manquant ou invalide." },
+          "401": { description: "Token expiré ou invalide." },
           "403": { description: "Email non vérifié." },
         },
       },
       delete: {
         tags: ["Session"],
         summary: "Destruction de la session",
-        description: "Supprime le cookie `__session` côté serveur.",
+        description: "Supprime le cookie `__session` côté serveur et révoque les refresh tokens Firebase.",
         responses: {
-          "200": { description: "Session supprimée." },
+          "200": {
+            description: "Session supprimée.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    ok: { type: "boolean" },
+                  },
+                },
+              },
+            },
+          },
         },
       },
     },
@@ -437,44 +465,6 @@ export const openApiSpec = {
         },
       },
     },
-    "/api/brulage/validate": {
-      post: {
-        tags: ["Brulage", "Compositions"],
-        summary: "Validation d'une composition d'équipe",
-        description:
-          "Valide une composition (brûlage, nombre de joueurs, règles FFTT, règles locales). Utilisée par la page de compositions.",
-        security: [{ SessionCookie: [] }],
-        requestBody: {
-          required: true,
-          content: {
-            "application/json": {
-              schema: {
-                type: "object",
-                properties: {
-                  composition: { type: "object", description: "Structure de composition interne." },
-                  teamNumber: { type: "integer" },
-                  journee: { type: "integer" },
-                  phase: { type: "string" },
-                },
-                required: ["composition", "teamNumber", "journee", "phase"],
-              },
-            },
-          },
-        },
-        responses: {
-          "200": {
-            description: "Résultat de la validation.",
-            content: {
-              "application/json": {
-                schema: { $ref: "#/components/schemas/CompositionValidation" },
-              },
-            },
-          },
-          "400": { description: "Paramètres manquants ou invalides." },
-          "403": { description: "Accès refusé (non ADMIN ou COACH)." },
-        },
-      },
-    },
     "/api/fftt/players": {
       get: {
         tags: ["FFTT"],
@@ -493,6 +483,21 @@ export const openApiSpec = {
         responses: {
           "200": {
             description: "Liste des joueurs.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    players: {
+                      type: "array",
+                      items: { type: "object" },
+                    },
+                    total: { type: "integer" },
+                    clubCode: { type: "string" },
+                  },
+                },
+              },
+            },
           },
           "400": { description: "Paramètre clubCode manquant." },
         },
@@ -504,8 +509,26 @@ export const openApiSpec = {
         summary: "Liste des équipes",
         description:
           "Retourne la liste des équipes (résultats de la dernière synchronisation FFTT) depuis Firestore.",
+        security: [{ SessionCookie: [] }],
         responses: {
-          "200": { description: "Liste des équipes." },
+          "200": {
+            description: "Liste des équipes.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    teams: {
+                      type: "array",
+                      items: { $ref: "#/components/schemas/TeamSummary" },
+                    },
+                    total: { type: "integer" },
+                  },
+                },
+              },
+            },
+          },
+          "403": { description: "Accès refusé (non ADMIN ou COACH avec email vérifié)." },
           "500": { description: "Erreur lors de la récupération des équipes." },
         },
       },
@@ -527,7 +550,34 @@ export const openApiSpec = {
           },
         ],
         responses: {
-          "200": { description: "Liste des matchs par équipe." },
+          "200": {
+            description: "Liste des matchs par équipe.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    teams: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          team: { $ref: "#/components/schemas/TeamSummary" },
+                          matches: {
+                            type: "array",
+                            items: { $ref: "#/components/schemas/TeamMatch" },
+                          },
+                          total: { type: "integer" },
+                        },
+                      },
+                    },
+                    totalTeams: { type: "integer" },
+                    totalMatches: { type: "integer" },
+                  },
+                },
+              },
+            },
+          },
           "500": { description: "Erreur lors de la récupération des matchs." },
         },
       },
@@ -538,6 +588,7 @@ export const openApiSpec = {
         summary: "Liste des matchs pour une équipe",
         description:
           "Retourne tous les matchs connus pour une équipe donnée (FireStore + synchronisations FFTT).",
+        security: [{ SessionCookie: [] }],
         parameters: [
           {
             name: "teamId",
@@ -548,9 +599,540 @@ export const openApiSpec = {
           },
         ],
         responses: {
-          "200": { description: "Liste des matchs pour l'équipe." },
-          "400": { description: "Paramètre teamId manquant." },
+          "200": {
+            description: "Liste des matchs pour l'équipe.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    teamId: { type: "string" },
+                    matches: {
+                      type: "array",
+                      items: { $ref: "#/components/schemas/TeamMatch" },
+                    },
+                    total: { type: "integer" },
+                  },
+                },
+              },
+            },
+          },
+          "400": { description: "Paramètre teamId manquant ou invalide." },
+          "401": { description: "Authentification requise." },
+          "403": { description: "Accès refusé (email non vérifié)." },
           "500": { description: "Erreur lors de la récupération des matchs." },
+        },
+      },
+    },
+    "/api/admin/locations": {
+      get: {
+        tags: ["Admin"],
+        summary: "Liste des lieux",
+        description: "Retourne la liste de tous les lieux disponibles, triés par nom.",
+        security: [{ SessionCookie: [] }],
+        responses: {
+          "200": {
+            description: "Liste des lieux.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                    locations: {
+                      type: "array",
+                      items: { $ref: "#/components/schemas/Location" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "403": { description: "Accès refusé (non ADMIN avec email vérifié)." },
+        },
+      },
+      post: {
+        tags: ["Admin"],
+        summary: "Création d'un lieu",
+        description: "Crée un nouveau lieu dans la base de données.",
+        security: [{ SessionCookie: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  name: { type: "string", description: "Nom du lieu" },
+                },
+                required: ["name"],
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Lieu créé avec succès.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                    location: { $ref: "#/components/schemas/Location" },
+                  },
+                },
+              },
+            },
+          },
+          "400": { description: "Nom manquant, invalide ou lieu déjà existant." },
+          "403": { description: "Accès refusé (non ADMIN avec email vérifié)." },
+          "429": { description: "Trop de requêtes (rate limit)." },
+        },
+      },
+      delete: {
+        tags: ["Admin"],
+        summary: "Suppression d'un lieu",
+        description: "Supprime un lieu de la base de données.",
+        security: [{ SessionCookie: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "query",
+            required: true,
+            description: "Identifiant du lieu à supprimer.",
+            schema: { type: "string" },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Lieu supprimé avec succès.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                  },
+                },
+              },
+            },
+          },
+          "400": { description: "ID manquant ou invalide." },
+          "403": { description: "Accès refusé (non ADMIN avec email vérifié)." },
+          "429": { description: "Trop de requêtes (rate limit)." },
+        },
+      },
+    },
+    "/api/teams/{teamId}/location": {
+      patch: {
+        tags: ["Equipes"],
+        summary: "Mise à jour du lieu d'une équipe",
+        description: "Met à jour le lieu associé à une équipe. Peut être null pour supprimer le lieu.",
+        security: [{ SessionCookie: [] }],
+        parameters: [
+          {
+            name: "teamId",
+            in: "path",
+            required: true,
+            description: "Identifiant de l'équipe (clé Firestore).",
+            schema: { type: "string" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  location: {
+                    type: ["string", "null"],
+                    description: "ID du lieu (dans la collection locations) ou null pour supprimer.",
+                  },
+                },
+                required: ["location"],
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Lieu mis à jour avec succès.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                    data: {
+                      type: "object",
+                      properties: {
+                        teamId: { type: "string" },
+                        location: { type: ["string", "null"] },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "400": { description: "Paramètres invalides ou lieu introuvable." },
+          "403": { description: "Accès refusé (non ADMIN ou COACH)." },
+          "404": { description: "Équipe introuvable." },
+        },
+      },
+    },
+    "/api/teams/{teamId}/discord-channel": {
+      patch: {
+        tags: ["Equipes"],
+        summary: "Mise à jour du canal Discord d'une équipe",
+        description: "Met à jour le canal Discord associé à une équipe. Peut être null pour supprimer le canal.",
+        security: [{ SessionCookie: [] }],
+        parameters: [
+          {
+            name: "teamId",
+            in: "path",
+            required: true,
+            description: "Identifiant de l'équipe (clé Firestore).",
+            schema: { type: "string" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  discordChannelId: {
+                    type: ["string", "null"],
+                    description: "ID du canal Discord ou null pour supprimer.",
+                  },
+                },
+                required: ["discordChannelId"],
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Canal Discord mis à jour avec succès.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                    data: {
+                      type: "object",
+                      properties: {
+                        teamId: { type: "string" },
+                        discordChannelId: { type: ["string", "null"] },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "400": { description: "Paramètres invalides." },
+          "403": { description: "Accès refusé (non ADMIN ou COACH avec email vérifié)." },
+          "404": { description: "Équipe introuvable." },
+        },
+      },
+    },
+    "/api/discord/channels": {
+      get: {
+        tags: ["Discord"],
+        summary: "Liste des canaux Discord",
+        description:
+          "Retourne la liste de tous les canaux textuels du serveur Discord, organisés par catégorie.",
+        security: [{ SessionCookie: [] }],
+        responses: {
+          "200": {
+            description: "Liste des canaux Discord.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                    channels: {
+                      type: "array",
+                      items: { $ref: "#/components/schemas/DiscordChannel" },
+                      description: "Format plat (tous les canaux textuels).",
+                    },
+                    hierarchy: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          category: {
+                            type: ["object", "null"],
+                            properties: {
+                              id: { type: "string" },
+                              name: { type: "string" },
+                              position: { type: "integer" },
+                            },
+                          },
+                          channels: {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              properties: {
+                                id: { type: "string" },
+                                name: { type: "string" },
+                                position: { type: "integer" },
+                              },
+                            },
+                          },
+                        },
+                      },
+                      description: "Structure hiérarchique (canaux organisés par catégorie).",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "403": { description: "Accès refusé (non ADMIN ou COACH avec email vérifié)." },
+          "500": { description: "Erreur lors de la récupération des canaux Discord." },
+        },
+      },
+    },
+    "/api/discord/members": {
+      get: {
+        tags: ["Discord"],
+        summary: "Liste des membres Discord",
+        description:
+          "Retourne la liste de tous les membres non-bots du serveur Discord, triés par nom d'affichage.",
+        security: [{ SessionCookie: [] }],
+        responses: {
+          "200": {
+            description: "Liste des membres Discord.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                    members: {
+                      type: "array",
+                      items: { $ref: "#/components/schemas/DiscordMember" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "401": { description: "Authentification requise." },
+          "403": { description: "Accès refusé." },
+          "500": { description: "Erreur lors de la récupération des membres Discord." },
+        },
+      },
+    },
+    "/api/discord/send-message": {
+      post: {
+        tags: ["Discord"],
+        summary: "Envoi d'un message Discord",
+        description:
+          "Envoie un message dans un canal Discord pour une équipe et une journée/phase donnée. Le message est enregistré dans Firestore.",
+        security: [{ SessionCookie: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  content: {
+                    type: "string",
+                    description: "Contenu principal du message (composition d'équipe).",
+                  },
+                  teamId: { type: "string", description: "Identifiant de l'équipe." },
+                  journee: {
+                    type: "integer",
+                    description: "Numéro de la journée.",
+                  },
+                  phase: {
+                    type: "string",
+                    enum: ["aller", "retour"],
+                    description: "Phase du championnat.",
+                  },
+                  customMessage: {
+                    type: "string",
+                    description: "Message personnalisé optionnel à ajouter après le contenu principal.",
+                  },
+                  channelId: {
+                    type: "string",
+                    description: "ID du canal Discord où envoyer le message.",
+                  },
+                },
+                required: ["content", "teamId", "journee", "phase", "channelId"],
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Message envoyé avec succès.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                  },
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Paramètres manquants ou invalides (content, teamId, journee, phase, channelId requis).",
+          },
+          "403": { description: "Accès refusé (non ADMIN ou COACH)." },
+          "500": { description: "Erreur lors de l'envoi du message Discord." },
+        },
+      },
+    },
+    "/api/discord/check-message-sent": {
+      get: {
+        tags: ["Discord"],
+        summary: "Vérification de l'envoi d'un message Discord",
+        description:
+          "Vérifie si un message Discord a déjà été envoyé pour une ou plusieurs équipes, journée et phase données.",
+        security: [{ SessionCookie: [] }],
+        parameters: [
+          {
+            name: "teamIds",
+            in: "query",
+            required: false,
+            description:
+              "Liste d'identifiants d'équipe séparés par des virgules (nouveau format). Maximum 50 équipes.",
+            schema: { type: "string" },
+          },
+          {
+            name: "teamId",
+            in: "query",
+            required: false,
+            description: "Identifiant d'une équipe (ancien format, pour compatibilité).",
+            schema: { type: "string" },
+          },
+          {
+            name: "journee",
+            in: "query",
+            required: true,
+            description: "Numéro de la journée.",
+            schema: { type: "integer" },
+          },
+          {
+            name: "phase",
+            in: "query",
+            required: true,
+            description: "Phase du championnat.",
+            schema: { type: "string", enum: ["aller", "retour"] },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Statut d'envoi des messages.",
+            content: {
+              "application/json": {
+                schema: {
+                  oneOf: [
+                    {
+                      type: "object",
+                      properties: {
+                        success: { type: "boolean" },
+                        sent: { type: "boolean" },
+                        sentAt: { type: ["string", "null"], format: "date-time" },
+                        customMessage: { type: "string" },
+                      },
+                      description: "Format simple (un seul teamId).",
+                    },
+                    {
+                      type: "object",
+                      properties: {
+                        success: { type: "boolean" },
+                        results: {
+                          type: "object",
+                          additionalProperties: {
+                            type: "object",
+                            properties: {
+                              sent: { type: "boolean" },
+                              sentAt: { type: ["string", "null"], format: "date-time" },
+                              customMessage: { type: "string" },
+                            },
+                          },
+                        },
+                      },
+                      description: "Format multiple (plusieurs teamIds).",
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Paramètres manquants ou invalides (journee, phase, teamIds/teamId requis).",
+          },
+          "403": { description: "Accès refusé (non ADMIN ou COACH avec email vérifié)." },
+        },
+      },
+    },
+    "/api/discord/update-custom-message": {
+      post: {
+        tags: ["Discord"],
+        summary: "Mise à jour du message personnalisé",
+        description:
+          "Sauvegarde un message personnalisé pour une équipe, journée et phase données. Ce message sera ajouté au message principal lors de l'envoi.",
+        security: [{ SessionCookie: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  teamId: { type: "string", description: "Identifiant de l'équipe." },
+                  journee: {
+                    type: "integer",
+                    description: "Numéro de la journée.",
+                  },
+                  phase: {
+                    type: "string",
+                    enum: ["aller", "retour"],
+                    description: "Phase du championnat.",
+                  },
+                  customMessage: {
+                    type: "string",
+                    description: "Message personnalisé à sauvegarder.",
+                  },
+                },
+                required: ["teamId", "journee", "phase"],
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Message personnalisé sauvegardé avec succès.",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean" },
+                  },
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Paramètres manquants ou invalides (teamId, journee, phase requis).",
+          },
+          "403": { description: "Accès refusé (non ADMIN ou COACH)." },
         },
       },
     },

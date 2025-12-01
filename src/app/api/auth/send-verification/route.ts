@@ -1,40 +1,32 @@
-import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
 import { sendMail } from "@/lib/mailer";
 import { readFile } from "fs/promises";
 import path from "path";
 import { getFirebaseErrorMessage } from "@/lib/firebase-error-utils";
-import { checkRateLimit } from "@/lib/auth/rate-limit";
+import { createSecureResponse } from "@/lib/api/response-utils";
+import { handleApiError, createErrorResponse } from "@/lib/api/error-handler";
+import { validateEmail } from "@/lib/api/validation-helpers";
+import { withRateLimit } from "@/lib/api/rate-limit-middleware";
 
 export const runtime = "nodejs";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const { email } = await req.json();
-    if (!email || typeof email !== "string") {
-      return NextResponse.json({ error: "Email requis" }, { status: 400 });
-    }
 
-    // Validation du format email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { error: "Format d'email invalide" },
-        { status: 400 }
-      );
-    }
+    // Validation de l'email
+    const emailError = validateEmail(email);
+    if (emailError) return emailError;
 
     // Rate limiting par email (3 requêtes par 15 minutes)
-    const rateLimitResult = checkRateLimit(`email:${email}`, 3, 15 * 60 * 1000);
-    if (!rateLimitResult.allowed) {
-      return NextResponse.json(
-        {
-          error: "Trop de requêtes",
-          message: `Veuillez patienter avant de renvoyer un email. Prochaine tentative possible dans ${Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000 / 60)} minutes.`,
-        },
-        { status: 429 }
-      );
-    }
+    const rateLimitError = withRateLimit({
+      key: `email:${email}`,
+      maxRequests: 3,
+      windowMs: 15 * 60 * 1000,
+      errorMessage: "Veuillez patienter avant de renvoyer un email. Prochaine tentative possible dans quelques minutes.",
+    });
+    if (rateLimitError) return rateLimitError;
 
     // Déterminer l'URL de base
     // Priorité: APP_URL (serveur) > NEXT_PUBLIC_APP_URL > headers > localhost
@@ -94,24 +86,27 @@ export async function POST(req: Request) {
       
       // Erreurs Firebase spécifiques
       if (errorMessage.includes("user-not-found") || errorMessage.includes("USER_NOT_FOUND")) {
-        return NextResponse.json(
-          { error: "Utilisateur non trouvé", message: "Aucun compte n'est associé à cet email" },
-          { status: 404 }
+        return createErrorResponse(
+          "Utilisateur non trouvé",
+          404,
+          "Aucun compte n'est associé à cet email"
         );
       }
       
       if (errorMessage.includes("invalid-email") || errorMessage.includes("INVALID_EMAIL")) {
-        return NextResponse.json(
-          { error: "Email invalide", message: "L'adresse email n'est pas valide" },
-          { status: 400 }
+        return createErrorResponse(
+          "Email invalide",
+          400,
+          "L'adresse email n'est pas valide"
         );
       }
 
       // Autres erreurs Firebase
       console.error("[send-verification] Erreur Firebase:", error);
-      return NextResponse.json(
-        { error: "Erreur lors de la génération du lien", message: getFirebaseErrorMessage(error) },
-        { status: 500 }
+      return createErrorResponse(
+        "Erreur lors de la génération du lien",
+        500,
+        getFirebaseErrorMessage(error)
       );
     }
 
@@ -155,41 +150,18 @@ export async function POST(req: Request) {
       });
     } catch (error) {
       console.error("[send-verification] Erreur lors de l'envoi de l'email:", error);
-      return NextResponse.json(
-        { error: "Erreur lors de l'envoi de l'email", message: "Impossible d'envoyer l'email de vérification" },
-        { status: 500 }
+      return createErrorResponse(
+        "Erreur lors de l'envoi de l'email",
+        500,
+        "Impossible d'envoyer l'email de vérification"
       );
     }
 
-    const res = NextResponse.json({ ok: true });
-    // Ajouter Cache-Control pour éviter la mise en cache
-    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    res.headers.set("Pragma", "no-cache");
-    res.headers.set("Expires", "0");
-    return res;
+    return createSecureResponse({ ok: true });
   } catch (error) {
-    // Logger l'erreur complète côté serveur pour le débogage
-    console.error("[send-verification] error", error);
-    
-    // Retourner un message filtré au client avec le bon code HTTP
-    const errorMessage = getFirebaseErrorMessage(error);
-    const errorString = error instanceof Error ? error.message : String(error);
-    
-    // Déterminer le code HTTP approprié
-    let statusCode = 500;
-    if (errorString.includes("user-not-found") || errorString.includes("USER_NOT_FOUND")) {
-      statusCode = 404;
-    } else if (errorString.includes("invalid-email") || errorString.includes("INVALID_EMAIL")) {
-      statusCode = 400;
-    } else if (errorString.includes("too-many-requests") || errorString.includes("TOO_MANY_REQUESTS")) {
-      statusCode = 429;
-    }
-
-    const res = NextResponse.json(
-      { error: errorMessage },
-      { status: statusCode }
-    );
-    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    return res;
+    return handleApiError(error, {
+      context: "app/api/auth/send-verification",
+      defaultMessage: getFirebaseErrorMessage(error),
+    });
   }
 }

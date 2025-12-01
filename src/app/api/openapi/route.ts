@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
+import { createSecureResponse } from "@/lib/api/response-utils";
 import { openApiSpec } from "@/lib/openapi";
 
 export async function GET() {
-  return NextResponse.json(openApiSpec, { status: 200 });
+  return createSecureResponse(openApiSpec, 200);
 }
 
 

@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { adminAuth, getFirestoreAdmin } from "@/lib/firebase-admin";
+import { createSecureResponse } from "@/lib/api/response-utils";
 
 export const runtime = "nodejs";
 
@@ -32,23 +32,19 @@ export async function GET() {
   const cookie = cookieStore.get("__session")?.value;
 
   if (!cookie) {
-    return NextResponse.json({ user: null }, { status: 200 });
+    return createSecureResponse({ user: null });
   }
 
   try {
     const decoded = await adminAuth.verifySessionCookie(cookie, true);
     if (!decoded.email_verified) {
-      return NextResponse.json({ user: null }, { status: 200 });
+      return createSecureResponse({ user: null });
     }
 
     // Vérifier le cache d'abord
     const cachedUser = getCachedUser(decoded.uid);
     if (cachedUser) {
-      const res = NextResponse.json({ user: cachedUser });
-      res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-      res.headers.set("Pragma", "no-cache");
-      res.headers.set("Expires", "0");
-      return res;
+      return createSecureResponse({ user: cachedUser });
     }
 
     // Essayer de récupérer les informations utilisateur depuis Firestore
@@ -107,17 +103,9 @@ export async function GET() {
       setCachedUser(decoded.uid, user);
     }
 
-    const res = NextResponse.json({ user });
-    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    res.headers.set("Pragma", "no-cache");
-    res.headers.set("Expires", "0");
-    return res;
+    return createSecureResponse({ user });
   } catch (error) {
     console.error("[session/verify] Error:", error);
-    const res = NextResponse.json({ user: null }, { status: 200 });
-    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    res.headers.set("Pragma", "no-cache");
-    res.headers.set("Expires", "0");
-    return res;
+    return createSecureResponse({ user: null });
   }
 }

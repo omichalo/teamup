@@ -1,42 +1,17 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { adminAuth } from "@/lib/firebase-admin";
+import type { NextRequest } from "next/server";
 import { getFirestore } from "firebase-admin/firestore";
-import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
+import { requireAdminOrCoach } from "@/lib/api/auth-middleware";
+import { createSecureResponse } from "@/lib/api/response-utils";
+import { handleApiError, createErrorResponse } from "@/lib/api/error-handler";
 
 export const runtime = "nodejs";
 
 const db = getFirestore();
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
-    // Vérifier l'authentification
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-    
-    if (!sessionCookie) {
-      return NextResponse.json(
-        { success: false, error: "Non authentifié" },
-        { status: 401 }
-      );
-    }
-
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    if (!decoded.email_verified) {
-      return NextResponse.json(
-        { success: false, error: "Email non vérifié" },
-        { status: 403 }
-      );
-    }
-
-    // Vérifier que l'utilisateur est admin ou coach
-    const role = resolveRole(decoded.role as string | undefined);
-    if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
-      return NextResponse.json(
-        { success: false, error: "Accès refusé" },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAdminOrCoach(req, true); // requireEmailVerified = true
+    if (auth instanceof Response) return auth;
 
     const { searchParams } = new URL(req.url);
     const teamIdsParam = searchParams.get("teamIds");
@@ -45,10 +20,7 @@ export async function GET(req: Request) {
     const phase = searchParams.get("phase");
 
     if (!journee || !phase) {
-      return NextResponse.json(
-        { success: false, error: "journee et phase sont requis" },
-        { status: 400 }
-      );
+      return createErrorResponse("journee et phase sont requis", 400);
     }
 
     // Déterminer la liste des teamIds à vérifier
@@ -60,26 +32,17 @@ export async function GET(req: Request) {
       // Ancien format : un seul teamId (rétrocompatibilité)
       teamIds = [teamId];
     } else {
-      return NextResponse.json(
-        { success: false, error: "teamIds ou teamId est requis" },
-        { status: 400 }
-      );
+      return createErrorResponse("teamIds ou teamId est requis", 400);
     }
 
     if (teamIds.length === 0) {
-      return NextResponse.json(
-        { success: false, error: "Au moins un teamId est requis" },
-        { status: 400 }
-      );
+      return createErrorResponse("Au moins un teamId est requis", 400);
     }
 
     // Limiter le nombre de teamIds pour éviter l'énumération et les abus
     const MAX_TEAM_IDS = 50;
     if (teamIds.length > MAX_TEAM_IDS) {
-      return NextResponse.json(
-        { success: false, error: `Maximum ${MAX_TEAM_IDS} teamIds autorisés` },
-        { status: 400 }
-      );
+      return createErrorResponse(`Maximum ${MAX_TEAM_IDS} teamIds autorisés`, 400);
     }
 
     // Valider que les teamIds sont des IDs valides (format attendu)
@@ -87,10 +50,7 @@ export async function GET(req: Request) {
     const validTeamIdPattern = /^[a-zA-Z0-9_-]+$/;
     const invalidTeamIds = teamIds.filter(id => !validTeamIdPattern.test(id));
     if (invalidTeamIds.length > 0) {
-      return NextResponse.json(
-        { success: false, error: "Format de teamId invalide" },
-        { status: 400 }
-      );
+      return createErrorResponse("Format de teamId invalide", 400);
     }
 
     const journeeNum = parseInt(journee, 10);
@@ -141,7 +101,7 @@ export async function GET(req: Request) {
     // Si un seul teamId était demandé (ancien format), retourner le format simple pour compatibilité
     if (teamIds.length === 1 && teamId) {
       const result = results[teamIds[0]];
-      return NextResponse.json({
+      return createSecureResponse({
         success: true,
         sent: result.sent,
         sentAt: result.sentAt,
@@ -150,13 +110,12 @@ export async function GET(req: Request) {
     }
 
     // Nouveau format : retourner tous les résultats
-    return NextResponse.json({ success: true, results });
+    return createSecureResponse({ success: true, results });
   } catch (error) {
-    console.error("[Discord] Erreur lors de la vérification:", error);
-    return NextResponse.json(
-      { success: false, error: "Erreur lors de la vérification" },
-      { status: 500 }
-    );
+    return handleApiError(error, {
+      context: "app/api/discord/check-message-sent",
+      defaultMessage: "Erreur lors de la vérification",
+    });
   }
 }
 

@@ -1,29 +1,16 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import type { NextRequest } from "next/server";
 import type { DocumentData, QueryDocumentSnapshot, Query } from "firebase-admin/firestore";
 import { adminAuth, getFirestoreAdmin } from "@/lib/firebase-admin";
-import { hasAnyRole, USER_ROLES, resolveRole, resolveCoachRequestStatus } from "@/lib/auth/roles";
+import { resolveRole, resolveCoachRequestStatus } from "@/lib/auth/roles";
+import { requireAdmin } from "@/lib/api/auth-middleware";
+import { createSecureResponse } from "@/lib/api/response-utils";
+import { handleApiError } from "@/lib/api/error-handler";
 import type { User } from "@/types";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-    if (!sessionCookie) {
-      return NextResponse.json(
-        { success: false, error: "Session cookie requis" },
-        { status: 401 }
-      );
-    }
-
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    const role = resolveRole(decoded.role as string | undefined);
-    if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
-      return NextResponse.json(
-        { success: false, error: "Accès refusé" },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAdmin(req);
+    if (auth instanceof Response) return auth;
 
     const firestore = getFirestoreAdmin();
 
@@ -160,20 +147,12 @@ export async function GET() {
       };
     });
 
-    const res = NextResponse.json({ success: true, users }, { status: 200 });
-    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    res.headers.set("Pragma", "no-cache");
-    res.headers.set("Expires", "0");
-    return res;
+    return createSecureResponse({ success: true, users }, 200);
   } catch (error) {
-    console.error("[app/api/admin/users] error", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Impossible de récupérer la liste des utilisateurs",
-      },
-      { status: 500 }
-    );
+    return handleApiError(error, {
+      context: "app/api/admin/users",
+      defaultMessage: "Impossible de récupérer la liste des utilisateurs",
+    });
   }
 }
 

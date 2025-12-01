@@ -1,48 +1,20 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { adminAuth } from "@/lib/firebase-admin";
-import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
+import type { NextRequest } from "next/server";
+import { requireAdminOrCoach } from "@/lib/api/auth-middleware";
+import { createSecureResponse } from "@/lib/api/response-utils";
+import { handleApiError, createErrorResponse } from "@/lib/api/error-handler";
 
 export const runtime = "nodejs";
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const DISCORD_SERVER_ID = process.env.DISCORD_SERVER_ID;
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    // Vérifier l'authentification
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-    
-    if (!sessionCookie) {
-      return NextResponse.json(
-        { success: false, error: "Non authentifié" },
-        { status: 401 }
-      );
-    }
-
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    if (!decoded.email_verified) {
-      return NextResponse.json(
-        { success: false, error: "Email non vérifié" },
-        { status: 403 }
-      );
-    }
-
-    // Vérifier que l'utilisateur est admin ou coach
-    const role = resolveRole(decoded.role as string | undefined);
-    if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
-      return NextResponse.json(
-        { success: false, error: "Accès refusé" },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAdminOrCoach(req, true); // requireEmailVerified = true
+    if (auth instanceof Response) return auth;
 
     if (!DISCORD_TOKEN || !DISCORD_SERVER_ID) {
-      return NextResponse.json(
-        { success: false, error: "Configuration Discord manquante" },
-        { status: 500 }
-      );
+      return createErrorResponse("Configuration Discord manquante", 500);
     }
 
     // Récupérer la liste des canaux du serveur Discord
@@ -59,9 +31,10 @@ export async function GET() {
     if (!response.ok) {
       const errorText = await response.text();
       console.error("[Discord Channels] Erreur lors de la récupération des canaux:", errorText);
-      return NextResponse.json(
-        { success: false, error: `Erreur lors de la récupération des canaux Discord: ${errorText}` },
-        { status: response.status }
+      return createErrorResponse(
+        "Erreur lors de la récupération des canaux Discord",
+        response.status,
+        errorText
       );
     }
 
@@ -152,17 +125,16 @@ export async function GET() {
       .map(({ id, name }) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    return NextResponse.json({ 
+    return createSecureResponse({ 
       success: true, 
       channels: flatChannels, // Format plat pour compatibilité
       hierarchy: channelsByCategory, // Structure hiérarchique
     });
   } catch (error) {
-    console.error("[Discord] Erreur:", error);
-    return NextResponse.json(
-      { success: false, error: "Erreur lors de la récupération des canaux" },
-      { status: 500 }
-    );
+    return handleApiError(error, {
+      context: "app/api/discord/channels",
+      defaultMessage: "Erreur lors de la récupération des canaux",
+    });
   }
 }
 

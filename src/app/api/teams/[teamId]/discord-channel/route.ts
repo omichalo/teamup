@@ -1,54 +1,29 @@
-import { NextResponse } from "next/server";
-import { NextRequest } from "next/server";
-import { cookies } from "next/headers";
+import type { NextRequest } from "next/server";
 import {
   initializeFirebaseAdmin,
   getFirestoreAdmin,
-  adminAuth,
 } from "@/lib/firebase-admin";
-import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
+import { requireAdminOrCoach } from "@/lib/api/auth-middleware";
+import { createSecureResponse } from "@/lib/api/response-utils";
+import { handleApiError, createErrorResponse } from "@/lib/api/error-handler";
+import { validateId } from "@/lib/api/validation-helpers";
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ teamId: string }> }
 ) {
   try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-    if (!sessionCookie) {
-      return NextResponse.json(
-        {
-          error: "Token d'authentification requis",
-          message: "Cette API nécessite une authentification valide",
-        },
-        { status: 401 }
-      );
-    }
-
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    const role = resolveRole(decoded.role as string | undefined);
-
-    if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
-      return NextResponse.json(
-        {
-          error: "Accès refusé",
-          message:
-            "Cette opération est réservée aux administrateurs et coachs",
-        },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAdminOrCoach(request);
+    if (auth instanceof Response) return auth;
 
     const { teamId } = await params;
+    
+    const idError = validateId(teamId, "teamId");
+    if (idError) return idError;
     const { discordChannelId } = await request.json();
 
     if (discordChannelId !== null && discordChannelId !== undefined && typeof discordChannelId !== "string") {
-      return NextResponse.json(
-        {
-          error: "Le canal Discord doit être une chaîne de caractères ou null",
-        },
-        { status: 400 }
-      );
+      return createErrorResponse("Le canal Discord doit être une chaîne de caractères ou null", 400);
     }
 
     await initializeFirebaseAdmin();
@@ -58,12 +33,7 @@ export async function PATCH(
     const teamDoc = await teamRef.get();
 
     if (!teamDoc.exists) {
-      return NextResponse.json(
-        {
-          error: "Équipe introuvable",
-        },
-        { status: 404 }
-      );
+      return createErrorResponse("Équipe introuvable", 404);
     }
 
     // Mettre à jour le canal Discord de l'équipe
@@ -79,7 +49,7 @@ export async function PATCH(
 
     await teamRef.update(updateData);
 
-    return NextResponse.json({
+    return createSecureResponse({
       success: true,
       data: {
         teamId,
@@ -87,15 +57,10 @@ export async function PATCH(
       },
     });
   } catch (error) {
-    console.error("[app/api/teams/[teamId]/discord-channel] PATCH error", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Erreur lors de la mise à jour du canal Discord",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
-    );
+    return handleApiError(error, {
+      context: "app/api/teams/[teamId]/discord-channel",
+      defaultMessage: "Erreur lors de la mise à jour du canal Discord",
+    });
   }
 }
 

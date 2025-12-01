@@ -1,33 +1,33 @@
-import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase-admin";
+import { createSecureResponse } from "@/lib/api/response-utils";
+import { handleApiError, createErrorResponse } from "@/lib/api/error-handler";
+import { validateString } from "@/lib/api/validation-helpers";
+import type { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
     const { idToken } = body;
 
-    if (!idToken || typeof idToken !== "string") {
-      return NextResponse.json(
-        { error: "Missing token", message: "Le token d'authentification est requis" },
-        { status: 400 }
-      );
-    }
+    const validatedToken = validateString(idToken, "idToken");
+    if (validatedToken instanceof Response) return validatedToken;
 
     // Vérification du token avec gestion d'erreurs explicite
     let decoded;
     try {
-      decoded = await adminAuth.verifyIdToken(idToken, true);
+      decoded = await adminAuth.verifyIdToken(validatedToken, true);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       
       // Token expiré
       if (errorMessage.includes("expired") || errorMessage.includes("Expired")) {
-        return NextResponse.json(
-          { error: "Token expired", message: "Le token d'authentification a expiré" },
-          { status: 401 }
+        return createErrorResponse(
+          "Token expired",
+          401,
+          "Le token d'authentification a expiré"
         );
       }
       
@@ -37,24 +37,27 @@ export async function POST(req: Request) {
         errorMessage.includes("Invalid") ||
         errorMessage.includes("malformed")
       ) {
-        return NextResponse.json(
-          { error: "Invalid token", message: "Le token d'authentification est invalide" },
-          { status: 401 }
+        return createErrorResponse(
+          "Invalid token",
+          401,
+          "Le token d'authentification est invalide"
         );
       }
 
       // Autres erreurs de vérification
       console.error("[session] Erreur lors de la vérification du token:", error);
-      return NextResponse.json(
-        { error: "Token verification failed", message: "Échec de la vérification du token" },
-        { status: 401 }
+      return createErrorResponse(
+        "Token verification failed",
+        401,
+        "Échec de la vérification du token"
       );
     }
 
     if (!decoded.email_verified) {
-      return NextResponse.json(
-        { error: "Email non vérifié", message: "L'email associé au compte n'est pas vérifié" },
-        { status: 403 }
+      return createErrorResponse(
+        "Email non vérifié",
+        403,
+        "L'email associé au compte n'est pas vérifié"
       );
     }
 
@@ -67,13 +70,14 @@ export async function POST(req: Request) {
       });
     } catch (error) {
       console.error("[session] Erreur lors de la création du cookie de session:", error);
-      return NextResponse.json(
-        { error: "Session creation failed", message: "Impossible de créer la session" },
-        { status: 500 }
+      return createErrorResponse(
+        "Session creation failed",
+        500,
+        "Impossible de créer la session"
       );
     }
 
-    const res = NextResponse.json({ ok: true });
+    const res = createSecureResponse({ ok: true });
     // Normaliser les paramètres du cookie : Secure et SameSite=Strict en production
     const isProduction = process.env.NODE_ENV === "production";
     res.cookies.set({
@@ -85,20 +89,12 @@ export async function POST(req: Request) {
       path: "/",
       maxAge: Math.floor((14 * 24 * 60 * 60 * 1000) / 1000),
     });
-    // Ajouter Cache-Control pour éviter la mise en cache
-    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    res.headers.set("Pragma", "no-cache");
-    res.headers.set("Expires", "0");
     return res;
   } catch (error) {
-    console.error("[session] Erreur inattendue lors de la création de session:", error);
-    return NextResponse.json(
-      {
-        error: "Internal server error",
-        message: "Une erreur inattendue s'est produite lors de la création de la session",
-      },
-      { status: 500 }
-    );
+    return handleApiError(error, {
+      context: "app/api/session",
+      defaultMessage: "Une erreur inattendue s'est produite lors de la création de la session",
+    });
   }
 }
 
@@ -133,7 +129,7 @@ export async function DELETE() {
 
     // Supprimer le cookie côté client avec les mêmes paramètres que la création
     const isProduction = process.env.NODE_ENV === "production";
-    const res = NextResponse.json({ ok: true });
+    const res = createSecureResponse({ ok: true });
     res.cookies.set({
       name: "__session",
       value: "",
@@ -143,15 +139,12 @@ export async function DELETE() {
       path: "/",
       maxAge: 0,
     });
-    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    res.headers.set("Pragma", "no-cache");
-    res.headers.set("Expires", "0");
     return res;
   } catch (error) {
     console.error("[session] Erreur lors de la déconnexion:", error);
     // Même en cas d'erreur, on supprime le cookie côté client avec les mêmes paramètres
     const isProduction = process.env.NODE_ENV === "production";
-    const res = NextResponse.json({ ok: true });
+    const res = createSecureResponse({ ok: true });
     res.cookies.set({
       name: "__session",
       value: "",
@@ -161,9 +154,6 @@ export async function DELETE() {
       path: "/",
       maxAge: 0,
     });
-    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    res.headers.set("Pragma", "no-cache");
-    res.headers.set("Expires", "0");
     return res;
   }
 }
