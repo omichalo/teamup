@@ -14,7 +14,9 @@ const toDate = (value: unknown): Date => {
   if (typeof value === "string") {
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) {
-      console.warn(`⚠️ [toDate] Chaîne invalide: "${value}", utilisation de la date du jour`);
+      console.warn(
+        `⚠️ [toDate] Chaîne invalide: "${value}", utilisation de la date du jour`
+      );
       return new Date();
     }
     return parsed;
@@ -24,14 +26,20 @@ const toDate = (value: unknown): Date => {
   if (typeof value === "number") {
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) {
-      console.warn(`⚠️ [toDate] Timestamp invalide: ${value}, utilisation de la date du jour`);
+      console.warn(
+        `⚠️ [toDate] Timestamp invalide: ${value}, utilisation de la date du jour`
+      );
       return new Date();
     }
     return parsed;
   }
 
   // Fallback
-  console.warn(`⚠️ [toDate] Type inattendu: ${typeof value}, valeur:`, value, "utilisation de la date du jour");
+  console.warn(
+    `⚠️ [toDate] Type inattendu: ${typeof value}, valeur:`,
+    value,
+    "utilisation de la date du jour"
+  );
   return new Date();
 };
 
@@ -44,6 +52,8 @@ export interface AggregatedTeamEntry {
     teamNumber?: number;
     location?: string;
     discordChannelId?: string;
+    epreuve?: string;
+    idEpreuve?: number;
     createdAt?: string | Date;
     updatedAt?: string | Date;
   };
@@ -60,8 +70,20 @@ export const transformAggregatedTeamEntry = (
 ): TransformedTeamWithMatches => {
   const { team, matches } = entry;
 
-  const teamNumberFromName = team.name.match(/\b(\d+)\b/);
-  const teamNumber = team.teamNumber ||
+  // Extraire le numéro d'équipe depuis le nom
+  // Supporte les formats : "SQY PING 3", "SQY PING (3)", "SQY PING (3) - Phase 1", etc.
+  let teamNumberFromName: RegExpMatchArray | null = null;
+  if (team.name.includes("SQY PING")) {
+    teamNumberFromName = team.name.match(/SQY PING\s*\((\d+)\)/i);
+    if (!teamNumberFromName) {
+      teamNumberFromName = team.name.match(/SQY PING\s*(\d+)/i);
+    }
+  }
+  if (!teamNumberFromName) {
+    teamNumberFromName = team.name.match(/\b(\d+)\b/);
+  }
+  const teamNumber =
+    team.teamNumber ||
     (teamNumberFromName ? parseInt(teamNumberFromName[1], 10) : 0);
 
   const transformedTeam: Team = {
@@ -71,6 +93,8 @@ export const transformAggregatedTeamEntry = (
     division: team.division || "Division inconnue",
     ...(team.location && { location: team.location }),
     ...(team.discordChannelId && { discordChannelId: team.discordChannelId }),
+    ...(team.epreuve && { epreuve: team.epreuve }),
+    ...(team.idEpreuve && { idEpreuve: team.idEpreuve }),
     players: [],
     createdAt: toDate(team.createdAt),
     updatedAt: toDate(team.updatedAt),
@@ -116,6 +140,11 @@ export const transformAggregatedTeamEntry = (
       result.epreuve = epreuveValue;
     }
 
+    const idEpreuveValue = match.idEpreuve as number | undefined;
+    if (idEpreuveValue !== undefined) {
+      result.idEpreuve = idEpreuveValue;
+    }
+
     const scoreValue = match.score as string | undefined;
     if (scoreValue) {
       result.score = scoreValue;
@@ -126,7 +155,9 @@ export const transformAggregatedTeamEntry = (
       result.result = resultValue;
     }
 
-    const compositionStringValue = match.compositionString as string | undefined;
+    const compositionStringValue = match.compositionString as
+      | string
+      | undefined;
     if (compositionStringValue) {
       result.compositionString = compositionStringValue;
     }
@@ -148,7 +179,10 @@ export const transformAggregatedTeamEntry = (
       result.lienDetails = lienDetailsValue;
     }
 
-    if (match.resultatsIndividuels !== undefined && match.resultatsIndividuels !== null) {
+    if (
+      match.resultatsIndividuels !== undefined &&
+      match.resultatsIndividuels !== null
+    ) {
       result.resultatsIndividuels = match.resultatsIndividuels;
     }
 
@@ -171,13 +205,10 @@ export const transformAggregatedTeamEntry = (
     return result;
   });
 
-  transformedMatches.sort(
-    (a, b) => a.date.getTime() - b.date.getTime()
-  );
+  transformedMatches.sort((a, b) => a.date.getTime() - b.date.getTime());
 
   return {
     team: transformedTeam,
     matches: transformedMatches,
   };
 };
-

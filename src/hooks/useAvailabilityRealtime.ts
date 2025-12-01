@@ -11,7 +11,8 @@ import { AvailabilityService, DayAvailability } from "@/lib/services/availabilit
 export const useAvailabilityRealtime = (
   journee: number | null,
   phase: "aller" | "retour" | null,
-  championshipType: "masculin" | "feminin"
+  championshipType: "masculin" | "feminin",
+  idEpreuve?: number
 ) => {
   const [availability, setAvailability] = useState<DayAvailability | null>(null);
   const [loading, setLoading] = useState(true);
@@ -41,7 +42,8 @@ export const useAvailabilityRealtime = (
           setAvailability(data);
           setLoading(false);
           setError(null);
-        }
+        },
+        idEpreuve
       );
     } catch (err) {
       const errorMessage =
@@ -57,7 +59,7 @@ export const useAvailabilityRealtime = (
         unsubscribe();
       }
     };
-  }, [journee, phase, championshipType]);
+  }, [journee, phase, championshipType, idEpreuve]);
 
   return { availability, loading, error };
 };

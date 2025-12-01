@@ -104,15 +104,36 @@ export default function EquipesPage() {
 
   // Grouper les équipes par épreuve en utilisant le vrai libellé de l&apos;API
   const equipesByEpreuve = filteredEquipes.reduce((acc, equipe) => {
-    if (equipe.matches.length > 0) {
-      // Utiliser le libellé d&apos;épreuve réel de l&apos;API FFTT
-      const epreuve =
+    // Déterminer l'épreuve : d'abord depuis l'équipe elle-même, sinon depuis les matchs
+    let epreuve: string | null = null;
+
+    // Essayer d'abord depuis l'équipe (si l'info est disponible)
+    if (equipe.team.epreuve) {
+      epreuve = equipe.team.epreuve;
+    } else if (equipe.matches.length > 0) {
+      // Fallback : utiliser le libellé d&apos;épreuve depuis les matchs
+      epreuve =
         equipe.matches[0].epreuve ||
         (equipe.matches[0].division?.includes("Féminin") ||
         equipe.matches[0].division?.includes("Dames")
           ? "Championnat de France par Équipes Féminin"
           : "Championnat de France par Équipes Masculin");
+    } else {
+      // Si pas de matchs et pas d'info d'épreuve, utiliser la division pour déterminer
+      const division = equipe.team.division || "";
+      if (division.includes("Féminin") || division.includes("Dames")) {
+        epreuve = "Championnat de France par Équipes Féminin";
+      } else if (
+        division.toLowerCase().includes("excellence") ||
+        division.toLowerCase().includes("paris idf")
+      ) {
+        epreuve = "L08_Championnat de Paris IDF";
+      } else {
+        epreuve = "Championnat de France par Équipes Masculin";
+      }
+    }
 
+    if (epreuve) {
       if (!acc[epreuve]) {
         acc[epreuve] = [];
       }
@@ -123,6 +144,19 @@ export default function EquipesPage() {
 
   const epreuves = React.useMemo(() => {
     return Object.keys(equipesByEpreuve).sort((a, b) => {
+      // Priorité 1: Excellence en dernier
+      const isExcellenceA =
+        a.toLowerCase().includes("excellence") ||
+        a.toLowerCase().includes("paris idf");
+      const isExcellenceB =
+        b.toLowerCase().includes("excellence") ||
+        b.toLowerCase().includes("paris idf");
+
+      if (isExcellenceA !== isExcellenceB) {
+        return isExcellenceA ? 1 : -1; // Excellence en dernier
+      }
+
+      // Priorité 2: Masculin avant Féminin
       const femA =
         a.toLowerCase().includes("féminin") ||
         a.toLowerCase().includes("dames");
@@ -506,13 +540,21 @@ export default function EquipesPage() {
                   label={`${epreuve} (${equipesByEpreuve[epreuve].length})`}
                   icon={<SportsTennis />}
                   sx={{
-                    color: epreuve.includes("Féminin")
-                      ? "secondary.main"
-                      : "primary.main",
-                    "&.Mui-selected": {
-                      color: epreuve.includes("Féminin")
+                    color:
+                      epreuve.toLowerCase().includes("excellence") ||
+                      epreuve.toLowerCase().includes("paris idf")
+                        ? "secondary.main"
+                        : epreuve.includes("Féminin")
                         ? "secondary.main"
                         : "primary.main",
+                    "&.Mui-selected": {
+                      color:
+                        epreuve.toLowerCase().includes("excellence") ||
+                        epreuve.toLowerCase().includes("paris idf")
+                          ? "secondary.main"
+                          : epreuve.includes("Féminin")
+                          ? "secondary.main"
+                          : "primary.main",
                     },
                   }}
                 />
@@ -531,12 +573,15 @@ export default function EquipesPage() {
                     ) : (
                       equipesByEpreuve[epreuve]
                         .sort((a, b) => {
-                          const numA = parseInt(
-                            a.team.name.match(/SQY PING (\d+)/)?.[1] || "0"
-                          );
-                          const numB = parseInt(
-                            b.team.name.match(/SQY PING (\d+)/)?.[1] || "0"
-                          );
+                          // Supporte les formats : "SQY PING 3", "SQY PING (3)", "SQY PING (3) - Phase 1", etc.
+                          const matchAWithParentheses = a.team.name.match(/SQY PING\s*\((\d+)\)/i);
+                          const matchA = matchAWithParentheses || a.team.name.match(/SQY PING\s*(\d+)/i);
+                          const numA = parseInt(matchA?.[1] || "0");
+                          
+                          const matchBWithParentheses = b.team.name.match(/SQY PING\s*\((\d+)\)/i);
+                          const matchB = matchBWithParentheses || b.team.name.match(/SQY PING\s*(\d+)/i);
+                          const numB = parseInt(matchB?.[1] || "0");
+                          
                           return numA - numB;
                         })
                         .map((equipeWithMatches) => (
@@ -545,7 +590,10 @@ export default function EquipesPage() {
                             sx={{
                               mb: 2,
                               borderLeft: `4px solid ${
-                                epreuve.includes("Féminin")
+                                epreuve.toLowerCase().includes("excellence") ||
+                                epreuve.toLowerCase().includes("paris idf")
+                                  ? "#9c27b0" // Violet pour Excellence
+                                  : epreuve.includes("Féminin")
                                   ? "#f57c00"
                                   : "#1976d2"
                               }`,
@@ -562,9 +610,17 @@ export default function EquipesPage() {
                                 <SportsTennis
                                   sx={{
                                     mr: 2,
-                                    color: epreuve.includes("Féminin")
-                                      ? "secondary.main"
-                                      : "primary.main",
+                                    color:
+                                      epreuve
+                                        .toLowerCase()
+                                        .includes("excellence") ||
+                                      epreuve
+                                        .toLowerCase()
+                                        .includes("paris idf")
+                                        ? "secondary.main"
+                                        : epreuve.includes("Féminin")
+                                        ? "secondary.main"
+                                        : "primary.main",
                                   }}
                                 />
                                 <Box sx={{ flexGrow: 1 }}>
@@ -680,7 +736,14 @@ export default function EquipesPage() {
                                   <Chip
                                     label={`${equipeWithMatches.matches.length} matchs`}
                                     color={
-                                      epreuve.includes("Féminin")
+                                      epreuve
+                                        .toLowerCase()
+                                        .includes("excellence") ||
+                                      epreuve
+                                        .toLowerCase()
+                                        .includes("paris idf")
+                                        ? "secondary"
+                                        : epreuve.includes("Féminin")
                                         ? "secondary"
                                         : "primary"
                                     }

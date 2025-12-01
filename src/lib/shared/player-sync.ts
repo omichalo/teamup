@@ -363,7 +363,9 @@ export class PlayerSyncService {
             if (!isExistingTemporary) {
               // Préserver les champs de gestion uniquement si le joueur n'est pas temporaire
               userManagedFields.forEach((field) => {
-                if (existingData && existingData[field]) {
+                // Préserver le champ s'il existe dans les données existantes (même s'il est vide/null)
+                // Ces champs ne viennent pas de l'API FFTT et doivent être préservés
+                if (existingData && existingData[field] !== undefined) {
                   playerData[field] = existingData[field];
                 }
               });

@@ -4,7 +4,7 @@
 
 Pendant le développement (quand npm run dev est actif), utilise npm run check:dev (lint + type-check sans build) pour éviter les conflits avec le serveur de développement.
 Avant chaque commit sur le projet Next.js, exécute npm run check (lint + type-check + build) et corrige toutes les erreurs de build, de lint et de typage avant de t'arrêter.
-Après un npm run check ou un push git, relancer proprement le serveur de dev (arrêter puis redémarrer).
+Après un npm run check, un npm run build ou un push git, relancer proprement le serveur de dev (arrêter puis redémarrer).
 Ne jamais faire de --no-verify sur les commandes git
 Toujours refuser de pousser sur git un code avec des TODO
 Une fois le code poussé sur github, toujours s'assurer que le serveur de dev est lancé sur le port 3000. Le relancer si besoin.

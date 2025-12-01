@@ -22,7 +22,17 @@ export const createFFTTAPI = () => {
 
 // Utilitaires pour extraire les informations des équipes
 export const extractTeamNumber = (libelle: string): number => {
-  const match = libelle.match(/SQY PING (\d+)/);
+  // Supporte les formats :
+  // - "SQY PING 3"
+  // - "SQY PING (3)"
+  // - "SQY PING 3 - Phase 1"
+  // - "SQY PING (3) - Phase 1"
+  // Cherche d'abord le format avec parenthèses, puis sans
+  const matchWithParentheses = libelle.match(/SQY PING\s*\((\d+)\)/i);
+  if (matchWithParentheses) {
+    return parseInt(matchWithParentheses[1], 10);
+  }
+  const match = libelle.match(/SQY PING\s*(\d+)/i);
   return match ? parseInt(match[1], 10) : 0;
 };
 
@@ -31,7 +41,11 @@ export const isFemaleTeam = (libelle: string): boolean => {
 };
 
 export const extractClubName = (libelle: string): string => {
-  return libelle.replace(/SQY PING \d+ - Phase \d+/, "").trim();
+  // Supprime "SQY PING (1) - Phase 1" ou "SQY PING 1 - Phase 1" du libellé
+  return libelle
+    .replace(/SQY PING\s*\(\d+\)\s*-\s*Phase\s*\d+/i, "")
+    .replace(/SQY PING\s*\d+\s*-\s*Phase\s*\d+/i, "")
+    .trim();
 };
 
 // Utilitaires pour déterminer la phase et le résultat

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -12,6 +12,7 @@ import {
 import { DragIndicator } from "@mui/icons-material";
 import type { Player } from "@/types/team-management";
 import type { EquipeWithMatches } from "@/hooks/useEquipesWithMatches";
+import type { EpreuveType } from "@/lib/shared/epreuve-utils";
 
 export interface TeamCompositionCardProps {
   equipe: EquipeWithMatches;
@@ -34,6 +35,7 @@ export interface TeamCompositionCardProps {
   completionThreshold?: number;
   renderPlayerIndicators?: (player: Player) => React.ReactNode;
   renderPlayerSecondary?: (player: Player) => React.ReactNode;
+  selectedEpreuve?: EpreuveType | null;
 }
 
 const DEFAULT_MAX_PLAYERS = 4;
@@ -59,6 +61,7 @@ export const TeamCompositionCard: React.FC<TeamCompositionCardProps> = ({
   completionThreshold: completionThresholdProp,
   renderPlayerIndicators,
   renderPlayerSecondary,
+  selectedEpreuve,
 }) => {
   const teamPlayersCount = players.length;
   const completionThreshold =
@@ -71,6 +74,31 @@ export const TeamCompositionCard: React.FC<TeamCompositionCardProps> = ({
         ? "droppable--over"
         : "droppable--blocked"
       : undefined;
+
+  // Vérifier si c'est le championnat de Paris via selectedEpreuve
+  const isParisChampionship = selectedEpreuve === "championnat_paris";
+
+  // Trier les joueurs par classement descendant (points décroissants) et les grouper par 3
+  const groupedPlayers = useMemo(() => {
+    // Trier par points décroissants (les meilleurs en premier)
+    const sortedPlayers = [...players].sort((a, b) => {
+      const pointsA = a.points ?? 0;
+      const pointsB = b.points ?? 0;
+      return pointsB - pointsA; // Décroissant
+    });
+
+    // Grouper par 3 si c'est le championnat de Paris
+    if (isParisChampionship) {
+      const groups: Player[][] = [];
+      for (let i = 0; i < sortedPlayers.length; i += 3) {
+        groups.push(sortedPlayers.slice(i, i + 3));
+      }
+      return groups;
+    }
+
+    // Sinon, retourner un seul groupe avec tous les joueurs
+    return [sortedPlayers];
+  }, [players, isParisChampionship]);
 
   return (
     <Card
@@ -214,119 +242,157 @@ export const TeamCompositionCard: React.FC<TeamCompositionCardProps> = ({
         ) : (
           <Box
             sx={{
-              display: "grid",
-              gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" },
-              gap: 1,
+              display: "flex",
+              flexDirection: "column",
+              gap: isParisChampionship ? 2 : 1,
             }}
           >
-            {players.map((player) => (
+            {groupedPlayers.map((group, groupIndex) => (
               <Box
-                key={player.id}
-                draggable={!matchPlayed}
-                onDragStart={
-                  !matchPlayed && onPlayerDragStart
-                    ? (event) => onPlayerDragStart(event, player.id)
-                    : undefined
-                }
-                onDragEnd={
-                  !matchPlayed && onPlayerDragEnd
-                    ? (event) => onPlayerDragEnd(event)
-                    : undefined
-                }
+                key={groupIndex}
                 sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 0.5,
-                  p: 1,
-                  border: "1px solid",
-                  borderColor: "divider",
-                  borderRadius: 1,
-                  position: "relative",
-                  cursor: matchPlayed ? "default" : "grab",
-                  backgroundColor: "background.paper",
-                  "&:hover": {
-                    backgroundColor: matchPlayed
-                      ? "background.paper"
-                      : "action.hover",
-                    borderColor: matchPlayed ? "divider" : "primary.main",
-                    boxShadow: matchPlayed ? "none" : 1,
-                  },
-                  "&:active": {
-                    cursor: matchPlayed ? "default" : "grabbing",
-                    opacity: matchPlayed ? 1 : 0.7,
-                  },
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" },
+                  gap: 1,
+                  ...(isParisChampionship && {
+                    p: 1.5,
+                    border: "2px solid",
+                    borderColor: "primary.light",
+                    borderRadius: 2,
+                    backgroundColor: "action.hover",
+                    boxShadow: 1,
+                  }),
                 }}
               >
-                <Box
-                  sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    flex: 1,
-                    minWidth: 0,
-                  }}
-                >
+                {isParisChampionship && (
                   <Box
+                    sx={{
+                      gridColumn: { xs: "1 / -1", sm: "1 / -1" },
+                      mb: -0.5,
+                    }}
+                  >
+                    <Chip
+                      label={`Groupe ${groupIndex + 1}`}
+                      size="small"
+                      color="primary"
+                      variant="outlined"
+                      sx={{
+                        fontWeight: 600,
+                        fontSize: "0.75rem",
+                      }}
+                    />
+                  </Box>
+                )}
+                {group.map((player) => (
+                  <Box
+                    key={player.id}
+                    draggable={!matchPlayed}
+                    onDragStart={
+                      !matchPlayed && onPlayerDragStart
+                        ? (event) => onPlayerDragStart(event, player.id)
+                        : undefined
+                    }
+                    onDragEnd={
+                      !matchPlayed && onPlayerDragEnd
+                        ? (event) => onPlayerDragEnd(event)
+                        : undefined
+                    }
                     sx={{
                       display: "flex",
                       alignItems: "center",
                       gap: 0.5,
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <DragIndicator
-                      fontSize="small"
-                      color="disabled"
-                      sx={{ cursor: matchPlayed ? "default" : "grab" }}
-                    />
-                    <Typography
-                      variant="body2"
-                      component="span"
-                      sx={{ fontWeight: 600 }}
-                    >
-                      {player.firstName} {player.name}
-                    </Typography>
-                    {renderPlayerIndicators?.(player)}
-                  </Box>
-                  <Typography variant="caption" color="text.secondary">
-                    {renderPlayerSecondary
-                      ? renderPlayerSecondary(player)
-                      : `${
-                          player.points !== undefined && player.points !== null
-                            ? player.points
-                            : "?"
-                        } points`}
-                  </Typography>
-                </Box>
-                {!matchPlayed && (
-                  <Chip
-                    label="×"
-                    size="small"
-                    color="default"
-                    data-chip="remove"
-                    draggable={false}
-                    onDragStart={(event) => {
-                      event.stopPropagation();
-                      event.preventDefault();
-                    }}
-                    onMouseDown={(event) => {
-                      event.stopPropagation();
-                    }}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onRemovePlayer(player.id);
-                    }}
-                    sx={{
-                      cursor: "pointer",
-                      minWidth: 24,
-                      height: 24,
-                      fontWeight: 700,
+                      p: 1,
+                      border: "1px solid",
+                      borderColor: "divider",
+                      borderRadius: 1,
+                      position: "relative",
+                      cursor: matchPlayed ? "default" : "grab",
+                      backgroundColor: "background.paper",
                       "&:hover": {
-                        backgroundColor: "error.main",
-                        color: "error.contrastText",
+                        backgroundColor: matchPlayed
+                          ? "background.paper"
+                          : "action.hover",
+                        borderColor: matchPlayed ? "divider" : "primary.main",
+                        boxShadow: matchPlayed ? "none" : 1,
+                      },
+                      "&:active": {
+                        cursor: matchPlayed ? "default" : "grabbing",
+                        opacity: matchPlayed ? 1 : 0.7,
                       },
                     }}
-                  />
-                )}
+                  >
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        flex: 1,
+                        minWidth: 0,
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 0.5,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <DragIndicator
+                          fontSize="small"
+                          color="disabled"
+                          sx={{ cursor: matchPlayed ? "default" : "grab" }}
+                        />
+                        <Typography
+                          variant="body2"
+                          component="span"
+                          sx={{ fontWeight: 600 }}
+                        >
+                          {player.firstName} {player.name}
+                        </Typography>
+                        {renderPlayerIndicators?.(player)}
+                      </Box>
+                      <Typography variant="caption" color="text.secondary">
+                        {renderPlayerSecondary
+                          ? renderPlayerSecondary(player)
+                          : `${
+                              player.points !== undefined && player.points !== null
+                                ? player.points
+                                : "?"
+                            } points`}
+                      </Typography>
+                    </Box>
+                    {!matchPlayed && (
+                      <Chip
+                        label="×"
+                        size="small"
+                        color="default"
+                        data-chip="remove"
+                        draggable={false}
+                        onDragStart={(event) => {
+                          event.stopPropagation();
+                          event.preventDefault();
+                        }}
+                        onMouseDown={(event) => {
+                          event.stopPropagation();
+                        }}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onRemovePlayer(player.id);
+                        }}
+                        sx={{
+                          cursor: "pointer",
+                          minWidth: 24,
+                          height: 24,
+                          fontWeight: 700,
+                          "&:hover": {
+                            backgroundColor: "error.main",
+                            color: "error.contrastText",
+                          },
+                        }}
+                      />
+                    )}
+                  </Box>
+                ))}
               </Box>
             ))}
           </Box>

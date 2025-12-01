@@ -14,13 +14,13 @@ export interface Player {
   isTransferred: boolean;
   isFemale: boolean;
   teamNumber?: number; // Équipe actuelle (1, 2, 3...)
-  highestMasculineTeamNumberByPhase?: { 
-    aller?: number; 
-    retour?: number; 
+  highestMasculineTeamNumberByPhase?: {
+    aller?: number;
+    retour?: number;
   }; // Numéro de l'équipe masculine la plus basse (numéro le plus élevé) dans laquelle le joueur est brûlé par phase (>= 2 matchs dans la phase). Exemple: { aller: 8, retour: 5 } signifie brûlé dans l'équipe 8 en phase aller et équipe 5 en phase retour
-  highestFeminineTeamNumberByPhase?: { 
-    aller?: number; 
-    retour?: number; 
+  highestFeminineTeamNumberByPhase?: {
+    aller?: number;
+    retour?: number;
   }; // Numéro de l'équipe féminine la plus basse (numéro le plus élevé) dans laquelle le joueur est brûlé par phase (>= 2 matchs dans la phase)
   masculineMatchesByTeamByPhase?: {
     aller?: { [teamNumber: number]: number };
@@ -43,6 +43,8 @@ export interface Team {
   discordWebhookUrl?: string;
   location?: string; // ID du lieu (ville) associé à l'équipe
   players: string[]; // IDs des joueurs
+  epreuve?: string; // Libellé de l'épreuve FFTT
+  idEpreuve?: number; // ID de l'épreuve FFTT (15954, 15955, 15980, etc.)
   createdAt: Date;
   updatedAt: Date;
 }
@@ -65,6 +67,7 @@ export interface Match {
   division?: string; // Division FFTT complète
   teamId?: string; // Identifiant unique équipe (ex: "1_M", "2_F")
   epreuve?: string; // Libellé de l&apos;épreuve FFTT
+  idEpreuve?: number; // ID de l&apos;épreuve FFTT (15954, 15955, 15980, etc.)
   score?: string; // Score du match (ex: "4-2")
   result?: string; // Résultat (VICTOIRE, DEFAITE, EXEMPT, W.O.)
   compositionString?: string; // Composition de l&apos;équipe pour ce match
