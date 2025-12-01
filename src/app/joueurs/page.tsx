@@ -920,7 +920,7 @@ export default function JoueursPage() {
                 alignItems: { xs: "stretch", md: "center" },
               }}
             >
-              <Box sx={{ flex: { xs: "1 1 auto", md: "0 0 300px" } }}>
+              <Box sx={{ flex: { xs: "1 1 auto", md: "0 0 240px" } }}>
                 <TextField
                   fullWidth
                   size="small"
