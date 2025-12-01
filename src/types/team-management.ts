@@ -23,8 +23,10 @@ export interface Player {
   participation: {
     [teamId: string]: boolean; // Participation au championnat par équipe
     championnat?: boolean; // Participation générale au championnat
+    championnatParis?: boolean; // Participation au championnat de Paris IDF (mixte)
   };
-  hasPlayedAtLeastOneMatch?: boolean; // Indique si le joueur a participé à au moins un match
+  hasPlayedAtLeastOneMatch?: boolean; // Indique si le joueur a participé à au moins un match (championnat par équipes)
+  hasPlayedAtLeastOneMatchParis?: boolean; // Indique si le joueur a participé à au moins un match au championnat de Paris (mixte)
   highestMasculineTeamNumberByPhase?: { 
     aller?: number; 
     retour?: number; 
@@ -33,6 +35,10 @@ export interface Player {
     aller?: number; 
     retour?: number; 
   }; // Numéro de l'équipe féminine la plus basse (numéro le plus élevé) dans laquelle le joueur est brûlé par phase (>= 2 matchs dans la phase)
+  highestTeamNumberByPhaseParis?: { 
+    aller?: number; 
+    retour?: number; 
+  }; // Numéro de l'équipe la plus basse dans laquelle le joueur est brûlé par phase au championnat de Paris (mixte, >= 2 matchs dans la phase)
   masculineMatchesByTeamByPhase?: {
     aller?: { [teamNumber: number]: number };
     retour?: { [teamNumber: number]: number };
@@ -41,6 +47,10 @@ export interface Player {
     aller?: { [teamNumber: number]: number };
     retour?: { [teamNumber: number]: number };
   }; // Nombre de matchs joués par équipe féminine et par phase (pour affichage dans le tooltip de brûlage)
+  matchesByTeamByPhaseParis?: {
+    aller?: { [teamNumber: number]: number };
+    retour?: { [teamNumber: number]: number };
+  }; // Nombre de matchs joués par équipe et par phase au championnat de Paris (mixte)
   // Champs additionnels de l&apos;API FFTT
   numClub?: string;
   club?: string;

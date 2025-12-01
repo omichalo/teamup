@@ -435,8 +435,10 @@ export default function JoueursPage() {
         },
         participation: {
           championnat: newPlayer.inChampionship,
+          championnatParis: false,
         },
         hasPlayedAtLeastOneMatch: false,
+        hasPlayedAtLeastOneMatchParis: false,
         ...(discordMentions.length > 0 ? { discordMentions } : {}),
       });
 
@@ -532,9 +534,11 @@ export default function JoueursPage() {
             feminine: [],
           },
           participation: {
-            championnat: newPlayer.inChampionship,
-          },
+          championnat: newPlayer.inChampionship,
+          championnatParis: false,
+        },
           hasPlayedAtLeastOneMatch: editingPlayer.hasPlayedAtLeastOneMatch || false,
+          hasPlayedAtLeastOneMatchParis: editingPlayer.hasPlayedAtLeastOneMatchParis || false,
           ...(discordMentions.length > 0 ? { discordMentions } : {}),
         });
       } else {
@@ -670,6 +674,42 @@ export default function JoueursPage() {
       alert("Erreur lors de la suppression du joueur");
     } finally {
       setDeleting(null);
+    }
+  };
+
+  const handleToggleParticipationParis = async (
+    player: Player,
+    inChampionshipParis: boolean
+  ) => {
+    try {
+      // Mettre à jour seulement la participation au championnat de Paris
+      await playerService.updatePlayer(player.id, {
+        participation: {
+          ...player.participation,
+          championnatParis: inChampionshipParis,
+        },
+      });
+
+      // Mettre à jour l'état local
+      setPlayers((prevPlayers) =>
+        prevPlayers.map((p) =>
+          p.id === player.id
+            ? {
+                ...p,
+                participation: {
+                  ...p.participation,
+                  championnatParis: inChampionshipParis,
+                },
+              }
+            : p
+        )
+      );
+    } catch (error) {
+      console.error(
+        "Erreur lors de la mise à jour de la participation au championnat de Paris:",
+        error
+      );
+      alert("Erreur lors de la mise à jour de la participation");
     }
   };
 
@@ -933,6 +973,7 @@ export default function JoueursPage() {
                       <TableCell>Participation</TableCell>
                       <TableCell>Brûlage Masculin</TableCell>
                       <TableCell>Brûlage Féminin</TableCell>
+                      <TableCell>Brûlage (Paris)</TableCell>
                       <TableCell>Discord</TableCell>
                     </TableRow>
                   </TableHead>
@@ -952,6 +993,26 @@ export default function JoueursPage() {
                                 color="success"
                                 variant="outlined"
                                 title="Ce joueur a participé à au moins un match"
+                              />
+                            )}
+                            {player.hasPlayedAtLeastOneMatchParis && (
+                              <Chip
+                                icon={<SportsTennisIcon />}
+                                label="A joué Paris"
+                                size="small"
+                                color="secondary"
+                                variant="outlined"
+                                title="Ce joueur a participé à au moins un match au championnat de Paris"
+                              />
+                            )}
+                            {player.hasPlayedAtLeastOneMatchParis && (
+                              <Chip
+                                icon={<SportsTennisIcon />}
+                                label="A joué Paris"
+                                size="small"
+                                color="secondary"
+                                variant="outlined"
+                                title="Ce joueur a participé à au moins un match au championnat de Paris"
                               />
                             )}
                           </Box>
@@ -1013,25 +1074,47 @@ export default function JoueursPage() {
                           />
                         </TableCell>
                         <TableCell>
-                          <Box display="flex" alignItems="center" gap={1}>
-                            <Switch
-                              size="small"
-                              checked={player.participation?.championnat || false}
-                              onChange={(e) =>
-                                handleToggleParticipation(
-                                  player,
-                                  e.target.checked
-                                )
-                              }
-                              title={
-                                player.participation?.championnat
-                                  ? "Participe au championnat"
-                                  : "Ne participe pas au championnat"
-                              }
-                            />
-                            <Typography variant="caption" color="text.secondary">
-                              {player.participation?.championnat ? "Oui" : "Non"}
-                            </Typography>
+                          <Box display="flex" flexDirection="column" gap={1}>
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <Switch
+                                size="small"
+                                checked={player.participation?.championnat || false}
+                                onChange={(e) =>
+                                  handleToggleParticipation(
+                                    player,
+                                    e.target.checked
+                                  )
+                                }
+                                title={
+                                  player.participation?.championnat
+                                    ? "Participe au championnat"
+                                    : "Ne participe pas au championnat"
+                                }
+                              />
+                              <Typography variant="caption" color="text.secondary">
+                                {player.participation?.championnat ? "Oui" : "Non"}
+                              </Typography>
+                            </Box>
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <Switch
+                                size="small"
+                                checked={player.participation?.championnatParis || false}
+                                onChange={(e) =>
+                                  handleToggleParticipationParis(
+                                    player,
+                                    e.target.checked
+                                  )
+                                }
+                                title={
+                                  player.participation?.championnatParis
+                                    ? "Participe au championnat de Paris"
+                                    : "Ne participe pas au championnat de Paris"
+                                }
+                              />
+                              <Typography variant="caption" color="text.secondary">
+                                Paris: {player.participation?.championnatParis ? "Oui" : "Non"}
+                              </Typography>
+                            </Box>
                           </Box>
                         </TableCell>
                         <TableCell>
@@ -1199,6 +1282,88 @@ export default function JoueursPage() {
                           })()}
                         </TableCell>
                         <TableCell>
+                          {(() => {
+                            const burnedTeam = player.highestTeamNumberByPhaseParis?.[currentPhase];
+                            const matchesByTeam = player.matchesByTeamByPhaseParis?.[currentPhase];
+                            const hasData =
+                              burnedTeam !== undefined ||
+                              (matchesByTeam &&
+                                Object.keys(matchesByTeam).length > 0);
+
+                            return hasData ? (
+                              <Tooltip
+                                title={
+                                  <Box>
+                                    {burnedTeam ? (
+                                      <>
+                                        <Typography
+                                          variant="body2"
+                                          sx={{ mb: 1, fontWeight: "bold" }}
+                                        >
+                                          Brûlé dans l&apos;équipe {burnedTeam} (Paris - Phase {currentPhase})
+                                        </Typography>
+                                        <Typography
+                                          variant="caption"
+                                          sx={{ display: "block", mb: 1 }}
+                                        >
+                                          Ne peut pas jouer dans les équipes inférieures
+                                        </Typography>
+                                      </>
+                                    ) : null}
+                                    {matchesByTeam &&
+                                    Object.keys(matchesByTeam).length > 0 ? (
+                                      <>
+                                        <Typography
+                                          variant="caption"
+                                          sx={{
+                                            display: "block",
+                                            mb: 0.5,
+                                            fontWeight: "bold",
+                                          }}
+                                        >
+                                          Matchs joués par équipe (Paris - Phase {currentPhase}):
+                                        </Typography>
+                                        <Box component="ul" sx={{ m: 0, pl: 2 }}>
+                                          {Object.entries(matchesByTeam)
+                                            .sort(([a], [b]) => Number(a) - Number(b))
+                                            .map(([team, count]) => (
+                                              <Typography
+                                                key={team}
+                                                component="li"
+                                                variant="caption"
+                                                sx={{ display: "list-item" }}
+                                              >
+                                                Équipe {team}: {count} match
+                                                {count > 1 ? "s" : ""}
+                                              </Typography>
+                                            ))}
+                                        </Box>
+                                      </>
+                                    ) : null}
+                                  </Box>
+                                }
+                                arrow
+                                placement="top"
+                              >
+                                <Chip
+                                  label={
+                                    burnedTeam
+                                      ? `Équipe ${burnedTeam}`
+                                      : "Voir stats"
+                                  }
+                                  color="secondary"
+                                  size="small"
+                                  variant="outlined"
+                                />
+                              </Tooltip>
+                            ) : (
+                              <Typography variant="body2" color="text.secondary">
+                                -
+                              </Typography>
+                            );
+                          })()}
+                        </TableCell>
+                        <TableCell>
                           <Badge
                             badgeContent={player.discordMentions?.length || 0}
                             color={hasInvalidDiscordMentions(player) ? "warning" : "primary"}
@@ -1278,6 +1443,26 @@ export default function JoueursPage() {
                                 title="Ce joueur a participé à au moins un match"
                               />
                             )}
+                            {player.hasPlayedAtLeastOneMatchParis && (
+                              <Chip
+                                icon={<SportsTennisIcon />}
+                                label="A joué Paris"
+                                size="small"
+                                color="secondary"
+                                variant="outlined"
+                                title="Ce joueur a participé à au moins un match au championnat de Paris"
+                              />
+                            )}
+                            {player.hasPlayedAtLeastOneMatchParis && (
+                              <Chip
+                                icon={<SportsTennisIcon />}
+                                label="A joué Paris"
+                                size="small"
+                                color="secondary"
+                                variant="outlined"
+                                title="Ce joueur a participé à au moins un match au championnat de Paris"
+                              />
+                            )}
                           </Box>
                         </TableCell>
                         <TableCell>
@@ -1343,25 +1528,47 @@ export default function JoueursPage() {
                           />
                         </TableCell>
                         <TableCell>
-                          <Box display="flex" alignItems="center" gap={1}>
-                            <Switch
-                              size="small"
-                              checked={player.participation?.championnat || false}
-                              onChange={(e) =>
-                                handleToggleParticipation(
-                                  player,
-                                  e.target.checked
-                                )
-                              }
-                              title={
-                                player.participation?.championnat
-                                  ? "Participe au championnat"
-                                  : "Ne participe pas au championnat"
-                              }
-                            />
-                            <Typography variant="caption" color="text.secondary">
-                              {player.participation?.championnat ? "Oui" : "Non"}
-                            </Typography>
+                          <Box display="flex" flexDirection="column" gap={1}>
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <Switch
+                                size="small"
+                                checked={player.participation?.championnat || false}
+                                onChange={(e) =>
+                                  handleToggleParticipation(
+                                    player,
+                                    e.target.checked
+                                  )
+                                }
+                                title={
+                                  player.participation?.championnat
+                                    ? "Participe au championnat"
+                                    : "Ne participe pas au championnat"
+                                }
+                              />
+                              <Typography variant="caption" color="text.secondary">
+                                {player.participation?.championnat ? "Oui" : "Non"}
+                              </Typography>
+                            </Box>
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <Switch
+                                size="small"
+                                checked={player.participation?.championnatParis || false}
+                                onChange={(e) =>
+                                  handleToggleParticipationParis(
+                                    player,
+                                    e.target.checked
+                                  )
+                                }
+                                title={
+                                  player.participation?.championnatParis
+                                    ? "Participe au championnat de Paris"
+                                    : "Ne participe pas au championnat de Paris"
+                                }
+                              />
+                              <Typography variant="caption" color="text.secondary">
+                                Paris: {player.participation?.championnatParis ? "Oui" : "Non"}
+                              </Typography>
+                            </Box>
                           </Box>
                         </TableCell>
                         <TableCell>
@@ -1474,6 +1681,26 @@ export default function JoueursPage() {
                                 title="Ce joueur a participé à au moins un match"
                               />
                             )}
+                            {player.hasPlayedAtLeastOneMatchParis && (
+                              <Chip
+                                icon={<SportsTennisIcon />}
+                                label="A joué Paris"
+                                size="small"
+                                color="secondary"
+                                variant="outlined"
+                                title="Ce joueur a participé à au moins un match au championnat de Paris"
+                              />
+                            )}
+                            {player.hasPlayedAtLeastOneMatchParis && (
+                              <Chip
+                                icon={<SportsTennisIcon />}
+                                label="A joué Paris"
+                                size="small"
+                                color="secondary"
+                                variant="outlined"
+                                title="Ce joueur a participé à au moins un match au championnat de Paris"
+                              />
+                            )}
                           </Box>
                         </TableCell>
                         <TableCell>
@@ -1535,25 +1762,47 @@ export default function JoueursPage() {
                           />
                         </TableCell>
                         <TableCell>
-                          <Box display="flex" alignItems="center" gap={1}>
-                            <Switch
-                              size="small"
-                              checked={player.participation?.championnat || false}
-                              onChange={(e) =>
-                                handleToggleParticipation(
-                                  player,
-                                  e.target.checked
-                                )
-                              }
-                              title={
-                                player.participation?.championnat
-                                  ? "Participe au championnat"
-                                  : "Ne participe pas au championnat"
-                              }
-                            />
-                            <Typography variant="caption" color="text.secondary">
-                              {player.participation?.championnat ? "Oui" : "Non"}
-                            </Typography>
+                          <Box display="flex" flexDirection="column" gap={1}>
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <Switch
+                                size="small"
+                                checked={player.participation?.championnat || false}
+                                onChange={(e) =>
+                                  handleToggleParticipation(
+                                    player,
+                                    e.target.checked
+                                  )
+                                }
+                                title={
+                                  player.participation?.championnat
+                                    ? "Participe au championnat"
+                                    : "Ne participe pas au championnat"
+                                }
+                              />
+                              <Typography variant="caption" color="text.secondary">
+                                {player.participation?.championnat ? "Oui" : "Non"}
+                              </Typography>
+                            </Box>
+                            <Box display="flex" alignItems="center" gap={1}>
+                              <Switch
+                                size="small"
+                                checked={player.participation?.championnatParis || false}
+                                onChange={(e) =>
+                                  handleToggleParticipationParis(
+                                    player,
+                                    e.target.checked
+                                  )
+                                }
+                                title={
+                                  player.participation?.championnatParis
+                                    ? "Participe au championnat de Paris"
+                                    : "Ne participe pas au championnat de Paris"
+                                }
+                              />
+                              <Typography variant="caption" color="text.secondary">
+                                Paris: {player.participation?.championnatParis ? "Oui" : "Non"}
+                              </Typography>
+                            </Box>
                           </Box>
                         </TableCell>
                         <TableCell>

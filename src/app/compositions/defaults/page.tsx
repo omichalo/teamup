@@ -26,6 +26,8 @@ import {
   FormControlLabel,
   Switch,
   Tooltip,
+  Card,
+  CardContent,
 } from "@mui/material";
 import { DragIndicator, AlternateEmail, Warning } from "@mui/icons-material";
 import { AuthGuard } from "@/components/AuthGuard";
@@ -37,11 +39,14 @@ import {
 import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
 import { CompositionDefaultsService } from "@/lib/services/composition-defaults-service";
 import { getCurrentPhase } from "@/lib/shared/phase-utils";
+import { EpreuveType, getMatchEpreuve } from "@/lib/shared/epreuve-utils";
 import {
   JOURNEE_CONCERNEE_PAR_REGLE,
   canAssignPlayerToTeam,
   validateTeamCompositionState,
   AssignmentValidationResult,
+  getParisTeamStructure,
+  isParisChampionship,
 } from "@/lib/compositions/validation";
 import type { Player } from "@/types/team-management";
 import { AvailablePlayersPanel } from "@/components/compositions/AvailablePlayersPanel";
@@ -84,6 +89,7 @@ export default function DefaultCompositionsPage() {
   const { equipes, loading: loadingEquipes } = useEquipesWithMatches();
   const [players, setPlayers] = useState<Player[]>([]);
   const [loadingPlayers, setLoadingPlayers] = useState(true);
+  const [selectedEpreuve, setSelectedEpreuve] = useState<EpreuveType>("championnat_equipes");
   const [selectedPhase, setSelectedPhase] = useState<"aller" | "retour" | null>(
     null
   );
@@ -125,10 +131,15 @@ export default function DefaultCompositionsPage() {
   }, [equipes, loadingEquipes]);
 
   useEffect(() => {
-    if (selectedPhase === null && currentPhase) {
+    // Pour le championnat de Paris, définir automatiquement la phase à "aller"
+    if (selectedEpreuve === "championnat_paris") {
+      if (selectedPhase !== "aller") {
+        setSelectedPhase("aller");
+      }
+    } else if (selectedPhase === null && currentPhase) {
       setSelectedPhase(currentPhase);
     }
-  }, [currentPhase, selectedPhase]);
+  }, [currentPhase, selectedPhase, selectedEpreuve]);
 
   const loadPlayers = useCallback(async () => {
     try {
@@ -241,11 +252,25 @@ export default function DefaultCompositionsPage() {
     loadDefaults();
   }, [selectedPhase, compositionDefaultsService]);
 
+  // Filtrer les équipes selon l'épreuve sélectionnée
+  const filteredEquipes = useMemo(() => {
+    if (!selectedEpreuve) {
+      return equipes;
+    }
+    return equipes.filter((equipe) => {
+      const epreuve = getMatchEpreuve(
+        equipe.matches[0] || {},
+        equipe.team
+      );
+      return epreuve === selectedEpreuve;
+    });
+  }, [equipes, selectedEpreuve]);
+
   const equipesByType = useMemo(() => {
     const masculin: EquipeWithMatches[] = [];
     const feminin: EquipeWithMatches[] = [];
 
-    equipes.forEach((equipe) => {
+    filteredEquipes.forEach((equipe) => {
       const isFemale = equipe.matches.some((match) => match.isFemale === true);
       if (isFemale) {
         feminin.push(equipe);
@@ -255,7 +280,7 @@ export default function DefaultCompositionsPage() {
     });
 
     return { masculin, feminin };
-  }, [equipes]);
+  }, [filteredEquipes]);
 
   const mergedDefaultCompositions = useMemo(
     () => ({
@@ -313,10 +338,17 @@ export default function DefaultCompositionsPage() {
     filteredAvailablePlayersWithoutAssignment,
   } = useMemo(() => {
     const currentTeams =
-      defaultCompositionTab === "masculin"
-        ? equipesByType.masculin
-        : equipesByType.feminin;
-    const assignments = defaultCompositions[defaultCompositionTab];
+      // Pour le championnat de Paris, utiliser toutes les équipes (masculin + féminin)
+      selectedEpreuve === "championnat_paris"
+        ? [...equipesByType.masculin, ...equipesByType.feminin]
+        : defaultCompositionTab === "masculin"
+          ? equipesByType.masculin
+          : equipesByType.feminin;
+    const championshipTypeForAssignments =
+      selectedEpreuve === "championnat_paris"
+        ? "masculin"
+        : defaultCompositionTab;
+    const assignments = defaultCompositions[championshipTypeForAssignments];
 
     const assignedIds = new Set<string>();
     currentTeams.forEach((equipe) => {
@@ -340,12 +372,29 @@ export default function DefaultCompositionsPage() {
     availablePlayers,
     filteredAvailablePlayers,
     defaultCompositionTab,
+    selectedEpreuve,
     defaultCompositions,
     equipesByType,
   ]);
 
+  // Fonction helper pour calculer le maxPlayers selon l'épreuve et la division
+  const getMaxPlayersForTeam = useCallback(
+    (equipe: EquipeWithMatches): number => {
+      // Vérifier directement si l'équipe fait partie du championnat de Paris
+      if (isParisChampionship(equipe)) {
+        const structure = getParisTeamStructure(equipe.team.division || "");
+        return structure?.totalPlayers || MAX_PLAYERS_PER_DEFAULT_TEAM; // Fallback si structure non reconnue
+      }
+      return MAX_PLAYERS_PER_DEFAULT_TEAM; // Championnat par équipes : 5 joueurs par défaut
+    },
+    []
+  );
+
   const canDropPlayer = useCallback(
     (playerId: string, teamId: string): AssignmentValidationResult => {
+      const equipe = equipes.find((e) => e.team.id === teamId);
+      const maxPlayers = equipe ? getMaxPlayersForTeam(equipe) : MAX_PLAYERS_PER_DEFAULT_TEAM;
+      
       return canAssignPlayerToTeam({
         playerId,
         teamId,
@@ -355,7 +404,7 @@ export default function DefaultCompositionsPage() {
         selectedPhase,
         selectedJournee: null,
         journeeRule: JOURNEE_CONCERNEE_PAR_REGLE,
-        maxPlayersPerTeam: MAX_PLAYERS_PER_DEFAULT_TEAM,
+        maxPlayersPerTeam: maxPlayers,
       });
     },
     [
@@ -363,6 +412,7 @@ export default function DefaultCompositionsPage() {
       equipes,
       mergedDefaultCompositions,
       selectedPhase,
+      getMaxPlayersForTeam,
     ]
   );
 
@@ -375,6 +425,9 @@ export default function DefaultCompositionsPage() {
     const nextErrors: Record<string, string | undefined> = {};
 
     Object.keys(mergedDefaultCompositions).forEach((teamId) => {
+      const equipe = equipes.find((e) => e.team.id === teamId);
+      const maxPlayers = equipe ? getMaxPlayersForTeam(equipe) : MAX_PLAYERS_PER_DEFAULT_TEAM;
+      
       const validation = validateTeamCompositionState({
         teamId,
         players,
@@ -383,7 +436,7 @@ export default function DefaultCompositionsPage() {
         selectedPhase,
         selectedJournee: null,
         journeeRule: JOURNEE_CONCERNEE_PAR_REGLE,
-        maxPlayersPerTeam: MAX_PLAYERS_PER_DEFAULT_TEAM,
+        maxPlayersPerTeam: maxPlayers,
       });
 
       if (!validation.valid) {
@@ -398,6 +451,7 @@ export default function DefaultCompositionsPage() {
     equipes,
     selectedPhase,
     defaultCompositionsLoaded,
+    getMaxPlayersForTeam,
   ]);
 
   const assignPlayerToTeam = useCallback(
@@ -450,11 +504,13 @@ export default function DefaultCompositionsPage() {
         return false;
       }
 
-      const championshipType = equipe.matches.some(
-        (match) => match.isFemale === true
-      )
-        ? "feminin"
-        : "masculin";
+      // Pour le championnat de Paris, utiliser "masculin" comme type par défaut (mixte)
+      const championshipType =
+        selectedEpreuve === "championnat_paris"
+          ? "masculin"
+          : equipe.matches.some((match) => match.isFemale === true)
+            ? "feminin"
+            : "masculin";
 
       const sameTypeTeams = (
         championshipType === "feminin"
@@ -547,14 +603,18 @@ export default function DefaultCompositionsPage() {
         return true;
       }
 
-      if (currentTeamPlayers.length >= MAX_PLAYERS_PER_DEFAULT_TEAM) {
+      // equipe est déjà déclaré plus haut dans la fonction
+      const maxPlayers = equipe ? getMaxPlayersForTeam(equipe) : MAX_PLAYERS_PER_DEFAULT_TEAM;
+      
+      if (currentTeamPlayers.length >= maxPlayers) {
         setDefaultCompositionMessage(
-          `Cette équipe est déjà complète (${MAX_PLAYERS_PER_DEFAULT_TEAM} joueurs).`
+          `Cette équipe est déjà complète (${maxPlayers} joueurs).`
         );
         console.log("[DefaultCompositions] Ajout refusé : équipe pleine", {
           teamId,
           playerId,
           currentPlayerCount: currentTeamPlayers.length,
+          maxPlayers,
         });
         return false;
       }
@@ -622,6 +682,8 @@ export default function DefaultCompositionsPage() {
       defaultCompositions,
       compositionDefaultsService,
       equipesByType,
+      getMaxPlayersForTeam,
+      selectedEpreuve,
     ]
   );
 
@@ -636,11 +698,13 @@ export default function DefaultCompositionsPage() {
         return;
       }
 
-      const championshipType = equipe.matches.some(
-        (match) => match.isFemale === true
-      )
-        ? "feminin"
-        : "masculin";
+      // Pour le championnat de Paris, utiliser "masculin" comme type par défaut (mixte)
+      const championshipType =
+        selectedEpreuve === "championnat_paris"
+          ? "masculin"
+          : equipe.matches.some((match) => match.isFemale === true)
+            ? "feminin"
+            : "masculin";
 
       let nextTeamsForType: Record<string, string[]> | null = null;
 
@@ -709,7 +773,7 @@ export default function DefaultCompositionsPage() {
         );
       }
     },
-    [selectedPhase, equipes, compositionDefaultsService]
+    [selectedPhase, equipes, compositionDefaultsService, selectedEpreuve]
   );
 
   const handleDragStart = useCallback(
@@ -836,10 +900,17 @@ export default function DefaultCompositionsPage() {
 
   const compositionSummary = useMemo(() => {
     const currentTeams =
-      defaultCompositionTab === "masculin"
-        ? equipesByType.masculin
-        : equipesByType.feminin;
-    const assignments = defaultCompositions[defaultCompositionTab];
+      // Pour le championnat de Paris, utiliser toutes les équipes (masculin + féminin)
+      selectedEpreuve === "championnat_paris"
+        ? [...equipesByType.masculin, ...equipesByType.feminin]
+        : defaultCompositionTab === "masculin"
+          ? equipesByType.masculin
+          : equipesByType.feminin;
+    const championshipTypeForAssignments =
+      selectedEpreuve === "championnat_paris"
+        ? "masculin"
+        : defaultCompositionTab;
+    const assignments = defaultCompositions[championshipTypeForAssignments];
 
     let completed = 0;
     let incomplete = 0;
@@ -873,6 +944,7 @@ export default function DefaultCompositionsPage() {
     defaultCompositions,
     defaultCompositionErrors,
     equipesByType,
+    selectedEpreuve,
   ]);
 
   const availablePlayersSubtitle = useMemo(() => {
@@ -891,46 +963,80 @@ export default function DefaultCompositionsPage() {
   );
 
   const rulesForDefaults: CompositionRuleItem[] = useMemo(
-    () => [
-      {
-        id: "maxPlayersDefaults",
-        label: "Une composition par défaut peut contenir jusqu'à 5 joueurs",
-        scope: "defaults",
-      },
-      {
-        id: "maxPlayersDaily",
-        label: "Une composition de journée ne peut aligner que 4 joueurs",
-        scope: "daily",
-      },
-      {
-        id: "foreign",
-        label: "Maximum un joueur étranger (ETR) par équipe",
-        scope: "both",
-      },
-      {
-        id: "female-in-male",
-        label: "Une équipe masculine ne peut comporter plus de deux joueuses",
-        scope: "both",
-      },
-      {
-        id: "burning",
-        label: "Respect du brûlage : impossible d'aligner un joueur dans une équipe de numéro inférieur",
-        scope: "both",
-      },
-      {
-        id: "fftt",
-        label: "Points minimum (selon division nationale)",
-        scope: "both",
-      },
-      {
-        id: "defaults-specific",
-        label: "Aucune limitation de journée (J2) sur cette page",
-        scope: "defaults",
-        description:
-          "Les règles spécifiques à la J2 ne sont appliquées que lors de la préparation d'une composition de journée.",
-      },
-    ],
-    []
+    () => {
+      if (selectedEpreuve === "championnat_paris") {
+        // Règles spécifiques au championnat de Paris
+        return [
+          {
+            id: "paris-structure",
+            label: "Structure par groupes : 3 groupes de 3 joueurs (Excellence, Promo Excellence, Honneur), 2 groupes de 3 (Division 1), 1 groupe de 3 (Division 2)",
+            scope: "both",
+          },
+          {
+            id: "paris-article8",
+            label: "Article 8 : Les joueurs du groupe 2 doivent avoir des points entre le max du groupe 1 et le min du groupe 3. Permutation possible dans un même groupe.",
+            scope: "both",
+          },
+          {
+            id: "paris-article12",
+            label: "Article 12 : Maximum 1 joueur brûlé par groupe de 3. Si 2 joueurs brûlés dans un même groupe, les 2 sont non qualifiés.",
+            scope: "both",
+          },
+          {
+            id: "paris-burning",
+            label: "Brûlage : Un joueur est brûlé s'il a joué 3 matchs ou plus dans UNE équipe de numéro inférieur. Il ne peut alors jouer que dans cette équipe ou une équipe de numéro supérieur.",
+            scope: "both",
+          },
+          {
+            id: "paris-mixte",
+            label: "Championnat mixte : pas de distinction masculin/féminin, une seule phase",
+            scope: "both",
+          },
+        ];
+      }
+      
+      // Règles pour le championnat par équipes
+      return [
+        {
+          id: "maxPlayersDefaults",
+          label: "Une composition par défaut peut contenir jusqu'à 5 joueurs",
+          scope: "defaults",
+        },
+        {
+          id: "maxPlayersDaily",
+          label: "Une composition de journée ne peut aligner que 4 joueurs",
+          scope: "daily",
+        },
+        {
+          id: "foreign",
+          label: "Maximum un joueur étranger (ETR) par équipe",
+          scope: "both",
+        },
+        {
+          id: "female-in-male",
+          label: "Une équipe masculine ne peut comporter plus de deux joueuses",
+          scope: "both",
+        },
+        {
+          id: "burning",
+          label: "Brûlage : Un joueur est brûlé s'il a joué 2 matchs ou plus dans une équipe de numéro inférieur. Il ne peut alors jouer que dans cette équipe ou une équipe de numéro supérieur.",
+          scope: "both",
+        },
+        {
+          id: "fftt",
+          label: "Points minimum selon division : Messieurs N1 (≥1800), N2 (≥1600), N3 (≥1400) | Dames N1 (≥1100), N2 (≥900 pour 2 sur 4)",
+          scope: "both",
+        },
+        {
+          id: "defaults-specific",
+          label: "Aucune limitation de journée (J2) sur cette page",
+          scope: "defaults",
+          description:
+            "Les règles spécifiques à la J2 ne sont appliquées que lors de la préparation d'une composition de journée.",
+        },
+      ];
+    },
+    [selectedEpreuve]
   );
 
   const phaseOptions: PhaseSelectOption[] = [
@@ -966,31 +1072,59 @@ export default function DefaultCompositionsPage() {
             </Button>
           </Stack>
 
-          <CompositionRulesHelp rules={rulesForDefaults} />
+          <Card sx={{ mb: 3 }}>
+            <CardContent sx={{ pt: 2.5, pb: 1.5 }}>
+              <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
+                <FormControl size="small" sx={{ minWidth: 200 }}>
+                  <InputLabel id="epreuve-select-label">Épreuve</InputLabel>
+                  <Select
+                    labelId="epreuve-select-label"
+                    id="epreuve-select"
+                    value={selectedEpreuve || ""}
+                    label="Épreuve"
+                    onChange={(e) => {
+                      const epreuve = e.target.value as EpreuveType;
+                      setSelectedEpreuve(epreuve);
+                      setSelectedPhase(null); // Réinitialiser la phase lors du changement d'épreuve
+                    }}
+                  >
+                    <MenuItem value="championnat_equipes">
+                      Championnat par Équipes
+                    </MenuItem>
+                    <MenuItem value="championnat_paris">
+                      Championnat de Paris IDF
+                    </MenuItem>
+                  </Select>
+                </FormControl>
+                {/* Masquer le sélecteur de phase pour le championnat de Paris (une seule phase) */}
+                {selectedEpreuve !== "championnat_paris" && (
+                  <FormControl size="small" sx={{ minWidth: 180 }}>
+                    <InputLabel id="default-phase-label">Phase</InputLabel>
+                    <Select
+                      labelId="default-phase-label"
+                      label="Phase"
+                      value={selectedPhase || ""}
+                      onChange={(event) =>
+                        setSelectedPhase(
+                          event.target.value
+                            ? (event.target.value as "aller" | "retour")
+                            : null
+                        )
+                      }
+                    >
+                      {phaseOptions.map((option) => (
+                        <MenuItem key={option.value} value={option.value}>
+                          {option.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                )}
+              </Box>
+            </CardContent>
+          </Card>
 
-          <Stack direction={{ xs: "column", md: "row" }} spacing={2} mb={3}>
-            <FormControl size="small" sx={{ minWidth: 180 }}>
-              <InputLabel id="default-phase-label">Phase</InputLabel>
-              <Select
-                labelId="default-phase-label"
-                label="Phase"
-                value={selectedPhase || ""}
-                onChange={(event) =>
-                  setSelectedPhase(
-                    event.target.value
-                      ? (event.target.value as "aller" | "retour")
-                      : null
-                  )
-                }
-              >
-                {phaseOptions.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Stack>
+          <CompositionRulesHelp rules={rulesForDefaults} />
 
           {loadingEquipes || loadingPlayers ? (
             <Box display="flex" justifyContent="center" py={6}>
@@ -1016,12 +1150,14 @@ export default function DefaultCompositionsPage() {
                 </Alert>
               )}
 
-              <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
-                <Tabs value={currentTabIndex} onChange={handleTabChange}>
-                  <Tab label="Équipes Masculines" />
-                  <Tab label="Équipes Féminines" />
-                </Tabs>
-              </Box>
+              {selectedEpreuve !== "championnat_paris" && (
+                <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
+                  <Tabs value={currentTabIndex} onChange={handleTabChange}>
+                    <Tab label="Équipes Masculines" />
+                    <Tab label="Équipes Féminines" />
+                  </Tabs>
+                </Box>
+              )}
 
               <Box sx={{ display: "flex", gap: 2, position: "relative" }}>
                 <AvailablePlayersPanel
@@ -1036,6 +1172,9 @@ export default function DefaultCompositionsPage() {
                   renderPlayerItem={(player) => {
                     const phase = (selectedPhase || "aller") as "aller" | "retour";
                     const championshipType = defaultCompositionTab;
+                    // Pour les compositions par défaut, on ne peut pas déterminer directement le championnat
+                    // On utilise les propriétés par défaut (championnat par équipes)
+                    // Note: Si besoin, on pourrait passer l'équipe en paramètre pour utiliser isParisChampionship
                     const burnedTeam =
                       championshipType === "masculin"
                         ? player.highestMasculineTeamNumberByPhase?.[phase]
@@ -1218,21 +1357,41 @@ export default function DefaultCompositionsPage() {
                   />
 
                   <TabPanel value={currentTabIndex} index={0}>
-                    {equipesByType.masculin.length === 0 ? (
-                      <Typography variant="body2" color="text.secondary">
-                        Aucune équipe masculine
-                      </Typography>
-                    ) : (
-                      <Box
-                        sx={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 2,
-                        }}
-                      >
-                        {equipesByType.masculin.map((equipe) => {
+                    {(() => {
+                      // Pour le championnat de Paris, afficher toutes les équipes (masculin + féminin)
+                      const equipesToDisplay =
+                        selectedEpreuve === "championnat_paris"
+                          ? [...equipesByType.masculin, ...equipesByType.feminin]
+                          : equipesByType.masculin;
+
+                      if (equipesToDisplay.length === 0) {
+                        return (
+                          <Typography variant="body2" color="text.secondary">
+                            {selectedEpreuve === "championnat_paris"
+                              ? "Aucune équipe"
+                              : "Aucune équipe masculine"}
+                          </Typography>
+                        );
+                      }
+
+                      return (
+                        <Box
+                          sx={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 2,
+                          }}
+                        >
+                          {equipesToDisplay.map((equipe) => {
+                          // Pour le championnat de Paris, utiliser "masculin" comme type par défaut (mixte)
+                          const championshipTypeForTeam =
+                            selectedEpreuve === "championnat_paris"
+                              ? "masculin"
+                              : equipe.matches.some((match) => match.isFemale === true)
+                                ? "feminin"
+                                : "masculin";
                           const assignments =
-                            defaultCompositions.masculin[equipe.team.id] || [];
+                            defaultCompositions[championshipTypeForTeam][equipe.team.id] || [];
                           const teamPlayers = assignments
                             .map((playerId) => players.find((p) => p.id === playerId))
                             .filter((p): p is Player => p !== undefined);
@@ -1280,6 +1439,7 @@ export default function DefaultCompositionsPage() {
                                 dragOverTeamId={dragOverTeamId}
                                 matchPlayed={false}
                                 showMatchStatus={false}
+                                selectedEpreuve={null}
                                 additionalHeader={
                                   validationError ? (
                                     <Chip
@@ -1290,17 +1450,20 @@ export default function DefaultCompositionsPage() {
                                     />
                                   ) : undefined
                                 }
-                                maxPlayers={MAX_PLAYERS_PER_DEFAULT_TEAM}
+                                maxPlayers={getMaxPlayersForTeam(equipe)}
                             completionThreshold={
                               MIN_PLAYERS_FOR_DEFAULT_COMPLETION
                             }
                                 renderPlayerIndicators={(player) => {
                                   const phase = (selectedPhase ||
                                     "aller") as "aller" | "retour";
-                                  const burnedTeam =
-                                    player.highestMasculineTeamNumberByPhase?.[
-                                      phase
-                                    ];
+                                  // Utiliser les bonnes propriétés selon le championnat
+                                  const isParis = isParisChampionship(equipe);
+                                  const burnedTeam = isParis
+                                    ? player.highestTeamNumberByPhaseParis?.[phase]
+                                    : player.highestMasculineTeamNumberByPhase?.[
+                                        phase
+                                      ];
                                   return (
                                     <>
                                       {player.nationality === "C" && (
@@ -1413,7 +1576,8 @@ export default function DefaultCompositionsPage() {
                           );
                         })}
                       </Box>
-                    )}
+                      );
+                    })()}
                   </TabPanel>
 
                   <TabPanel value={currentTabIndex} index={1}>
@@ -1479,6 +1643,7 @@ export default function DefaultCompositionsPage() {
                                 dragOverTeamId={dragOverTeamId}
                                 matchPlayed={false}
                                 showMatchStatus={false}
+                                selectedEpreuve={null}
                                 additionalHeader={
                                   validationError ? (
                                     <Chip
@@ -1489,17 +1654,20 @@ export default function DefaultCompositionsPage() {
                                     />
                                   ) : undefined
                                 }
-                                maxPlayers={MAX_PLAYERS_PER_DEFAULT_TEAM}
+                                maxPlayers={getMaxPlayersForTeam(equipe)}
                             completionThreshold={
                               MIN_PLAYERS_FOR_DEFAULT_COMPLETION
                             }
                                 renderPlayerIndicators={(player) => {
                                   const phase = (selectedPhase ||
                                     "aller") as "aller" | "retour";
-                                  const burnedTeam =
-                                    player.highestFeminineTeamNumberByPhase?.[
-                                      phase
-                                    ];
+                                  // Utiliser les bonnes propriétés selon le championnat
+                                  const isParis = isParisChampionship(equipe);
+                                  const burnedTeam = isParis
+                                    ? player.highestTeamNumberByPhaseParis?.[phase]
+                                    : player.highestFeminineTeamNumberByPhase?.[
+                                        phase
+                                      ];
                                   return (
                                     <>
                                       {player.nationality === "C" && (

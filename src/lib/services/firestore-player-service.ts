@@ -47,12 +47,16 @@ export class FirestorePlayerService {
       participation: {
         ...data.participation,
         championnat: data.participation?.championnat || false,
+        championnatParis: data.participation?.championnatParis || false,
       },
       hasPlayedAtLeastOneMatch: data.hasPlayedAtLeastOneMatch || false,
+      hasPlayedAtLeastOneMatchParis: data.hasPlayedAtLeastOneMatchParis || false,
       highestMasculineTeamNumberByPhase: data.highestMasculineTeamNumberByPhase,
       highestFeminineTeamNumberByPhase: data.highestFeminineTeamNumberByPhase,
+      highestTeamNumberByPhaseParis: data.highestTeamNumberByPhaseParis,
       masculineMatchesByTeamByPhase: data.masculineMatchesByTeamByPhase || {},
       feminineMatchesByTeamByPhase: data.feminineMatchesByTeamByPhase || {},
+      matchesByTeamByPhaseParis: data.matchesByTeamByPhaseParis || {},
       discordMentions: data.discordMentions || undefined,
       // Champs additionnels de l&apos;API FFTT
       numClub: data.numClub,
@@ -181,6 +185,16 @@ export class FirestorePlayerService {
         }
       }
       // Si discordMentions n'est pas dans updates, on ne le modifie pas (préserve la valeur existante)
+      
+      // Gérer participation : si le champ est présent dans updates, fusionner avec l'existant
+      if (updates.participation !== undefined) {
+        const currentParticipation = (currentDoc.data().participation as Record<string, unknown>) || {};
+        firestoreUpdates.participation = {
+          ...currentParticipation,
+          ...updates.participation,
+        };
+        console.log(`[FirestorePlayerService] Mise à jour de participation pour le joueur ${playerId}:`, firestoreUpdates.participation);
+      }
       
       // Utiliser updateDoc pour permettre l'utilisation de deleteField()
       await updateDoc(playerRef, firestoreUpdates);
@@ -329,6 +343,7 @@ export class FirestorePlayerService {
         },
         participation: playerData.participation || {
           championnat: false,
+          championnatParis: false,
         },
         hasPlayedAtLeastOneMatch: playerData.hasPlayedAtLeastOneMatch || false,
         createdAt: new Date(),
@@ -427,6 +442,7 @@ export class FirestorePlayerService {
         },
         participation: playerData.participation || currentData.participation || {
           championnat: false,
+          championnatParis: false,
         },
         hasPlayedAtLeastOneMatch: playerData.hasPlayedAtLeastOneMatch ?? currentData.hasPlayedAtLeastOneMatch ?? false,
         // Gérer discordMentions : inclure seulement si défini et non vide, sinon préserver la valeur existante

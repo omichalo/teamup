@@ -19,6 +19,8 @@ export interface TeamData {
   division: string;
   isFemale: boolean;
   teamNumber: number;
+  idEpreuve?: number; // ID de l'épreuve FFTT (15954, 15955, 15980, etc.)
+  epreuve?: string; // Libellé de l'épreuve FFTT
   createdAt: Date;
   updatedAt: Date;
 }
@@ -89,12 +91,15 @@ export class TeamSyncService {
       console.log(`✅ ${equipes.length} équipes récupérées depuis l&apos;API FFTT`);
 
       // Filtrer les équipes pour les épreuves spécifiques
+      // 15954 = Championnat de France par Équipes Masculin
+      // 15955 = Championnat de France par Équipes Féminin
+      // 15980 = Championnat de Paris IDF (Excellence)
       const filteredEquipes = equipes.filter(
         (equipe: FFTTEquipe) =>
-          equipe.idEpreuve === 15954 || equipe.idEpreuve === 15955
+          equipe.idEpreuve === 15954 || equipe.idEpreuve === 15955 || equipe.idEpreuve === 15980
       );
       console.log(
-        `Équipes filtrées (épreuves 15954 et 15955): ${filteredEquipes.length}`
+        `Équipes filtrées (épreuves 15954, 15955 et 15980): ${filteredEquipes.length}`
       );
 
       // Traiter les équipes
@@ -116,6 +121,8 @@ export class TeamSyncService {
             equipe.idEpreuve
           ),
           teamNumber: this.extractTeamNumber(equipe.libelle),
+          idEpreuve: equipe.idEpreuve,
+          epreuve: equipe.libelleEpreuve,
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -226,9 +233,15 @@ export class TeamSyncService {
 
   /**
    * Extrait le numéro d&apos;équipe depuis le libellé
+   * Supporte les formats : "SQY PING 3", "SQY PING (3)", "SQY PING (3) - Phase 1", etc.
    */
   private extractTeamNumber(libelle: string): number {
-    const match = libelle.match(/SQY PING (\d+)/);
-    return match ? parseInt(match[1]) : 0;
+    // Cherche d'abord le format avec parenthèses, puis sans
+    const matchWithParentheses = libelle.match(/SQY PING\s*\((\d+)\)/i);
+    if (matchWithParentheses) {
+      return parseInt(matchWithParentheses[1], 10);
+    }
+    const match = libelle.match(/SQY PING\s*(\d+)/i);
+    return match ? parseInt(match[1], 10) : 0;
   }
 }

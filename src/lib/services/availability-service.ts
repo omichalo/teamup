@@ -60,6 +60,7 @@ export interface DayAvailability {
   journee: number;
   phase: "aller" | "retour";
   championshipType: "masculin" | "feminin";
+  idEpreuve?: number; // ID de l'épreuve FFTT (15954, 15955, 15980, etc.) pour différencier les calendriers
   date?: string;
   players: PlayerAvailability;
   createdAt?: Date;
@@ -72,18 +73,25 @@ export class AvailabilityService {
   private getDocumentId(
     journee: number,
     phase: "aller" | "retour",
-    championshipType: "masculin" | "feminin"
+    championshipType: "masculin" | "feminin",
+    idEpreuve?: number
   ): string {
+    // Si idEpreuve est fourni, l'inclure dans l'ID pour différencier les calendriers
+    // Sinon, utiliser l'ancien format pour la rétrocompatibilité
+    if (idEpreuve !== undefined) {
+      return `${phase}_${journee}_${championshipType}_${idEpreuve}`;
+    }
     return `${phase}_${journee}_${championshipType}`;
   }
 
   async getAvailability(
     journee: number,
     phase: "aller" | "retour",
-    championshipType: "masculin" | "feminin"
+    championshipType: "masculin" | "feminin",
+    idEpreuve?: number
   ): Promise<DayAvailability | null> {
     try {
-      const docId = this.getDocumentId(journee, phase, championshipType);
+      const docId = this.getDocumentId(journee, phase, championshipType, idEpreuve);
       const docRef = doc(getDbInstanceDirect(), this.collectionName, docId);
       const docSnap = await getDoc(docRef);
 
@@ -93,6 +101,7 @@ export class AvailabilityService {
           journee: data.journee,
           phase: data.phase || phase, // Fallback sur la phase passée en paramètre si absente
           championshipType: data.championshipType,
+          idEpreuve: data.idEpreuve,
           date: data.date,
           players: data.players || {},
           createdAt:
@@ -118,7 +127,8 @@ export class AvailabilityService {
       const docId = this.getDocumentId(
         availability.journee,
         availability.phase,
-        availability.championshipType
+        availability.championshipType,
+        availability.idEpreuve
       );
       const docRef = doc(getDbInstanceDirect(), this.collectionName, docId);
 
@@ -158,6 +168,10 @@ export class AvailabilityService {
         dataToSave.date = availability.date;
       } else if (existingData?.date !== undefined) {
         dataToSave.date = existingData.date;
+      }
+
+      if (availability.idEpreuve !== undefined) {
+        dataToSave.idEpreuve = availability.idEpreuve;
       }
 
       console.log("[AvailabilityService] sanitized players", {
@@ -246,10 +260,11 @@ export class AvailabilityService {
     journee: number,
     phase: "aller" | "retour",
     championshipType: "masculin" | "feminin",
-    callback: (availability: DayAvailability | null) => void
+    callback: (availability: DayAvailability | null) => void,
+    idEpreuve?: number
   ): Unsubscribe {
     try {
-      const docId = this.getDocumentId(journee, phase, championshipType);
+      const docId = this.getDocumentId(journee, phase, championshipType, idEpreuve);
       const docRef = doc(getDbInstanceDirect(), this.collectionName, docId);
 
       const unsubscribe = onSnapshot(
@@ -261,6 +276,7 @@ export class AvailabilityService {
               journee: data.journee,
               phase: data.phase || phase,
               championshipType: data.championshipType,
+              idEpreuve: data.idEpreuve,
               date: data.date,
               players: data.players || {},
               createdAt:

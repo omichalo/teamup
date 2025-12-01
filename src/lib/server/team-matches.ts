@@ -75,6 +75,8 @@ export interface TeamSummary {
   teamNumber: number;
   location?: string; // ID du lieu (ville) associé à l'équipe
   discordChannelId?: string; // ID du canal Discord associé à l'équipe
+  epreuve?: string; // Libellé de l'épreuve FFTT
+  idEpreuve?: number; // ID de l'épreuve FFTT (15954, 15955, 15980, etc.)
   createdAt: Date;
   updatedAt: Date;
 }
@@ -93,6 +95,8 @@ export async function getTeams(firestore: Firestore): Promise<TeamSummary[]> {
       teamNumber: data.number || data.teamNumber,
       location: data.location,
       discordChannelId: data.discordChannelId,
+      epreuve: data.epreuve,
+      idEpreuve: data.idEpreuve,
       createdAt: data.createdAt?.toDate?.() || data.createdAt || new Date(),
       updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || new Date(),
     });

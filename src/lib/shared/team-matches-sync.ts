@@ -37,7 +37,7 @@ function convertToFFTTRencontre(rencontre: unknown): FFTTRencontre {
 
 function convertToFFTTDetailsRencontre(details: unknown): FFTTDetailsRencontre {
   const d = details as Record<string, unknown>;
-  
+
   // Gérer joueursA : peut être un tableau ou un objet
   let joueursA: FFTTJoueur[] = [];
   if (d.joueursA) {
@@ -48,7 +48,7 @@ function convertToFFTTDetailsRencontre(details: unknown): FFTTDetailsRencontre {
       joueursA = Object.values(d.joueursA).map(convertToFFTTJoueur);
     }
   }
-  
+
   // Gérer joueursB : peut être un tableau ou un objet
   let joueursB: FFTTJoueur[] = [];
   if (d.joueursB) {
@@ -59,7 +59,7 @@ function convertToFFTTDetailsRencontre(details: unknown): FFTTDetailsRencontre {
       joueursB = Object.values(d.joueursB).map(convertToFFTTJoueur);
     }
   }
-  
+
   return {
     nomEquipeA: String(d.nomEquipeA || ""),
     nomEquipeB: String(d.nomEquipeB || ""),
@@ -135,6 +135,7 @@ export interface MatchData {
   division: string;
   teamId: string;
   epreuve: string;
+  idEpreuve?: number; // ID de l'épreuve FFTT (15954, 15955, 15980, etc.)
   score?: string | undefined;
   result: string;
   rencontreId: string;
@@ -190,7 +191,9 @@ export class TeamMatchesSyncService {
    */
   async syncMatchesForTeam(teamId: string): Promise<TeamMatchesSyncResult> {
     try {
-      console.log(`🔄 Synchronisation des matchs pour l&apos;équipe ${teamId}...`);
+      console.log(
+        `🔄 Synchronisation des matchs pour l&apos;équipe ${teamId}...`
+      );
       await this.ffttApi.initialize();
 
       // Récupérer les équipes du club
@@ -344,10 +347,7 @@ export class TeamMatchesSyncService {
             error
           );
           // Créer le match sans les détails des joueurs
-          const matchData = createBaseMatch(
-            rencontre as FFTTRencontre,
-            equipe
-          );
+          const matchData = createBaseMatch(rencontre as FFTTRencontre, equipe);
           processedMatches.push(matchData);
         }
       }
@@ -384,10 +384,15 @@ export class TeamMatchesSyncService {
       const equipes = await this.ffttApi.getEquipesByClub(this.clubCode);
 
       // Filtrer les équipes pour les épreuves spécifiques et ajouter le champ isFemale
+      // 15954 = Championnat de France par Équipes Masculin
+      // 15955 = Championnat de France par Équipes Féminin
+      // 15980 = Championnat de Paris IDF (Excellence)
       const filteredEquipes = equipes
         .filter(
           (equipe: FFTTEquipe) =>
-            equipe.idEpreuve === 15954 || equipe.idEpreuve === 15955
+            equipe.idEpreuve === 15954 ||
+            equipe.idEpreuve === 15955 ||
+            equipe.idEpreuve === 15980
         )
         .map((equipe: FFTTEquipe) => {
           // S'assurer que isFemale est défini en utilisant toutes les informations disponibles
@@ -414,7 +419,8 @@ export class TeamMatchesSyncService {
       const allMatches = await this.fetchAllMatches(filteredEquipes);
 
       // Recalculer les journées basées sur la date si l'extraction depuis le libellé a échoué
-      const matchesWithRecalculatedJournees = this.recalculateJourneesByDate(allMatches);
+      const matchesWithRecalculatedJournees =
+        this.recalculateJourneesByDate(allMatches);
 
       // Enrichir les matchs avec les licences des joueurs avant de mettre à jour la participation
       let enrichedMatches = matchesWithRecalculatedJournees;
@@ -428,26 +434,28 @@ export class TeamMatchesSyncService {
           id: doc.id,
           ...doc.data(),
         }));
-        console.log(
-          `✅ ${playersCache.length} joueurs chargés en cache`
-        );
+        console.log(`✅ ${playersCache.length} joueurs chargés en cache`);
 
         console.log(
           "🔄 Enrichissement des matchs avec les licences des joueurs..."
         );
         enrichedMatches = await Promise.all(
-          allMatches.map((match) => this.enrichSQYPlayersFromClub(match, db, playersCache))
+          allMatches.map((match) =>
+            this.enrichSQYPlayersFromClub(match, db, playersCache)
+          )
         );
-        console.log(
-          `✅ ${enrichedMatches.length} matchs enrichis`
-        );
+        console.log(`✅ ${enrichedMatches.length} matchs enrichis`);
 
         // Mettre à jour la participation des joueurs avec les matchs enrichis
         console.log(
           "🔄 Mise à jour de la participation des joueurs basée sur les matchs enrichis..."
         );
         const participationResult =
-          await this.updatePlayerParticipationFromMatches(enrichedMatches, db, playersCache);
+          await this.updatePlayerParticipationFromMatches(
+            enrichedMatches,
+            db,
+            playersCache
+          );
         console.log(
           `✅ Participation mise à jour: ${participationResult.updated} joueurs, ${participationResult.errors} erreurs`
         );
@@ -476,10 +484,10 @@ export class TeamMatchesSyncService {
   private async fetchAllMatches(equipes: FFTTEquipe[]): Promise<MatchData[]> {
     // ID de l'équipe pour laquelle afficher les logs détaillés (33882 = équipe 2 masculine)
     const DEBUG_TEAM_ID = 33882;
-    
-      const matchPromises = equipes.map(async (equipe) => {
+
+    const matchPromises = equipes.map(async (equipe) => {
       const isDebugTeam = equipe.idEquipe === DEBUG_TEAM_ID;
-      
+
       try {
         const rencontres = await this.ffttApi.getRencontrePouleByLienDivision(
           equipe.lienDivision
@@ -502,7 +510,9 @@ export class TeamMatchesSyncService {
           `🏓 ${sqyPingMatches.length} matchs SQY Ping sur ${rencontres.length} matchs de poule pour ${equipe.libelle}`
         );
         if (isDebugTeam) {
-          console.log(`   └─ Équipe: ${equipe.libelle} | Division: ${equipe.division}`);
+          console.log(
+            `   └─ Équipe: ${equipe.libelle} | Division: ${equipe.division}`
+          );
         }
 
         // Transformer les matchs avec récupération des détails
@@ -549,7 +559,6 @@ export class TeamMatchesSyncService {
               );
             }
 
-
             const detailsRencontre =
               await this.ffttApi.getDetailsRencontreByLien(
                 rencontre.lien,
@@ -557,16 +566,16 @@ export class TeamMatchesSyncService {
                 clubEquipeB || ""
               );
 
-
             // Convertir les détails avant de créer le match
-            const convertedDetails = convertToFFTTDetailsRencontre(detailsRencontre);
-            
+            const convertedDetails =
+              convertToFFTTDetailsRencontre(detailsRencontre);
+
             const matchData = createBaseMatch(
               rencontre as FFTTRencontre,
               equipe,
               convertedDetails
             );
-            
+
             processedMatches.push(matchData);
           } catch (error) {
             console.error(
@@ -622,7 +631,7 @@ export class TeamMatchesSyncService {
     try {
       // Utiliser le cache si fourni, sinon charger depuis Firestore
       let allPlayers: Array<{ id: string; [key: string]: unknown }>;
-      
+
       if (playersCache) {
         allPlayers = playersCache;
       } else if (db) {
@@ -781,10 +790,24 @@ export class TeamMatchesSyncService {
             matches.map((match) => this.enrichSQYPlayersFromClub(match, db))
           );
 
-      // Collecter tous les joueurs qui participent à au moins un match
-      const participatingPlayers = new Set<string>();
+      // Séparer les matchs du championnat par équipes et du championnat de Paris
+      const matchesChampionnatEquipes = enrichedMatches.filter(
+        (match) => match.idEpreuve !== 15980
+      );
+      const matchesChampionnatParis = enrichedMatches.filter(
+        (match) => match.idEpreuve === 15980
+      );
 
-      for (const match of enrichedMatches) {
+      console.log(
+        `📊 ${matchesChampionnatEquipes.length} matchs championnat par équipes, ${matchesChampionnatParis.length} matchs championnat de Paris`
+      );
+
+      // Collecter tous les joueurs qui participent à au moins un match (championnat par équipes)
+      const participatingPlayers = new Set<string>();
+      const participatingPlayersParis = new Set<string>();
+
+      // Traiter les matchs du championnat par équipes
+      for (const match of matchesChampionnatEquipes) {
         // Un match est considéré comme joué s&apos;il a des joueurs OU des résultats individuels OU des scores > 0
         const hasPlayers =
           match.joueursSQY &&
@@ -819,14 +842,48 @@ export class TeamMatchesSyncService {
         }
       }
 
+      // Traiter les matchs du championnat de Paris
+      for (const match of matchesChampionnatParis) {
+        // Un match est considéré comme joué s'il a des joueurs OU des résultats individuels OU des scores > 0
+        const hasPlayers =
+          match.joueursSQY &&
+          Array.isArray(match.joueursSQY) &&
+          match.joueursSQY.length > 0;
+        const hasResults =
+          match.resultatsIndividuels &&
+          Array.isArray(match.resultatsIndividuels) &&
+          match.resultatsIndividuels.length > 0;
+        // Parser le score depuis le champ score (format "24-18")
+        let hasScore = false;
+        if (match.score) {
+          const scoreParts = match.score.split("-");
+          if (scoreParts.length === 2) {
+            const scoreA = parseInt(scoreParts[0], 10);
+            const scoreB = parseInt(scoreParts[1], 10);
+            hasScore = scoreA > 0 || scoreB > 0;
+          }
+        }
+
+        if (hasPlayers || hasResults || hasScore) {
+          // Vérifier aussi joueursSQY (nouveau format)
+          if (hasPlayers) {
+            for (const joueur of match.joueursSQY!) {
+              if (joueur.licence && joueur.licence.trim() !== "") {
+                participatingPlayersParis.add(joueur.licence);
+              }
+            }
+          }
+        }
+      }
+
       console.log(
-        `📊 ${participatingPlayers.size} joueurs participants identifiés`
+        `📊 ${participatingPlayers.size} joueurs participants championnat par équipes, ${participatingPlayersParis.size} joueurs participants championnat de Paris`
       );
 
       // Calculer les équipes de brûlage séparément pour masculin et féminin
       console.log("🔄 Calcul des équipes de brûlage...");
 
-      // Structures séparées pour masculin et féminin: Map<licence, Map<phase, Map<teamNumber, count>>>
+      // Structures séparées pour masculin et féminin (championnat par équipes): Map<licence, Map<phase, Map<teamNumber, count>>>
       const matchCountByPlayerPhaseTeamMasculin = new Map<
         string,
         Map<string, Map<number, number>>
@@ -836,11 +893,14 @@ export class TeamMatchesSyncService {
         Map<string, Map<number, number>>
       >();
 
-      // Compter les matchs par joueur, phase et équipe (séparer masculin et féminin)
-      // let debugCountMasculin = 0;
-      // let debugCountFeminin = 0;
-      
-      for (const match of enrichedMatches) {
+      // Structure unifiée pour le championnat de Paris (mixte): Map<licence, Map<phase, Map<teamNumber, count>>>
+      const matchCountByPlayerPhaseTeamParis = new Map<
+        string,
+        Map<string, Map<number, number>>
+      >();
+
+      // Compter les matchs par joueur, phase et équipe pour le championnat par équipes (séparer masculin et féminin)
+      for (const match of matchesChampionnatEquipes) {
         const isFeminin = match.isFemale;
         // if (isFeminin) {
         //   debugCountFeminin++;
@@ -879,7 +939,6 @@ export class TeamMatchesSyncService {
               continue;
             }
 
-
             // Initialiser les structures si nécessaire
             if (!matchCountMap.has(playerLicence)) {
               matchCountMap.set(playerLicence, new Map());
@@ -908,10 +967,14 @@ export class TeamMatchesSyncService {
           string,
           Map<string, Map<number, number>>
         >,
-        typeName: string
+        typeName: string,
+        isParisChampionship = false
       ): {
         highestBurnedTeamByPlayerByPhase: Map<string, Map<string, number>>; // licence -> phase -> teamNumber
-        matchesByTeamByPlayerByPhase: Map<string, Map<string, Map<number, number>>>; // licence -> phase -> teamNumber -> count
+        matchesByTeamByPlayerByPhase: Map<
+          string,
+          Map<string, Map<number, number>>
+        >; // licence -> phase -> teamNumber -> count
       } => {
         const highestBurnedTeamByPlayerByPhase = new Map<
           string,
@@ -924,10 +987,7 @@ export class TeamMatchesSyncService {
 
         for (const [playerLicence, phaseMap] of matchCountByPlayerPhaseTeam) {
           const playerBurnoutByPhase = new Map<string, number>();
-          const playerMatchesByPhase = new Map<
-            string,
-            Map<number, number>
-          >();
+          const playerMatchesByPhase = new Map<string, Map<number, number>>();
 
           // Calculer le brûlage pour chaque phase séparément
           for (const [phase, teamMap] of phaseMap) {
@@ -946,26 +1006,54 @@ export class TeamMatchesSyncService {
             }
 
             // Déterminer l'équipe de brûlage pour cette phase
-            // Règle FFTT : Un joueur est brûlé dans l'équipe où il a joué son 2ème match
-            // (en comptant tous les matchs dans l'ordre croissant des numéros d'équipe)
-            // Exemple : {1: 3, 2: 1} -> liste triée : [1, 1, 1, 2] -> 2ème match = équipe 1
             let highestBurnedTeamInPhase: number | null = null;
 
-            // Créer une liste de tous les matchs triés par numéro d'équipe croissant
-            const allMatches: number[] = [];
-            for (const [teamNumber, matchCount] of matchesByTeamInPhase) {
-              // Ajouter le numéro d'équipe autant de fois qu'il y a de matchs
-              for (let i = 0; i < matchCount; i++) {
-                allMatches.push(teamNumber);
+            if (isParisChampionship) {
+              // Règle Article 12 du championnat de Paris :
+              // Un joueur est brûlé s'il a joué 3 fois ou plus dans UNE équipe de numéro inférieur
+              // On cherche la plus basse équipe (numéro le plus élevé) où il est brûlé
+              const teamNumbers = Array.from(matchesByTeamInPhase.keys()).sort((a, b) => a - b);
+              
+              for (let i = 0; i < teamNumbers.length; i++) {
+                const currentTeamNumber = teamNumbers[i];
+                
+                // Vérifier s'il y a une équipe de numéro inférieur où le joueur a joué 3 fois ou plus
+                for (let j = 0; j < i; j++) {
+                  const lowerTeamNumber = teamNumbers[j];
+                  const matchCountInLowerTeam = matchesByTeamInPhase.get(lowerTeamNumber) || 0;
+                  
+                  // Si le joueur a 3 matchs ou plus dans cette équipe inférieure, il est brûlé dans l'équipe actuelle
+                  if (matchCountInLowerTeam >= 3) {
+                    highestBurnedTeamInPhase = currentTeamNumber;
+                    break; // Prendre la première équipe où il est brûlé (la plus basse)
+                  }
+                }
+                
+                if (highestBurnedTeamInPhase !== null) {
+                  break;
+                }
               }
-            }
+            } else {
+              // Règle FFTT championnat par équipes : Un joueur est brûlé dans l'équipe où il a joué son 2ème match
+              // (en comptant tous les matchs dans l'ordre croissant des numéros d'équipe)
+              // Exemple : {1: 3, 2: 1} -> liste triée : [1, 1, 1, 2] -> 2ème match = équipe 1
+              
+              // Créer une liste de tous les matchs triés par numéro d'équipe croissant
+              const allMatches: number[] = [];
+              for (const [teamNumber, matchCount] of matchesByTeamInPhase) {
+                // Ajouter le numéro d'équipe autant de fois qu'il y a de matchs
+                for (let i = 0; i < matchCount; i++) {
+                  allMatches.push(teamNumber);
+                }
+              }
 
-            // Trier par numéro d'équipe croissant
-            allMatches.sort((a, b) => a - b);
+              // Trier par numéro d'équipe croissant
+              allMatches.sort((a, b) => a - b);
 
-            // Si le joueur a joué au moins 2 matchs, il est brûlé dans l'équipe du 2ème match
-            if (allMatches.length >= 2) {
-              highestBurnedTeamInPhase = allMatches[1]; // 2ème élément (index 1)
+              // Si le joueur a joué au moins 2 matchs, il est brûlé dans l'équipe du 2ème match
+              if (allMatches.length >= 2) {
+                highestBurnedTeamInPhase = allMatches[1]; // 2ème élément (index 1)
+              }
             }
 
             // Si le joueur est brûlé dans cette phase, enregistrer
@@ -982,7 +1070,10 @@ export class TeamMatchesSyncService {
             );
           }
           if (playerMatchesByPhase.size > 0) {
-            matchesByTeamByPlayerByPhase.set(playerLicence, playerMatchesByPhase);
+            matchesByTeamByPlayerByPhase.set(
+              playerLicence,
+              playerMatchesByPhase
+            );
           }
         }
 
@@ -1001,7 +1092,6 @@ export class TeamMatchesSyncService {
           matchesByTeamByPlayerByPhase,
         };
       };
-
 
       // Calculer les brûlages séparément pour masculin et féminin
       const {
@@ -1022,26 +1112,40 @@ export class TeamMatchesSyncService {
         "féminin"
       );
 
+      // Calculer les brûlages pour le championnat de Paris (mixte, pas de distinction M/F)
+      // Utiliser 3 matchs au lieu de 2 pour le brûlage (Article 12)
+      const {
+        highestBurnedTeamByPlayerByPhase: highestBurnedTeamByPlayerByPhaseParis,
+        matchesByTeamByPlayerByPhase: matchesByTeamByPlayerByPhaseParis,
+      } = calculateBurnoutForTeamType(
+        matchCountByPlayerPhaseTeamParis,
+        "Paris (mixte)",
+        true // isParisChampionship = true
+      );
 
       // Récupérer les données actuelles des joueurs pour éviter les mises à jour inutiles
-      // Inclure tous les joueurs qui ont participé OU qui ont des matchs enregistrés (masculin ou féminin)
+      // Inclure tous les joueurs qui ont participé OU qui ont des matchs enregistrés (masculin ou féminin, championnat par équipes ou Paris)
       const allPlayerIds = new Set([
         ...Array.from(participatingPlayers),
+        ...Array.from(participatingPlayersParis),
         ...Array.from(masculineMatchesByTeamByPlayerByPhase.keys()),
         ...Array.from(feminineMatchesByTeamByPlayerByPhase.keys()),
+        ...Array.from(matchesByTeamByPlayerByPhaseParis.keys()),
       ]);
       const playerIds = Array.from(allPlayerIds);
       const playersToUpdate = [];
 
       // OPTIMISATION : Utiliser le cache de joueurs si fourni, sinon récupérer avec getAll()
       console.log(`📥 Récupération de ${playerIds.length} joueurs...`);
-      
+
       // Créer une Map pour un accès rapide aux données existantes
       const playerDataMap = new Map<string, Record<string, unknown>>();
-      
+
       if (playersCache) {
         // Utiliser le cache de joueurs déjà chargé (évite les reads supplémentaires)
-        console.log(`✅ Utilisation du cache de joueurs (${playersCache.length} joueurs en cache)`);
+        console.log(
+          `✅ Utilisation du cache de joueurs (${playersCache.length} joueurs en cache)`
+        );
         for (const player of playersCache) {
           if (playerIds.includes(player.id)) {
             playerDataMap.set(player.id, player);
@@ -1052,28 +1156,36 @@ export class TeamMatchesSyncService {
         const docRefs = playerIds.map((playerId) =>
           db.collection("players").doc(playerId)
         );
-        
+
         // getAll() peut récupérer jusqu'à 10 documents à la fois
         // Diviser en sous-batches de 10 et les traiter en parallèle
         const getAllBatchSize = 10;
         const getAllBatches: Array<Array<DocumentReference>> = [];
-        
+
         for (let k = 0; k < docRefs.length; k += getAllBatchSize) {
           getAllBatches.push(docRefs.slice(k, k + getAllBatchSize));
         }
-        
+
         // Traiter les batches getAll() en parallèle (max 5 à la fois pour ne pas surcharger)
         const maxConcurrentGetAll = 5;
         for (let k = 0; k < getAllBatches.length; k += maxConcurrentGetAll) {
-          const concurrentBatches = getAllBatches.slice(k, k + maxConcurrentGetAll);
-          const getAllPromises = concurrentBatches.map((batch) => db.getAll(...batch));
-          
+          const concurrentBatches = getAllBatches.slice(
+            k,
+            k + maxConcurrentGetAll
+          );
+          const getAllPromises = concurrentBatches.map((batch) =>
+            db.getAll(...batch)
+          );
+
           const results = await Promise.all(getAllPromises);
-          
+
           results.forEach((docs) => {
             docs.forEach((doc) => {
               if (doc.exists) {
-                playerDataMap.set(doc.id, doc.data() as Record<string, unknown>);
+                playerDataMap.set(
+                  doc.id,
+                  doc.data() as Record<string, unknown>
+                );
               }
             });
           });
@@ -1086,15 +1198,39 @@ export class TeamMatchesSyncService {
           if (playerData) {
             const updates: Record<string, unknown> = {};
 
-            // Mettre à jour hasPlayedAtLeastOneMatch si pas déjà true
-            if (!playerData?.hasPlayedAtLeastOneMatch) {
+            // Mettre à jour hasPlayedAtLeastOneMatch si pas déjà true (championnat par équipes)
+            if (
+              participatingPlayers.has(playerId) &&
+              !playerData?.hasPlayedAtLeastOneMatch
+            ) {
               updates.hasPlayedAtLeastOneMatch = true;
             }
 
+            // Mettre à jour hasPlayedAtLeastOneMatchParis si pas déjà true (championnat de Paris)
+            if (
+              participatingPlayersParis.has(playerId) &&
+              !playerData?.hasPlayedAtLeastOneMatchParis
+            ) {
+              updates.hasPlayedAtLeastOneMatchParis = true;
+            }
+
             // Mettre à jour participation.championnat si pas déjà true
-            const participation = playerData?.participation as { championnat?: boolean } | undefined;
-            if (!participation?.championnat) {
+            const participation = playerData?.participation as
+              | { championnat?: boolean; championnatParis?: boolean }
+              | undefined;
+            if (
+              participatingPlayers.has(playerId) &&
+              !participation?.championnat
+            ) {
               updates["participation.championnat"] = true;
+            }
+
+            // Mettre à jour participation.championnatParis si pas déjà true
+            if (
+              participatingPlayersParis.has(playerId) &&
+              !participation?.championnatParis
+            ) {
+              updates["participation.championnatParis"] = true;
             }
 
             // Mettre à jour highestMasculineTeamNumberByPhase si le joueur est brûlé en masculin
@@ -1106,7 +1242,9 @@ export class TeamMatchesSyncService {
             if (highestMasculineBurnedTeamByPhase) {
               // Le joueur est brûlé en masculin pour au moins une phase
               const currentHighestByPhase =
-                (playerData?.highestMasculineTeamNumberByPhase as { aller?: number; retour?: number } | undefined) || {};
+                (playerData?.highestMasculineTeamNumberByPhase as
+                  | { aller?: number; retour?: number }
+                  | undefined) || {};
 
               const newHighestByPhase: {
                 aller?: number;
@@ -1114,13 +1252,19 @@ export class TeamMatchesSyncService {
               } = { ...currentHighestByPhase };
 
               // Mettre à jour pour chaque phase
-              for (const [phase, burnedTeam] of highestMasculineBurnedTeamByPhase) {
+              for (const [
+                phase,
+                burnedTeam,
+              ] of highestMasculineBurnedTeamByPhase) {
                 if (phase === "aller" || phase === "retour") {
                   const currentHighest = currentHighestByPhase[phase] ?? null;
 
                   // Mettre à jour si la valeur actuelle est absente ou si la nouvelle valeur est différente
                   // La valeur calculée est la source de vérité basée sur les matchs réels
-                  if (currentHighest === null || burnedTeam !== currentHighest) {
+                  if (
+                    currentHighest === null ||
+                    burnedTeam !== currentHighest
+                  ) {
                     newHighestByPhase[phase] = burnedTeam;
                   }
                 }
@@ -1138,9 +1282,11 @@ export class TeamMatchesSyncService {
               }
             } else if (!hasMasculineMatches) {
               // Le joueur n'a plus de matchs masculins, supprimer le brûlage si le champ existe
-              if ((playerData?.highestMasculineTeamNumberByPhase as unknown) !== undefined) {
-                updates.highestMasculineTeamNumberByPhase =
-                  FieldValue.delete();
+              if (
+                (playerData?.highestMasculineTeamNumberByPhase as unknown) !==
+                undefined
+              ) {
+                updates.highestMasculineTeamNumberByPhase = FieldValue.delete();
               }
             }
 
@@ -1153,7 +1299,9 @@ export class TeamMatchesSyncService {
             if (highestFeminineBurnedTeamByPhase) {
               // Le joueur est brûlé en féminin pour au moins une phase
               const currentHighestByPhase =
-                (playerData?.highestFeminineTeamNumberByPhase as { aller?: number; retour?: number } | undefined) || {};
+                (playerData?.highestFeminineTeamNumberByPhase as
+                  | { aller?: number; retour?: number }
+                  | undefined) || {};
 
               const newHighestByPhase: {
                 aller?: number;
@@ -1161,13 +1309,19 @@ export class TeamMatchesSyncService {
               } = { ...currentHighestByPhase };
 
               // Mettre à jour pour chaque phase
-              for (const [phase, burnedTeam] of highestFeminineBurnedTeamByPhase) {
+              for (const [
+                phase,
+                burnedTeam,
+              ] of highestFeminineBurnedTeamByPhase) {
                 if (phase === "aller" || phase === "retour") {
                   const currentHighest = currentHighestByPhase[phase] ?? null;
 
                   // Mettre à jour si la valeur actuelle est absente ou si la nouvelle valeur est différente
                   // La valeur calculée est la source de vérité basée sur les matchs réels
-                  if (currentHighest === null || burnedTeam !== currentHighest) {
+                  if (
+                    currentHighest === null ||
+                    burnedTeam !== currentHighest
+                  ) {
                     newHighestByPhase[phase] = burnedTeam;
                   }
                 }
@@ -1185,9 +1339,11 @@ export class TeamMatchesSyncService {
               }
             } else if (!hasFeminineMatches) {
               // Le joueur n'a plus de matchs féminins, supprimer le brûlage si le champ existe
-              if ((playerData?.highestFeminineTeamNumberByPhase as unknown) !== undefined) {
-                updates.highestFeminineTeamNumberByPhase =
-                  FieldValue.delete();
+              if (
+                (playerData?.highestFeminineTeamNumberByPhase as unknown) !==
+                undefined
+              ) {
+                updates.highestFeminineTeamNumberByPhase = FieldValue.delete();
               }
             }
 
@@ -1235,6 +1391,79 @@ export class TeamMatchesSyncService {
               }
 
               updates.feminineMatchesByTeamByPhase = matchesByTeamByPhaseObj;
+            }
+
+            // Mettre à jour highestTeamNumberByPhaseParis si le joueur est brûlé au championnat de Paris (mixte)
+            const highestBurnedTeamByPhaseParis =
+              highestBurnedTeamByPlayerByPhaseParis.get(playerId);
+            const hasMatchesParis =
+              matchesByTeamByPlayerByPhaseParis.has(playerId);
+
+            if (highestBurnedTeamByPhaseParis) {
+              // Le joueur est brûlé pour au moins une phase (Paris)
+              const currentHighestByPhase =
+                (playerData?.highestTeamNumberByPhaseParis as
+                  | { aller?: number; retour?: number }
+                  | undefined) || {};
+
+              const newHighestByPhase: {
+                aller?: number;
+                retour?: number;
+              } = { ...currentHighestByPhase };
+
+              // Mettre à jour pour chaque phase
+              for (const [phase, burnedTeam] of highestBurnedTeamByPhaseParis) {
+                if (phase === "aller" || phase === "retour") {
+                  const currentHighest = currentHighestByPhase[phase] ?? null;
+
+                  if (
+                    currentHighest === null ||
+                    burnedTeam !== currentHighest
+                  ) {
+                    newHighestByPhase[phase] = burnedTeam;
+                  }
+                }
+              }
+
+              const hasChanges = Object.keys(newHighestByPhase).some(
+                (phase) =>
+                  newHighestByPhase[phase as "aller" | "retour"] !==
+                  currentHighestByPhase[phase as "aller" | "retour"]
+              );
+
+              if (hasChanges || Object.keys(newHighestByPhase).length > 0) {
+                updates.highestTeamNumberByPhaseParis = newHighestByPhase;
+              }
+            } else if (!hasMatchesParis) {
+              // Le joueur n'a plus de matchs Paris, supprimer le brûlage si le champ existe
+              if (
+                (playerData?.highestTeamNumberByPhaseParis as unknown) !==
+                undefined
+              ) {
+                updates.highestTeamNumberByPhaseParis = FieldValue.delete();
+              }
+            }
+
+            // Mettre à jour matchesByTeamByPhaseParis pour l'affichage dans le tooltip
+            const matchesByPhaseParis =
+              matchesByTeamByPlayerByPhaseParis.get(playerId);
+            if (matchesByPhaseParis && matchesByPhaseParis.size > 0) {
+              // Convertir la Map par phase en objet pour Firestore
+              const matchesByTeamByPhaseObj: {
+                aller?: { [teamNumber: number]: number };
+                retour?: { [teamNumber: number]: number };
+              } = {};
+
+              for (const [phase, matchesByTeam] of matchesByPhaseParis) {
+                const matchesByTeamObj: { [teamNumber: number]: number } = {};
+                matchesByTeam.forEach((count, teamNumber) => {
+                  matchesByTeamObj[teamNumber] = count;
+                });
+                matchesByTeamByPhaseObj[phase as "aller" | "retour"] =
+                  matchesByTeamObj;
+              }
+
+              updates.matchesByTeamByPhaseParis = matchesByTeamByPhaseObj;
             }
 
             // Ajouter updatedAt si il y a des mises à jour
@@ -1321,7 +1550,7 @@ export class TeamMatchesSyncService {
       // Grouper les matchs par équipe (utiliser le champ teamId du match)
       let matchesWithTeamId = 0;
       let matchesWithoutTeamId = 0;
-      
+
       matches.forEach((match) => {
         const teamId = match.teamId;
 
@@ -1332,45 +1561,65 @@ export class TeamMatchesSyncService {
           matchesByTeam.get(teamId)!.push(match);
           matchesWithTeamId++;
         } else {
-          console.warn(`⚠️ Match sans teamId: ${match.id} (teamId="${teamId}")`);
+          console.warn(
+            `⚠️ Match sans teamId: ${match.id} (teamId="${teamId}")`
+          );
           matchesWithoutTeamId++;
         }
       });
-      
-      console.log(`📊 Matchs avec teamId: ${matchesWithTeamId}, sans teamId: ${matchesWithoutTeamId}`);
+
+      console.log(
+        `📊 Matchs avec teamId: ${matchesWithTeamId}, sans teamId: ${matchesWithoutTeamId}`
+      );
 
       console.log(`📊 ${matchesByTeam.size} équipes avec des matchs`);
       console.log(`📊 Équipes: ${Array.from(matchesByTeam.keys()).join(", ")}`);
-      
+
       // Calculer le total de matchs à sauvegarder
       const totalMatchesToSave = Array.from(matchesByTeam.values()).reduce(
         (sum, teamMatches) => sum + teamMatches.length,
         0
       );
-      console.log(`📊 Total de matchs à sauvegarder: ${totalMatchesToSave} (sur ${matches.length} matchs reçus)`);
-      
+      console.log(
+        `📊 Total de matchs à sauvegarder: ${totalMatchesToSave} (sur ${matches.length} matchs reçus)`
+      );
+
       // Vérifier que les teamId existent dans Firestore
       if (db && matchesByTeam.size > 0) {
         const teamIds = Array.from(matchesByTeam.keys());
-        const teamRefs = teamIds.map(teamId => db.collection("teams").doc(teamId));
+        const teamRefs = teamIds.map((teamId) =>
+          db.collection("teams").doc(teamId)
+        );
         const teamDocs = await db.getAll(...teamRefs);
-        const existingTeamIds = teamDocs.filter(doc => doc.exists).map(doc => doc.id);
-        const missingTeamIds = teamIds.filter(id => !existingTeamIds.includes(id));
-        
+        const existingTeamIds = teamDocs
+          .filter((doc) => doc.exists)
+          .map((doc) => doc.id);
+        const missingTeamIds = teamIds.filter(
+          (id) => !existingTeamIds.includes(id)
+        );
+
         if (missingTeamIds.length > 0) {
-          console.warn(`⚠️ ${missingTeamIds.length} équipes référencées dans les matchs n'existent pas dans Firestore: ${missingTeamIds.join(", ")}`);
+          console.warn(
+            `⚠️ ${
+              missingTeamIds.length
+            } équipes référencées dans les matchs n'existent pas dans Firestore: ${missingTeamIds.join(
+              ", "
+            )}`
+          );
         } else {
-          console.log(`✅ Toutes les équipes référencées existent dans Firestore`);
+          console.log(
+            `✅ Toutes les équipes référencées existent dans Firestore`
+          );
         }
       }
 
       // OPTIMISATION : Paralléliser les commits de batch pour différentes équipes
       // Sauvegarder par batch
       const batchSize = 500;
-      
+
       // Préparer tous les batches pour toutes les équipes
       const batchPromises: Array<Promise<void>> = [];
-      
+
       for (const [teamId, teamMatches] of matchesByTeam) {
         console.log(
           `💾 Préparation de ${teamMatches.length} matchs pour ${teamId}...`
@@ -1435,21 +1684,25 @@ export class TeamMatchesSyncService {
             const serializableMatchData = {
               ...matchData,
               joueursSQY:
-                matchData.joueursSQY?.map((joueur) => cleanPlayer({
-                  licence: joueur.licence,
-                  nom: (joueur as { nom?: string }).nom,
-                  prenom: (joueur as { prenom?: string }).prenom,
-                  points: joueur.points,
-                  sexe: joueur.sexe,
-                })) || [],
+                matchData.joueursSQY?.map((joueur) =>
+                  cleanPlayer({
+                    licence: joueur.licence,
+                    nom: (joueur as { nom?: string }).nom,
+                    prenom: (joueur as { prenom?: string }).prenom,
+                    points: joueur.points,
+                    sexe: joueur.sexe,
+                  })
+                ) || [],
               joueursAdversaires:
-                matchData.joueursAdversaires?.map((joueur) => cleanPlayer({
-                  licence: joueur.licence,
-                  nom: (joueur as { nom?: string }).nom,
-                  prenom: (joueur as { prenom?: string }).prenom,
-                  points: joueur.points,
-                  sexe: joueur.sexe,
-                })) || [],
+                matchData.joueursAdversaires?.map((joueur) =>
+                  cleanPlayer({
+                    licence: joueur.licence,
+                    nom: (joueur as { nom?: string }).nom,
+                    prenom: (joueur as { prenom?: string }).prenom,
+                    points: joueur.points,
+                    sexe: joueur.sexe,
+                  })
+                ) || [],
             };
 
             // Forcer la mise à jour des champs importants même s'ils étaient vides avant
@@ -1465,7 +1718,9 @@ export class TeamMatchesSyncService {
             };
 
             // Fonction récursive pour supprimer toutes les propriétés undefined
-            const removeUndefined = (obj: Record<string, unknown>): Record<string, unknown> => {
+            const removeUndefined = (
+              obj: Record<string, unknown>
+            ): Record<string, unknown> => {
               const cleaned: Record<string, unknown> = {};
               for (const [key, value] of Object.entries(obj)) {
                 if (value === undefined) {
@@ -1482,7 +1737,9 @@ export class TeamMatchesSyncService {
                   );
                 } else if (typeof value === "object" && value !== null) {
                   // Nettoyer les objets imbriqués
-                  cleaned[key] = removeUndefined(value as Record<string, unknown>);
+                  cleaned[key] = removeUndefined(
+                    value as Record<string, unknown>
+                  );
                 } else {
                   cleaned[key] = value;
                 }
@@ -1490,31 +1747,38 @@ export class TeamMatchesSyncService {
               return cleaned;
             };
 
-            const updateData = removeUndefined(updateDataRaw as Record<string, unknown>);
+            const updateData = removeUndefined(
+              updateDataRaw as Record<string, unknown>
+            );
 
             batch.set(docRef, updateData, { merge: true });
             saved++;
           }
-          
-          console.log(`  📝 Batch préparé: ${matchesInThisBatch} matchs ajoutés au batch (saved=${saved})`);
+
+          console.log(
+            `  📝 Batch préparé: ${matchesInThisBatch} matchs ajoutés au batch (saved=${saved})`
+          );
 
           // Ajouter la promesse de commit au tableau pour parallélisation
           // Capturer les valeurs dans une closure pour éviter les problèmes de référence
           const currentTeamId = teamId;
           const currentBatchSize = batchEnd - i;
-          
+
           batchPromises.push(
-            batch.commit().then(() => {
-              console.log(
-                `✅ Batch sauvegardé pour ${currentTeamId} (${currentBatchSize} matchs)`
-              );
-            }).catch((error) => {
-              console.error(
-                `❌ Erreur lors du commit du batch pour ${currentTeamId}:`,
-                error
-              );
-              throw error;
-            })
+            batch
+              .commit()
+              .then(() => {
+                console.log(
+                  `✅ Batch sauvegardé pour ${currentTeamId} (${currentBatchSize} matchs)`
+                );
+              })
+              .catch((error) => {
+                console.error(
+                  `❌ Erreur lors du commit du batch pour ${currentTeamId}:`,
+                  error
+                );
+                throw error;
+              })
           );
         }
       }
@@ -1522,9 +1786,15 @@ export class TeamMatchesSyncService {
       // Attendre que tous les batches soient committés en parallèle
       await Promise.all(batchPromises);
 
-      console.log(`✅ Synchronisation terminée: ${saved} matchs sauvegardés sur ${matches.length} matchs reçus`);
+      console.log(
+        `✅ Synchronisation terminée: ${saved} matchs sauvegardés sur ${matches.length} matchs reçus`
+      );
       if (saved !== matches.length) {
-        console.warn(`⚠️ Attention: ${matches.length - saved} matchs n'ont pas été sauvegardés (probablement sans teamId)`);
+        console.warn(
+          `⚠️ Attention: ${
+            matches.length - saved
+          } matchs n'ont pas été sauvegardés (probablement sans teamId)`
+        );
       }
       return { saved, errors };
     } catch (error) {
@@ -1541,7 +1811,7 @@ export class TeamMatchesSyncService {
   private recalculateJourneesByDate(matches: MatchData[]): MatchData[] {
     // Grouper les matchs par équipe
     const matchesByTeam = new Map<string, MatchData[]>();
-    
+
     matches.forEach((match) => {
       const teamKey = match.teamId || `team_${match.teamNumber}`;
       if (!matchesByTeam.has(teamKey)) {
@@ -1552,7 +1822,7 @@ export class TeamMatchesSyncService {
 
     // Pour chaque équipe, recalculer les journées
     const recalculatedMatches: MatchData[] = [];
-    
+
     matchesByTeam.forEach((teamMatches) => {
       // Trier par date
       const sortedMatches = [...teamMatches].sort((a, b) => {
