@@ -94,6 +94,7 @@ export default function JoueursPage() {
     isActive: true,
     hasPlayedMatch: "", // "" = tous, "true" = a joué, "false" = n'a pas joué
     inChampionship: "", // "" = tous, "true" = inscrit, "false" = pas inscrit
+    inChampionshipParis: "", // "" = tous, "true" = inscrit, "false" = pas inscrit
     hasDiscord: "", // "" = tous, "true" = avec Discord valide, "false" = sans Discord
   });
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -267,6 +268,15 @@ export default function JoueursPage() {
       );
     }
 
+    // Filtre par "inscrit en championnat de Paris"
+    if (filters.inChampionshipParis !== "") {
+      const inChampionshipParis = filters.inChampionshipParis === "true";
+      filtered = filtered.filter(
+        (player) =>
+          (player.participation?.championnatParis || false) === inChampionshipParis
+      );
+    }
+
     // Filtre par Discord
     if (filters.hasDiscord !== "") {
       const hasDiscord = filters.hasDiscord === "true";
@@ -338,6 +348,15 @@ export default function JoueursPage() {
         filtered = filtered.filter(
           (player) =>
             (player.participation?.championnat || false) === inChampionship
+        );
+      }
+
+      // Filtre par "inscrit en championnat de Paris"
+      if (filters.inChampionshipParis !== "") {
+        const inChampionshipParis = filters.inChampionshipParis === "true";
+        filtered = filtered.filter(
+          (player) =>
+            (player.participation?.championnatParis || false) === inChampionshipParis
         );
       }
 
@@ -910,6 +929,20 @@ export default function JoueursPage() {
                       label="Inscrit en championnat"
                       onChange={(e) =>
                         setFilters({ ...filters, inChampionship: e.target.value })
+                      }
+                    >
+                      <MenuItem value="">Tous</MenuItem>
+                      <MenuItem value="true">Inscrit</MenuItem>
+                      <MenuItem value="false">Non inscrit</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: "220px" } }}>
+                    <InputLabel>Inscrit en championnat de Paris</InputLabel>
+                    <Select
+                      value={filters.inChampionshipParis}
+                      label="Inscrit en championnat de Paris"
+                      onChange={(e) =>
+                        setFilters({ ...filters, inChampionshipParis: e.target.value })
                       }
                     >
                       <MenuItem value="">Tous</MenuItem>
