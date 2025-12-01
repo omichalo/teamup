@@ -48,14 +48,14 @@ env:
       - RUNTIME
 
   - variable: NEXT_PUBLIC_APP_URL
-    value: https://teamup--sqyping-teamup.us-east4.hosted.app
+    value: https://teamup.sqyping.fr
     availability:
       - BUILD
       - RUNTIME
 
   # URL de l'application pour les routes API (serveur uniquement)
   - variable: APP_URL
-    value: https://teamup--sqyping-teamup.us-east4.hosted.app
+    value: https://teamup.sqyping.fr
     availability:
       - RUNTIME
 
