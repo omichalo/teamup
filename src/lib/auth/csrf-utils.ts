@@ -92,16 +92,22 @@ export function validateOrigin(req: Request): boolean {
   // Priorité: APP_URL (runtime serveur) > NEXT_PUBLIC_APP_URL
   // APP_URL est disponible uniquement au runtime serveur (Firebase App Hosting)
   const expectedOrigin = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
+  const expectedHostname = expectedOrigin ? extractHostname(expectedOrigin) : null;
 
-  if (expectedOrigin) {
-    const expectedHostname = extractHostname(expectedOrigin);
-    if (!expectedHostname) {
-      // Log en production pour débugger (masqué si nécessaire)
-      if (process.env.NODE_ENV === "production" && process.env.DEBUG === "true") {
-        console.warn("[validateOrigin] Impossible d'extraire le hostname de:", expectedOrigin);
-      }
-      return false;
-    }
+  // Log de debug en production pour diagnostiquer les problèmes
+  if (process.env.NODE_ENV === "production" && process.env.DEBUG === "true") {
+    console.log("[validateOrigin] Début de validation:", {
+      origin: origin || null,
+      referer: referer || null,
+      host: host || null,
+      APP_URL: process.env.APP_URL || null,
+      NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || null,
+      expectedOrigin: expectedOrigin || null,
+      expectedHostname: expectedHostname || null,
+    });
+  }
+
+  if (expectedOrigin && expectedHostname) {
     const normalizedExpected = normalizeHostname(expectedHostname);
 
     // Vérifier l'origine
@@ -114,8 +120,12 @@ export function validateOrigin(req: Request): boolean {
           
           if (!isValid && process.env.NODE_ENV === "production" && process.env.DEBUG === "true") {
             console.warn("[validateOrigin] Origin mismatch:", {
-              origin: normalizedOrigin,
-              expected: normalizedExpected,
+              originRaw: origin,
+              originHostname: originHostname,
+              originNormalized: normalizedOrigin,
+              expectedOrigin,
+              expectedHostname,
+              expectedNormalized: normalizedExpected,
             });
           }
           
@@ -138,8 +148,12 @@ export function validateOrigin(req: Request): boolean {
           
           if (!isValid && process.env.NODE_ENV === "production" && process.env.DEBUG === "true") {
             console.warn("[validateOrigin] Referer mismatch:", {
-              referer: normalizedReferer,
-              expected: normalizedExpected,
+              refererRaw: referer,
+              refererHostname: refererHostname,
+              refererNormalized: normalizedReferer,
+              expectedOrigin,
+              expectedHostname,
+              expectedNormalized: normalizedExpected,
             });
           }
           
@@ -160,8 +174,11 @@ export function validateOrigin(req: Request): boolean {
       
       if (!isValid && process.env.NODE_ENV === "production" && process.env.DEBUG === "true") {
         console.warn("[validateOrigin] Host mismatch:", {
-          host: normalizedHost,
-          expected: normalizedExpected,
+          hostRaw: host,
+          hostNormalized: normalizedHost,
+          expectedOrigin,
+          expectedHostname,
+          expectedNormalized: normalizedExpected,
         });
       }
       
@@ -173,10 +190,12 @@ export function validateOrigin(req: Request): boolean {
   if (process.env.NODE_ENV === "production") {
     if (process.env.DEBUG === "true") {
       console.warn("[validateOrigin] Validation échouée - aucune origine valide trouvée", {
-        hasOrigin: !!origin,
-        hasReferer: !!referer,
-        hasHost: !!host,
+        origin: origin || null,
+        referer: referer || null,
+        host: host || null,
         expectedOrigin,
+        expectedHostname: expectedHostname || null,
+        normalizedExpected: expectedHostname ? normalizeHostname(expectedHostname) : null,
       });
     }
     return false;

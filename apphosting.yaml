@@ -59,6 +59,13 @@ env:
     availability:
       - RUNTIME
 
+  # Debug mode (pour activer les logs de debug en production)
+  # À désactiver une fois le problème résolu pour éviter les logs verbeux
+  - variable: DEBUG
+    value: "true"
+    availability:
+      - RUNTIME
+
   # FFTT API Configuration (privées, côté serveur uniquement)
   # Utilisation de Cloud Secret Manager pour la sécurité
   # Voir CONFIG_SECRETS_FFTT.md pour la configuration
