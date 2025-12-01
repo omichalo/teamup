@@ -45,12 +45,35 @@ export async function validateCSRFToken(
 }
 
 /**
+ * Normalise un hostname en retirant le préfixe www. pour la comparaison
+ */
+function normalizeHostname(hostname: string): string {
+  return hostname.replace(/^www\./, "");
+}
+
+/**
+ * Extrait le hostname d'une URL, en gérant les cas où l'URL peut être incomplète
+ */
+function extractHostname(url: string): string | null {
+  try {
+    // Si l'URL ne commence pas par http:// ou https://, l'ajouter
+    const urlWithProtocol = url.startsWith("http://") || url.startsWith("https://")
+      ? url
+      : `https://${url}`;
+    return new URL(urlWithProtocol).hostname;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Vérifie l'origine de la requête pour prévenir les attaques CSRF.
  * Valide que l'Origin ou le Referer correspond au domaine attendu.
  */
 export function validateOrigin(req: Request): boolean {
   const origin = req.headers.get("origin");
   const referer = req.headers.get("referer");
+  const host = req.headers.get("host");
 
   // En développement, autoriser localhost
   if (process.env.NODE_ENV === "development") {
@@ -60,35 +83,106 @@ export function validateOrigin(req: Request): boolean {
     if (referer && (referer.includes("localhost") || referer.includes("127.0.0.1"))) {
       return true;
     }
+    if (host && (host.includes("localhost") || host.includes("127.0.0.1"))) {
+      return true;
+    }
   }
 
   // En production, valider contre le domaine attendu
-  const expectedOrigin = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL;
-  
+  // Priorité: APP_URL (runtime serveur) > NEXT_PUBLIC_APP_URL
+  // APP_URL est disponible uniquement au runtime serveur (Firebase App Hosting)
+  const expectedOrigin = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
+
   if (expectedOrigin) {
-    const expectedHost = new URL(expectedOrigin).hostname;
-    
+    const expectedHostname = extractHostname(expectedOrigin);
+    if (!expectedHostname) {
+      // Log en production pour débugger (masqué si nécessaire)
+      if (process.env.NODE_ENV === "production" && process.env.DEBUG === "true") {
+        console.warn("[validateOrigin] Impossible d'extraire le hostname de:", expectedOrigin);
+      }
+      return false;
+    }
+    const normalizedExpected = normalizeHostname(expectedHostname);
+
+    // Vérifier l'origine
     if (origin) {
       try {
-        const originHost = new URL(origin).hostname;
-        return originHost === expectedHost;
-      } catch {
-        return false;
+        const originHostname = extractHostname(origin);
+        if (originHostname) {
+          const normalizedOrigin = normalizeHostname(originHostname);
+          const isValid = normalizedOrigin === normalizedExpected;
+          
+          if (!isValid && process.env.NODE_ENV === "production" && process.env.DEBUG === "true") {
+            console.warn("[validateOrigin] Origin mismatch:", {
+              origin: normalizedOrigin,
+              expected: normalizedExpected,
+            });
+          }
+          
+          if (isValid) return true;
+        }
+      } catch (error) {
+        if (process.env.NODE_ENV === "production" && process.env.DEBUG === "true") {
+          console.warn("[validateOrigin] Erreur lors de la validation de l'origine:", error);
+        }
       }
     }
 
+    // Vérifier le referer
     if (referer) {
       try {
-        const refererHost = new URL(referer).hostname;
-        return refererHost === expectedHost;
-      } catch {
-        return false;
+        const refererHostname = extractHostname(referer);
+        if (refererHostname) {
+          const normalizedReferer = normalizeHostname(refererHostname);
+          const isValid = normalizedReferer === normalizedExpected;
+          
+          if (!isValid && process.env.NODE_ENV === "production" && process.env.DEBUG === "true") {
+            console.warn("[validateOrigin] Referer mismatch:", {
+              referer: normalizedReferer,
+              expected: normalizedExpected,
+            });
+          }
+          
+          if (isValid) return true;
+        }
+      } catch (error) {
+        if (process.env.NODE_ENV === "production" && process.env.DEBUG === "true") {
+          console.warn("[validateOrigin] Erreur lors de la validation du referer:", error);
+        }
       }
+    }
+
+    // Si pas d'origine/referer mais un host header présent, vérifier le host
+    // (utile pour les requêtes depuis le même domaine)
+    if (host && !origin && !referer) {
+      const normalizedHost = normalizeHostname(host);
+      const isValid = normalizedHost === normalizedExpected;
+      
+      if (!isValid && process.env.NODE_ENV === "production" && process.env.DEBUG === "true") {
+        console.warn("[validateOrigin] Host mismatch:", {
+          host: normalizedHost,
+          expected: normalizedExpected,
+        });
+      }
+      
+      if (isValid) return true;
     }
   }
 
-  // Si pas d'origine/referer et pas de domaine configuré, accepter (pour compatibilité)
-  // En production, cela devrait être rejeté
-  return process.env.NODE_ENV === "development";
+  // Si pas d'origine/referer/host et pas de domaine configuré, rejeter en production
+  if (process.env.NODE_ENV === "production") {
+    if (process.env.DEBUG === "true") {
+      console.warn("[validateOrigin] Validation échouée - aucune origine valide trouvée", {
+        hasOrigin: !!origin,
+        hasReferer: !!referer,
+        hasHost: !!host,
+        expectedOrigin,
+      });
+    }
+    return false;
+  }
+
+  // En développement, accepter si pas de validation possible
+  return true;
 }
 
