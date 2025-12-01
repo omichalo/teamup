@@ -48,21 +48,21 @@ env:
       - RUNTIME
 
   - variable: NEXT_PUBLIC_APP_URL
-    value: https://teamup--sqyping-teamup.us-east4.hosted.app
+    value: https://teamup.sqyping.fr
     availability:
       - BUILD
       - RUNTIME
 
   # URL de l'application pour les routes API (serveur uniquement)
   - variable: APP_URL
-    value: https://teamup--sqyping-teamup.us-east4.hosted.app
+    value: https://teamup.sqyping.fr
     availability:
       - RUNTIME
 
   # Debug mode (pour activer les logs de debug en production)
   # À désactiver une fois le problème résolu pour éviter les logs verbeux
   - variable: DEBUG
-    value: "true"
+    value: "false"
     availability:
       - RUNTIME
 
