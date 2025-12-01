@@ -291,13 +291,23 @@ export default function DefaultCompositionsPage() {
   );
 
   const championshipPlayers = useMemo(
-    () =>
-      players.filter(
+    () => {
+      // Pour le championnat de Paris, filtrer par participation au championnat de Paris
+      if (selectedEpreuve === "championnat_paris") {
+        return players.filter(
+          (player) => 
+            player.participation?.championnatParis === true && 
+            (player.isActive || player.isTemporary)
+        );
+      }
+      // Pour le championnat par équipes, filtrer par participation au championnat
+      return players.filter(
         (player) => 
           player.participation?.championnat === true && 
           (player.isActive || player.isTemporary)
-      ),
-    [players]
+      );
+    },
+    [players, selectedEpreuve]
   );
 
   const playerPool = useMemo(
@@ -1278,18 +1288,32 @@ export default function DefaultCompositionsPage() {
                                     }}
                                   />
                                 )}
-                                {!player.participation?.championnat && (
-                                  <Chip
-                                    label="Hors championnat"
-                                    size="small"
-                                    color="default"
-                                    variant="outlined"
-                                    sx={{
-                                      height: 20,
-                                      fontSize: "0.7rem",
-                                    }}
-                                  />
-                                )}
+                                {(() => {
+                                  // Afficher le chip "Hors championnat" selon l'épreuve sélectionnée
+                                  const isOutOfChampionship = selectedEpreuve === "championnat_paris"
+                                    ? !player.participation?.championnatParis
+                                    : !player.participation?.championnat;
+                                  
+                                  if (isOutOfChampionship) {
+                                    return (
+                                      <Chip
+                                        label={
+                                          selectedEpreuve === "championnat_paris"
+                                            ? "Hors championnat de Paris"
+                                            : "Hors championnat"
+                                        }
+                                        size="small"
+                                        color="default"
+                                        variant="outlined"
+                                        sx={{
+                                          height: 20,
+                                          fontSize: "0.7rem",
+                                        }}
+                                      />
+                                    );
+                                  }
+                                  return null;
+                                })()}
                                 {!player.isActive && !player.isTemporary && (
                                   <Chip
                                     label="Sans licence"
@@ -1339,7 +1363,11 @@ export default function DefaultCompositionsPage() {
                           size="small"
                         />
                       }
-                      label="Afficher tous les joueurs (hors championnat et sans licence)"
+                      label={
+                        selectedEpreuve === "championnat_paris"
+                          ? "Afficher tous les joueurs (hors championnat de Paris et sans licence)"
+                          : "Afficher tous les joueurs (hors championnat et sans licence)"
+                      }
                     />
                   }
                 />
