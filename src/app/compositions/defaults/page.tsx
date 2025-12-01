@@ -40,6 +40,7 @@ import { FirestorePlayerService } from "@/lib/services/firestore-player-service"
 import { CompositionDefaultsService } from "@/lib/services/composition-defaults-service";
 import { getCurrentPhase } from "@/lib/shared/phase-utils";
 import { EpreuveType, getMatchEpreuve } from "@/lib/shared/epreuve-utils";
+import { useChampionshipTypes } from "@/hooks/useChampionshipTypes";
 import {
   JOURNEE_CONCERNEE_PAR_REGLE,
   canAssignPlayerToTeam,
@@ -86,6 +87,7 @@ function TabPanel(props: TabPanelProps) {
 }
 
 export default function DefaultCompositionsPage() {
+  const { loadBoth, createEmpty } = useChampionshipTypes();
   const { equipes, loading: loadingEquipes } = useEquipesWithMatches();
   const [players, setPlayers] = useState<Player[]>([]);
   const [loadingPlayers, setLoadingPlayers] = useState(true);
@@ -217,27 +219,30 @@ export default function DefaultCompositionsPage() {
           "[DefaultCompositions] Chargement des compositions par défaut",
           { phase: selectedPhase }
         );
-        const [masculineDefaults, feminineDefaults] = await Promise.all([
-          compositionDefaultsService.getDefaults(selectedPhase, "masculin"),
-          compositionDefaultsService.getDefaults(selectedPhase, "feminin"),
-        ]);
+        
+        // Utiliser loadBoth pour charger les compositions en parallèle
+        const result = await loadBoth({
+          loadMasculin: () => compositionDefaultsService.getDefaults(selectedPhase, "masculin"),
+          loadFeminin: () => compositionDefaultsService.getDefaults(selectedPhase, "feminin"),
+          defaultValue: null,
+        });
 
         setDefaultCompositions({
-          masculin: masculineDefaults?.teams || {},
-          feminin: feminineDefaults?.teams || {},
+          masculin: result.data.masculin?.teams || {},
+          feminin: result.data.feminin?.teams || {},
         });
         setDefaultCompositionMessage(null);
         console.log("[DefaultCompositions] Compositions chargées", {
           phase: selectedPhase,
-          masculinTeams: Object.keys(masculineDefaults?.teams ?? {}),
-          femininTeams: Object.keys(feminineDefaults?.teams ?? {}),
+          masculinTeams: Object.keys(result.data.masculin?.teams ?? {}),
+          femininTeams: Object.keys(result.data.feminin?.teams ?? {}),
         });
       } catch (error) {
         console.error(
           "Erreur lors du chargement des compositions par défaut:",
           error
         );
-        setDefaultCompositions({ masculin: {}, feminin: {} });
+        setDefaultCompositions(createEmpty<Record<string, string[]>>({}));
         console.log("[DefaultCompositions] Échec du chargement des compositions, réinitialisation", {
           phase: selectedPhase,
         });
@@ -250,7 +255,7 @@ export default function DefaultCompositionsPage() {
     };
 
     loadDefaults();
-  }, [selectedPhase, compositionDefaultsService]);
+  }, [selectedPhase, compositionDefaultsService, loadBoth, createEmpty]);
 
   // Filtrer les équipes selon l'épreuve sélectionnée
   const filteredEquipes = useMemo(() => {

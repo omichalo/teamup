@@ -64,6 +64,7 @@ import {
   getIdEpreuve,
   getMatchEpreuve,
 } from "@/lib/shared/epreuve-utils";
+import { useChampionshipTypes } from "@/hooks/useChampionshipTypes";
 import {
   JOURNEE_CONCERNEE_PAR_REGLE,
   AssignmentValidationResult,
@@ -75,7 +76,6 @@ import {
   extractTeamNumber,
   calculateFutureBurnout,
   getParisTeamStructure,
-  isParisChampionship,
 } from "@/lib/compositions/validation";
 import { AvailablePlayersPanel } from "@/components/compositions/AvailablePlayersPanel";
 import { TeamCompositionCard } from "@/components/compositions/TeamCompositionCard";
@@ -294,6 +294,10 @@ export default function CompositionsPage() {
   const [selectedEpreuve, setSelectedEpreuve] = useState<EpreuveType | null>(
     null
   );
+  const { loadBoth, createEmpty, isParisChampionship } = useChampionshipTypes();
+  
+  // Calculer isParis une fois pour éviter les appels répétés
+  const isParis = useMemo(() => isParisChampionship(selectedEpreuve), [isParisChampionship, selectedEpreuve]);
   const [selectedJournee, setSelectedJournee] = useState<number | null>(null);
   const [selectedPhase, setSelectedPhase] = useState<"aller" | "retour" | null>(
     null
@@ -408,7 +412,7 @@ export default function CompositionsPage() {
   }, [tabValue, selectedJournee]);
 
   const compositionRules: CompositionRuleItem[] = useMemo(() => {
-    if (selectedEpreuve === "championnat_paris") {
+    if (isParis) {
       // Règles spécifiques au championnat de Paris
       return [
         {
@@ -487,7 +491,7 @@ export default function CompositionsPage() {
           "Cette règle ne s'applique que sur la page des compositions de journée lorsque la J2 est sélectionnée.",
       },
     ];
-  }, [selectedEpreuve]);
+  }, [isParis]);
 
   // Déterminer la phase en cours
   const currentPhase = useMemo(() => {
@@ -681,11 +685,11 @@ export default function CompositionsPage() {
     }
   }, [currentPhase, selectedPhase]);
 
-  // Initialiser selectedJournee avec la première journée dont la date de début est après aujourd'hui
+    // Initialiser selectedJournee avec la première journée dont la date de début est après aujourd'hui
   useEffect(() => {
     // Pour le championnat de Paris, utiliser "aller" comme phase par défaut
     const phaseToUse =
-      selectedEpreuve === "championnat_paris" ? "aller" : selectedPhase;
+      isParis ? "aller" : selectedPhase;
 
     if (
       selectedEpreuve === null ||
@@ -721,7 +725,7 @@ export default function CompositionsPage() {
       const lastJournee = journees.sort((a, b) => b.journee - a.journee)[0];
       setSelectedJournee(lastJournee.journee);
     }
-  }, [selectedPhase, selectedEpreuve, journeesByPhase]);
+  }, [selectedPhase, selectedEpreuve, journeesByPhase, isParis]);
 
   // Charger les joueurs
   const loadPlayers = useCallback(async () => {
@@ -853,13 +857,13 @@ export default function CompositionsPage() {
   const getMaxPlayersForTeam = useCallback(
     (equipe: EquipeWithMatches): number => {
       // Vérifier directement si l'équipe fait partie du championnat de Paris
-      if (isParisChampionship(equipe)) {
+      if (isParis) {
         const structure = getParisTeamStructure(equipe.team.division || "");
         return structure?.totalPlayers || 4; // Fallback à 4 si structure non reconnue
       }
       return 4; // Championnat par équipes : 4 joueurs
     },
-    []
+    [isParis]
   );
 
   useEffect(() => {
@@ -979,28 +983,30 @@ export default function CompositionsPage() {
 
     const loadDefaults = async () => {
       try {
-        const [masculineDefaults, feminineDefaults] = await Promise.all([
-          compositionDefaultsService.getDefaults(selectedPhase, "masculin"),
-          compositionDefaultsService.getDefaults(selectedPhase, "feminin"),
-        ]);
+        // Utiliser loadBoth pour charger les compositions en parallèle
+        const result = await loadBoth({
+          loadMasculin: () => compositionDefaultsService.getDefaults(selectedPhase, "masculin"),
+          loadFeminin: () => compositionDefaultsService.getDefaults(selectedPhase, "feminin"),
+          defaultValue: null,
+        });
 
         setDefaultCompositions({
-          masculin: masculineDefaults?.teams || {},
-          feminin: feminineDefaults?.teams || {},
+          masculin: result.data.masculin?.teams || {},
+          feminin: result.data.feminin?.teams || {},
         });
       } catch (error) {
         console.error(
           "Erreur lors du chargement des compositions par défaut:",
           error
         );
-        setDefaultCompositions({ masculin: {}, feminin: {} });
+        setDefaultCompositions(createEmpty<Record<string, string[]>>({}));
       }
 
       setDefaultCompositionsLoaded(true);
     };
 
     loadDefaults();
-  }, [selectedPhase, compositionDefaultsService]);
+  }, [selectedPhase, compositionDefaultsService, loadBoth, createEmpty]);
 
   // Calculer l'idEpreuve à partir de selectedEpreuve
   const idEpreuve = useMemo(
@@ -1068,7 +1074,7 @@ export default function CompositionsPage() {
 
     // Pour le championnat de Paris, utiliser "masculin" comme type par défaut (mixte)
     const championshipType =
-      selectedEpreuve === "championnat_paris"
+      isParis
         ? "masculin"
         : tabValue === 0
         ? "masculin"
@@ -1093,7 +1099,7 @@ export default function CompositionsPage() {
     tabValue,
     selectedJournee,
     selectedPhase,
-    selectedEpreuve,
+    isParis,
   ]);
 
   // Filtrer les joueurs disponibles selon la recherche
@@ -1112,12 +1118,13 @@ export default function CompositionsPage() {
 
   // Déterminer le type de championnat selon l'onglet actif
   // Pour le championnat de Paris, utiliser "masculin" comme type par défaut (mixte)
-  const championshipType =
-    selectedEpreuve === "championnat_paris"
+  const championshipType = useMemo(() => {
+    return isParis
       ? "masculin"
       : tabValue === 0
       ? "masculin"
       : "feminin";
+  }, [isParis, tabValue]);
 
   // Écouter les compositions en temps réel
   const { composition: realtimeComposition, error: compositionError } =
@@ -1315,7 +1322,7 @@ export default function CompositionsPage() {
   } = useMemo(() => {
     // Pour le championnat de Paris, utiliser toutes les équipes (masculin + féminin)
     const sameTypeEquipes =
-      selectedEpreuve === "championnat_paris"
+      isParis
         ? [...equipesByType.masculin, ...equipesByType.feminin]
         : tabValue === 0
         ? equipesByType.masculin
@@ -1343,7 +1350,7 @@ export default function CompositionsPage() {
     tabValue,
     equipesByType,
     compositions,
-    selectedEpreuve,
+    isParis,
   ]);
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
@@ -1496,10 +1503,11 @@ export default function CompositionsPage() {
       const isHome = match.isHome ? "Domicile" : "Extérieur";
 
       // Pour le championnat de Paris, grouper les joueurs et ajouter le numéro de groupe
-      const isParis = epreuve === "championnat_paris";
+      // Utiliser isParisChampionship depuis le hook au lieu de vérifier epreuve directement
+      const isParisMatch = epreuve === "championnat_paris";
       let playersList: string;
 
-      if (isParis) {
+      if (isParisMatch) {
         // Trier les joueurs par points décroissants
         const sortedPlayers = [...teamPlayers].sort((a, b) => {
           const pointsA = a.points ?? 0;
@@ -1637,7 +1645,7 @@ export default function CompositionsPage() {
   const compositionSummary = useMemo(() => {
     // Pour le championnat de Paris, utiliser toutes les équipes (masculin + féminin)
     const currentTypeEquipes =
-      selectedEpreuve === "championnat_paris"
+      isParis
         ? [...equipesByType.masculin, ...equipesByType.feminin]
         : tabValue === 0
         ? equipesByType.masculin
@@ -1700,7 +1708,7 @@ export default function CompositionsPage() {
     compositions,
     players,
     getMatchForTeam,
-    selectedEpreuve,
+    isParis,
     teamValidationErrors,
   ]);
 
@@ -2490,7 +2498,7 @@ export default function CompositionsPage() {
                 </Select>
               </FormControl>
               {/* Masquer le sélecteur de phase pour le championnat de Paris (une seule phase) */}
-              {selectedEpreuve !== "championnat_paris" && (
+              {!isParis && (
                 <FormControl size="small" sx={{ minWidth: 150 }}>
                   <InputLabel id="phase-select-label">Phase</InputLabel>
                   <Select
@@ -2523,7 +2531,7 @@ export default function CompositionsPage() {
                     )
                   }
                   disabled={
-                    (selectedEpreuve === "championnat_paris"
+                    (isParis
                       ? false
                       : selectedPhase === null) || selectedEpreuve === null
                   }
@@ -2531,7 +2539,7 @@ export default function CompositionsPage() {
                   {(() => {
                     // Pour le championnat de Paris, utiliser "aller" comme phase
                     const phaseToUse =
-                      selectedEpreuve === "championnat_paris"
+                      isParis
                         ? "aller"
                         : selectedPhase;
 
@@ -2608,10 +2616,10 @@ export default function CompositionsPage() {
         </Box>
 
         {selectedJournee &&
-        (selectedEpreuve === "championnat_paris" || selectedPhase) ? (
+        (isParis || selectedPhase) ? (
           <>
             <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
-              {selectedEpreuve !== "championnat_paris" && (
+              {!isParis && (
                 <Tabs value={tabValue} onChange={handleTabChange}>
                   <Tab label="Équipes Masculines" />
                   <Tab label="Équipes Féminines" />
@@ -2636,7 +2644,6 @@ export default function CompositionsPage() {
                   const championshipType =
                     tabValue === 0 ? "masculin" : "feminin";
                   // Utiliser les bonnes propriétés selon le championnat
-                  const isParis = selectedEpreuve === "championnat_paris";
                   const burnedTeam = isParis
                     ? player.highestTeamNumberByPhaseParis?.[phase]
                     : championshipType === "masculin"
@@ -2828,7 +2835,7 @@ export default function CompositionsPage() {
                   percentage={compositionSummary.percentage}
                   discordMessagesSent={(() => {
                     const currentTypeEquipes =
-                      selectedEpreuve === "championnat_paris"
+                      isParis
                         ? [...equipesByType.masculin, ...equipesByType.feminin]
                         : tabValue === 0
                         ? equipesByType.masculin
@@ -2844,7 +2851,7 @@ export default function CompositionsPage() {
                   })()}
                   discordMessagesTotal={(() => {
                     const currentTypeEquipes =
-                      selectedEpreuve === "championnat_paris"
+                      isParis
                         ? [...equipesByType.masculin, ...equipesByType.feminin]
                         : tabValue === 0
                         ? equipesByType.masculin
@@ -2860,14 +2867,14 @@ export default function CompositionsPage() {
                   {(() => {
                     // Pour le championnat de Paris, afficher toutes les équipes (masculin + féminin)
                     const equipesToDisplay =
-                      selectedEpreuve === "championnat_paris"
+                      isParis
                         ? [...equipesByType.masculin, ...equipesByType.feminin]
                         : equipesByType.masculin;
 
                     if (equipesToDisplay.length === 0) {
                       return (
                         <Typography variant="body2" color="text.secondary">
-                          {selectedEpreuve === "championnat_paris"
+                          {isParis
                             ? "Aucune équipe"
                             : "Aucune équipe masculine"}
                         </Typography>
@@ -2901,7 +2908,7 @@ export default function CompositionsPage() {
 
                           // Pour le championnat de Paris, utiliser les disponibilités "masculin" (mixte)
                           const teamAvailabilityMap =
-                            selectedEpreuve === "championnat_paris"
+                            isParis
                               ? availabilities.masculin || {}
                               : availabilities.masculin || {};
 
@@ -3044,14 +3051,12 @@ export default function CompositionsPage() {
                                     const phase = selectedPhase || "aller";
                                     // Pour le championnat de Paris, utiliser "masculin" comme type par défaut (mixte)
                                     const championshipType =
-                                      selectedEpreuve === "championnat_paris"
+                                      isParis
                                         ? "masculin"
                                         : tabValue === 0
                                         ? "masculin"
                                         : "feminin";
                                     // Utiliser les bonnes propriétés selon le championnat
-                                    const isParis =
-                                      selectedEpreuve === "championnat_paris";
                                     const burnedTeam = isParis
                                       ? player.highestTeamNumberByPhaseParis?.[
                                           phase
@@ -3698,7 +3703,7 @@ export default function CompositionsPage() {
 
                         // Pour le championnat de Paris, utiliser les disponibilités "masculin" (mixte)
                         const teamAvailabilityMap =
-                          selectedEpreuve === "championnat_paris"
+                          isParis
                             ? availabilities.masculin || {}
                             : availabilities.feminin || {};
 
