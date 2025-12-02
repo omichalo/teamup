@@ -24,25 +24,25 @@ interface TeamCompositionData {
 interface UseCompositionTeamListOptions {
   equipes: EquipeWithMatches[];
   players: Player[];
-  compositions?: Record<string, string[]>;
-  defaultCompositions?: {
+  compositions: Record<string, string[]> | undefined;
+  defaultCompositions: {
     masculin: Record<string, string[]>;
     feminin: Record<string, string[]>;
-  };
+  } | undefined;
   selectedEpreuve: EpreuveType | null;
   selectedJournee: number | null;
   selectedPhase: "aller" | "retour" | null;
   tabValue?: number; // 0 = masculin, 1 = féminin
-  defaultCompositionTab?: "masculin" | "feminin";
+  defaultCompositionTab: "masculin" | "feminin" | undefined;
   isParis: boolean;
   draggedPlayerId: string | null;
   dragOverTeamId: string | null;
-  teamValidationErrors?: Record<string, { reason?: string; offendingPlayerIds?: string[] }>;
-  defaultCompositionErrors?: Record<string, string | undefined>;
-  availabilities?: {
+  teamValidationErrors: Record<string, { reason?: string; offendingPlayerIds?: string[] }> | undefined;
+  defaultCompositionErrors: Record<string, string | undefined> | undefined;
+  availabilities: {
     masculin?: Record<string, { available?: boolean; comment?: string }>;
     feminin?: Record<string, { available?: boolean; comment?: string }>;
-  };
+  } | undefined;
   mode: "daily" | "defaults";
 }
 

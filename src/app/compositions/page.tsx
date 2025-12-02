@@ -12,12 +12,8 @@ import {
   CardContent,
   Tabs,
   Tab,
-  Chip,
   CircularProgress,
-  IconButton,
-  Tooltip,
 } from "@mui/material";
-import { Message, Close, Send } from "@mui/icons-material";
 import {
   useEquipesWithMatches,
   type EquipeWithMatches,
@@ -33,15 +29,12 @@ import { EpreuveType, getIdEpreuve } from "@/lib/shared/epreuve-utils";
 import { useChampionshipTypes } from "@/hooks/useChampionshipTypes";
 import {
   getMatchForTeamAndJournee,
-  getPlayersFromMatch,
   isMatchPlayed,
 } from "@/lib/compositions/validation";
 import { AvailablePlayersPanel } from "@/components/compositions/AvailablePlayersPanel";
-import { TeamCompositionCard } from "@/components/compositions/TeamCompositionCard";
 import { CompositionsSummary } from "@/components/compositions/CompositionsSummary";
 import { CompositionRulesHelp } from "@/components/compositions/CompositionRulesHelp";
 import { CompositionTabPanel } from "@/components/compositions/CompositionTabPanel";
-import { PlayerBurnoutIndicators } from "@/components/compositions/PlayerBurnoutIndicators";
 import { useMaxPlayersForTeam } from "@/hooks/useMaxPlayersForTeam";
 import { useFilteredEquipes } from "@/hooks/useFilteredEquipes";
 import { useEquipesByType } from "@/hooks/useEquipesByType";
@@ -57,10 +50,11 @@ import { useCompositionState } from "@/hooks/useCompositionState";
 import { CompositionDialogs } from "@/components/compositions/CompositionDialogs";
 import { useDiscordMessage } from "@/hooks/useDiscordMessage";
 import { CompositionToolbar } from "@/components/compositions/CompositionToolbar";
-import { DiscordMessageEditor } from "@/components/compositions/DiscordMessageEditor";
 import { useCompositionJournees } from "@/hooks/useCompositionJournees";
 import { useCompositionPlayers } from "@/hooks/useCompositionPlayers";
 import { CompositionSelectors } from "@/components/compositions/CompositionSelectors";
+import { useAvailablePlayers } from "@/hooks/useAvailablePlayers";
+import { CompositionTeamList } from "@/components/compositions/CompositionTeamList";
 
 // TabPanel remplacé par CompositionTabPanel
 
@@ -519,39 +513,15 @@ export default function CompositionsPage() {
   }, [errorMasculineAvailability, errorFeminineAvailability]);
 
   // Filtrer les joueurs disponibles selon l'onglet sélectionné
-  const availablePlayers = useMemo(() => {
-    if (selectedJournee === null || selectedPhase === null) {
-      return [];
-    }
-
-    // Pour le championnat de Paris, utiliser "masculin" comme type par défaut (mixte)
-    const championshipType = isParis
-      ? "masculin"
-      : tabValue === 0
-      ? "masculin"
-      : "feminin";
-    const availabilityMap = availabilities[championshipType] || {};
-
-    return players.filter((player) => {
-      // Vérifier la disponibilité selon le type de championnat
-      const playerAvailability = availabilityMap[player.id];
-
-      // Si pas de réponse, ne pas afficher (seulement les joueurs qui ont répondu)
-      if (!playerAvailability) {
-        return false;
-      }
-
-      // Afficher seulement les joueurs disponibles (available === true)
-      return playerAvailability.available === true;
-    });
-  }, [
+  const { availablePlayers } = useAvailablePlayers({
     players,
-    availabilities,
+    selectedEpreuve,
     tabValue,
+    availabilities,
     selectedJournee,
     selectedPhase,
     isParis,
-  ]);
+  });
 
   // Filtrer les joueurs disponibles selon la recherche
   const filteredAvailablePlayers = useFilteredPlayers(
@@ -644,7 +614,6 @@ export default function CompositionsPage() {
 
   // Extraire les valeurs du hook
   const {
-    sendingDiscord,
     discordSentStatus,
     customMessages,
     setCustomMessages,
@@ -654,7 +623,6 @@ export default function CompositionsPage() {
     discordChannels,
     sendMessage: handleSendDiscordMessage,
     formatMatchInfo,
-    insertMention,
     saveCustomMessage: handleSaveCustomMessage,
     saveTimeoutRef,
   } = discordMessage;
@@ -1129,474 +1097,40 @@ export default function CompositionsPage() {
                       ? [...equipesByType.masculin, ...equipesByType.feminin]
                       : equipesByType.masculin;
 
-                    if (equipesToDisplay.length === 0) {
-                      return (
-                        <Typography variant="body2" color="text.secondary">
-                          {isParis
-                            ? "Aucune équipe"
-                            : "Aucune équipe masculine"}
-                        </Typography>
-                      );
-                    }
-
                     return (
-                      <Box
-                        sx={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 2,
-                        }}
-                      >
-                        {equipesToDisplay.map((equipe) => {
-                          const match = getMatchForTeam(equipe);
-                          const matchPlayed = isMatchPlayed(match);
-                          const teamPlayers = matchPlayed
-                            ? getPlayersFromMatch(match, players)
-                            : (compositions[equipe.team.id] || [])
-                                .map((playerId) =>
-                                  players.find((p) => p.id === playerId)
-                                )
-                                .filter((p): p is Player => p !== undefined);
-
-                          const teamPlayersData =
-                            Array.isArray(teamPlayers) &&
-                            teamPlayers.every((p) => "id" in p)
-                              ? teamPlayers
-                              : [];
-
-                          // Pour le championnat de Paris, utiliser les disponibilités "masculin" (mixte)
-                          const teamAvailabilityMap = isParis
-                            ? availabilities.masculin || {}
-                            : availabilities.masculin || {};
-
-                          const isDragOver =
-                            !matchPlayed &&
-                            draggedPlayerId &&
-                            dragOverTeamId === equipe.team.id;
-
-                          const dropCheck =
-                            !matchPlayed &&
-                            draggedPlayerId &&
-                            dragOverTeamId === equipe.team.id
-                              ? canDropPlayer(draggedPlayerId, equipe.team.id)
-                              : {
-                                  canAssign: true,
-                                  reason: undefined,
-                                  simulatedPlayers: teamPlayersData,
-                                  willBeBurned: false,
-                                };
-                          const canDrop = matchPlayed
-                            ? false
-                            : dropCheck.canAssign;
-
-                          // Construire le message de dropReason (sans l'information de brûlage lors du drag)
-                          // L'information de brûlage sera affichée uniquement si le joueur est déjà dans l'équipe
-                          const dropReasonWithBurning = dropCheck.reason;
-                          const dragHandlers = matchPlayed
-                            ? undefined
-                            : {
-                                onDragOver: (event: React.DragEvent) =>
-                                  handleDragOver(event, equipe.team.id),
-                                onDragLeave: handleDragLeave,
-                                onDrop: (event: React.DragEvent) =>
-                                  handleDrop(event, equipe.team.id),
-                              };
-                          const validationInfo =
-                            !matchPlayed &&
-                            selectedJournee !== null &&
-                            selectedPhase !== null
-                              ? teamValidationErrors[equipe.team.id]
-                              : undefined;
-                          const validationError = validationInfo?.reason;
-                          const offendingPlayerIds =
-                            validationInfo?.offendingPlayerIds ?? [];
-
-                          const isFemaleTeam = equipe.matches.some(
-                            (match) => match.isFemale === true
-                          );
-                          const matchInfo = formatMatchInfo(
-                            match,
-                            teamPlayersData,
-                            equipe.team.location,
-                            equipe.team.name,
-                            isFemaleTeam,
-                            selectedEpreuve
-                          );
-
-                          return (
-                            <Box
-                              key={equipe.team.id}
-                              sx={{
-                                display: "flex",
-                                gap: 2,
-                                alignItems: "flex-start",
-                                mb: 2,
-                              }}
-                            >
-                              <Box sx={{ flex: 1 }}>
-                                <TeamCompositionCard
-                                  equipe={equipe}
-                                  players={teamPlayersData}
-                                  onRemovePlayer={(playerId) =>
-                                    handleRemovePlayer(equipe.team.id, playerId)
-                                  }
-                                  onPlayerDragStart={(event, playerId) =>
-                                    handleDragStart(event, playerId)
-                                  }
-                                  onPlayerDragEnd={handleDragEnd}
-                                  isDragOver={Boolean(isDragOver)}
-                                  canDrop={canDrop}
-                                  dropReason={dropReasonWithBurning}
-                                  draggedPlayerId={draggedPlayerId}
-                                  dragOverTeamId={dragOverTeamId}
-                                  matchPlayed={matchPlayed}
-                                  selectedEpreuve={selectedEpreuve}
-                                  maxPlayers={getMaxPlayersForTeam(equipe)}
-                                  additionalHeader={
-                                    <Box
-                                      sx={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: 1,
-                                      }}
-                                    >
-                                      {validationError && (
-                                        <Chip
-                                          label="Invalide"
-                                          size="small"
-                                          color="error"
-                                          variant="filled"
-                                        />
-                                      )}
-                                      {matchInfo && !matchPlayed && (
-                                        <Tooltip
-                                          title={
-                                            !equipe.team.discordChannelId
-                                              ? "Aucun canal Discord configuré pour cette équipe. Configurez-le dans la page des équipes."
-                                              : showMatchInfo[equipe.team.id]
-                                              ? "Masquer le message"
-                                              : "Afficher le message"
-                                          }
-                                        >
-                                          <span>
-                                            <IconButton
-                                              size="small"
-                                              onClick={() => {
-                                                setShowMatchInfo((prev) => ({
-                                                  ...prev,
-                                                  [equipe.team.id]:
-                                                    !prev[equipe.team.id],
-                                                }));
-                                              }}
-                                              disabled={
-                                                !equipe.team.discordChannelId
-                                              }
-                                              color={
-                                                showMatchInfo[equipe.team.id]
-                                                  ? "primary"
-                                                  : "default"
-                                              }
-                                            >
-                                              <Message fontSize="small" />
-                                            </IconButton>
-                                          </span>
-                                        </Tooltip>
-                                      )}
-                                    </Box>
-                                  }
-                                  renderPlayerIndicators={(player) => {
-                                    const phase = selectedPhase || "aller";
-                                    // Pour le championnat de Paris, utiliser "masculin" comme type par défaut (mixte)
-                                    const championshipType = isParis
-                                      ? "masculin"
-                                      : tabValue === 0
-                                      ? "masculin"
-                                      : "feminin";
-                                    return (
-                                      <PlayerBurnoutIndicators
-                                        player={player}
-                                        equipe={equipe}
-                                        phase={phase}
-                                        championshipType={championshipType}
-                                        isParis={isParis}
-                                        teamAvailabilityMap={
-                                          teamAvailabilityMap
-                                        }
-                                        offendingPlayerIds={offendingPlayerIds}
-                                        validationError={validationError}
-                                        discordMembers={discordMembers}
-                                      />
-                                    );
-                                  }}
-                                  renderPlayerSecondary={(player) =>
-                                    player.points !== undefined &&
-                                    player.points !== null
-                                      ? `${player.points} points`
-                                      : "Points non disponibles"
-                                  }
-                                  {...(dragHandlers ?? {})}
-                                />
-                                {validationError && (
-                                  <Typography
-                                    variant="caption"
-                                    color="error"
-                                    sx={{ mt: 1, display: "block" }}
-                                  >
-                                    {validationError}
-                                  </Typography>
-                                )}
-                              </Box>
-                              {matchInfo &&
-                                !matchPlayed &&
-                                showMatchInfo[equipe.team.id] && (
-                                  <Card
-                                    elevation={2}
-                                    sx={{
-                                      minWidth: 300,
-                                      maxWidth: 400,
-                                      borderLeft: "4px solid",
-                                      borderLeftColor: "primary.main",
-                                      backgroundColor: "action.hover",
-                                      position: "relative",
-                                    }}
-                                  >
-                                    <Box
-                                      sx={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "space-between",
-                                        p: 1,
-                                        pb: 0.5,
-                                        borderBottom: "1px solid",
-                                        borderBottomColor: "divider",
-                                      }}
-                                    >
-                                      <Box
-                                        sx={{
-                                          display: "flex",
-                                          alignItems: "center",
-                                          gap: 1,
-                                        }}
-                                      >
-                                        <Message
-                                          fontSize="small"
-                                          color="primary"
-                                        />
-                                        <Box
-                                          sx={{
-                                            display: "flex",
-                                            flexDirection: "column",
-                                            gap: 0.25,
-                                          }}
-                                        >
-                                          <Typography
-                                            variant="caption"
-                                            color="text.secondary"
-                                            sx={{ fontWeight: 500 }}
-                                          >
-                                            Message Discord
-                                          </Typography>
-                                          {equipe.team.discordChannelId && (
-                                            <Typography
-                                              variant="caption"
-                                              color="text.secondary"
-                                              sx={{
-                                                fontSize: "0.7rem",
-                                                fontStyle: "italic",
-                                              }}
-                                            >
-                                              Canal: #
-                                              {discordChannels.find(
-                                                (c) =>
-                                                  c.id ===
-                                                  equipe.team.discordChannelId
-                                              )?.name || "Canal configuré"}
-                                            </Typography>
-                                          )}
-                                        </Box>
-                                      </Box>
-                                      <Box
-                                        sx={{
-                                          display: "flex",
-                                          alignItems: "center",
-                                          gap: 0.5,
-                                        }}
-                                      >
-                                        <Box
-                                          sx={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: 0.5,
-                                          }}
-                                        >
-                                          {discordSentStatus[equipe.team.id]
-                                            ?.sent && (
-                                            <Chip
-                                              label="Envoyé"
-                                              size="small"
-                                              color="success"
-                                              variant="outlined"
-                                              sx={{
-                                                height: 20,
-                                                fontSize: "0.65rem",
-                                              }}
-                                              title={
-                                                discordSentStatus[
-                                                  equipe.team.id
-                                                ]?.sentAt
-                                                  ? `Envoyé le ${new Date(
-                                                      discordSentStatus[
-                                                        equipe.team.id
-                                                      ].sentAt!
-                                                    ).toLocaleString("fr-FR")}`
-                                                  : "Message déjà envoyé"
-                                              }
-                                            />
-                                          )}
-                                          <Tooltip
-                                            title={
-                                              !equipe.team.discordChannelId
-                                                ? "Aucun canal Discord configuré pour cette équipe. Configurez-le dans la page des équipes."
-                                                : discordSentStatus[
-                                                    equipe.team.id
-                                                  ]?.sent
-                                                ? "Renvoyer le message sur Discord"
-                                                : "Envoyer le message sur Discord"
-                                            }
-                                          >
-                                            <span>
-                                              <IconButton
-                                                size="small"
-                                                onClick={() => {
-                                                  if (!matchInfo) return;
-                                                  if (
-                                                    discordSentStatus[
-                                                      equipe.team.id
-                                                    ]?.sent
-                                                  ) {
-                                                    setConfirmResendDialog({
-                                                      open: true,
-                                                      teamId: equipe.team.id,
-                                                      matchInfo,
-                                                      ...(equipe.team
-                                                        .discordChannelId
-                                                        ? {
-                                                            channelId:
-                                                              equipe.team
-                                                                .discordChannelId,
-                                                          }
-                                                        : {}),
-                                                    });
-                                                  } else {
-                                                    handleSendDiscordMessage(
-                                                      equipe.team.id,
-                                                      matchInfo,
-                                                      selectedJournee,
-                                                      selectedPhase,
-                                                      equipe.team
-                                                        .discordChannelId
-                                                    );
-                                                  }
-                                                }}
-                                                disabled={
-                                                  sendingDiscord[
-                                                    equipe.team.id
-                                                  ] ||
-                                                  !matchInfo ||
-                                                  !equipe.team.discordChannelId
-                                                }
-                                                sx={{ p: 0.5 }}
-                                                color={
-                                                  discordSentStatus[
-                                                    equipe.team.id
-                                                  ]?.sent
-                                                    ? "warning"
-                                                    : "primary"
-                                                }
-                                              >
-                                                {sendingDiscord[
-                                                  equipe.team.id
-                                                ] ? (
-                                                  <CircularProgress size={16} />
-                                                ) : (
-                                                  <Send fontSize="small" />
-                                                )}
-                                              </IconButton>
-                                            </span>
-                                          </Tooltip>
-                                        </Box>
-                                        <IconButton
-                                          size="small"
-                                          onClick={() => {
-                                            setShowMatchInfo((prev) => ({
-                                              ...prev,
-                                              [equipe.team.id]: false,
-                                            }));
-                                          }}
-                                          sx={{ p: 0.5 }}
-                                          title="Fermer le message"
-                                        >
-                                          <Close fontSize="small" />
-                                        </IconButton>
-                                      </Box>
-                                    </Box>
-                                    <CardContent
-                                      sx={{ pt: 1.5, pb: "16px !important" }}
-                                    >
-                                      <Typography
-                                        variant="body2"
-                                        component="pre"
-                                        sx={{
-                                          whiteSpace: "pre-wrap",
-                                          fontFamily: "monospace",
-                                          fontSize: "0.75rem",
-                                          lineHeight: 1.8,
-                                          m: 0,
-                                          mb: 2,
-                                          color: "text.primary",
-                                        }}
-                                      >
-                                        {matchInfo}
-                                      </Typography>
-                                      <Box sx={{ mt: 1 }}>
-                                        <DiscordMessageEditor
-                                          teamId={equipe.team.id}
-                                          value={
-                                            customMessages[equipe.team.id] || ""
-                                          }
-                                          onChange={(newValue) => {
-                                            setCustomMessages((prev) => ({
-                                              ...prev,
-                                              [equipe.team.id]: newValue,
-                                            }));
-                                          }}
-                                          onSave={(newValue) => {
-                                            if (
-                                              selectedJournee &&
-                                              selectedPhase
-                                            ) {
-                                              handleSaveCustomMessage(
-                                                equipe.team.id,
-                                                newValue,
-                                                selectedJournee,
-                                                selectedPhase
-                                              );
-                                            }
-                                          }}
-                                          discordMembers={discordMembers}
-                                          selectedJournee={selectedJournee}
-                                          selectedPhase={selectedPhase}
-                                          saveTimeoutRef={saveTimeoutRef}
-                                          onInsertMention={insertMention}
-                                        />
-                                      </Box>
-                                    </CardContent>
-                                  </Card>
-                                )}
-                            </Box>
-                          );
-                        })}
-                      </Box>
+                      <CompositionTeamList
+                        equipes={equipesToDisplay}
+                        players={players}
+                        compositions={compositions}
+                        selectedEpreuve={selectedEpreuve}
+                        selectedJournee={selectedJournee}
+                        selectedPhase={selectedPhase}
+                        tabValue={tabValue}
+                        isParis={isParis}
+                        draggedPlayerId={draggedPlayerId}
+                        dragOverTeamId={dragOverTeamId}
+                        teamValidationErrors={teamValidationErrors}
+                        availabilities={availabilities}
+                        mode="daily"
+                        onRemovePlayer={handleRemovePlayer}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEnd}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                        formatMatchInfo={formatMatchInfo}
+                        showMatchInfo={showMatchInfo}
+                        setShowMatchInfo={setShowMatchInfo}
+                        discordSentStatus={discordSentStatus}
+                        customMessages={customMessages}
+                        setCustomMessages={setCustomMessages}
+                        handleSaveCustomMessage={handleSaveCustomMessage}
+                        handleSendDiscordMessage={handleSendDiscordMessage}
+                        setConfirmResendDialog={setConfirmResendDialog}
+                        discordChannels={discordChannels}
+                        discordMembers={discordMembers}
+                        saveTimeoutRef={saveTimeoutRef}
+                      />
                     );
                   })()}
                 </CompositionTabPanel>
@@ -1606,460 +1140,39 @@ export default function CompositionsPage() {
                   index={1}
                   prefix="compositions"
                 >
-                  {equipesByType.feminin.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary">
-                      Aucune équipe féminine
-                    </Typography>
-                  ) : (
-                    <Box
-                      sx={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 2,
-                      }}
-                    >
-                      {equipesByType.feminin.map((equipe) => {
-                        const match = getMatchForTeam(equipe);
-                        const matchPlayed = isMatchPlayed(match);
-                        const teamPlayers = matchPlayed
-                          ? getPlayersFromMatch(match, players)
-                          : (compositions[equipe.team.id] || [])
-                              .map((playerId) =>
-                                players.find((p) => p.id === playerId)
-                              )
-                              .filter((p): p is Player => p !== undefined);
-
-                        const teamPlayersData =
-                          Array.isArray(teamPlayers) &&
-                          teamPlayers.every((p) => "id" in p)
-                            ? teamPlayers
-                            : [];
-
-                        // Pour le championnat de Paris, utiliser les disponibilités "masculin" (mixte)
-                        const teamAvailabilityMap = isParis
-                          ? availabilities.masculin || {}
-                          : availabilities.feminin || {};
-
-                        const isDragOver =
-                          !matchPlayed &&
-                          draggedPlayerId &&
-                          dragOverTeamId === equipe.team.id;
-                        const dropCheck =
-                          !matchPlayed &&
-                          draggedPlayerId &&
-                          dragOverTeamId === equipe.team.id
-                            ? canDropPlayer(draggedPlayerId, equipe.team.id)
-                            : {
-                                canAssign: true,
-                                reason: undefined,
-                                simulatedPlayers: teamPlayersData,
-                                willBeBurned: false,
-                              };
-                        const canDrop = matchPlayed
-                          ? false
-                          : dropCheck.canAssign;
-
-                        // Construire le message de dropReason (sans l'information de brûlage lors du drag)
-                        // L'information de brûlage sera affichée uniquement si le joueur est déjà dans l'équipe
-                        const dropReasonWithBurning = dropCheck.reason;
-                        const dragHandlers = matchPlayed
-                          ? undefined
-                          : {
-                              onDragOver: (event: React.DragEvent) =>
-                                handleDragOver(event, equipe.team.id),
-                              onDragLeave: handleDragLeave,
-                              onDrop: (event: React.DragEvent) =>
-                                handleDrop(event, equipe.team.id),
-                            };
-                        const validationInfo =
-                          !matchPlayed &&
-                          selectedJournee !== null &&
-                          selectedPhase !== null
-                            ? teamValidationErrors[equipe.team.id]
-                            : undefined;
-                        const validationError = validationInfo?.reason;
-                        const offendingPlayerIds =
-                          validationInfo?.offendingPlayerIds ?? [];
-
-                        const isFemaleTeam = equipe.matches.some(
-                          (match) => match.isFemale === true
-                        );
-                        const matchInfo = formatMatchInfo(
-                          match,
-                          teamPlayersData,
-                          equipe.team.location,
-                          equipe.team.name,
-                          isFemaleTeam,
-                          selectedEpreuve
-                        );
-
-                        return (
-                          <Box
-                            key={equipe.team.id}
-                            sx={{
-                              display: "flex",
-                              gap: 2,
-                              alignItems: "flex-start",
-                              mb: 2,
-                            }}
-                          >
-                            <Box sx={{ flex: 1 }}>
-                              <TeamCompositionCard
-                                equipe={equipe}
-                                players={teamPlayersData}
-                                onRemovePlayer={(playerId) =>
-                                  handleRemovePlayer(equipe.team.id, playerId)
-                                }
-                                onPlayerDragStart={(event, playerId) =>
-                                  handleDragStart(event, playerId)
-                                }
-                                onPlayerDragEnd={handleDragEnd}
-                                isDragOver={Boolean(isDragOver)}
-                                canDrop={canDrop}
-                                dropReason={dropReasonWithBurning}
-                                draggedPlayerId={draggedPlayerId}
-                                dragOverTeamId={dragOverTeamId}
-                                matchPlayed={matchPlayed}
-                                selectedEpreuve={selectedEpreuve}
-                                maxPlayers={getMaxPlayersForTeam(equipe)}
-                                additionalHeader={
-                                  <Box
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 1,
-                                    }}
-                                  >
-                                    {validationError && (
-                                      <Chip
-                                        label="Invalide"
-                                        size="small"
-                                        color="error"
-                                        variant="filled"
-                                      />
-                                    )}
-                                    {matchInfo && !matchPlayed && (
-                                      <Tooltip
-                                        title={
-                                          !equipe.team.discordChannelId
-                                            ? "Aucun canal Discord configuré pour cette équipe. Configurez-le dans la page des équipes."
-                                            : showMatchInfo[equipe.team.id]
-                                            ? "Masquer le message"
-                                            : "Afficher le message"
-                                        }
-                                      >
-                                        <span>
-                                          <IconButton
-                                            size="small"
-                                            onClick={() => {
-                                              setShowMatchInfo((prev) => ({
-                                                ...prev,
-                                                [equipe.team.id]:
-                                                  !prev[equipe.team.id],
-                                              }));
-                                            }}
-                                            disabled={
-                                              !equipe.team.discordChannelId
-                                            }
-                                            color={
-                                              showMatchInfo[equipe.team.id]
-                                                ? "primary"
-                                                : "default"
-                                            }
-                                          >
-                                            <Message fontSize="small" />
-                                          </IconButton>
-                                        </span>
-                                      </Tooltip>
-                                    )}
-                                  </Box>
-                                }
-                                renderPlayerIndicators={(player) => {
-                                  const phase = selectedPhase || "aller";
-                                  // Pour les équipes féminines, utiliser "feminin" comme type
-                                  const championshipType = "feminin";
-                                  return (
-                                    <PlayerBurnoutIndicators
-                                      player={player}
-                                      equipe={equipe}
-                                      phase={phase}
-                                      championshipType={championshipType}
-                                      isParis={isParis}
-                                      teamAvailabilityMap={teamAvailabilityMap}
-                                      offendingPlayerIds={offendingPlayerIds}
-                                      validationError={validationError}
-                                      discordMembers={discordMembers}
-                                    />
-                                  );
-                                }}
-                                renderPlayerSecondary={(player) =>
-                                  player.points !== undefined &&
-                                  player.points !== null
-                                    ? `${player.points} points`
-                                    : "Points non disponibles"
-                                }
-                                {...(dragHandlers ?? {})}
-                              />
-                              {validationError && (
-                                <Typography
-                                  variant="caption"
-                                  color="error"
-                                  sx={{ mt: 1, display: "block" }}
-                                >
-                                  {validationError}
-                                </Typography>
-                              )}
-                            </Box>
-                            {matchInfo &&
-                              !matchPlayed &&
-                              showMatchInfo[equipe.team.id] && (
-                                <Card
-                                  elevation={2}
-                                  sx={{
-                                    minWidth: 300,
-                                    maxWidth: 400,
-                                    borderLeft: "4px solid",
-                                    borderLeftColor: "primary.main",
-                                    backgroundColor: "action.hover",
-                                    position: "relative",
-                                  }}
-                                >
-                                  <Box
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "space-between",
-                                      p: 1,
-                                      pb: 0.5,
-                                      borderBottom: "1px solid",
-                                      borderBottomColor: "divider",
-                                    }}
-                                  >
-                                    <Box
-                                      sx={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: 1,
-                                      }}
-                                    >
-                                      <Message
-                                        fontSize="small"
-                                        color="primary"
-                                      />
-                                      <Box
-                                        sx={{
-                                          display: "flex",
-                                          flexDirection: "column",
-                                          gap: 0.25,
-                                        }}
-                                      >
-                                        <Typography
-                                          variant="caption"
-                                          color="text.secondary"
-                                          sx={{ fontWeight: 500 }}
-                                        >
-                                          Message Discord
-                                        </Typography>
-                                        {equipe.team.discordChannelId && (
-                                          <Typography
-                                            variant="caption"
-                                            color="text.secondary"
-                                            sx={{
-                                              fontSize: "0.7rem",
-                                              fontStyle: "italic",
-                                            }}
-                                          >
-                                            Canal: #
-                                            {discordChannels.find(
-                                              (c) =>
-                                                c.id ===
-                                                equipe.team.discordChannelId
-                                            )?.name || "Canal configuré"}
-                                          </Typography>
-                                        )}
-                                      </Box>
-                                    </Box>
-                                    <Box
-                                      sx={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: 0.5,
-                                      }}
-                                    >
-                                      <Box
-                                        sx={{
-                                          display: "flex",
-                                          alignItems: "center",
-                                          gap: 0.5,
-                                        }}
-                                      >
-                                        {discordSentStatus[equipe.team.id]
-                                          ?.sent && (
-                                          <Chip
-                                            label="Envoyé"
-                                            size="small"
-                                            color="success"
-                                            variant="outlined"
-                                            sx={{
-                                              height: 20,
-                                              fontSize: "0.65rem",
-                                            }}
-                                            title={
-                                              discordSentStatus[equipe.team.id]
-                                                ?.sentAt
-                                                ? `Envoyé le ${new Date(
-                                                    discordSentStatus[
-                                                      equipe.team.id
-                                                    ].sentAt!
-                                                  ).toLocaleString("fr-FR")}`
-                                                : "Message déjà envoyé"
-                                            }
-                                          />
-                                        )}
-                                        <Tooltip
-                                          title={
-                                            !equipe.team.discordChannelId
-                                              ? "Aucun canal Discord configuré pour cette équipe. Configurez-le dans la page des équipes."
-                                              : discordSentStatus[
-                                                  equipe.team.id
-                                                ]?.sent
-                                              ? "Renvoyer le message sur Discord"
-                                              : "Envoyer le message sur Discord"
-                                          }
-                                        >
-                                          <span>
-                                            <IconButton
-                                              size="small"
-                                              onClick={() => {
-                                                if (!matchInfo) return;
-                                                if (
-                                                  discordSentStatus[
-                                                    equipe.team.id
-                                                  ]?.sent
-                                                ) {
-                                                  setConfirmResendDialog({
-                                                    open: true,
-                                                    teamId: equipe.team.id,
-                                                    matchInfo,
-                                                    ...(equipe.team
-                                                      .discordChannelId
-                                                      ? {
-                                                          channelId:
-                                                            equipe.team
-                                                              .discordChannelId,
-                                                        }
-                                                      : {}),
-                                                  });
-                                                } else {
-                                                  handleSendDiscordMessage(
-                                                    equipe.team.id,
-                                                    matchInfo,
-                                                    selectedJournee,
-                                                    selectedPhase,
-                                                    equipe.team.discordChannelId
-                                                  );
-                                                }
-                                              }}
-                                              disabled={
-                                                sendingDiscord[
-                                                  equipe.team.id
-                                                ] ||
-                                                !matchInfo ||
-                                                !equipe.team.discordChannelId
-                                              }
-                                              sx={{ p: 0.5 }}
-                                              color={
-                                                discordSentStatus[
-                                                  equipe.team.id
-                                                ]?.sent
-                                                  ? "warning"
-                                                  : "primary"
-                                              }
-                                            >
-                                              {sendingDiscord[
-                                                equipe.team.id
-                                              ] ? (
-                                                <CircularProgress size={16} />
-                                              ) : (
-                                                <Send fontSize="small" />
-                                              )}
-                                            </IconButton>
-                                          </span>
-                                        </Tooltip>
-                                      </Box>
-                                      <IconButton
-                                        size="small"
-                                        onClick={() => {
-                                          setShowMatchInfo((prev) => ({
-                                            ...prev,
-                                            [equipe.team.id]: false,
-                                          }));
-                                        }}
-                                        sx={{ p: 0.5 }}
-                                        title="Fermer le message"
-                                      >
-                                        <Close fontSize="small" />
-                                      </IconButton>
-                                    </Box>
-                                  </Box>
-                                  <CardContent
-                                    sx={{ pt: 1.5, pb: "16px !important" }}
-                                  >
-                                    <Typography
-                                      variant="body2"
-                                      component="pre"
-                                      sx={{
-                                        whiteSpace: "pre-wrap",
-                                        fontFamily: "monospace",
-                                        fontSize: "0.75rem",
-                                        lineHeight: 1.8,
-                                        m: 0,
-                                        mb: 2,
-                                        color: "text.primary",
-                                      }}
-                                    >
-                                      {matchInfo}
-                                    </Typography>
-                                    <Box sx={{ mt: 1 }}>
-                                      <DiscordMessageEditor
-                                        teamId={equipe.team.id}
-                                        value={
-                                          customMessages[equipe.team.id] || ""
-                                        }
-                                        onChange={(newValue) => {
-                                          setCustomMessages((prev) => ({
-                                            ...prev,
-                                            [equipe.team.id]: newValue,
-                                          }));
-                                        }}
-                                        onSave={(newValue) => {
-                                          if (
-                                            selectedJournee &&
-                                            selectedPhase
-                                          ) {
-                                            handleSaveCustomMessage(
-                                              equipe.team.id,
-                                              newValue,
-                                              selectedJournee,
-                                              selectedPhase
-                                            );
-                                          }
-                                        }}
-                                        discordMembers={discordMembers}
-                                        selectedJournee={selectedJournee}
-                                        selectedPhase={selectedPhase}
-                                        saveTimeoutRef={saveTimeoutRef}
-                                        onInsertMention={insertMention}
-                                      />
-                                    </Box>
-                                  </CardContent>
-                                </Card>
-                              )}
-                          </Box>
-                        );
-                      })}
-                    </Box>
-                  )}
+                  <CompositionTeamList
+                    equipes={equipesByType.feminin}
+                    players={players}
+                    compositions={compositions}
+                    selectedEpreuve={selectedEpreuve}
+                    selectedJournee={selectedJournee}
+                    selectedPhase={selectedPhase}
+                    tabValue={tabValue}
+                    isParis={isParis}
+                    draggedPlayerId={draggedPlayerId}
+                    dragOverTeamId={dragOverTeamId}
+                    teamValidationErrors={teamValidationErrors}
+                    availabilities={availabilities}
+                    mode="daily"
+                    onRemovePlayer={handleRemovePlayer}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    formatMatchInfo={formatMatchInfo}
+                    showMatchInfo={showMatchInfo}
+                    setShowMatchInfo={setShowMatchInfo}
+                    discordSentStatus={discordSentStatus}
+                    customMessages={customMessages}
+                    setCustomMessages={setCustomMessages}
+                    handleSaveCustomMessage={handleSaveCustomMessage}
+                    handleSendDiscordMessage={handleSendDiscordMessage}
+                    setConfirmResendDialog={setConfirmResendDialog}
+                    discordChannels={discordChannels}
+                    discordMembers={discordMembers}
+                    saveTimeoutRef={saveTimeoutRef}
+                  />
                 </CompositionTabPanel>
               </Box>
             </Box>
