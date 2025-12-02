@@ -14,7 +14,6 @@ import {
   CircularProgress,
   Tabs,
   Tab,
-  Chip,
   FormControlLabel,
   Switch,
 } from "@mui/material";
@@ -28,9 +27,7 @@ import {
   JOURNEE_CONCERNEE_PAR_REGLE,
   validateTeamCompositionState,
 } from "@/lib/compositions/validation";
-import type { Player } from "@/types/team-management";
 import { AvailablePlayersPanel } from "@/components/compositions/AvailablePlayersPanel";
-import { TeamCompositionCard } from "@/components/compositions/TeamCompositionCard";
 import { CompositionsSummary } from "@/components/compositions/CompositionsSummary";
 import { CompositionRulesHelp } from "@/components/compositions/CompositionRulesHelp";
 import { CompositionTabPanel } from "@/components/compositions/CompositionTabPanel";
@@ -38,16 +35,16 @@ import { useMaxPlayersForTeam } from "@/hooks/useMaxPlayersForTeam";
 import { useFilteredEquipes } from "@/hooks/useFilteredEquipes";
 import { useEquipesByType } from "@/hooks/useEquipesByType";
 import { useCanDropPlayer } from "@/hooks/useCanDropPlayer";
-import { PlayerBurnoutIndicators } from "@/components/compositions/PlayerBurnoutIndicators";
 import { useCompositionDragDrop } from "@/hooks/useCompositionDragDrop";
 import { AvailablePlayerItem } from "@/components/compositions/AvailablePlayerItem";
 import { useCurrentPhase } from "@/hooks/useCurrentPhase";
 import { useFilteredPlayers } from "@/hooks/useFilteredPlayers";
 import { usePlayersWithoutAssignment } from "@/hooks/usePlayersWithoutAssignment";
 import { useCompositionRules } from "@/hooks/useCompositionRules";
-import { isParisChampionship as isParisChampionshipValidation } from "@/lib/compositions/validation";
 import { useCompositionPlayers } from "@/hooks/useCompositionPlayers";
 import { CompositionSelectors } from "@/components/compositions/CompositionSelectors";
+import { useAvailablePlayers } from "@/hooks/useAvailablePlayers";
+import { CompositionTeamList } from "@/components/compositions/CompositionTeamList";
 
 interface PhaseSelectOption {
   value: "aller" | "retour";
@@ -209,18 +206,13 @@ export default function DefaultCompositionsPage() {
   // championshipPlayers et playerPool sont maintenant fournis par useCompositionPlayers
 
   // Filtrer les joueurs selon le type de championnat
-  // Masculin : hommes ET femmes
-  // Féminin : uniquement les femmes
-  const availablePlayers = useMemo(() => {
-    const pool = includeAllPlayers ? players : playerPool;
-    if (defaultCompositionTab === "masculin") {
-      // Championnat masculin : afficher tous les joueurs (hommes et femmes)
-      return pool;
-    } else {
-      // Championnat féminin : afficher uniquement les femmes
-      return pool.filter((player) => player.gender === "F");
-    }
-  }, [players, playerPool, includeAllPlayers, defaultCompositionTab]);
+  const { availablePlayers } = useAvailablePlayers({
+    players,
+    playerPool,
+    includeAllPlayers,
+    selectedEpreuve,
+    defaultCompositionTab,
+  });
 
   // Filtrer les joueurs disponibles selon la recherche
   const filteredAvailablePlayers = useFilteredPlayers(
@@ -888,240 +880,53 @@ export default function DefaultCompositionsPage() {
                       }
 
                       return (
-                        <Box
-                          sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 2,
-                          }}
-                        >
-                          {equipesToDisplay.map((equipe) => {
-                          // Pour le championnat de Paris, utiliser "masculin" comme type par défaut (mixte)
-                          const championshipTypeForTeam =
-                            selectedEpreuve === "championnat_paris"
-                              ? "masculin"
-                              : equipe.matches.some((match) => match.isFemale === true)
-                                ? "feminin"
-                                : "masculin";
-                          const assignments =
-                            defaultCompositions[championshipTypeForTeam][equipe.team.id] || [];
-                          const teamPlayers = assignments
-                            .map((playerId) => players.find((p) => p.id === playerId))
-                            .filter((p): p is Player => p !== undefined);
-
-                          const isDragOver =
-                            draggedPlayerId && dragOverTeamId === equipe.team.id;
-                          const dropCheck =
-                            draggedPlayerId && dragOverTeamId === equipe.team.id
-                              ? canDropPlayer(draggedPlayerId, equipe.team.id)
-                              : {
-                                  canAssign: true,
-                                  reason: undefined,
-                                  simulatedPlayers: teamPlayers,
-                                };
-                          const canDrop = dropCheck.canAssign;
-                          const validationError =
-                            defaultCompositionErrors[equipe.team.id];
-
-                          return (
-                            <Box key={equipe.team.id}>
-                              <TeamCompositionCard
-                                equipe={equipe}
-                                players={teamPlayers}
-                                onRemovePlayer={(playerId) =>
-                                  handleRemoveDefaultPlayer(
-                                    equipe.team.id,
-                                    playerId
-                                  )
-                                }
-                                onPlayerDragStart={(event, playerId) =>
-                                  handleDragStart(event, playerId)
-                                }
-                                onPlayerDragEnd={handleDragEnd}
-                                onDragOver={(event) =>
-                                  handleDragOver(event, equipe.team.id)
-                                }
-                                onDragLeave={handleDragLeave}
-                                onDrop={(event) =>
-                                  handleDrop(event, equipe.team.id)
-                                }
-                                isDragOver={Boolean(isDragOver)}
-                                canDrop={canDrop}
-                                dropReason={dropCheck.reason}
-                                draggedPlayerId={draggedPlayerId}
-                                dragOverTeamId={dragOverTeamId}
-                                matchPlayed={false}
-                                showMatchStatus={false}
-                                selectedEpreuve={null}
-                                additionalHeader={
-                                  validationError ? (
-                                    <Chip
-                                      label="Invalide"
-                                      size="small"
-                                      color="error"
-                                      variant="filled"
-                                    />
-                                  ) : undefined
-                                }
-                                maxPlayers={getMaxPlayersForTeam(equipe)}
-                            completionThreshold={
-                              MIN_PLAYERS_FOR_DEFAULT_COMPLETION
-                            }
-                                renderPlayerIndicators={(player) => {
-                                  const phase = (selectedPhase || "aller") as "aller" | "retour";
-                                  // Pour les équipes masculines, utiliser "masculin" comme type
-                                  const championshipType = "masculin";
-                                  const isParisMatch = isParisChampionshipValidation(equipe);
-                                  return (
-                                    <PlayerBurnoutIndicators
-                                      player={player}
-                                      equipe={equipe}
-                                      phase={phase}
-                                      championshipType={championshipType}
-                                      isParis={isParisMatch}
-                                      discordMembers={discordMembers}
-                                    />
-                                  );
-                                }}
-                                renderPlayerSecondary={(player) =>
-                                  player.points !== undefined &&
-                                  player.points !== null
-                                    ? `${player.points} points`
-                                    : "Points non disponibles"
-                                }
-                              />
-                              {validationError && (
-                                <Typography
-                                  variant="caption"
-                                  color="error"
-                                  sx={{ mt: 1, display: "block" }}
-                                >
-                                  {validationError}
-                                </Typography>
-                              )}
-                            </Box>
-                          );
-                        })}
-                      </Box>
+                        <CompositionTeamList
+                          equipes={equipesToDisplay}
+                          players={players}
+                          defaultCompositions={defaultCompositions}
+                          selectedEpreuve={selectedEpreuve}
+                          selectedJournee={null}
+                          selectedPhase={selectedPhase}
+                          defaultCompositionTab={defaultCompositionTab}
+                          isParis={selectedEpreuve === "championnat_paris"}
+                          draggedPlayerId={draggedPlayerId}
+                          dragOverTeamId={dragOverTeamId}
+                          defaultCompositionErrors={defaultCompositionErrors}
+                          mode="defaults"
+                          onRemovePlayer={handleRemoveDefaultPlayer}
+                          onDragStart={handleDragStart}
+                          onDragEnd={handleDragEnd}
+                          onDragOver={handleDragOver}
+                          onDragLeave={handleDragLeave}
+                          onDrop={handleDrop}
+                          completionThreshold={MIN_PLAYERS_FOR_DEFAULT_COMPLETION}
+                        />
                       );
                     })()}
                   </CompositionTabPanel>
 
                   <CompositionTabPanel value={currentTabIndex} index={1} prefix="default-compositions">
-                    {equipesByType.feminin.length === 0 ? (
-                      <Typography variant="body2" color="text.secondary">
-                        Aucune équipe féminine
-                      </Typography>
-                    ) : (
-                      <Box
-                        sx={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 2,
-                        }}
-                      >
-                        {equipesByType.feminin.map((equipe) => {
-                          const assignments =
-                            defaultCompositions.feminin[equipe.team.id] || [];
-                          const teamPlayers = assignments
-                            .map((playerId) => players.find((p) => p.id === playerId))
-                            .filter((p): p is Player => p !== undefined);
-
-                          const isDragOver =
-                            draggedPlayerId && dragOverTeamId === equipe.team.id;
-                          const dropCheck =
-                            draggedPlayerId && dragOverTeamId === equipe.team.id
-                              ? canDropPlayer(draggedPlayerId, equipe.team.id)
-                              : {
-                                  canAssign: true,
-                                  reason: undefined,
-                                  simulatedPlayers: teamPlayers,
-                                };
-                          const canDrop = dropCheck.canAssign;
-                          const validationError =
-                            defaultCompositionErrors[equipe.team.id];
-
-                          return (
-                            <Box key={equipe.team.id}>
-                              <TeamCompositionCard
-                                equipe={equipe}
-                                players={teamPlayers}
-                                onRemovePlayer={(playerId) =>
-                                  handleRemoveDefaultPlayer(
-                                    equipe.team.id,
-                                    playerId
-                                  )
-                                }
-                                onPlayerDragStart={(event, playerId) =>
-                                  handleDragStart(event, playerId)
-                                }
-                                onPlayerDragEnd={handleDragEnd}
-                                onDragOver={(event) =>
-                                  handleDragOver(event, equipe.team.id)
-                                }
-                                onDragLeave={handleDragLeave}
-                                onDrop={(event) =>
-                                  handleDrop(event, equipe.team.id)
-                                }
-                                isDragOver={Boolean(isDragOver)}
-                                canDrop={canDrop}
-                                dropReason={dropCheck.reason}
-                                draggedPlayerId={draggedPlayerId}
-                                dragOverTeamId={dragOverTeamId}
-                                matchPlayed={false}
-                                showMatchStatus={false}
-                                selectedEpreuve={null}
-                                additionalHeader={
-                                  validationError ? (
-                                    <Chip
-                                      label="Invalide"
-                                      size="small"
-                                      color="error"
-                                      variant="filled"
-                                    />
-                                  ) : undefined
-                                }
-                                maxPlayers={getMaxPlayersForTeam(equipe)}
-                            completionThreshold={
-                              MIN_PLAYERS_FOR_DEFAULT_COMPLETION
-                            }
-                                renderPlayerIndicators={(player) => {
-                                  const phase = (selectedPhase || "aller") as "aller" | "retour";
-                                  // Pour les équipes féminines, utiliser "feminin" comme type
-                                  const championshipType = "feminin";
-                                  const isParisMatch = isParisChampionshipValidation(equipe);
-                                  return (
-                                    <PlayerBurnoutIndicators
-                                      player={player}
-                                      equipe={equipe}
-                                      phase={phase}
-                                      championshipType={championshipType}
-                                      isParis={isParisMatch}
-                                      discordMembers={discordMembers}
-                                    />
-                                  );
-                                }}
-                                renderPlayerSecondary={(player) =>
-                                  player.points !== undefined &&
-                                  player.points !== null
-                                    ? `${player.points} points`
-                                    : "Points non disponibles"
-                                }
-                              />
-                              {validationError && (
-                                <Typography
-                                  variant="caption"
-                                  color="error"
-                                  sx={{ mt: 1, display: "block" }}
-                                >
-                                  {validationError}
-                                </Typography>
-                              )}
-                            </Box>
-                          );
-                        })}
-                      </Box>
-                    )}
+                    <CompositionTeamList
+                      equipes={equipesByType.feminin}
+                      players={players}
+                      defaultCompositions={defaultCompositions}
+                      selectedEpreuve={selectedEpreuve}
+                      selectedJournee={null}
+                      selectedPhase={selectedPhase}
+                      defaultCompositionTab={defaultCompositionTab}
+                      isParis={selectedEpreuve === "championnat_paris"}
+                      draggedPlayerId={draggedPlayerId}
+                      dragOverTeamId={dragOverTeamId}
+                      defaultCompositionErrors={defaultCompositionErrors}
+                      mode="defaults"
+                      onRemovePlayer={handleRemoveDefaultPlayer}
+                      onDragStart={handleDragStart}
+                      onDragEnd={handleDragEnd}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      completionThreshold={MIN_PLAYERS_FOR_DEFAULT_COMPLETION}
+                    />
                   </CompositionTabPanel>
                 </Box>
               </Box>
