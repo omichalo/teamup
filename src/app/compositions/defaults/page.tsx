@@ -8,10 +8,6 @@ import Link from "next/link";
 import {
   Box,
   Typography,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Stack,
   Button,
   Alert,
@@ -21,13 +17,10 @@ import {
   Chip,
   FormControlLabel,
   Switch,
-  Card,
-  CardContent,
 } from "@mui/material";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
 import { useEquipesWithMatches } from "@/hooks/useEquipesWithMatches";
-import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
 import { CompositionDefaultsService } from "@/lib/services/composition-defaults-service";
 import { EpreuveType } from "@/lib/shared/epreuve-utils";
 import { useChampionshipTypes } from "@/hooks/useChampionshipTypes";
@@ -53,6 +46,8 @@ import { useFilteredPlayers } from "@/hooks/useFilteredPlayers";
 import { usePlayersWithoutAssignment } from "@/hooks/usePlayersWithoutAssignment";
 import { useCompositionRules } from "@/hooks/useCompositionRules";
 import { isParisChampionship as isParisChampionshipValidation } from "@/lib/compositions/validation";
+import { useCompositionPlayers } from "@/hooks/useCompositionPlayers";
+import { CompositionSelectors } from "@/components/compositions/CompositionSelectors";
 
 interface PhaseSelectOption {
   value: "aller" | "retour";
@@ -65,9 +60,16 @@ const MIN_PLAYERS_FOR_DEFAULT_COMPLETION = 4;
 export default function DefaultCompositionsPage() {
   const { loadBoth, createEmpty, isParisChampionship } = useChampionshipTypes();
   const { equipes, loading: loadingEquipes } = useEquipesWithMatches();
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [loadingPlayers, setLoadingPlayers] = useState(true);
   const [selectedEpreuve, setSelectedEpreuve] = useState<EpreuveType>("championnat_equipes");
+  const {
+    players,
+    loadingPlayers,
+    loadPlayers,
+    playerPool,
+  } = useCompositionPlayers({
+    includeAllPlayers: false,
+    selectedEpreuve,
+  });
   const isParis = useMemo(() => isParisChampionship(selectedEpreuve), [isParisChampionship, selectedEpreuve]);
   const [selectedPhase, setSelectedPhase] = useState<"aller" | "retour" | null>(
     null
@@ -95,7 +97,6 @@ export default function DefaultCompositionsPage() {
   const [includeAllPlayers, setIncludeAllPlayers] = useState(false);
   const [discordMembers, setDiscordMembers] = useState<Array<{ id: string; username: string; displayName: string }>>([]);
 
-  const playerService = useMemo(() => new FirestorePlayerService(), []);
   const compositionDefaultsService = useMemo(
     () => new CompositionDefaultsService(),
     []
@@ -110,34 +111,9 @@ export default function DefaultCompositionsPage() {
     setSelectedPhase,
   });
 
-  const loadPlayers = useCallback(async () => {
-    try {
-      setLoadingPlayers(true);
-      const fetchedPlayers = await playerService.getAllPlayers();
-      setPlayers(
-        fetchedPlayers.sort((a, b) => {
-          const pointsDiff = (b.points || 0) - (a.points || 0);
-          if (pointsDiff !== 0) {
-            return pointsDiff;
-          }
-          return `${a.firstName} ${a.name}`.localeCompare(
-            `${b.firstName} ${b.name}`
-          );
-        })
-      );
-    } catch (error) {
-      console.error(
-        "Erreur lors du chargement des joueurs depuis Firestore:",
-        error
-      );
-      setPlayers([]);
-    } finally {
-      setLoadingPlayers(false);
-    }
-  }, [playerService]);
-
+  // Charger les joueurs au montage
   useEffect(() => {
-    loadPlayers();
+    void loadPlayers();
   }, [loadPlayers]);
 
   // Charger les membres Discord
@@ -230,43 +206,21 @@ export default function DefaultCompositionsPage() {
     [defaultCompositions]
   );
 
-  const championshipPlayers = useMemo(
-    () => {
-      // Pour le championnat de Paris, filtrer par participation au championnat de Paris
-      if (selectedEpreuve === "championnat_paris") {
-        return players.filter(
-          (player) => 
-            player.participation?.championnatParis === true && 
-            (player.isActive || player.isTemporary)
-        );
-      }
-      // Pour le championnat par équipes, filtrer par participation au championnat
-      return players.filter(
-        (player) => 
-          player.participation?.championnat === true && 
-          (player.isActive || player.isTemporary)
-      );
-    },
-    [players, selectedEpreuve]
-  );
-
-  const playerPool = useMemo(
-    () => (includeAllPlayers ? players : championshipPlayers),
-    [players, championshipPlayers, includeAllPlayers]
-  );
+  // championshipPlayers et playerPool sont maintenant fournis par useCompositionPlayers
 
   // Filtrer les joueurs selon le type de championnat
   // Masculin : hommes ET femmes
   // Féminin : uniquement les femmes
   const availablePlayers = useMemo(() => {
+    const pool = includeAllPlayers ? players : playerPool;
     if (defaultCompositionTab === "masculin") {
       // Championnat masculin : afficher tous les joueurs (hommes et femmes)
-      return playerPool;
+      return pool;
     } else {
       // Championnat féminin : afficher uniquement les femmes
-      return playerPool.filter((player) => player.gender === "F");
+      return pool.filter((player) => player.gender === "F");
     }
-  }, [playerPool, defaultCompositionTab]);
+  }, [players, playerPool, includeAllPlayers, defaultCompositionTab]);
 
   // Filtrer les joueurs disponibles selon la recherche
   const filteredAvailablePlayers = useFilteredPlayers(
@@ -801,57 +755,25 @@ export default function DefaultCompositionsPage() {
             </Button>
           </Stack>
 
-          <Card sx={{ mb: 3 }}>
-            <CardContent sx={{ pt: 2.5, pb: 1.5 }}>
-              <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
-                <FormControl size="small" sx={{ minWidth: 200 }}>
-                  <InputLabel id="epreuve-select-label">Épreuve</InputLabel>
-                  <Select
-                    labelId="epreuve-select-label"
-                    id="epreuve-select"
-                    value={selectedEpreuve || ""}
-                    label="Épreuve"
-                    onChange={(e) => {
-                      const epreuve = e.target.value as EpreuveType;
-                      setSelectedEpreuve(epreuve);
-                      setSelectedPhase(null); // Réinitialiser la phase lors du changement d'épreuve
-                    }}
-                  >
-                    <MenuItem value="championnat_equipes">
-                      Championnat par Équipes
-                    </MenuItem>
-                    <MenuItem value="championnat_paris">
-                      Championnat de Paris IDF
-                    </MenuItem>
-                  </Select>
-                </FormControl>
-                {/* Masquer le sélecteur de phase pour le championnat de Paris (une seule phase) */}
-                {selectedEpreuve !== "championnat_paris" && (
-                  <FormControl size="small" sx={{ minWidth: 180 }}>
-                    <InputLabel id="default-phase-label">Phase</InputLabel>
-                    <Select
-                      labelId="default-phase-label"
-                      label="Phase"
-                      value={selectedPhase || ""}
-                      onChange={(event) =>
-                        setSelectedPhase(
-                          event.target.value
-                            ? (event.target.value as "aller" | "retour")
-                            : null
-                        )
-                      }
-                    >
-                      {phaseOptions.map((option) => (
-                        <MenuItem key={option.value} value={option.value}>
-                          {option.label}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                )}
-              </Box>
-            </CardContent>
-          </Card>
+          <CompositionSelectors
+            selectedEpreuve={selectedEpreuve}
+            selectedPhase={selectedPhase}
+            selectedJournee={null}
+            onEpreuveChange={(epreuve) => {
+              setSelectedEpreuve(epreuve);
+              setSelectedPhase(null); // Réinitialiser la phase lors du changement d'épreuve
+            }}
+            onPhaseChange={(phase) =>
+              setSelectedPhase(
+                phase ? (phase as "aller" | "retour") : null
+              )
+            }
+            onJourneeChange={() => {}}
+            isParis={isParis}
+            journeesByPhase={new Map()}
+            showJournee={false}
+            phaseOptions={phaseOptions}
+          />
 
           <CompositionRulesHelp rules={rulesForDefaults} />
 

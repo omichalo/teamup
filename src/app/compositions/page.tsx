@@ -29,10 +29,7 @@ import { CompositionDefaultsService } from "@/lib/services/composition-defaults-
 import { Player } from "@/types/team-management";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
-import {
-  EpreuveType,
-  getIdEpreuve,
-} from "@/lib/shared/epreuve-utils";
+import { EpreuveType, getIdEpreuve } from "@/lib/shared/epreuve-utils";
 import { useChampionshipTypes } from "@/hooks/useChampionshipTypes";
 import {
   getMatchForTeamAndJournee,
@@ -147,11 +144,7 @@ export default function CompositionsPage() {
   const [selectedEpreuve, setSelectedEpreuve] = useState<EpreuveType | null>(
     null
   );
-  const {
-    players,
-    loadingPlayers,
-    loadPlayers,
-  } = useCompositionPlayers({
+  const { players, loadingPlayers, loadPlayers } = useCompositionPlayers({
     includeAllPlayers: false,
     selectedEpreuve,
   });
