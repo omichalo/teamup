@@ -22,6 +22,7 @@ export function FirebaseAuthRestorer() {
 
         // Récupérer un custom token depuis le serveur
         const res = await fetch("/api/session/firebase-token", {
+          method: "POST",
           credentials: "include",
         });
 

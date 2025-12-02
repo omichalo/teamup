@@ -12,10 +12,6 @@ import {
   CardContent,
   Button,
   CircularProgress,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Switch,
   FormControlLabel,
   TextField,
@@ -35,24 +31,30 @@ import {
   Comment as CommentIcon,
   DoneAll,
 } from "@mui/icons-material";
-import { useEquipesWithMatches } from "@/hooks/useEquipesWithMatches";
 import { useAvailabilityRealtime } from "@/hooks/useAvailabilityRealtime";
 import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
-import { AvailabilityService, DayAvailability } from "@/lib/services/availability-service";
+import {
+  AvailabilityService,
+  DayAvailability,
+} from "@/lib/services/availability-service";
 import { CompositionService } from "@/lib/services/composition-service";
 import { Player } from "@/types/team-management";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
-import { getCurrentPhase } from "@/lib/shared/phase-utils";
+import { CompositionSelectors } from "@/components/compositions/CompositionSelectors";
+import { useAppData } from "@/hooks/useAppData";
+import { useSelection } from "@/hooks/useSelection";
 
 interface AvailabilityResponse {
   available?: boolean;
   comment?: string;
 }
 
-import { EpreuveType, getIdEpreuve, getMatchEpreuve } from "@/lib/shared/epreuve-utils";
-
-type ChampionshipType = "masculin" | "feminin";
+import { EpreuveType, getIdEpreuve } from "@/lib/shared/epreuve-utils";
+import {
+  useChampionshipTypes,
+  type ChampionshipType,
+} from "@/hooks/useChampionshipTypes";
 
 type PlayerAvailabilityByType = {
   masculin?: AvailabilityResponse;
@@ -94,8 +96,12 @@ const availabilityEntriesEqual = (
   skipNormalization: boolean = false
 ): boolean => {
   // Pour les commentaires, on compare les valeurs brutes pour permettre les espaces
-  const normalizedCurrent = skipNormalization ? current : sanitizeAvailabilityEntry(current);
-  const normalizedNext = skipNormalization ? next : sanitizeAvailabilityEntry(next);
+  const normalizedCurrent = skipNormalization
+    ? current
+    : sanitizeAvailabilityEntry(current);
+  const normalizedNext = skipNormalization
+    ? next
+    : sanitizeAvailabilityEntry(next);
 
   if (!normalizedCurrent && !normalizedNext) {
     return true;
@@ -123,13 +129,23 @@ const updateAvailabilityState = (
   const currentEntry = currentPlayerState?.[championshipType];
 
   const computedEntry = computeNextEntry(currentEntry);
-  
+
   // Pour les commentaires, on compare les valeurs brutes pour permettre les espaces
   // La normalisation sera faite uniquement lors de la sauvegarde
-  const normalizedCurrent = skipNormalization ? currentEntry : sanitizeAvailabilityEntry(currentEntry);
-  const normalizedNext = skipNormalization ? computedEntry : sanitizeAvailabilityEntry(computedEntry);
+  const normalizedCurrent = skipNormalization
+    ? currentEntry
+    : sanitizeAvailabilityEntry(currentEntry);
+  const normalizedNext = skipNormalization
+    ? computedEntry
+    : sanitizeAvailabilityEntry(computedEntry);
 
-  if (availabilityEntriesEqual(normalizedCurrent, normalizedNext, skipNormalization)) {
+  if (
+    availabilityEntriesEqual(
+      normalizedCurrent,
+      normalizedNext,
+      skipNormalization
+    )
+  ) {
     return { nextState: previousState, changed: false };
   }
 
@@ -137,7 +153,11 @@ const updateAvailabilityState = (
 
   // Si on skip la normalisation, on vérifie si l'entrée est vide différemment
   if (skipNormalization) {
-    if (!computedEntry || (computedEntry.available === undefined && (!computedEntry.comment || computedEntry.comment.trim().length === 0))) {
+    if (
+      !computedEntry ||
+      (computedEntry.available === undefined &&
+        (!computedEntry.comment || computedEntry.comment.trim().length === 0))
+    ) {
       if (!currentPlayerState) {
         return { nextState: previousState, changed: false };
       }
@@ -218,14 +238,27 @@ const buildPlayersPayload = (
 };
 
 export default function DisponibilitesPage() {
-  const { equipes, loading: loadingEquipes } = useEquipesWithMatches();
+  const { loadBoth, createEmpty } = useChampionshipTypes();
+  // Utiliser les données depuis le store global
+  const { equipes, loading: loadingEquipes } = useAppData();
+  // Utiliser les sélections depuis le store (synchronisées entre pages)
+  const {
+    selectedEpreuve,
+    selectedPhase,
+    selectedJournee,
+    setSelectedEpreuve,
+    setSelectedPhase,
+    setSelectedJournee,
+    journeesByPhase,
+    isParis,
+  } = useSelection({
+    equipes,
+    loadingEquipes,
+    autoInitialize: true,
+    showJournee: true,
+  });
   const [players, setPlayers] = useState<Player[]>([]);
   const [loadingPlayers, setLoadingPlayers] = useState(true);
-  const [selectedEpreuve, setSelectedEpreuve] = useState<EpreuveType | null>(null);
-  const [selectedJournee, setSelectedJournee] = useState<number | null>(null);
-  const [selectedPhase, setSelectedPhase] = useState<"aller" | "retour" | null>(
-    null
-  );
   const [showAllPlayers, setShowAllPlayers] = useState(false);
   // Structure: { playerId: { masculin?: AvailabilityResponse, feminin?: AvailabilityResponse } }
   const [availabilities, setAvailabilities] = useState<AvailabilityState>({});
@@ -254,10 +287,16 @@ export default function DisponibilitesPage() {
     setAvailabilityWarning(null);
   }, []);
 
-
   const persistAvailability = useCallback(
-    async (stateSnapshot: AvailabilityState, championshipType: ChampionshipType) => {
-      if (selectedJournee === null || selectedPhase === null || selectedEpreuve === null) {
+    async (
+      stateSnapshot: AvailabilityState,
+      championshipType: ChampionshipType
+    ) => {
+      if (
+        selectedJournee === null ||
+        selectedPhase === null ||
+        selectedEpreuve === null
+      ) {
         return;
       }
 
@@ -279,14 +318,17 @@ export default function DisponibilitesPage() {
           championshipType,
           players: payload,
         };
-        
+
         if (idEpreuve !== undefined) {
           availabilityData.idEpreuve = idEpreuve;
         }
-        
+
         await availabilityService.saveAvailability(availabilityData);
       } catch (error) {
-        console.error("Erreur lors de la sauvegarde de la disponibilité:", error);
+        console.error(
+          "Erreur lors de la sauvegarde de la disponibilité:",
+          error
+        );
       }
     },
     [availabilityService, selectedJournee, selectedPhase, selectedEpreuve]
@@ -297,275 +339,6 @@ export default function DisponibilitesPage() {
     availabilitiesRef.current = availabilities;
   }, [availabilities]);
 
-  // Déterminer la phase en cours
-  const currentPhase = useMemo(() => {
-    if (loadingEquipes || equipes.length === 0) {
-      return "aller" as const;
-    }
-    return getCurrentPhase(equipes);
-  }, [equipes, loadingEquipes]);
-
-
-  // Extraire les journées depuis les matchs, groupées par épreuve et phase avec leurs dates
-  const journeesByEpreuveAndPhase = useMemo(() => {
-    const journeesMap = new Map<
-      EpreuveType,
-      Map<
-        "aller" | "retour",
-        Map<number, { journee: number; phase: "aller" | "retour"; dates: Date[] }>
-      >
-    >();
-
-    // Debug: log pour voir toutes les équipes et leurs matchs
-    const parisEquipes = equipes.filter((equipe) => 
-      equipe.team?.idEpreuve === 15980 || 
-      equipe.team?.epreuve?.toLowerCase().includes("paris idf") ||
-      equipe.team?.epreuve?.toLowerCase().includes("excellence")
-    );
-    console.log("[Disponibilites] Équipes Paris trouvées:", {
-      count: parisEquipes.length,
-      equipes: parisEquipes.map((equipe) => ({
-        teamId: equipe.team?.id,
-        teamName: equipe.team?.name,
-        teamIdEpreuve: equipe.team?.idEpreuve,
-        teamEpreuve: equipe.team?.epreuve,
-        matchesCount: equipe.matches.length,
-        matches: equipe.matches.map((match) => ({
-          id: match.id,
-          idEpreuve: match.idEpreuve,
-          journee: match.journee,
-          phase: match.phase,
-        })),
-      })),
-    });
-
-    equipes.forEach((equipe) => {
-      equipe.matches.forEach((match) => {
-        const epreuve = getMatchEpreuve(match, equipe.team);
-        
-        // Debug: log pour comprendre pourquoi les matchs de Paris ne sont pas détectés
-        if (match.idEpreuve === 15980 || equipe.team?.idEpreuve === 15980) {
-          console.log("[Disponibilites] Match Paris détecté:", {
-            matchIdEpreuve: match.idEpreuve,
-            teamIdEpreuve: equipe.team?.idEpreuve,
-            teamEpreuve: equipe.team?.epreuve,
-            epreuveDetected: epreuve,
-            journee: match.journee,
-            phase: match.phase,
-            matchId: match.id,
-          });
-        }
-        
-        if (!epreuve || !match.journee || !match.phase) {
-          if (match.idEpreuve === 15980 || equipe.team?.idEpreuve === 15980) {
-            console.log("[Disponibilites] Match Paris rejeté:", {
-              epreuve,
-              journee: match.journee,
-              phase: match.phase,
-            });
-          }
-          return;
-        }
-
-        // Pour le championnat de Paris, accepter toutes les phases (il n'y en a qu'une)
-        // Pour le championnat par équipes, accepter uniquement "aller" et "retour"
-        const phaseLower = match.phase.toLowerCase();
-        let phase: "aller" | "retour";
-        
-        if (epreuve === "championnat_paris") {
-          // Pour Paris, normaliser toutes les phases en "aller" (car il n'y a qu'une phase)
-          phase = "aller";
-        } else if (phaseLower === "aller" || phaseLower === "retour") {
-          phase = phaseLower as "aller" | "retour";
-        } else {
-          // Phase non reconnue pour le championnat par équipes
-          return;
-        }
-
-        if (!journeesMap.has(epreuve)) {
-          journeesMap.set(epreuve, new Map());
-        }
-        const epreuveMap = journeesMap.get(epreuve)!;
-
-        if (!epreuveMap.has(phase)) {
-          epreuveMap.set(phase, new Map());
-        }
-        const phaseMap = epreuveMap.get(phase)!;
-
-        const matchDate =
-          match.date instanceof Date ? match.date : new Date(match.date);
-
-        if (!phaseMap.has(match.journee)) {
-          phaseMap.set(match.journee, {
-            journee: match.journee,
-            phase,
-            dates: [matchDate],
-          });
-        } else {
-          const journeeData = phaseMap.get(match.journee)!;
-          // Ajouter la date si elle n'existe pas déjà (même jour)
-          const dateStr = matchDate.toDateString();
-          const exists = journeeData.dates.some(
-            (d) => d.toDateString() === dateStr
-          );
-          if (!exists) {
-            journeeData.dates.push(matchDate);
-          }
-        }
-      });
-    });
-
-    // Trier les dates pour chaque journée
-    journeesMap.forEach((epreuveMap) => {
-      epreuveMap.forEach((phaseMap) => {
-        phaseMap.forEach((journeeData) => {
-          journeeData.dates.sort((a, b) => a.getTime() - b.getTime());
-        });
-      });
-    });
-
-    // Debug: log pour voir ce qui a été extrait
-    const parisPhases = journeesMap.get("championnat_paris");
-    const equipesPhases = journeesMap.get("championnat_equipes");
-    console.log("[Disponibilites] Journées extraites par épreuve:", {
-      championnat_equipes: equipesPhases?.size || 0,
-      championnat_paris: parisPhases?.size || 0,
-      details: {
-        championnat_equipes: equipesPhases ? Array.from(equipesPhases.entries()).map(([phase, phaseMap]) => ({
-          phase,
-          journees: Array.from(phaseMap.keys()),
-        })) : [],
-        championnat_paris: parisPhases ? Array.from(parisPhases.entries()).map(([phase, phaseMap]) => ({
-          phase,
-          journees: Array.from(phaseMap.keys()),
-        })) : [],
-      },
-    });
-
-    return journeesMap;
-  }, [equipes]);
-
-  // Extraire les journées pour l'épreuve sélectionnée
-  const journeesByPhase = useMemo(() => {
-    if (!selectedEpreuve) {
-      return new Map<
-        "aller" | "retour",
-        Map<number, { journee: number; phase: "aller" | "retour"; dates: Date[] }>
-      >();
-    }
-    return journeesByEpreuveAndPhase.get(selectedEpreuve) || new Map();
-  }, [selectedEpreuve, journeesByEpreuveAndPhase]);
-
-  // Calculer l'épreuve avec la prochaine journée la plus proche (basée sur la date de début)
-  const defaultEpreuve = useMemo(() => {
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-
-    let closestEpreuve: EpreuveType | null = null;
-    let closestDate: Date | null = null;
-
-    for (const [epreuve, epreuveMap] of journeesByEpreuveAndPhase) {
-      for (const [phase, phaseMap] of epreuveMap) {
-        for (const [journee, journeeData] of phaseMap) {
-          if (journeeData.dates.length > 0) {
-            // Utiliser la date de début (minimum) plutôt que la fin
-            const debutJournee = new Date(
-              Math.min(...journeeData.dates.map((d) => d.getTime()))
-            );
-            debutJournee.setHours(0, 0, 0, 0);
-
-            if (debutJournee >= now) {
-              if (!closestDate || debutJournee < closestDate) {
-                closestDate = new Date(debutJournee);
-                closestEpreuve = epreuve;
-                console.log(`[Disponibilites] Nouvelle épreuve la plus proche: ${epreuve}, journée ${journee}, phase ${phase}, date: ${debutJournee.toISOString().split('T')[0]}`);
-              }
-            }
-          }
-        }
-      }
-    }
-
-    const formattedDate: string = closestDate !== null 
-      ? (closestDate as Date).toISOString().split('T')[0] 
-      : "aucune";
-    console.log(`[Disponibilites] Épreuve par défaut sélectionnée: ${closestEpreuve || "championnat_equipes"}, date la plus proche: ${formattedDate}`);
-    return (closestEpreuve || ("championnat_equipes" as EpreuveType)) as EpreuveType; // Fallback sur championnat_equipes
-  }, [journeesByEpreuveAndPhase]);
-
-  // Initialiser selectedEpreuve avec l'épreuve par défaut
-  // Utiliser une ref pour suivre si on a déjà initialisé une fois
-  const hasInitializedEpreuve = React.useRef(false);
-  
-  useEffect(() => {
-    // Initialiser seulement si :
-    // 1. On n'a pas encore initialisé ET selectedEpreuve est null
-    // 2. OU on n'a pas encore initialisé ET defaultEpreuve est disponible
-    if (!hasInitializedEpreuve.current) {
-      if (defaultEpreuve && journeesByEpreuveAndPhase.has(defaultEpreuve)) {
-        // Vérifier que defaultEpreuve a des données réelles (pas juste le fallback)
-        const hasRealData = Array.from(journeesByEpreuveAndPhase.get(defaultEpreuve)?.values() || []).some(
-          (phaseMap) => phaseMap.size > 0
-        );
-        if (hasRealData) {
-          setSelectedEpreuve(defaultEpreuve);
-          hasInitializedEpreuve.current = true;
-        }
-      }
-    }
-  }, [defaultEpreuve, selectedEpreuve, journeesByEpreuveAndPhase]);
-
-  // Initialiser selectedPhase avec la phase en cours
-  useEffect(() => {
-    if (selectedPhase === null && currentPhase) {
-      setSelectedPhase(currentPhase);
-    }
-  }, [currentPhase, selectedPhase]);
-
-  // Initialiser selectedJournee avec la prochaine journée dans le futur (basée sur la date de début)
-  useEffect(() => {
-    // Pour le championnat de Paris, utiliser "aller" comme phase par défaut
-    const phaseToUse = selectedEpreuve === "championnat_paris" 
-      ? "aller" 
-      : selectedPhase;
-    
-    if (
-      selectedEpreuve === null ||
-      phaseToUse === null ||
-      !journeesByPhase.has(phaseToUse)
-    ) {
-      return;
-    }
-    
-    const now = new Date();
-    now.setHours(0, 0, 0, 0); // Réinitialiser l'heure pour comparer uniquement les dates
-
-    const journees = Array.from(
-      journeesByPhase.get(phaseToUse)?.values() || []
-    ) as Array<{ journee: number; phase: "aller" | "retour"; dates: Date[] }>;
-
-    // Trouver la prochaine journée basée sur la date de début (minimum)
-    const nextJournee = journees
-      .sort((a, b) => a.journee - b.journee) // Trier par numéro de journée
-      .find(({ dates }) => {
-        if (dates.length === 0) return false;
-        // La date de début de la journée = date minimale
-        const debutJournee = new Date(
-          Math.min(...dates.map((d: Date) => d.getTime()))
-        );
-        debutJournee.setHours(0, 0, 0, 0);
-        return debutJournee >= now;
-      });
-
-    if (nextJournee) {
-      setSelectedJournee(nextJournee.journee);
-    } else if (journees.length > 0) {
-      // Si aucune journée future, sélectionner la dernière
-      const lastJournee = journees.sort((a, b) => b.journee - a.journee)[0];
-      setSelectedJournee(lastJournee.journee);
-    }
-  }, [selectedPhase, selectedEpreuve, journeesByPhase]);
-
   // Filtrer les joueurs selon les critères
   const filteredPlayers = useMemo(() => {
     let filtered = players;
@@ -574,10 +347,14 @@ export default function DisponibilitesPage() {
     if (!showAllPlayers) {
       if (selectedEpreuve === "championnat_paris") {
         // Pour le championnat de Paris, filtrer par participation.championnatParis
-        filtered = filtered.filter((p) => p.participation?.championnatParis === true);
+        filtered = filtered.filter(
+          (p) => p.participation?.championnatParis === true
+        );
       } else {
         // Pour le championnat par équipes, filtrer par participation.championnat
-        filtered = filtered.filter((p) => p.participation?.championnat === true);
+        filtered = filtered.filter(
+          (p) => p.participation?.championnat === true
+        );
       }
     }
 
@@ -632,21 +409,70 @@ export default function DisponibilitesPage() {
     };
   }, [filteredPlayers, availabilities]);
 
+  // Fonctions génériques pour filtrer les joueurs selon leur disponibilité
+  const filterPlayersByComment = useCallback(
+    (
+      player: Player,
+      playerAvailabilities: PlayerAvailabilityByType | undefined
+    ): boolean => {
+      const masculinComment = playerAvailabilities?.masculin?.comment?.trim();
+      const femininComment = playerAvailabilities?.feminin?.comment?.trim();
+
+      if (player.gender === "M") {
+        return Boolean(masculinComment && masculinComment.length > 0);
+      } else {
+        return Boolean(
+          (masculinComment && masculinComment.length > 0) ||
+            (femininComment && femininComment.length > 0)
+        );
+      }
+    },
+    []
+  );
+
+  const filterPlayersByOK = useCallback(
+    (
+      player: Player,
+      playerAvailabilities: PlayerAvailabilityByType | undefined
+    ): boolean => {
+      if (player.gender === "M") {
+        return playerAvailabilities?.masculin?.available === true;
+      } else {
+        // Pour les femmes : au moins une catégorie avec available === true
+        return (
+          playerAvailabilities?.masculin?.available === true ||
+          playerAvailabilities?.feminin?.available === true
+        );
+      }
+    },
+    []
+  );
+
+  const filterPlayersByKO = useCallback(
+    (
+      player: Player,
+      playerAvailabilities: PlayerAvailabilityByType | undefined
+    ): boolean => {
+      if (player.gender === "M") {
+        return playerAvailabilities?.masculin?.available === false;
+      } else {
+        // Pour les femmes : au moins une catégorie avec available === false
+        return (
+          playerAvailabilities?.masculin?.available === false ||
+          playerAvailabilities?.feminin?.available === false
+        );
+      }
+    },
+    []
+  );
+
   // Joueurs ayant fait un commentaire (au moins un commentaire présent, même sans réponse)
   const playersWithComment = useMemo(() => {
     return filteredPlayers.filter((player) => {
       const playerAvailabilities = availabilities[player.id];
-      const masculinComment = playerAvailabilities?.masculin?.comment?.trim();
-      const femininComment = playerAvailabilities?.feminin?.comment?.trim();
-      
-      if (player.gender === "M") {
-        return masculinComment && masculinComment.length > 0;
-      } else {
-        return (masculinComment && masculinComment.length > 0) || 
-               (femininComment && femininComment.length > 0);
-      }
+      return filterPlayersByComment(player, playerAvailabilities);
     });
-  }, [filteredPlayers, availabilities]);
+  }, [filteredPlayers, availabilities, filterPlayersByComment]);
 
   // Joueurs ayant répondu OK (disponible) - au moins une catégorie avec available === true
   // Pour les femmes : si elle a répondu OK dans une catégorie, elle apparaît dans OK
@@ -654,17 +480,9 @@ export default function DisponibilitesPage() {
   const playersWithOK = useMemo(() => {
     return filteredPlayers.filter((player) => {
       const playerAvailabilities = availabilities[player.id];
-      
-      if (player.gender === "M") {
-        return playerAvailabilities?.masculin?.available === true;
-      } else {
-        // Pour les femmes : au moins une catégorie avec available === true
-        // Une femme avec OK féminin et KO masculin apparaîtra dans OK
-        return playerAvailabilities?.masculin?.available === true ||
-               playerAvailabilities?.feminin?.available === true;
-      }
+      return filterPlayersByOK(player, playerAvailabilities);
     });
-  }, [filteredPlayers, availabilities]);
+  }, [filteredPlayers, availabilities, filterPlayersByOK]);
 
   // Joueurs ayant répondu KO (indisponible) - au moins une catégorie avec available === false
   // Pour les femmes : si elle a répondu KO dans une catégorie, elle apparaît dans KO
@@ -672,17 +490,9 @@ export default function DisponibilitesPage() {
   const playersWithKO = useMemo(() => {
     return filteredPlayers.filter((player) => {
       const playerAvailabilities = availabilities[player.id];
-      
-      if (player.gender === "M") {
-        return playerAvailabilities?.masculin?.available === false;
-      } else {
-        // Pour les femmes : au moins une catégorie avec available === false
-        // Une femme avec OK féminin et KO masculin apparaîtra dans KO
-        return playerAvailabilities?.masculin?.available === false ||
-               playerAvailabilities?.feminin?.available === false;
-      }
+      return filterPlayersByKO(player, playerAvailabilities);
     });
-  }, [filteredPlayers, availabilities]);
+  }, [filteredPlayers, availabilities, filterPlayersByKO]);
 
   const loadPlayers = useCallback(async () => {
     try {
@@ -709,13 +519,23 @@ export default function DisponibilitesPage() {
   const {
     availability: masculineAvailability,
     error: errorMasculineAvailability,
-  } = useAvailabilityRealtime(selectedJournee, selectedPhase, "masculin", idEpreuveForHooks);
+  } = useAvailabilityRealtime(
+    selectedJournee,
+    selectedPhase,
+    "masculin",
+    idEpreuveForHooks
+  );
 
   // Écouter les disponibilités en temps réel (féminin)
   const {
     availability: feminineAvailability,
     error: errorFeminineAvailability,
-  } = useAvailabilityRealtime(selectedJournee, selectedPhase, "feminin", idEpreuveForHooks);
+  } = useAvailabilityRealtime(
+    selectedJournee,
+    selectedPhase,
+    "feminin",
+    idEpreuveForHooks
+  );
 
   // Fusionner les disponibilités masculines et féminines en temps réel
   useEffect(() => {
@@ -760,7 +580,12 @@ export default function DisponibilitesPage() {
     }
 
     setAvailabilities(mergedAvailabilities);
-  }, [masculineAvailability, feminineAvailability, selectedJournee, selectedPhase]);
+  }, [
+    masculineAvailability,
+    feminineAvailability,
+    selectedJournee,
+    selectedPhase,
+  ]);
 
   // Gérer les erreurs de chargement
   useEffect(() => {
@@ -779,11 +604,10 @@ export default function DisponibilitesPage() {
       loadingEquipes ||
       loadingPlayers
     ) {
-      assignedPlayersByTypeRef.current = {
-        masculin: new Set(),
-        feminin: new Set(),
-      };
-      assignedPlayersDetailsRef.current = { masculin: {}, feminin: {} };
+      assignedPlayersByTypeRef.current = createEmpty(new Set<string>());
+      assignedPlayersDetailsRef.current = createEmpty<Record<string, string[]>>(
+        {}
+      );
       return;
     }
 
@@ -791,38 +615,34 @@ export default function DisponibilitesPage() {
 
     const loadAssignedPlayers = async () => {
       try {
-        const [masculineComposition, feminineComposition] = await Promise.all([
-          compositionService.getComposition(
-            selectedJournee,
-            selectedPhase,
-            "masculin"
-          ),
-          compositionService.getComposition(
-            selectedJournee,
-            selectedPhase,
-            "feminin"
-          ),
-        ]);
+        // Utiliser loadBoth pour charger les compositions en parallèle
+        const result = await loadBoth({
+          loadMasculin: () =>
+            compositionService.getComposition(
+              selectedJournee,
+              selectedPhase,
+              "masculin"
+            ),
+          loadFeminin: () =>
+            compositionService.getComposition(
+              selectedJournee,
+              selectedPhase,
+              "feminin"
+            ),
+          defaultValue: null,
+        });
 
         if (isCancelled) {
           return;
         }
 
-        const mapping = {
-          masculin: new Set<string>(),
-          feminin: new Set<string>(),
-        };
-        const details: {
-          masculin: Record<string, string[]>;
-          feminin: Record<string, string[]>;
-        } = { masculin: {}, feminin: {} };
+        const mapping = createEmpty(new Set<string>());
+        const details = createEmpty<Record<string, string[]>>({});
 
         const processComposition = (
-          composition:
-            | Awaited<
-                ReturnType<typeof compositionService.getComposition>
-              >
-            | null,
+          composition: Awaited<
+            ReturnType<typeof compositionService.getComposition>
+          > | null,
           type: ChampionshipType
         ) => {
           if (!composition?.teams) {
@@ -846,8 +666,8 @@ export default function DisponibilitesPage() {
           });
         };
 
-        processComposition(masculineComposition, "masculin");
-        processComposition(feminineComposition, "feminin");
+        processComposition(result.data.masculin, "masculin");
+        processComposition(result.data.feminin, "feminin");
 
         assignedPlayersByTypeRef.current = mapping;
         assignedPlayersDetailsRef.current = details;
@@ -859,11 +679,10 @@ export default function DisponibilitesPage() {
           "Erreur lors du chargement des compositions pour la page disponibilités:",
           error
         );
-        assignedPlayersByTypeRef.current = {
-          masculin: new Set(),
-          feminin: new Set(),
-        };
-        assignedPlayersDetailsRef.current = { masculin: {}, feminin: {} };
+        assignedPlayersByTypeRef.current = createEmpty(new Set<string>());
+        assignedPlayersDetailsRef.current = createEmpty<
+          Record<string, string[]>
+        >({});
       }
     };
 
@@ -879,6 +698,8 @@ export default function DisponibilitesPage() {
     equipes,
     loadingEquipes,
     loadingPlayers,
+    loadBoth,
+    createEmpty,
   ]);
 
   const handleAvailabilityChange = (
@@ -940,9 +761,9 @@ export default function DisponibilitesPage() {
     if (stateChanged && nextStateSnapshot) {
       void persistAvailability(nextStateSnapshot, championshipType);
 
-      const resultingEntry = nextStateSnapshot[playerId]?.[
-        championshipType
-      ] as AvailabilityResponse | undefined;
+      const resultingEntry = nextStateSnapshot[playerId]?.[championshipType] as
+        | AvailabilityResponse
+        | undefined;
       const isNowAvailable = resultingEntry?.available === true;
       const isPlayerAssigned =
         assignedPlayersByTypeRef.current[championshipType]?.has(playerId) ??
@@ -956,9 +777,7 @@ export default function DisponibilitesPage() {
         const assignedTeams =
           assignedPlayersDetailsRef.current[championshipType]?.[playerId] || [];
         const teamsLabel =
-          assignedTeams.length > 0
-            ? ` (${assignedTeams.join(", ")})`
-            : "";
+          assignedTeams.length > 0 ? ` (${assignedTeams.join(", ")})` : "";
 
         const warningText = `${playerLabel} est actuellement positionné dans une composition${teamsLabel}. Cette équipe sera invalide tant que la disponibilité n'est pas réajustée.`;
         setAvailabilityWarning(warningText);
@@ -1066,357 +885,280 @@ export default function DisponibilitesPage() {
       redirectWhenUnauthorized="/joueur"
     >
       <Box sx={{ p: 5 }}>
-          <Snackbar
-            open={Boolean(availabilityWarning)}
-            autoHideDuration={6000}
+        <Snackbar
+          open={Boolean(availabilityWarning)}
+          autoHideDuration={6000}
+          onClose={handleWarningClose}
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        >
+          <Alert
             onClose={handleWarningClose}
-            anchorOrigin={{ vertical: "top", horizontal: "center" }}
+            severity="warning"
+            sx={{ width: "100%" }}
           >
-            <Alert
-              onClose={handleWarningClose}
-              severity="warning"
-              sx={{ width: "100%" }}
-            >
-              {availabilityWarning}
-            </Alert>
-          </Snackbar>
+            {availabilityWarning}
+          </Alert>
+        </Snackbar>
         <Typography variant="h4" gutterBottom>
-            Disponibilités des Joueurs
+          Disponibilités des Joueurs
         </Typography>
 
         <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            Saisissez la disponibilité des joueurs pour une journée de
-            championnat. Par défaut, seuls les joueurs participant au
-            championnat sont affichés.
+          Saisissez la disponibilité des joueurs pour une journée de
+          championnat. Par défaut, seuls les joueurs participant au championnat
+          sont affichés.
         </Typography>
 
-          <Card sx={{ mb: 1 }}>
-            <CardContent sx={{ pt: 2.5, pb: 1.5 }}>
-              <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
-                <FormControl size="small" sx={{ minWidth: 200 }}>
-                  <InputLabel id="epreuve-select-label">Épreuve</InputLabel>
-                  <Select
-                    labelId="epreuve-select-label"
-                    id="epreuve-select"
-                    value={selectedEpreuve || ""}
-                    label="Épreuve"
-                    onChange={(e) => {
-                      const epreuve = e.target.value as EpreuveType;
-                      setSelectedEpreuve(epreuve);
-                      setSelectedPhase(null); // Réinitialiser la phase lors du changement d'épreuve
-                      setSelectedJournee(null); // Réinitialiser la journée lors du changement d'épreuve
-                    }}
-                  >
-                    <MenuItem value="championnat_equipes">
-                      Championnat par Équipes
-                    </MenuItem>
-                    <MenuItem value="championnat_paris">
-                      Championnat de Paris IDF
-                    </MenuItem>
-                  </Select>
-                </FormControl>
-                {/* Masquer le sélecteur de phase pour le championnat de Paris (une seule phase) */}
-                {selectedEpreuve !== "championnat_paris" && (
-                  <FormControl size="small" sx={{ minWidth: 150 }}>
-                    <InputLabel id="phase-select-label">Phase</InputLabel>
-                    <Select
-                      labelId="phase-select-label"
-                      id="phase-select"
-                      value={selectedPhase || ""}
-                      label="Phase"
-                      onChange={(e) => {
-                        const phase = e.target.value as "aller" | "retour";
-                        setSelectedPhase(phase);
-                        setSelectedJournee(null); // Réinitialiser la journée lors du changement de phase
-                      }}
-                      disabled={selectedEpreuve === null}
-                    >
-                      <MenuItem value="aller">Phase Aller</MenuItem>
-                      <MenuItem value="retour">Phase Retour</MenuItem>
-                    </Select>
-                  </FormControl>
-                )}
-                <FormControl size="small" sx={{ minWidth: 150 }}>
-                  <InputLabel id="journee-select-label">Journée</InputLabel>
-                  <Select
-                    labelId="journee-select-label"
-                    id="journee-select"
-                    value={selectedJournee || ""}
-                    label="Journée"
-                    onChange={(e) =>
-                      setSelectedJournee(
-                        e.target.value ? Number(e.target.value) : null
-                      )
-                    }
-                    disabled={
-                      (selectedEpreuve === "championnat_paris" 
-                        ? false 
-                        : selectedPhase === null) || 
-                      selectedEpreuve === null
-                    }
-                  >
-                    {(() => {
-                      // Pour le championnat de Paris, utiliser "aller" comme phase
-                      const phaseToUse = selectedEpreuve === "championnat_paris" 
-                        ? "aller" 
-                        : selectedPhase;
-                      
-                      if (!phaseToUse) return null;
-                      
-                      const journeesArray = Array.from(
-                        journeesByPhase.get(phaseToUse)?.values() || []
-                      ) as Array<{ journee: number; phase: "aller" | "retour"; dates: Date[] }>;
-                      
-                      return journeesArray
-                        .sort((a, b) => a.journee - b.journee)
-                        .map(({ journee, dates }) => {
-                          // Formater les dates pour l'affichage
-                          const datesFormatted = dates
-                            .map((date: Date) => {
-                              return new Intl.DateTimeFormat("fr-FR", {
-                                day: "2-digit",
-                                month: "2-digit",
-                              }).format(date);
-                            })
-                            .join(", ");
-                          return (
-                            <MenuItem key={journee} value={journee}>
-                              Journée {journee} - {datesFormatted}
-                            </MenuItem>
-                          );
-                        });
-                    })()}
-                  </Select>
-                </FormControl>
+        <Card sx={{ mb: 1 }}>
+          <CardContent sx={{ pt: 2.5, pb: 1.5 }}>
+            <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
+              <CompositionSelectors
+                selectedEpreuve={selectedEpreuve}
+                selectedPhase={selectedPhase}
+                selectedJournee={selectedJournee}
+                onEpreuveChange={(epreuve) => {
+                  setSelectedEpreuve(epreuve);
+                  setSelectedPhase(null); // Réinitialiser la phase lors du changement d'épreuve
+                  setSelectedJournee(null); // Réinitialiser la journée lors du changement d'épreuve
+                }}
+                onPhaseChange={(phase) => {
+                  setSelectedPhase(phase);
+                  setSelectedJournee(null); // Réinitialiser la journée lors du changement de phase
+                }}
+                onJourneeChange={setSelectedJournee}
+                isParis={isParis}
+                journeesByPhase={journeesByPhase}
+                showJournee={true}
+              />
 
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={showAllPlayers}
-                      onChange={(e) => setShowAllPlayers(e.target.checked)}
-                    />
-                  }
-                  label="Afficher tous les joueurs"
-                />
-              </Box>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={showAllPlayers}
+                    onChange={(e) => setShowAllPlayers(e.target.checked)}
+                  />
+                }
+                label="Afficher tous les joueurs"
+              />
+            </Box>
 
-              {selectedJournee && (
-                <TextField
-                  fullWidth
-                  size="small"
-                  placeholder="Rechercher un joueur..."
-                  id="player-search"
-                  name="player-search"
-                  aria-label="Rechercher un joueur"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon />
-                      </InputAdornment>
-                    ),
-                  }}
-                  InputLabelProps={{ shrink: true }}
-                  sx={{ mt: 2.5, mb: 0.75 }}
-                />
-              )}
-            </CardContent>
-          </Card>
+            {selectedJournee && (
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Rechercher un joueur..."
+                id="player-search"
+                name="player-search"
+                aria-label="Rechercher un joueur"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                }}
+                InputLabelProps={{ shrink: true }}
+                sx={{ mt: 2.5, mb: 0.75 }}
+              />
+            )}
+          </CardContent>
+        </Card>
 
-          {selectedJournee === null ? (
-            <Alert severity="warning">
-              Veuillez sélectionner une journée pour commencer la saisie.
-            </Alert>
-          ) : (
-            <>
-              <Box
+        {selectedJournee === null ? (
+          <Alert severity="warning">
+            Veuillez sélectionner une journée pour commencer la saisie.
+          </Alert>
+        ) : (
+          <>
+            <Box
+              sx={{
+                position: "sticky",
+                top: 0,
+                zIndex: 5,
+                backgroundColor: "background.paper",
+                borderBottom: 1,
+                borderColor: "divider",
+                mb: 2,
+                pt: 1,
+                pb: 1,
+              }}
+            >
+              <Tabs
+                value={tabValue}
+                onChange={(_, v) => setTabValue(v)}
                 sx={{
-                  position: "sticky",
-                  top: 0,
-                  zIndex: 5,
-                  backgroundColor: "background.paper",
-                  borderBottom: 1,
-                  borderColor: "divider",
-                  mb: 2,
-                  pt: 1,
-                  pb: 1,
+                  minHeight: 40,
+                  "& .MuiTab-root": {
+                    minHeight: 38,
+                    paddingTop: 0.5,
+                    paddingBottom: 0.5,
+                  },
                 }}
               >
-                <Tabs
-                  value={tabValue}
-                  onChange={(_, v) => setTabValue(v)}
-                  sx={{
-                    minHeight: 40,
-                    "& .MuiTab-root": {
-                      minHeight: 38,
-                      paddingTop: 0.5,
-                      paddingBottom: 0.5,
-                    },
-                  }}
-                >
-                  <Tab
-                    label={`Tous (${filteredPlayers.length})`}
-                    icon={<GroupIcon fontSize="small" />}
-                    iconPosition="start"
-                  />
-                  <Tab
-                    label={`Réponses (${respondedPlayers.length})`}
-                    icon={<DoneAll fontSize="small" color="primary" />}
-                    iconPosition="start"
-                  />
-                  <Tab
-                    label={`En attente (${pendingPlayers.length})`}
-                    icon={<HourglassEmpty fontSize="small" color="warning" />}
-                    iconPosition="start"
-                  />
-                  <Tab
-                    label={`Commentaires (${playersWithComment.length})`}
-                    icon={<CommentIcon fontSize="small" color="info" />}
-                    iconPosition="start"
-                  />
-                  <Tab
-                    label={`OK (${playersWithOK.length})`}
-                    icon={<CheckCircle fontSize="small" color="success" />}
-                    iconPosition="start"
-                  />
-                  <Tab
-                    label={`KO (${playersWithKO.length})`}
-                    icon={<Cancel fontSize="small" color="error" />}
-                    iconPosition="start"
-                  />
-                </Tabs>
-              </Box>
+                <Tab
+                  label={`Tous (${filteredPlayers.length})`}
+                  icon={<GroupIcon fontSize="small" />}
+                  iconPosition="start"
+                />
+                <Tab
+                  label={`Réponses (${respondedPlayers.length})`}
+                  icon={<DoneAll fontSize="small" color="primary" />}
+                  iconPosition="start"
+                />
+                <Tab
+                  label={`En attente (${pendingPlayers.length})`}
+                  icon={<HourglassEmpty fontSize="small" color="warning" />}
+                  iconPosition="start"
+                />
+                <Tab
+                  label={`Commentaires (${playersWithComment.length})`}
+                  icon={<CommentIcon fontSize="small" color="info" />}
+                  iconPosition="start"
+                />
+                <Tab
+                  label={`OK (${playersWithOK.length})`}
+                  icon={<CheckCircle fontSize="small" color="success" />}
+                  iconPosition="start"
+                />
+                <Tab
+                  label={`KO (${playersWithKO.length})`}
+                  icon={<Cancel fontSize="small" color="error" />}
+                  iconPosition="start"
+                />
+              </Tabs>
+            </Box>
 
-              {tabValue === 0 && (
-                <Box>
+            {tabValue === 0 && (
+              <Box>
+                <PlayerList
+                  players={filteredPlayers}
+                  availabilities={availabilities}
+                  onAvailabilityChange={handleAvailabilityChange}
+                  onCommentChange={handleCommentChange}
+                  selectedEpreuve={selectedEpreuve}
+                />
+              </Box>
+            )}
+
+            {tabValue === 1 && (
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Joueurs ayant répondu
+                </Typography>
+                <PlayerList
+                  players={respondedPlayers}
+                  availabilities={availabilities}
+                  onAvailabilityChange={handleAvailabilityChange}
+                  onCommentChange={handleCommentChange}
+                  selectedEpreuve={selectedEpreuve}
+                />
+              </Box>
+            )}
+
+            {tabValue === 2 && (
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Joueurs en attente de réponse
+                </Typography>
+                {pendingPlayers.length === 0 ? (
+                  <Alert severity="success">
+                    Tous les joueurs ont répondu !
+                  </Alert>
+                ) : (
                   <PlayerList
-                    players={filteredPlayers}
+                    players={pendingPlayers}
                     availabilities={availabilities}
                     onAvailabilityChange={handleAvailabilityChange}
                     onCommentChange={handleCommentChange}
                     selectedEpreuve={selectedEpreuve}
                   />
-                </Box>
-              )}
+                )}
+              </Box>
+            )}
 
-              {tabValue === 1 && (
-                <Box>
-                  <Typography variant="h6" gutterBottom>
-                    Joueurs ayant répondu
-                  </Typography>
+            {tabValue === 3 && (
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Joueurs ayant fait un commentaire
+                </Typography>
+                {playersWithComment.length === 0 ? (
+                  <Alert severity="info">
+                    Aucun joueur n&apos;a fait de commentaire.
+                  </Alert>
+                ) : (
                   <PlayerList
-                    players={respondedPlayers}
+                    players={playersWithComment}
                     availabilities={availabilities}
                     onAvailabilityChange={handleAvailabilityChange}
                     onCommentChange={handleCommentChange}
                     selectedEpreuve={selectedEpreuve}
                   />
-                </Box>
-              )}
-
-              {tabValue === 2 && (
-                <Box>
-                  <Typography variant="h6" gutterBottom>
-                    Joueurs en attente de réponse
-                  </Typography>
-                  {pendingPlayers.length === 0 ? (
-                    <Alert severity="success">
-                      Tous les joueurs ont répondu !
-                    </Alert>
-                  ) : (
-                    <PlayerList
-                      players={pendingPlayers}
-                      availabilities={availabilities}
-                      onAvailabilityChange={handleAvailabilityChange}
-                      onCommentChange={handleCommentChange}
-                      selectedEpreuve={selectedEpreuve}
-                    />
-                  )}
-                </Box>
-              )}
-
-              {tabValue === 3 && (
-                <Box>
-                  <Typography variant="h6" gutterBottom>
-                    Joueurs ayant fait un commentaire
-                  </Typography>
-                  {playersWithComment.length === 0 ? (
-                    <Alert severity="info">
-                      Aucun joueur n&apos;a fait de commentaire.
-                    </Alert>
-                  ) : (
-                    <PlayerList
-                      players={playersWithComment}
-                      availabilities={availabilities}
-                      onAvailabilityChange={handleAvailabilityChange}
-                      onCommentChange={handleCommentChange}
-                      selectedEpreuve={selectedEpreuve}
-                    />
-                  )}
-                </Box>
-              )}
-
-              {tabValue === 4 && (
-                <Box>
-                  <Typography variant="h6" gutterBottom>
-                    Joueurs ayant répondu OK (Disponible)
-                  </Typography>
-                  {playersWithOK.length === 0 ? (
-                    <Alert severity="info">
-                      Aucun joueur n&apos;a répondu disponible.
-                    </Alert>
-                  ) : (
-                    <PlayerList
-                      players={playersWithOK}
-                      availabilities={availabilities}
-                      onAvailabilityChange={handleAvailabilityChange}
-                      onCommentChange={handleCommentChange}
-                      selectedEpreuve={selectedEpreuve}
-                    />
-                  )}
-                </Box>
-              )}
-
-              {tabValue === 5 && (
-                <Box>
-                  <Typography variant="h6" gutterBottom>
-                    Joueurs ayant répondu KO (Indisponible)
-                  </Typography>
-                  {playersWithKO.length === 0 ? (
-                    <Alert severity="info">
-                      Aucun joueur n&apos;a répondu indisponible.
-                    </Alert>
-                  ) : (
-                    <PlayerList
-                      players={playersWithKO}
-                      availabilities={availabilities}
-                      onAvailabilityChange={handleAvailabilityChange}
-                      onCommentChange={handleCommentChange}
-                      selectedEpreuve={selectedEpreuve}
-                    />
-                  )}
-                </Box>
-              )}
-
-              <Box sx={{ mt: 4, textAlign: "center" }}>
-                <Button
-                  variant="outlined"
-                  href={
-                    selectedJournee !== null && selectedPhase !== null
-                      ? `/compositions?journee=${selectedJournee}&phase=${selectedPhase}`
-                      : "/compositions"
-                  }
-                  sx={{ px: 3 }}
-                >
-                  {selectedJournee !== null && selectedPhase !== null
-                    ? `Voir les compositions - J${selectedJournee} (${selectedPhase})`
-                    : "Voir les compositions"}
-                </Button>
+                )}
               </Box>
-            </>
-          )}
-        </Box>
+            )}
+
+            {tabValue === 4 && (
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Joueurs ayant répondu OK (Disponible)
+                </Typography>
+                {playersWithOK.length === 0 ? (
+                  <Alert severity="info">
+                    Aucun joueur n&apos;a répondu disponible.
+                  </Alert>
+                ) : (
+                  <PlayerList
+                    players={playersWithOK}
+                    availabilities={availabilities}
+                    onAvailabilityChange={handleAvailabilityChange}
+                    onCommentChange={handleCommentChange}
+                    selectedEpreuve={selectedEpreuve}
+                  />
+                )}
+              </Box>
+            )}
+
+            {tabValue === 5 && (
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Joueurs ayant répondu KO (Indisponible)
+                </Typography>
+                {playersWithKO.length === 0 ? (
+                  <Alert severity="info">
+                    Aucun joueur n&apos;a répondu indisponible.
+                  </Alert>
+                ) : (
+                  <PlayerList
+                    players={playersWithKO}
+                    availabilities={availabilities}
+                    onAvailabilityChange={handleAvailabilityChange}
+                    onCommentChange={handleCommentChange}
+                    selectedEpreuve={selectedEpreuve}
+                  />
+                )}
+              </Box>
+            )}
+
+            <Box sx={{ mt: 4, textAlign: "center" }}>
+              <Button
+                variant="outlined"
+                href={
+                  selectedJournee !== null && selectedPhase !== null
+                    ? `/compositions?journee=${selectedJournee}&phase=${selectedPhase}`
+                    : "/compositions"
+                }
+                sx={{ px: 3 }}
+              >
+                {selectedJournee !== null && selectedPhase !== null
+                  ? `Voir les compositions - J${selectedJournee} (${selectedPhase})`
+                  : "Voir les compositions"}
+              </Button>
+            </Box>
+          </>
+        )}
+      </Box>
     </AuthGuard>
   );
 }
@@ -1450,7 +1192,8 @@ function PlayerList({
   onCommentChange,
   selectedEpreuve,
 }: PlayerListProps) {
-  const isParisChampionship = selectedEpreuve === "championnat_paris";
+  const { isParisChampionship } = useChampionshipTypes();
+  const isParis = isParisChampionship(selectedEpreuve);
   const [expandedPlayer, setExpandedPlayer] = useState<{
     id: string;
     type: "masculin" | "feminin" | "both";
@@ -1469,8 +1212,9 @@ function PlayerList({
         //   - Pour les hommes : vérifier uniquement masculin
         //   - Pour les femmes : vérifier masculin ET féminin
         // Un joueur a répondu seulement s'il a indiqué disponible/indisponible (available est un boolean)
-        const hasRespondedMasculin = typeof masculinAvailability?.available === "boolean";
-        const hasRespondedFeminin = isParisChampionship
+        const hasRespondedMasculin =
+          typeof masculinAvailability?.available === "boolean";
+        const hasRespondedFeminin = isParis
           ? true // Pour Paris, pas de distinction
           : isFemale
           ? typeof femininAvailability?.available === "boolean"
@@ -1483,18 +1227,18 @@ function PlayerList({
             key={player.id}
             sx={{
               mb: 1,
-              borderLeft:
-                isParisChampionship
-                  ? hasRespondedMasculin
-                    ? `4px solid ${
-                        masculinAvailability?.available ? "#4caf50" : "#f44336"
-                      }`
-                    : "4px solid transparent"
-                  : hasRespondedMasculin && (isFemale ? hasRespondedFeminin : true)
+              borderLeft: isParis
+                ? hasRespondedMasculin
                   ? `4px solid ${
                       masculinAvailability?.available ? "#4caf50" : "#f44336"
                     }`
-                  : "4px solid transparent",
+                  : "4px solid transparent"
+                : hasRespondedMasculin &&
+                  (isFemale ? hasRespondedFeminin : true)
+                ? `4px solid ${
+                    masculinAvailability?.available ? "#4caf50" : "#f44336"
+                  }`
+                : "4px solid transparent",
             }}
           >
             <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
@@ -1545,7 +1289,7 @@ function PlayerList({
                   sx={{ minWidth: { xs: "100%", sm: 280 } }}
                 >
                   {/* Disponibilité - Pour le championnat de Paris, pas de distinction masculin/féminin */}
-                  {isParisChampionship ? (
+                  {isParis ? (
                     <Box
                       display="flex"
                       alignItems="center"
@@ -1700,84 +1444,84 @@ function PlayerList({
 
                       {/* Disponibilité Féminine (uniquement pour les femmes) */}
                       {isFemale && (
-                    <Box
-                      display="flex"
-                      alignItems="center"
-                      gap={1}
-                      sx={{ flexWrap: "wrap" }}
-                    >
-                      <Typography
-                        variant="caption"
-                        sx={{ minWidth: 80, fontWeight: "medium" }}
-                      >
-                        Féminin:
-                      </Typography>
-                      <Button
-                        variant={
-                          femininAvailability?.available === true
-                            ? "contained"
-                            : "outlined"
-                        }
-                        color="success"
-                        size="small"
-                        onClick={() =>
-                          onAvailabilityChange(player.id, "feminin", true)
-                        }
-                        sx={{ minWidth: 70, flexGrow: { xs: 1, sm: 0 } }}
-                      >
-                        <CheckCircle fontSize="small" sx={{ mr: 0.5 }} />
-                        Oui
-                      </Button>
-                      <Button
-                        variant={
-                          femininAvailability?.available === false
-                            ? "contained"
-                            : "outlined"
-                        }
-                        color="error"
-                        size="small"
-                        onClick={() =>
-                          onAvailabilityChange(player.id, "feminin", false)
-                        }
-                        sx={{ minWidth: 70, flexGrow: { xs: 1, sm: 0 } }}
-                      >
-                        <Cancel fontSize="small" sx={{ mr: 0.5 }} />
-                        Non
-                      </Button>
-                      <Button
-                        size="small"
-                        onClick={() =>
-                          setExpandedPlayer(
-                            isExpanded && expandedPlayer?.type === "feminin"
-                              ? null
-                              : { id: player.id, type: "feminin" }
-                          )
-                        }
-                        sx={{
-                          minWidth: 40,
-                          position: femininAvailability?.comment
-                            ? "relative"
-                            : undefined,
-                          ...(femininAvailability?.comment
-                            ? {
-                                "&::after": {
-                                  content: "''",
-                                  position: "absolute",
-                                  top: 4,
-                                  right: 6,
-                                  width: 6,
-                                  height: 6,
-                                  borderRadius: "50%",
-                                  bgcolor: "info.main",
-                                },
-                              }
-                            : {}),
-                        }}
-                      >
-                        💬
-                      </Button>
-                    </Box>
-                  )}
+                        <Box
+                          display="flex"
+                          alignItems="center"
+                          gap={1}
+                          sx={{ flexWrap: "wrap" }}
+                        >
+                          <Typography
+                            variant="caption"
+                            sx={{ minWidth: 80, fontWeight: "medium" }}
+                          >
+                            Féminin:
+                          </Typography>
+                          <Button
+                            variant={
+                              femininAvailability?.available === true
+                                ? "contained"
+                                : "outlined"
+                            }
+                            color="success"
+                            size="small"
+                            onClick={() =>
+                              onAvailabilityChange(player.id, "feminin", true)
+                            }
+                            sx={{ minWidth: 70, flexGrow: { xs: 1, sm: 0 } }}
+                          >
+                            <CheckCircle fontSize="small" sx={{ mr: 0.5 }} />
+                            Oui
+                          </Button>
+                          <Button
+                            variant={
+                              femininAvailability?.available === false
+                                ? "contained"
+                                : "outlined"
+                            }
+                            color="error"
+                            size="small"
+                            onClick={() =>
+                              onAvailabilityChange(player.id, "feminin", false)
+                            }
+                            sx={{ minWidth: 70, flexGrow: { xs: 1, sm: 0 } }}
+                          >
+                            <Cancel fontSize="small" sx={{ mr: 0.5 }} />
+                            Non
+                          </Button>
+                          <Button
+                            size="small"
+                            onClick={() =>
+                              setExpandedPlayer(
+                                isExpanded && expandedPlayer?.type === "feminin"
+                                  ? null
+                                  : { id: player.id, type: "feminin" }
+                              )
+                            }
+                            sx={{
+                              minWidth: 40,
+                              position: femininAvailability?.comment
+                                ? "relative"
+                                : undefined,
+                              ...(femininAvailability?.comment
+                                ? {
+                                    "&::after": {
+                                      content: "''",
+                                      position: "absolute",
+                                      top: 4,
+                                      right: 6,
+                                      width: 6,
+                                      height: 6,
+                                      borderRadius: "50%",
+                                      bgcolor: "info.main",
+                                    },
+                                  }
+                                : {}),
+                            }}
+                          >
+                            💬
+                          </Button>
+                        </Box>
+                      )}
                     </>
                   )}
                 </Box>
@@ -1793,7 +1537,7 @@ function PlayerList({
                     gap: 1,
                   }}
                 >
-                  {isParisChampionship ? (
+                  {isParis ? (
                     <Box>
                       <TextField
                         fullWidth
@@ -1828,7 +1572,11 @@ function PlayerList({
                           name={`comment-${player.id}-masculin`}
                           value={masculinAvailability?.comment || ""}
                           onChange={(e) =>
-                            onCommentChange(player.id, "masculin", e.target.value)
+                            onCommentChange(
+                              player.id,
+                              "masculin",
+                              e.target.value
+                            )
                           }
                           multiline
                           rows={2}
@@ -1856,7 +1604,11 @@ function PlayerList({
                             name={`comment-${player.id}-feminin`}
                             value={femininAvailability?.comment || ""}
                             onChange={(e) =>
-                              onCommentChange(player.id, "feminin", e.target.value)
+                              onCommentChange(
+                                player.id,
+                                "feminin",
+                                e.target.value
+                              )
                             }
                             multiline
                             rows={2}
@@ -1883,7 +1635,7 @@ function PlayerList({
                       gap: 0.5,
                     }}
                   >
-                    {isParisChampionship ? (
+                    {isParis ? (
                       masculinAvailability?.comment && (
                         <Typography
                           variant="caption"
@@ -1901,7 +1653,8 @@ function PlayerList({
                             color="text.secondary"
                             sx={{ fontStyle: "italic" }}
                           >
-                            <strong>Masc:</strong> {masculinAvailability.comment}
+                            <strong>Masc:</strong>{" "}
+                            {masculinAvailability.comment}
                           </Typography>
                         )}
                         {isFemale && femininAvailability?.comment && (

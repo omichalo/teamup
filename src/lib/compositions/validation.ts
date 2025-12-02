@@ -3,6 +3,7 @@ import { Match } from "@/types";
 import { EquipeWithMatches } from "@/hooks/useEquipesWithMatches";
 import { validateFFTTRules } from "@/lib/shared/fftt-utils";
 import { getMatchEpreuve, ID_EPREUVE_PARIS } from "@/lib/shared/epreuve-utils";
+import type { ChampionshipType } from "@/hooks/useChampionshipTypes";
 
 export type PhaseType = "aller" | "retour";
 
@@ -50,6 +51,32 @@ export interface TeamCompositionValidationResult {
 export const JOURNEE_CONCERNEE_PAR_REGLE = 2;
 
 const DEFAULT_JOURNEE_RULE = JOURNEE_CONCERNEE_PAR_REGLE;
+
+/**
+ * Récupère le numéro d'équipe brûlée pour un joueur selon le type de championnat
+ * 
+ * @param player - Le joueur
+ * @param championshipType - Type de championnat ("masculin" | "feminin")
+ * @param phase - Phase du championnat
+ * @param isParis - Indique si c'est le championnat de Paris
+ * @returns Le numéro d'équipe brûlée ou undefined/null si le joueur n'est pas brûlé
+ */
+export function getBurnedTeam(
+  player: Player,
+  championshipType: ChampionshipType,
+  phase: PhaseType,
+  isParis: boolean
+): number | undefined | null {
+  if (isParis) {
+    return player.highestTeamNumberByPhaseParis?.[phase];
+  }
+  
+  if (championshipType === "masculin") {
+    return player.highestMasculineTeamNumberByPhase?.[phase];
+  }
+  
+  return player.highestFeminineTeamNumberByPhase?.[phase];
+}
 
 export const isMatchPlayed = (match: Match | null): boolean => {
   if (!match) {
@@ -394,12 +421,8 @@ export const canAssignPlayerToTeam = (
   const championshipType = isFemaleTeam ? "feminin" : "masculin";
   const phase = selectedPhase || "aller";
 
-  // Pour le championnat de Paris, utiliser les données spécifiques à Paris
-  const burnedTeam = isParis
-    ? player.highestTeamNumberByPhaseParis?.[phase]
-    : championshipType === "masculin"
-      ? player.highestMasculineTeamNumberByPhase?.[phase]
-      : player.highestFeminineTeamNumberByPhase?.[phase];
+  // Utiliser la fonction générique pour récupérer le burnedTeam
+  const burnedTeam = getBurnedTeam(player, championshipType, phase, isParis);
 
   if (burnedTeam !== undefined && burnedTeam !== null) {
     if (teamNumber > burnedTeam) {
@@ -629,10 +652,9 @@ export const validateTeamCompositionState = (
   if (teamNumber > 0 && !isParis) {
     const phaseValue = selectedPhase ?? "aller";
     
+    const championshipType = isFemaleTeam ? "feminin" : "masculin";
     const burnedPlayer = teamPlayers.find((player) => {
-      const burnedTeam = isFemaleTeam
-        ? player.highestFeminineTeamNumberByPhase?.[phaseValue]
-        : player.highestMasculineTeamNumberByPhase?.[phaseValue];
+      const burnedTeam = getBurnedTeam(player, championshipType, phaseValue, isParis);
       return (
         burnedTeam !== undefined &&
         burnedTeam !== null &&
@@ -641,9 +663,7 @@ export const validateTeamCompositionState = (
     });
 
     if (burnedPlayer) {
-      const burnedTeamNumber = isFemaleTeam
-        ? burnedPlayer.highestFeminineTeamNumberByPhase?.[phaseValue]
-        : burnedPlayer.highestMasculineTeamNumberByPhase?.[phaseValue];
+      const burnedTeamNumber = getBurnedTeam(burnedPlayer, championshipType, phaseValue, isParis);
       return {
         valid: false,
         reason: `${burnedPlayer.firstName} ${burnedPlayer.name} est brûlé(e) : équipe autorisée ${burnedTeamNumber ?? "?"}, équipe actuelle ${teamNumber}`,

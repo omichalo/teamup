@@ -61,7 +61,22 @@ Tu appliques systématiquement les principes de développement DRY et SOLID.
   - 404 : Ressource non trouvée
   - 429 : Trop de requêtes (rate limiting)
   - 500 : Erreur serveur interne
-- **Validation d'entrée** : Toujours valider le format des données avant traitement (ex: regex pour emails, validation de types)
+- **Validation d'entrée** : **TOUJOURS** utiliser les helpers de validation depuis `@/lib/api/validation-helpers` :
+  - `validateEmail(email, fieldName?)` - Valide un email (présence + format)
+  - `validateId(id, fieldName)` - Valide un ID (format alphanumérique, tirets, underscores)
+  - `validateRequired(value, fieldName)` - Valide qu'une valeur est présente
+  - `validateRequiredFields(fields)` - Valide plusieurs champs en une fois
+  - `validatePositiveInteger(value, fieldName)` - Valide un entier positif
+- **NE JAMAIS** valider manuellement les emails avec des regex (utiliser `validateEmail`)
+- **NE JAMAIS** valider manuellement les IDs (utiliser `validateId`)
+- Exemple :
+  ```typescript
+  const emailError = validateEmail(email);
+  if (emailError) return emailError;
+  
+  const idError = validateId(teamId, "teamId");
+  if (idError) return idError;
+  ```
 - **Messages d'erreur utilisateur** : Fournir des messages clairs et utiles sans exposer de détails techniques ou de stack traces
 
 ## Firestore
@@ -77,9 +92,30 @@ Tu appliques systématiquement les principes de développement DRY et SOLID.
   - Firebase Admin SDK
   - Des bibliothèques nécessitant le runtime Node.js (tweetnacl, etc.)
 
+### Middlewares d'authentification
+
+- **TOUJOURS** utiliser les middlewares d'authentification depuis `@/lib/api/auth-middleware` :
+  - `requireAuth(req, options?)` - Authentification de base avec support des rôles
+  - `requireAdmin(req)` - Wrapper pour ADMIN uniquement
+  - `requireAdminOrCoach(req, requireEmailVerified?)` - Wrapper pour ADMIN ou COACH
+  - `requireAdminWithEmailVerified(req)` - Wrapper pour ADMIN avec email vérifié obligatoire
+- Options disponibles pour `requireAuth` :
+  - `allowedRoles?: UserRole[]` - Rôles autorisés
+  - `requireEmailVerified?: boolean` - Exiger un email vérifié (défaut: false)
+  - `validateCSRF?: boolean` - Valider l'origine (défaut: true pour mutations)
+- **NE JAMAIS** utiliser `adminAuth.verifySessionCookie()` directement dans les routes API (sauf routes spéciales comme `/api/session`)
+- Exemple :
+  ```typescript
+  const auth = await requireAdminOrCoach(req, true); // requireEmailVerified = true
+  if (auth instanceof Response) return auth;
+  // auth.decoded, auth.role, auth.uid sont disponibles
+  ```
+
 ### Protection CSRF
 
 - **TOUJOURS** utiliser `validateOrigin(req)` sur les mutations (POST, PATCH, DELETE, PUT)
+- **Note** : Les middlewares `requireAuth` valident automatiquement CSRF pour les mutations
+- Pour les routes publiques, utiliser `validateOrigin(req)` manuellement
 - Importer depuis `@/lib/auth/csrf-utils`
 - Retourner 403 si l'origine est invalide
 - Exemple :
@@ -95,31 +131,39 @@ Tu appliques systématiquement les principes de développement DRY et SOLID.
   - Envoi d'emails (password reset, verification)
   - Authentification (login, signup)
   - Toute route exposée à des attaques de brute-force
-- Utiliser `checkRateLimit()` depuis `@/lib/auth/rate-limit`
-- Retourner 429 avec un message informatif si la limite est dépassée
+- **TOUJOURS** utiliser le middleware `withRateLimit()` depuis `@/lib/api/rate-limit-middleware`
+- Retourne automatiquement 429 avec un message informatif si la limite est dépassée
 - Exemple :
   ```typescript
-  const rateLimitResult = checkRateLimit(`email:${email}`, 3, 15 * 60 * 1000);
-  if (!rateLimitResult.allowed) {
-    return NextResponse.json({ error: "Trop de requêtes" }, { status: 429 });
-  }
+  const rateLimitError = withRateLimit({
+    key: `email:${email}`,
+    maxRequests: 3,
+    windowMs: 15 * 60 * 1000,
+    errorMessage: "Veuillez patienter avant de renvoyer un email.",
+  });
+  if (rateLimitError) return rateLimitError;
   ```
 
 ### Headers de sécurité (Cache-Control)
 
-- **TOUJOURS** ajouter `Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate` sur les réponses sensibles :
+- **TOUJOURS** utiliser `createSecureResponse()` depuis `@/lib/api/response-utils` pour les réponses sensibles
+- Cette fonction ajoute automatiquement les headers de sécurité :
+  - `Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate`
+  - `Pragma: no-cache`
+  - `Expires: 0`
+- Routes concernées :
   - Routes de session (`/api/session/*`)
   - Routes d'authentification (`/api/auth/*`)
   - Routes admin (`/api/admin/*`)
   - Toute route contenant des données utilisateur ou sensibles
-- Ajouter également `Pragma: no-cache` et `Expires: 0` pour compatibilité
+- **NE JAMAIS** utiliser `NextResponse.json()` directement pour les réponses sensibles
 - Exemple :
   ```typescript
-  const res = NextResponse.json(data);
-  res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-  res.headers.set("Pragma", "no-cache");
-  res.headers.set("Expires", "0");
-  return res;
+  return createSecureResponse(data, 200);
+  // Au lieu de :
+  // const res = NextResponse.json(data);
+  // res.headers.set("Cache-Control", "...");
+  // return res;
   ```
 
 ### Cookies sécurisés
@@ -222,6 +266,131 @@ Tu appliques systématiquement les principes de développement DRY et SOLID.
 7. **Routes coach/admin** : Les routes accessibles aux coachs ET admins doivent vérifier les deux rôles
    - Exemple : `/api/teams`, `/api/discord/channels` → `[USER_ROLES.ADMIN, USER_ROLES.COACH]`
 
+## Patterns API - Helpers et Middlewares
+
+### Helpers de réponse
+
+- **TOUJOURS** utiliser les helpers depuis `@/lib/api/response-utils` :
+  - `createSecureResponse(data, status)` - Réponse sécurisée avec headers Cache-Control
+  - `createErrorResponse(message, status, details?)` - Réponse d'erreur standardisée
+- **TOUJOURS** utiliser `handleApiError()` depuis `@/lib/api/error-handler` dans les blocs catch
+- Exemple :
+  ```typescript
+  try {
+    // ... logique ...
+    return createSecureResponse({ success: true }, 200);
+  } catch (error) {
+    return handleApiError(error, {
+      context: "app/api/example",
+      defaultMessage: "Erreur lors de l'opération",
+    });
+  }
+  ```
+
+### Structure standard d'une route API
+
+```typescript
+import type { NextRequest } from "next/server";
+import { requireAdminOrCoach } from "@/lib/api/auth-middleware";
+import { createSecureResponse } from "@/lib/api/response-utils";
+import { handleApiError, createErrorResponse } from "@/lib/api/error-handler";
+import { validateEmail, validateId } from "@/lib/api/validation-helpers";
+import { withRateLimit } from "@/lib/api/rate-limit-middleware";
+
+export const runtime = "nodejs"; // Si nécessaire
+
+export async function POST(req: NextRequest) {
+  try {
+    // 1. Authentification
+    const auth = await requireAdminOrCoach(req, true);
+    if (auth instanceof Response) return auth;
+
+    // 2. Validation des paramètres
+    const { email, teamId } = await req.json();
+    const emailError = validateEmail(email);
+    if (emailError) return emailError;
+    
+    const idError = validateId(teamId, "teamId");
+    if (idError) return idError;
+
+    // 3. Rate limiting (si nécessaire)
+    const rateLimitError = withRateLimit({
+      key: `action:${auth.uid}`,
+      maxRequests: 10,
+      windowMs: 60 * 1000,
+    });
+    if (rateLimitError) return rateLimitError;
+
+    // 4. Logique métier
+    // ...
+
+    // 5. Réponse
+    return createSecureResponse({ success: true }, 200);
+  } catch (error) {
+    return handleApiError(error, {
+      context: "app/api/example",
+      defaultMessage: "Erreur lors de l'opération",
+    });
+  }
+}
+```
+
+### Documentation Swagger/OpenAPI
+
+- **TOUJOURS** mettre à jour la documentation OpenAPI dans `src/lib/openapi.ts` lors de la création ou modification d'une route API
+- **TOUJOURS** documenter :
+  - Toutes les méthodes HTTP supportées (GET, POST, PATCH, DELETE, etc.)
+  - Tous les paramètres (path, query, body) avec leurs types et contraintes
+  - Tous les codes de réponse HTTP possibles (200, 400, 401, 403, 404, 429, 500)
+  - Les schémas de réponse détaillés (structure JSON retournée)
+  - Les contraintes de sécurité (`security: [{ SessionCookie: [] }]`)
+  - Les tags appropriés (Auth, Admin, Discord, Equipes, Session, etc.)
+- **Exceptions** (ne pas documenter) :
+  - Routes internes : `/api/session/firebase-token` (utilisée uniquement par FirebaseAuthRestorer)
+  - Routes méta : `/api/openapi` (route de documentation elle-même)
+  - Routes webhook externes : `/api/discord/interactions`, `/api/discord/link-license` (optionnel, peuvent être documentées mais marquées comme webhooks)
+  - Routes de monitoring : `/api/health` (optionnel)
+- **Schémas réutilisables** : Créer des schémas dans `components.schemas` pour les types réutilisés (User, Location, DiscordChannel, etc.)
+- **Vérification** : Après chaque modification de route API, vérifier que la documentation Swagger est à jour en consultant `/swagger` ou `/api/openapi`
+- Exemple de documentation complète :
+  ```typescript
+  "/api/example/{id}": {
+    get: {
+      tags: ["Example"],
+      summary: "Description courte",
+      description: "Description détaillée de ce que fait la route.",
+      security: [{ SessionCookie: [] }],
+      parameters: [
+        {
+          name: "id",
+          in: "path",
+          required: true,
+          description: "Identifiant de la ressource.",
+          schema: { type: "string" },
+        },
+      ],
+      responses: {
+        "200": {
+          description: "Succès.",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  success: { type: "boolean" },
+                  data: { type: "object" },
+                },
+              },
+            },
+          },
+        },
+        "400": { description: "Paramètres invalides." },
+        "403": { description: "Accès refusé." },
+      },
+    },
+  },
+  ```
+
 ## Performance
 
 - Ne pas sur-optimiser prématurément, mais éviter les erreurs évidentes (boucles lourdes dans le rendu, re-renders inutiles).
@@ -289,10 +458,12 @@ Tu appliques systématiquement les principes de développement DRY et SOLID.
   - npm run check:dev passe (en développement)
   - Aucun TODO dans le code
   - Messages de commit conformes
+  - **Documentation Swagger à jour** : Si une route API a été créée ou modifiée, vérifier que `src/lib/openapi.ts` est mis à jour
 - AVANT chaque push, vérifier :
   - npm run check passe (lint + type-check + build)
   - On est sur une branche feature/fix/etc (pas main)
   - Le code est prêt pour review
+  - **Documentation Swagger cohérente** : Toutes les routes API utilisées par le frontend sont documentées dans `src/lib/openapi.ts`
 
 ## Déploiement
 

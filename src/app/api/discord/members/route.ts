@@ -1,30 +1,18 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { adminAuth } from "@/lib/firebase-admin";
+import type { NextRequest } from "next/server";
+import { requireAuth } from "@/lib/api/auth-middleware";
+import { createSecureResponse } from "@/lib/api/response-utils";
+import { handleApiError, createErrorResponse } from "@/lib/api/error-handler";
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const DISCORD_SERVER_ID = process.env.DISCORD_SERVER_ID;
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    // Vérifier l'authentification
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-    
-    if (!sessionCookie) {
-      return NextResponse.json(
-        { success: false, error: "Non authentifié" },
-        { status: 401 }
-      );
-    }
-
-    await adminAuth.verifySessionCookie(sessionCookie, true);
+    const auth = await requireAuth(req);
+    if (auth instanceof Response) return auth;
 
     if (!DISCORD_TOKEN || !DISCORD_SERVER_ID) {
-      return NextResponse.json(
-        { success: false, error: "Configuration Discord manquante" },
-        { status: 500 }
-      );
+      return createErrorResponse("Configuration Discord manquante", 500);
     }
 
     // Récupérer la liste des membres du serveur Discord
@@ -66,9 +54,10 @@ export async function GET() {
           // Si l'erreur n'est pas du JSON, utiliser le message d'erreur tel quel
         }
         
-        return NextResponse.json(
-          { success: false, error: errorMessage, details: errorText },
-          { status: response.status }
+        return createErrorResponse(
+          errorMessage,
+          response.status,
+          errorText
         );
       }
 
@@ -102,13 +91,12 @@ export async function GET() {
     // Trier par nom d'affichage
     members.sort((a, b) => a.displayName.localeCompare(b.displayName));
 
-    return NextResponse.json({ success: true, members });
+    return createSecureResponse({ success: true, members });
   } catch (error) {
-    console.error("[Discord] Erreur:", error);
-    return NextResponse.json(
-      { success: false, error: "Erreur lors de la récupération des membres" },
-      { status: 500 }
-    );
+    return handleApiError(error, {
+      context: "app/api/discord/members",
+      defaultMessage: "Erreur lors de la récupération des membres",
+    });
   }
 }
 

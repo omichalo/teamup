@@ -1,5 +1,3 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import {
@@ -9,14 +7,16 @@ import {
 } from "@/lib/firebase-admin";
 import {
   COACH_REQUEST_STATUS,
-  hasAnyRole,
   resolveCoachRequestStatus,
   resolveRole,
   USER_ROLES,
 } from "@/lib/auth/roles";
 import type { CoachRequestStatus, UserRole } from "@/types";
-import { validateOrigin } from "@/lib/auth/csrf-utils";
+import { requireAdmin } from "@/lib/api/auth-middleware";
+import { createSecureResponse } from "@/lib/api/response-utils";
+import { handleApiError, createErrorResponse } from "@/lib/api/error-handler";
 import { logAuditAction, AUDIT_ACTIONS } from "@/lib/auth/audit-logger";
+import { validateId } from "@/lib/api/validation-helpers";
 
 interface SetRolePayload {
   userId?: string;
@@ -26,7 +26,6 @@ interface SetRolePayload {
   playerId?: string | null;
 }
 
-const ADMIN_ONLY_ROLES: readonly UserRole[] = [USER_ROLES.ADMIN];
 const MANAGED_ROLES: readonly UserRole[] = [
   USER_ROLES.ADMIN,
   USER_ROLES.COACH,
@@ -50,40 +49,8 @@ const resolveCoachStatusForRole = (
 
 export async function POST(req: NextRequest) {
   try {
-    // Valider l'origine de la requête pour prévenir les attaques CSRF
-    if (!validateOrigin(req)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid origin",
-          message: "Requête non autorisée",
-        },
-        { status: 403 }
-      );
-    }
-
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-    if (!sessionCookie) {
-      return NextResponse.json(
-        { success: false, error: "Session cookie requis" },
-        { status: 401 }
-      );
-    }
-
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    const requesterRole = resolveRole(decoded.role as string | undefined);
-
-    if (!hasAnyRole(requesterRole, ADMIN_ONLY_ROLES)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Accès refusé",
-          message: "Seuls les administrateurs peuvent modifier les rôles",
-        },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAdmin(req);
+    if (auth instanceof Response) return auth;
 
     const body = (await req.json()) as SetRolePayload;
 
@@ -91,25 +58,19 @@ export async function POST(req: NextRequest) {
       body ?? {};
 
     if (!userId || typeof userId !== "string") {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Paramètre 'userId' invalide",
-        },
-        { status: 400 }
-      );
+      return createErrorResponse("Paramètre 'userId' invalide", 400);
     }
+
+    const userIdError = validateId(userId, "userId");
+    if (userIdError) return userIdError;
 
     const resolvedRole = resolveRole(role ?? null);
 
     if (!MANAGED_ROLES.includes(resolvedRole)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Rôle invalide",
-          details: `Le rôle '${role}' n'est pas supporté`,
-        },
-        { status: 400 }
+      return createErrorResponse(
+        "Rôle invalide",
+        400,
+        `Le rôle '${role}' n'est pas supporté`
       );
     }
 
@@ -143,7 +104,7 @@ export async function POST(req: NextRequest) {
           coachRequestMessage !== undefined
             ? coachRequestMessage
             : FieldValue.delete(),
-        coachRequestHandledBy: decoded.uid,
+        coachRequestHandledBy: auth.uid,
         coachRequestHandledAt: now,
         coachRequestUpdatedAt: now,
         playerId: playerId !== undefined ? playerId : FieldValue.delete(),
@@ -153,7 +114,7 @@ export async function POST(req: NextRequest) {
     );
 
     // Log d'audit pour la modification de rôle
-    logAuditAction(AUDIT_ACTIONS.USER_ROLE_CHANGED, decoded.uid, {
+    logAuditAction(AUDIT_ACTIONS.USER_ROLE_CHANGED, auth.uid, {
       resource: "user",
       resourceId: userId,
       details: {
@@ -164,7 +125,7 @@ export async function POST(req: NextRequest) {
       success: true,
     });
 
-    const res = NextResponse.json(
+    return createSecureResponse(
       {
         success: true,
         data: {
@@ -173,22 +134,14 @@ export async function POST(req: NextRequest) {
           coachRequestStatus: resolvedCoachStatus,
         },
       },
-      { status: 200 }
+      200
     );
-    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    res.headers.set("Pragma", "no-cache");
-    res.headers.set("Expires", "0");
-    return res;
   } catch (error) {
-    console.error("[app/api/admin/users/set-role] error", error);
-    
     // Log d'audit pour l'échec
     try {
-      const cookieStore = await cookies();
-      const sessionCookie = cookieStore.get("__session")?.value;
-      if (sessionCookie) {
-        const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-        logAuditAction(AUDIT_ACTIONS.USER_ROLE_CHANGED, decoded.uid, {
+      const auth = await requireAdmin(req);
+      if (!(auth instanceof Response)) {
+        logAuditAction(AUDIT_ACTIONS.USER_ROLE_CHANGED, auth.uid, {
           resource: "user",
           success: false,
           details: { error: error instanceof Error ? error.message : "Unknown error" },
@@ -198,16 +151,10 @@ export async function POST(req: NextRequest) {
       // Ignorer les erreurs de logging d'audit
     }
 
-    const res = NextResponse.json(
-      {
-        success: false,
-        error: "Erreur lors de la mise à jour du rôle",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
-    );
-    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    return res;
+    return handleApiError(error, {
+      context: "app/api/admin/users/set-role",
+      defaultMessage: "Erreur lors de la mise à jour du rôle",
+    });
   }
 }
 

@@ -1,52 +1,27 @@
 import type { NextRequest } from "next/server";
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { initializeFirebaseAdmin, getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
+import { initializeFirebaseAdmin, getFirestoreAdmin } from "@/lib/firebase-admin";
 import { getTeamMatches } from "@/lib/server/team-matches";
+import { requireAuth } from "@/lib/api/auth-middleware";
+import { createSecureResponse } from "@/lib/api/response-utils";
+import { handleApiError } from "@/lib/api/error-handler";
+import { validateId } from "@/lib/api/validation-helpers";
 
 export const runtime = "nodejs";
 
 export async function GET(
-  _request: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ teamId: string }> }
 ) {
-  // Vérification d'authentification
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get("__session")?.value;
-  
-  if (!sessionCookie) {
-    return NextResponse.json(
-      { error: "Authentification requise" },
-      { status: 401 }
-    );
-  }
-
   try {
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    if (!decoded.email_verified) {
-      return NextResponse.json(
-        { error: "Email non vérifié" },
-        { status: 403 }
-      );
-    }
-  } catch {
-    return NextResponse.json(
-      { error: "Session invalide" },
-      { status: 401 }
-    );
-  }
+    const auth = await requireAuth(req, { requireEmailVerified: true });
+    if (auth instanceof Response) return auth;
 
-  // Récupérer teamId depuis les paramètres de route
-  const { teamId } = await params;
+    // Récupérer teamId depuis les paramètres de route
+    const { teamId } = await params;
 
-  if (!teamId || typeof teamId !== "string") {
-    return NextResponse.json(
-      { error: "Team ID parameter is required" },
-      { status: 400 }
-    );
-  }
+    const idError = validateId(teamId, "teamId");
+    if (idError) return idError;
 
-  try {
     await initializeFirebaseAdmin();
     const firestore = getFirestoreAdmin();
     const matches = await getTeamMatches(firestore, teamId);
@@ -55,23 +30,19 @@ export async function GET(
       `📊 [app/api/teams/${teamId}/matches] ${matches.length} matchs récupérés pour l'équipe ${teamId}`
     );
 
-    return NextResponse.json(
+    return createSecureResponse(
       {
         teamId,
         matches,
         total: matches.length,
       },
-      { status: 200 }
+      200
     );
   } catch (error) {
-    console.error("[app/api/teams/[teamId]/matches] Firestore Error:", error);
-    return NextResponse.json(
-      {
-        error: "Failed to fetch team matches",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
-    );
+    return handleApiError(error, {
+      context: "app/api/teams/[teamId]/matches",
+      defaultMessage: "Failed to fetch team matches",
+    });
   }
 }
 

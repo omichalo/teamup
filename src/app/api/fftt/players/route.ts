@@ -1,17 +1,16 @@
-import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { initializeFirebaseAdmin, getFirestoreAdmin } from "@/lib/firebase-admin";
 import type { Player } from "@/types";
+import { createSecureResponse } from "@/lib/api/response-utils";
+import { handleApiError, createErrorResponse } from "@/lib/api/error-handler";
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const clubCode = searchParams.get("clubCode");
 
     if (!clubCode) {
-      return NextResponse.json(
-        { error: "Club code parameter is required" },
-        { status: 400 }
-      );
+      return createErrorResponse("Club code parameter is required", 400);
     }
 
     await initializeFirebaseAdmin();
@@ -46,23 +45,19 @@ export async function GET(req: Request) {
 
     console.log(`📊 [app/api/fftt/players] ${players.length} joueurs récupérés depuis Firestore`);
 
-    return NextResponse.json(
+    return createSecureResponse(
       {
         players,
         total: players.length,
         clubCode,
       },
-      { status: 200 }
+      200
     );
   } catch (error) {
-    console.error("[app/api/fftt/players] Firestore Error:", error);
-    return NextResponse.json(
-      {
-        error: "Failed to fetch players data",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
-    );
+    return handleApiError(error, {
+      context: "app/api/fftt/players",
+      defaultMessage: "Failed to fetch players data",
+    });
   }
 }
 

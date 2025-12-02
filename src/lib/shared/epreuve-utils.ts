@@ -58,6 +58,13 @@ export function getMatchEpreuve(
   return null;
 }
 
+/**
+ * Vérifie si une épreuve est le championnat de Paris
+ */
+export function isParisChampionship(epreuve: EpreuveType | null | undefined): boolean {
+  return epreuve === "championnat_paris";
+}
+
 
 
 

@@ -1,44 +1,36 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
-import { hasAnyRole, USER_ROLES, COACH_REQUEST_STATUS, resolveRole } from "@/lib/auth/roles";
+import type { NextRequest } from "next/server";
+import { getFirestoreAdmin } from "@/lib/firebase-admin";
+import { USER_ROLES, COACH_REQUEST_STATUS } from "@/lib/auth/roles";
 import { FieldValue } from "firebase-admin/firestore";
+import { requireAuth } from "@/lib/api/auth-middleware";
+import { createSecureResponse } from "@/lib/api/response-utils";
+import { handleApiError, createErrorResponse } from "@/lib/api/error-handler";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-    if (!sessionCookie) {
-      return NextResponse.json(
-        { success: false, error: "Authentification requise" },
-        { status: 401 }
-      );
-    }
+    const auth = await requireAuth(req);
+    if (auth instanceof Response) return auth;
 
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    const role = resolveRole(decoded.role as string | undefined);
-
+    // Vérifier que l'utilisateur est player, coach ou admin
     if (
-      !hasAnyRole(role, [USER_ROLES.PLAYER]) &&
-      !hasAnyRole(role, [USER_ROLES.COACH, USER_ROLES.ADMIN])
+      auth.role !== USER_ROLES.PLAYER &&
+      auth.role !== USER_ROLES.COACH &&
+      auth.role !== USER_ROLES.ADMIN
     ) {
-      return NextResponse.json(
-        { success: false, error: "Accès refusé" },
-        { status: 403 }
-      );
+      return createErrorResponse("Accès refusé", 403);
     }
 
     const { message } = (await req.json()) ?? {};
 
     const db = getFirestoreAdmin();
-    const userRef = db.collection("users").doc(decoded.uid);
+    const userRef = db.collection("users").doc(auth.uid);
 
     const userDoc = await userRef.get();
 
     if (!userDoc.exists) {
       await userRef.set({
-        email: decoded.email,
-        role,
+        email: auth.decoded.email,
+        role: auth.role,
         coachRequestStatus: COACH_REQUEST_STATUS.PENDING,
         coachRequestUpdatedAt: FieldValue.serverTimestamp(),
         coachRequestMessage: message || null,
@@ -55,19 +47,15 @@ export async function POST(req: Request) {
     }
 
     console.log("[app/api/coach/request] Coach request submitted successfully", {
-      uid: decoded.uid,
+      uid: auth.uid,
     });
 
-    return NextResponse.json({ success: true }, { status: 200 });
+    return createSecureResponse({ success: true }, 200);
   } catch (error) {
-    console.error("[app/api/coach/request] error", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Impossible d'enregistrer la demande",
-      },
-      { status: 500 }
-    );
+    return handleApiError(error, {
+      context: "app/api/coach/request",
+      defaultMessage: "Impossible d'enregistrer la demande",
+    });
   }
 }
 

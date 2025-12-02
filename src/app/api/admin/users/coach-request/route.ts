@@ -1,5 +1,3 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import {
   initializeFirebaseAdmin,
@@ -9,12 +7,12 @@ import {
 import {
   USER_ROLES,
   COACH_REQUEST_STATUS,
-  hasAnyRole,
-  resolveRole,
 } from "@/lib/auth/roles";
 import { FieldValue } from "firebase-admin/firestore";
 import type { CoachRequestStatus, UserRole } from "@/types";
-import { validateOrigin } from "@/lib/auth/csrf-utils";
+import { requireAdmin } from "@/lib/api/auth-middleware";
+import { createSecureResponse } from "@/lib/api/response-utils";
+import { handleApiError, createErrorResponse } from "@/lib/api/error-handler";
 import { logAuditAction, AUDIT_ACTIONS } from "@/lib/auth/audit-logger";
 
 interface CoachRequestUpdatePayload {
@@ -26,36 +24,8 @@ interface CoachRequestUpdatePayload {
 
 export async function PATCH(req: NextRequest) {
   try {
-    // Valider l'origine de la requête pour prévenir les attaques CSRF
-    if (!validateOrigin(req)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid origin",
-          message: "Requête non autorisée",
-        },
-        { status: 403 }
-      );
-    }
-
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-    if (!sessionCookie) {
-      return NextResponse.json(
-        { success: false, error: "Session cookie requis" },
-        { status: 401 }
-      );
-    }
-
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    const role = resolveRole(decoded.role as string | undefined);
-
-    if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
-      return NextResponse.json(
-        { success: false, error: "Accès refusé" },
-        { status: 403 }
-      );
-    }
+    const auth = await requireAdmin(req);
+    if (auth instanceof Response) return auth;
 
     const {
       userId,
@@ -65,10 +35,7 @@ export async function PATCH(req: NextRequest) {
     }: CoachRequestUpdatePayload = await req.json();
 
     if (!userId || (action !== "approve" && action !== "reject")) {
-      return NextResponse.json(
-        { success: false, error: "Paramètres invalides" },
-        { status: 400 }
-      );
+      return createErrorResponse("Paramètres invalides", 400);
     }
 
     await initializeFirebaseAdmin();
@@ -98,7 +65,7 @@ export async function PATCH(req: NextRequest) {
           role: targetRole,
           coachRequestStatus: COACH_REQUEST_STATUS.APPROVED,
           coachRequestMessage: message !== undefined ? message : null,
-          coachRequestHandledBy: decoded.uid,
+          coachRequestHandledBy: auth.uid,
           coachRequestHandledAt: now,
           coachRequestUpdatedAt: now,
           updatedAt: now,
@@ -107,7 +74,7 @@ export async function PATCH(req: NextRequest) {
       );
 
       // Log d'audit pour l'approbation
-      logAuditAction(AUDIT_ACTIONS.COACH_REQUEST_APPROVED, decoded.uid, {
+      logAuditAction(AUDIT_ACTIONS.COACH_REQUEST_APPROVED, auth.uid, {
         resource: "user",
         resourceId: userId,
         details: {
@@ -124,7 +91,7 @@ export async function PATCH(req: NextRequest) {
           {
             coachRequestStatus: COACH_REQUEST_STATUS.REJECTED,
             coachRequestMessage: message ?? null,
-            coachRequestHandledBy: decoded.uid,
+            coachRequestHandledBy: auth.uid,
             coachRequestHandledAt: now,
             coachRequestUpdatedAt: now,
             updatedAt: now,
@@ -133,7 +100,7 @@ export async function PATCH(req: NextRequest) {
         );
 
       // Log d'audit pour le rejet
-      logAuditAction(AUDIT_ACTIONS.COACH_REQUEST_REJECTED, decoded.uid, {
+      logAuditAction(AUDIT_ACTIONS.COACH_REQUEST_REJECTED, auth.uid, {
         resource: "user",
         resourceId: userId,
         details: {
@@ -143,22 +110,11 @@ export async function PATCH(req: NextRequest) {
       });
     }
 
-    const res = NextResponse.json({ success: true }, { status: 200 });
-    res.headers.set(
-      "Cache-Control",
-      "no-store, no-cache, must-revalidate, proxy-revalidate"
-    );
-    res.headers.set("Pragma", "no-cache");
-    res.headers.set("Expires", "0");
-    return res;
+    return createSecureResponse({ success: true }, 200);
   } catch (error) {
-    console.error("[app/api/admin/users/coach-request] error", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Impossible de mettre à jour la demande",
-      },
-      { status: 500 }
-    );
+    return handleApiError(error, {
+      context: "app/api/admin/users/coach-request",
+      defaultMessage: "Impossible de mettre à jour la demande",
+    });
   }
 }

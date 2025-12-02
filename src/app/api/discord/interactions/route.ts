@@ -8,6 +8,8 @@ import {
 } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import nacl from "tweetnacl";
+import { createErrorResponse } from "@/lib/api/error-handler";
+import { handleApiError } from "@/lib/api/error-handler";
 
 const DISCORD_PUBLIC_KEY = process.env.DISCORD_PUBLIC_KEY; // Clé publique du bot Discord
 
@@ -38,10 +40,7 @@ export async function POST(req: Request) {
     // Vérifier que DISCORD_PUBLIC_KEY est configuré (obligatoire en production)
     if (!DISCORD_PUBLIC_KEY) {
       console.error("[Discord Interactions] DISCORD_PUBLIC_KEY non configuré");
-      return NextResponse.json(
-        { error: "Server misconfiguration" },
-        { status: 500 }
-      );
+      return createErrorResponse("Server misconfiguration", 500);
     }
 
     // Vérifier la signature Discord (obligatoire)
@@ -51,7 +50,7 @@ export async function POST(req: Request) {
 
     if (!signature || !timestamp) {
       console.error("[Discord Interactions] Headers de signature manquants");
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+      return createErrorResponse("Invalid signature", 401);
     }
 
     const isValid = verifyDiscordSignature(
@@ -62,7 +61,7 @@ export async function POST(req: Request) {
     );
     if (!isValid) {
       console.error("[Discord Interactions] Signature invalide");
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+      return createErrorResponse("Invalid signature", 401);
     }
 
     const data = JSON.parse(body) as DiscordInteraction;
@@ -115,23 +114,12 @@ export async function POST(req: Request) {
     }
 
     // Type d'interaction non géré
-    return NextResponse.json(
-      { error: "Unknown interaction type" },
-      { status: 400 }
-    );
+    return createErrorResponse("Unknown interaction type", 400);
   } catch (error) {
-    console.error("[Discord Interactions] Erreur:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
-    console.error("[Discord Interactions] Détails:", errorMessage);
-
-    return NextResponse.json(
-      {
-        error: "Erreur lors du traitement de l'interaction",
-        details: errorMessage,
-      },
-      { status: 500 }
-    );
+    return handleApiError(error, {
+      context: "app/api/discord/interactions",
+      defaultMessage: "Erreur lors du traitement de l'interaction",
+    });
   }
 }
 
