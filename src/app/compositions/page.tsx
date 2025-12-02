@@ -10,10 +10,6 @@ import {
   Typography,
   Card,
   CardContent,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Tabs,
   Tab,
   Chip,
@@ -28,7 +24,6 @@ import {
 } from "@/hooks/useEquipesWithMatches";
 import { useCompositionRealtime } from "@/hooks/useCompositionRealtime";
 import { useAvailabilityRealtime } from "@/hooks/useAvailabilityRealtime";
-import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
 import { CompositionService } from "@/lib/services/composition-service";
 import { CompositionDefaultsService } from "@/lib/services/composition-defaults-service";
 import { Player } from "@/types/team-management";
@@ -37,7 +32,6 @@ import { USER_ROLES } from "@/lib/auth/roles";
 import {
   EpreuveType,
   getIdEpreuve,
-  getMatchEpreuve,
 } from "@/lib/shared/epreuve-utils";
 import { useChampionshipTypes } from "@/hooks/useChampionshipTypes";
 import {
@@ -67,6 +61,9 @@ import { CompositionDialogs } from "@/components/compositions/CompositionDialogs
 import { useDiscordMessage } from "@/hooks/useDiscordMessage";
 import { CompositionToolbar } from "@/components/compositions/CompositionToolbar";
 import { DiscordMessageEditor } from "@/components/compositions/DiscordMessageEditor";
+import { useCompositionJournees } from "@/hooks/useCompositionJournees";
+import { useCompositionPlayers } from "@/hooks/useCompositionPlayers";
+import { CompositionSelectors } from "@/components/compositions/CompositionSelectors";
 
 // TabPanel remplacé par CompositionTabPanel
 
@@ -146,11 +143,18 @@ function formatDivision(division: string): string {
 
 export default function CompositionsPage() {
   const { equipes, loading: loadingEquipes } = useEquipesWithMatches();
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [loadingPlayers, setLoadingPlayers] = useState(true);
+  const { journeesByEpreuveAndPhase } = useCompositionJournees(equipes);
   const [selectedEpreuve, setSelectedEpreuve] = useState<EpreuveType | null>(
     null
   );
+  const {
+    players,
+    loadingPlayers,
+    loadPlayers,
+  } = useCompositionPlayers({
+    includeAllPlayers: false,
+    selectedEpreuve,
+  });
   const { loadBoth, createEmpty, isParisChampionship } = useChampionshipTypes();
 
   // Calculer isParis une fois pour éviter les appels répétés
@@ -206,7 +210,6 @@ export default function CompositionsPage() {
 
   // getDiscordStatus est maintenant importé depuis @/lib/compositions/discord-utils
 
-  const playerService = useMemo(() => new FirestorePlayerService(), []);
   const compositionService = useMemo(() => new CompositionService(), []);
   const compositionDefaultsService = useMemo(
     () => new CompositionDefaultsService(),
@@ -237,87 +240,7 @@ export default function CompositionsPage() {
   // Filtrer les équipes selon l'épreuve sélectionnée
   const { filteredEquipes } = useFilteredEquipes(equipes, selectedEpreuve);
 
-  // Extraire les journées depuis les matchs, groupées par épreuve et phase avec leurs dates
-  // Utiliser toutes les équipes (pas filteredEquipes) pour calculer defaultEpreuve correctement
-  const journeesByEpreuveAndPhase = useMemo(() => {
-    const journeesMap = new Map<
-      EpreuveType,
-      Map<
-        "aller" | "retour",
-        Map<
-          number,
-          { journee: number; phase: "aller" | "retour"; dates: Date[] }
-        >
-      >
-    >();
-
-    equipes.forEach((equipe) => {
-      equipe.matches.forEach((match) => {
-        const epreuve = getMatchEpreuve(match, equipe.team);
-
-        if (!epreuve || !match.journee || !match.phase) {
-          return;
-        }
-
-        // Pour le championnat de Paris, accepter toutes les phases (il n'y en a qu'une)
-        // Pour le championnat par équipes, accepter uniquement "aller" et "retour"
-        const phaseLower = match.phase.toLowerCase();
-        let phase: "aller" | "retour";
-
-        if (epreuve === "championnat_paris") {
-          // Pour Paris, normaliser toutes les phases en "aller" (car il n'y a qu'une phase)
-          phase = "aller";
-        } else if (phaseLower === "aller" || phaseLower === "retour") {
-          phase = phaseLower as "aller" | "retour";
-        } else {
-          // Phase non reconnue pour le championnat par équipes
-          return;
-        }
-
-        if (!journeesMap.has(epreuve)) {
-          journeesMap.set(epreuve, new Map());
-        }
-        const epreuveMap = journeesMap.get(epreuve)!;
-
-        if (!epreuveMap.has(phase)) {
-          epreuveMap.set(phase, new Map());
-        }
-        const phaseMap = epreuveMap.get(phase)!;
-
-        const matchDate =
-          match.date instanceof Date ? match.date : new Date(match.date);
-
-        if (!phaseMap.has(match.journee)) {
-          phaseMap.set(match.journee, {
-            journee: match.journee,
-            phase,
-            dates: [matchDate],
-          });
-        } else {
-          const journeeData = phaseMap.get(match.journee)!;
-          // Ajouter la date si elle n'existe pas déjà (même jour)
-          const dateStr = matchDate.toDateString();
-          const exists = journeeData.dates.some(
-            (d) => d.toDateString() === dateStr
-          );
-          if (!exists) {
-            journeeData.dates.push(matchDate);
-          }
-        }
-      });
-    });
-
-    // Trier les dates pour chaque journée
-    journeesMap.forEach((epreuveMap) => {
-      epreuveMap.forEach((phaseMap) => {
-        phaseMap.forEach((journeeData) => {
-          journeeData.dates.sort((a, b) => a.getTime() - b.getTime());
-        });
-      });
-    });
-
-    return journeesMap;
-  }, [equipes]);
+  // journeesByEpreuveAndPhase est maintenant fourni par useCompositionJournees
 
   // Extraire les journées pour l'épreuve sélectionnée
   const journeesByPhase = useMemo(() => {
@@ -450,21 +373,9 @@ export default function CompositionsPage() {
     }
   }, [selectedPhase, selectedEpreuve, journeesByPhase, isParis]);
 
-  // Charger les joueurs
-  const loadPlayers = useCallback(async () => {
-    try {
-      setLoadingPlayers(true);
-      const allPlayers = await playerService.getAllPlayers();
-      setPlayers(allPlayers);
-    } catch (error) {
-      console.error("Erreur lors du chargement des joueurs:", error);
-    } finally {
-      setLoadingPlayers(false);
-    }
-  }, [playerService]);
-
+  // Charger les joueurs au montage
   useEffect(() => {
-    loadPlayers();
+    void loadPlayers();
   }, [loadPlayers]);
 
   // Charger les locations via l'API route (évite les problèmes de permissions Firestore côté client)
@@ -1106,106 +1017,23 @@ export default function CompositionsPage() {
           Composez les équipes pour une journée de championnat.
         </Typography>
 
-        <Card sx={{ mb: 3 }}>
-          <CardContent sx={{ pt: 2.5, pb: 1.5 }}>
-            <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
-              <FormControl size="small" sx={{ minWidth: 200 }}>
-                <InputLabel id="epreuve-select-label">Épreuve</InputLabel>
-                <Select
-                  labelId="epreuve-select-label"
-                  id="epreuve-select"
-                  value={selectedEpreuve || ""}
-                  label="Épreuve"
-                  onChange={(e) => {
-                    const epreuve = e.target.value as EpreuveType;
-                    setSelectedEpreuve(epreuve);
-                    setSelectedPhase(null); // Réinitialiser la phase lors du changement d'épreuve
-                    setSelectedJournee(null); // Réinitialiser la journée lors du changement d'épreuve
-                  }}
-                >
-                  <MenuItem value="championnat_equipes">
-                    Championnat par Équipes
-                  </MenuItem>
-                  <MenuItem value="championnat_paris">
-                    Championnat de Paris IDF
-                  </MenuItem>
-                </Select>
-              </FormControl>
-              {/* Masquer le sélecteur de phase pour le championnat de Paris (une seule phase) */}
-              {!isParis && (
-                <FormControl size="small" sx={{ minWidth: 150 }}>
-                  <InputLabel id="phase-select-label">Phase</InputLabel>
-                  <Select
-                    labelId="phase-select-label"
-                    id="phase-select"
-                    value={selectedPhase || ""}
-                    label="Phase"
-                    onChange={(e) => {
-                      const phase = e.target.value as "aller" | "retour";
-                      setSelectedPhase(phase);
-                      setSelectedJournee(null); // Réinitialiser la journée lors du changement de phase
-                    }}
-                    disabled={selectedEpreuve === null}
-                  >
-                    <MenuItem value="aller">Phase Aller</MenuItem>
-                    <MenuItem value="retour">Phase Retour</MenuItem>
-                  </Select>
-                </FormControl>
-              )}
-              <FormControl size="small" sx={{ minWidth: 150 }}>
-                <InputLabel id="journee-select-label">Journée</InputLabel>
-                <Select
-                  labelId="journee-select-label"
-                  id="journee-select"
-                  value={selectedJournee || ""}
-                  label="Journée"
-                  onChange={(e) =>
-                    setSelectedJournee(
-                      e.target.value ? Number(e.target.value) : null
-                    )
-                  }
-                  disabled={
-                    (isParis ? false : selectedPhase === null) ||
-                    selectedEpreuve === null
-                  }
-                >
-                  {(() => {
-                    // Pour le championnat de Paris, utiliser "aller" comme phase
-                    const phaseToUse = isParis ? "aller" : selectedPhase;
-
-                    if (!phaseToUse) return null;
-
-                    const journeesArray = Array.from(
-                      journeesByPhase.get(phaseToUse)?.values() || []
-                    ) as Array<{
-                      journee: number;
-                      phase: "aller" | "retour";
-                      dates: Date[];
-                    }>;
-
-                    return journeesArray
-                      .sort((a, b) => a.journee - b.journee)
-                      .map(({ journee, dates }) => {
-                        const datesFormatted = dates
-                          .map((date) => {
-                            return new Intl.DateTimeFormat("fr-FR", {
-                              day: "2-digit",
-                              month: "2-digit",
-                            }).format(date);
-                          })
-                          .join(", ");
-                        return (
-                          <MenuItem key={journee} value={journee}>
-                            Journée {journee} - {datesFormatted}
-                          </MenuItem>
-                        );
-                      });
-                  })()}
-                </Select>
-              </FormControl>
-            </Box>
-          </CardContent>
-        </Card>
+        <CompositionSelectors
+          selectedEpreuve={selectedEpreuve}
+          selectedPhase={selectedPhase}
+          selectedJournee={selectedJournee}
+          onEpreuveChange={(epreuve) => {
+            setSelectedEpreuve(epreuve);
+            setSelectedPhase(null); // Réinitialiser la phase lors du changement d'épreuve
+            setSelectedJournee(null); // Réinitialiser la journée lors du changement d'épreuve
+          }}
+          onPhaseChange={(phase) => {
+            setSelectedPhase(phase);
+            setSelectedJournee(null); // Réinitialiser la journée lors du changement de phase
+          }}
+          onJourneeChange={setSelectedJournee}
+          isParis={isParis}
+          journeesByPhase={journeesByPhase}
+        />
 
         <CompositionRulesHelp rules={compositionRules} />
 
