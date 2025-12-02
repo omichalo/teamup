@@ -19,6 +19,7 @@ import { getBurnedTeamNumber } from "@/lib/compositions/player-burnout-utils";
 import { getDiscordStatus } from "@/lib/compositions/discord-utils";
 import type { DiscordMember } from "@/types/discord";
 import type { EpreuveType } from "@/lib/shared/epreuve-utils";
+import { useDiscordFromStore } from "@/hooks/useStoreSelectors";
 
 interface AvailablePlayerItemProps {
   player: Player;
@@ -27,7 +28,7 @@ interface AvailablePlayerItemProps {
   isParis: boolean;
   selectedEpreuve: EpreuveType | null;
   draggedPlayerId: string | null;
-  discordMembers: DiscordMember[];
+  discordMembers?: DiscordMember[]; // Optionnel, utilise le store si non fourni
   onDragStart: (event: React.DragEvent, playerId: string) => void;
   onDragEnd: () => void;
 }
@@ -43,10 +44,14 @@ export function AvailablePlayerItem(props: AvailablePlayerItemProps) {
     isParis,
     selectedEpreuve,
     draggedPlayerId,
-    discordMembers,
+    discordMembers: discordMembersProp,
     onDragStart,
     onDragEnd,
   } = props;
+
+  // Utiliser le store si discordMembers n'est pas fourni en prop
+  const { discordMembers: discordMembersFromStore } = useDiscordFromStore();
+  const discordMembers = discordMembersProp ?? discordMembersFromStore;
 
   const burnedTeam = getBurnedTeamNumber(player, phase, championshipType, isParis);
   const isForeign = player.nationality === "ETR";

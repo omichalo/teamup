@@ -10,6 +10,7 @@ import {
   MenuItem,
 } from "@mui/material";
 import type { EpreuveType } from "@/lib/shared/epreuve-utils";
+import { useSelectionFromStore } from "@/hooks/useStoreSelectors";
 
 interface JourneeData {
   journee: number;
@@ -18,13 +19,13 @@ interface JourneeData {
 }
 
 interface CompositionSelectorsProps {
-  selectedEpreuve: EpreuveType | null;
-  selectedPhase: "aller" | "retour" | null;
-  selectedJournee: number | null;
-  onEpreuveChange: (epreuve: EpreuveType) => void;
-  onPhaseChange: (phase: "aller" | "retour" | null) => void;
-  onJourneeChange: (journee: number | null) => void;
-  isParis: boolean;
+  selectedEpreuve?: EpreuveType | null; // Optionnel, utilise le store si non fourni
+  selectedPhase?: "aller" | "retour" | null; // Optionnel, utilise le store si non fourni
+  selectedJournee?: number | null; // Optionnel, utilise le store si non fourni
+  onEpreuveChange?: (epreuve: EpreuveType) => void; // Optionnel, utilise le store si non fourni
+  onPhaseChange?: (phase: "aller" | "retour" | null) => void; // Optionnel, utilise le store si non fourni
+  onJourneeChange?: (journee: number | null) => void; // Optionnel, utilise le store si non fourni
+  isParis?: boolean; // Optionnel, utilise le store si non fourni
   journeesByPhase: Map<
     "aller" | "retour",
     Map<number, JourneeData>
@@ -37,14 +38,25 @@ interface CompositionSelectorsProps {
  * Composant pour les sélecteurs d'épreuve, phase et journée
  */
 export function CompositionSelectors(props: CompositionSelectorsProps) {
+  // Utiliser le store pour les sélections si non fournies en props
   const {
-    selectedEpreuve,
-    selectedPhase,
-    selectedJournee,
-    onEpreuveChange,
-    onPhaseChange,
-    onJourneeChange,
-    isParis,
+    selectedEpreuve: selectedEpreuveFromStore,
+    selectedPhase: selectedPhaseFromStore,
+    selectedJournee: selectedJourneeFromStore,
+    setSelectedEpreuve: setSelectedEpreuveFromStore,
+    setSelectedPhase: setSelectedPhaseFromStore,
+    setSelectedJournee: setSelectedJourneeFromStore,
+    isParis: isParisFromStore,
+  } = useSelectionFromStore();
+
+  const {
+    selectedEpreuve: selectedEpreuveProp,
+    selectedPhase: selectedPhaseProp,
+    selectedJournee: selectedJourneeProp,
+    onEpreuveChange: onEpreuveChangeProp,
+    onPhaseChange: onPhaseChangeProp,
+    onJourneeChange: onJourneeChangeProp,
+    isParis: isParisProp,
     journeesByPhase,
     showJournee = true,
     phaseOptions = [
@@ -52,6 +64,17 @@ export function CompositionSelectors(props: CompositionSelectorsProps) {
       { value: "retour", label: "Phase Retour" },
     ],
   } = props;
+
+  // Utiliser les valeurs des props si fournies, sinon utiliser le store
+  const selectedEpreuve = selectedEpreuveProp ?? selectedEpreuveFromStore;
+  const selectedPhase = selectedPhaseProp ?? selectedPhaseFromStore;
+  const selectedJournee = selectedJourneeProp ?? selectedJourneeFromStore;
+  const isParis = isParisProp ?? isParisFromStore ?? false;
+
+  // Utiliser les handlers des props si fournis, sinon utiliser le store
+  const onEpreuveChange = onEpreuveChangeProp ?? ((epreuve: EpreuveType) => setSelectedEpreuveFromStore(epreuve));
+  const onPhaseChange = onPhaseChangeProp ?? ((phase: "aller" | "retour" | null) => setSelectedPhaseFromStore(phase));
+  const onJourneeChange = onJourneeChangeProp ?? ((journee: number | null) => setSelectedJourneeFromStore(journee));
 
   return (
     <Card sx={{ mb: 3 }}>

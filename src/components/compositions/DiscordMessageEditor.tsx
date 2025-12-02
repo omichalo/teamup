@@ -2,12 +2,8 @@
 
 import { Box, TextField, Popper, Paper, List, ListItem, ListItemButton, ListItemText, Typography } from "@mui/material";
 import { useState, useCallback } from "react";
-
-interface DiscordMember {
-  id: string;
-  username: string;
-  displayName: string;
-}
+import type { DiscordMember } from "@/types/discord";
+import { useDiscordFromStore } from "@/hooks/useStoreSelectors";
 
 interface MentionSuggestionsProps {
   members: DiscordMember[];
@@ -118,7 +114,7 @@ interface DiscordMessageEditorProps {
   value: string;
   onChange: (value: string) => void;
   onSave: (value: string) => void;
-  discordMembers: DiscordMember[];
+  discordMembers?: DiscordMember[]; // Optionnel, utilise le store si non fourni
   selectedJournee: number | null;
   selectedPhase: "aller" | "retour" | null;
   saveTimeoutRef: React.MutableRefObject<Record<string, NodeJS.Timeout>>;
@@ -134,12 +130,16 @@ export function DiscordMessageEditor(props: DiscordMessageEditorProps) {
     value,
     onChange,
     onSave,
-    discordMembers,
+    discordMembers: discordMembersProp,
     selectedJournee,
     selectedPhase,
     saveTimeoutRef,
     onInsertMention,
   } = props;
+
+  // Utiliser le store si discordMembers n'est pas fourni en prop
+  const { discordMembers: discordMembersFromStore } = useDiscordFromStore();
+  const discordMembers = discordMembersProp ?? discordMembersFromStore;
 
   const [mentionAnchor, setMentionAnchor] = useState<{
     anchorEl: HTMLElement;

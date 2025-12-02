@@ -3,12 +3,10 @@ import type { Player } from "@/types/team-management";
 import type { Match } from "@/types";
 import type { EpreuveType } from "@/lib/shared/epreuve-utils";
 import type { EquipeWithMatches } from "./useEquipesWithMatches";
+import { useAppStore } from "@/stores/app-store";
+import { useDiscordMembers as useDiscordMembersFromStore } from "@/hooks/useAppData";
+import type { DiscordMember } from "@/types/discord";
 
-interface DiscordMember {
-  id: string;
-  username: string;
-  displayName: string;
-}
 
 interface DiscordChannel {
   id: string;
@@ -120,87 +118,13 @@ export function useDiscordMessage(
     matchInfo: string | null;
     channelId?: string;
   }>({ open: false, teamId: null, matchInfo: null });
-  const [discordMembers, setDiscordMembers] = useState<DiscordMember[]>([]);
-  const [discordChannels, setDiscordChannels] = useState<DiscordChannel[]>([]);
   const saveTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({});
 
-  // Charger les membres Discord
-  useEffect(() => {
-    const loadDiscordMembers = async () => {
-      try {
-        console.log("[Compositions] Chargement des membres Discord...");
-        const response = await fetch("/api/discord/members", {
-          method: "GET",
-          credentials: "include",
-        });
-        console.log("[Compositions] Réponse status:", response.status);
-        if (response.ok) {
-          const result = await response.json();
-          console.log("[Compositions] Résultat:", result);
-          if (result.success) {
-            console.log(
-              "[Compositions] Membres reçus:",
-              result.members?.length || 0
-            );
-            setDiscordMembers(result.members || []);
-          } else {
-            console.error(
-              "[Compositions] Erreur dans la réponse:",
-              result.error
-            );
-          }
-        } else {
-          const errorText = await response.text();
-          console.error(
-            "[Compositions] Erreur HTTP:",
-            response.status,
-            errorText
-          );
-        }
-      } catch (error) {
-        console.error(
-          "[Compositions] Erreur lors du chargement des membres Discord:",
-          error
-        );
-      }
-    };
-    void loadDiscordMembers();
-  }, []);
-
-  // Charger les canaux Discord
-  useEffect(() => {
-    const loadDiscordChannels = async () => {
-      try {
-        const response = await fetch("/api/discord/channels", {
-          method: "GET",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success) {
-            setDiscordChannels(result.channels || []);
-          } else {
-            console.error(
-              "Erreur lors du chargement des canaux Discord:",
-              result.error
-            );
-          }
-        } else {
-          const errorData = await response.json();
-          console.error(
-            "Erreur HTTP lors du chargement des canaux Discord:",
-            errorData
-          );
-        }
-      } catch (error) {
-        console.error("Erreur lors du chargement des canaux Discord:", error);
-      }
-    };
-    void loadDiscordChannels();
-  }, []);
+  // Utiliser les membres Discord depuis le store global
+  const discordMembers = useDiscordMembersFromStore();
+  
+  // Utiliser les canaux Discord depuis le store global (chargés par useAppDataLoader)
+  const { discordChannels } = useAppStore();
 
   // Vérifier le statut d'envoi des messages Discord
   useEffect(() => {

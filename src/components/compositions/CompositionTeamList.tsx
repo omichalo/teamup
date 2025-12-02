@@ -11,8 +11,9 @@ import { DiscordMessageEditor } from "./DiscordMessageEditor";
 import { useCompositionTeamList } from "@/hooks/useCompositionTeamList";
 import { isParisChampionship as isParisChampionshipValidation, getMatchForTeamAndJournee } from "@/lib/compositions/validation";
 import type { DiscordMember } from "@/types/discord";
+import { useSelectionFromStore, useDiscordFromStore } from "@/hooks/useStoreSelectors";
 
-interface CompositionTeamListProps {
+export interface CompositionTeamListProps {
   equipes: EquipeWithMatches[];
   players: Player[];
   compositions?: Record<string, string[]>;
@@ -20,12 +21,12 @@ interface CompositionTeamListProps {
     masculin: Record<string, string[]>;
     feminin: Record<string, string[]>;
   };
-  selectedEpreuve: EpreuveType | null;
-  selectedJournee: number | null;
-  selectedPhase: "aller" | "retour" | null;
+  selectedEpreuve?: EpreuveType | null; // Optionnel, utilise le store si non fourni
+  selectedJournee?: number | null; // Optionnel, utilise le store si non fourni
+  selectedPhase?: "aller" | "retour" | null; // Optionnel, utilise le store si non fourni
   tabValue?: number;
   defaultCompositionTab?: "masculin" | "feminin";
-  isParis: boolean;
+  isParis?: boolean; // Optionnel, utilise le store si non fourni
   draggedPlayerId: string | null;
   dragOverTeamId: string | null;
   teamValidationErrors?: Record<string, { reason?: string; offendingPlayerIds?: string[] } | undefined>;
@@ -64,7 +65,7 @@ interface CompositionTeamListProps {
     channelId?: string;
   }>>;
   discordChannels?: Array<{ id: string; name: string; type?: number }>;
-  discordMembers?: DiscordMember[];
+  discordMembers?: DiscordMember[]; // Optionnel, utilise le store si non fourni
   saveTimeoutRef?: React.MutableRefObject<Record<string, NodeJS.Timeout>>;
   completionThreshold?: number;
 }
@@ -73,17 +74,28 @@ interface CompositionTeamListProps {
  * Composant pour afficher la liste des équipes avec leurs compositions
  */
 export function CompositionTeamList(props: CompositionTeamListProps) {
+  // Utiliser le store pour les sélections si non fournies en props
+  const {
+    selectedEpreuve: selectedEpreuveFromStore,
+    selectedPhase: selectedPhaseFromStore,
+    selectedJournee: selectedJourneeFromStore,
+    isParis: isParisFromStore,
+  } = useSelectionFromStore();
+
+  // Utiliser le store pour Discord si non fourni en props
+  const { discordMembers: discordMembersFromStore } = useDiscordFromStore();
+
   const {
     equipes,
     players,
     compositions,
     defaultCompositions,
-    selectedEpreuve,
-    selectedJournee,
-    selectedPhase,
+    selectedEpreuve: selectedEpreuveProp,
+    selectedJournee: selectedJourneeProp,
+    selectedPhase: selectedPhaseProp,
     tabValue = 0,
     defaultCompositionTab,
-    isParis,
+    isParis: isParisProp,
     draggedPlayerId,
     dragOverTeamId,
     teamValidationErrors,
@@ -106,10 +118,17 @@ export function CompositionTeamList(props: CompositionTeamListProps) {
     handleSendDiscordMessage,
     setConfirmResendDialog,
     discordChannels,
-    discordMembers,
+    discordMembers: discordMembersProp,
     saveTimeoutRef,
     completionThreshold,
   } = props;
+
+  // Utiliser les valeurs des props si fournies, sinon utiliser le store
+  const selectedEpreuve: EpreuveType | null = selectedEpreuveProp ?? selectedEpreuveFromStore ?? null;
+  const selectedPhase: "aller" | "retour" | null = selectedPhaseProp ?? selectedPhaseFromStore ?? null;
+  const selectedJournee: number | null = selectedJourneeProp ?? selectedJourneeFromStore ?? null;
+  const isParis: boolean = isParisProp ?? isParisFromStore ?? false;
+  const discordMembers: DiscordMember[] = discordMembersProp ?? discordMembersFromStore ?? [];
 
   const { teamsData } = useCompositionTeamList({
     equipes,

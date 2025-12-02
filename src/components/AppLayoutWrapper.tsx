@@ -1,5 +1,7 @@
 "use client";
 
+import { useAppDataLoader } from "@/hooks/useAppDataLoader";
+
 import { usePathname } from "next/navigation";
 import { Layout } from "./Layout";
 
@@ -7,6 +9,9 @@ import { Layout } from "./Layout";
 const AUTH_ROUTES = ["/login", "/signup", "/reset", "/reset-password", "/auth/verify-email"];
 
 export function AppLayoutWrapper({ children }: { children: React.ReactNode }) {
+  // Charger les données partagées une seule fois au niveau de l'application
+  useAppDataLoader();
+  
   const pathname = usePathname();
   const isAuthRoute = AUTH_ROUTES.some((route) => pathname?.startsWith(route));
 

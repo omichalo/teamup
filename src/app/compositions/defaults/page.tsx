@@ -19,32 +19,29 @@ import {
 } from "@mui/material";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
-import { useEquipesWithMatches } from "@/hooks/useEquipesWithMatches";
 import { CompositionDefaultsService } from "@/lib/services/composition-defaults-service";
-import { EpreuveType } from "@/lib/shared/epreuve-utils";
 import { useChampionshipTypes } from "@/hooks/useChampionshipTypes";
 import {
   JOURNEE_CONCERNEE_PAR_REGLE,
   validateTeamCompositionState,
 } from "@/lib/compositions/validation";
-import { AvailablePlayersPanel } from "@/components/compositions/AvailablePlayersPanel";
-import { CompositionsSummary } from "@/components/compositions/CompositionsSummary";
 import { CompositionRulesHelp } from "@/components/compositions/CompositionRulesHelp";
-import { CompositionTabPanel } from "@/components/compositions/CompositionTabPanel";
 import { useMaxPlayersForTeam } from "@/hooks/useMaxPlayersForTeam";
 import { useFilteredEquipes } from "@/hooks/useFilteredEquipes";
 import { useEquipesByType } from "@/hooks/useEquipesByType";
 import { useCanDropPlayer } from "@/hooks/useCanDropPlayer";
 import { useCompositionDragDrop } from "@/hooks/useCompositionDragDrop";
 import { AvailablePlayerItem } from "@/components/compositions/AvailablePlayerItem";
-import { useCurrentPhase } from "@/hooks/useCurrentPhase";
 import { useFilteredPlayers } from "@/hooks/useFilteredPlayers";
 import { usePlayersWithoutAssignment } from "@/hooks/usePlayersWithoutAssignment";
 import { useCompositionRules } from "@/hooks/useCompositionRules";
 import { useCompositionPlayers } from "@/hooks/useCompositionPlayers";
 import { CompositionSelectors } from "@/components/compositions/CompositionSelectors";
 import { useAvailablePlayers } from "@/hooks/useAvailablePlayers";
-import { CompositionTeamList } from "@/components/compositions/CompositionTeamList";
+import { useChampionshipTab } from "@/hooks/useChampionshipTab";
+import { CompositionPageLayout } from "@/components/compositions/CompositionPageLayout";
+import { useAppData } from "@/hooks/useAppData";
+import { useSelection } from "@/hooks/useSelection";
 
 interface PhaseSelectOption {
   value: "aller" | "retour";
@@ -55,23 +52,27 @@ const MAX_PLAYERS_PER_DEFAULT_TEAM = 5;
 const MIN_PLAYERS_FOR_DEFAULT_COMPLETION = 4;
 
 export default function DefaultCompositionsPage() {
-  const { loadBoth, createEmpty, isParisChampionship } = useChampionshipTypes();
-  const { equipes, loading: loadingEquipes } = useEquipesWithMatches();
-  const [selectedEpreuve, setSelectedEpreuve] = useState<EpreuveType>(
-    "championnat_equipes"
-  );
+  const { loadBoth, createEmpty } = useChampionshipTypes();
+  // Utiliser les données depuis le store global
+  const { equipes, loading: loadingEquipes } = useAppData();
+  // Utiliser les sélections depuis le store (synchronisées entre pages)
+  const {
+    selectedEpreuve,
+    selectedPhase,
+    setSelectedEpreuve,
+    setSelectedPhase,
+    isParis,
+  } = useSelection({
+    equipes,
+    loadingEquipes,
+    autoInitialize: true,
+    showJournee: false,
+  });
   const { players, loadingPlayers, loadPlayers, playerPool } =
     useCompositionPlayers({
       includeAllPlayers: false,
       selectedEpreuve,
     });
-  const isParis = useMemo(
-    () => isParisChampionship(selectedEpreuve),
-    [isParisChampionship, selectedEpreuve]
-  );
-  const [selectedPhase, setSelectedPhase] = useState<"aller" | "retour" | null>(
-    null
-  );
   const [defaultCompositions, setDefaultCompositions] = useState<{
     masculin: Record<string, string[]>;
     feminin: Record<string, string[]>;
@@ -84,57 +85,23 @@ export default function DefaultCompositionsPage() {
   const [defaultCompositionErrors, setDefaultCompositionErrors] = useState<
     Record<string, string | undefined>
   >({});
-  const [defaultCompositionTab, setDefaultCompositionTab] = useState<
-    "masculin" | "feminin"
-  >("masculin");
   const [defaultCompositionMessage, setDefaultCompositionMessage] = useState<
     string | null
   >(null);
   const [searchQuery, setSearchQuery] = useState("");
   // draggedPlayerId et dragOverTeamId sont maintenant gérés par useCompositionDragDrop
   const [includeAllPlayers, setIncludeAllPlayers] = useState(false);
-  const [discordMembers, setDiscordMembers] = useState<
-    Array<{ id: string; username: string; displayName: string }>
-  >([]);
+  // discordMembers est maintenant chargé automatiquement par les composants via le store
 
   const compositionDefaultsService = useMemo(
     () => new CompositionDefaultsService(),
     []
   );
 
-  // Gestion de la phase actuelle
-  useCurrentPhase({
-    equipes,
-    loadingEquipes,
-    selectedEpreuve,
-    selectedPhase,
-    setSelectedPhase,
-  });
-
   // Charger les joueurs au montage
   useEffect(() => {
     void loadPlayers();
   }, [loadPlayers]);
-
-  // Charger les membres Discord
-  useEffect(() => {
-    const loadDiscordMembers = async () => {
-      try {
-        const response = await fetch("/api/discord/members", {
-          credentials: "include",
-        });
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success && result.members) {
-            setDiscordMembers(result.members);
-          }
-        }
-      } catch (error) {
-        console.error("Erreur lors du chargement des membres Discord:", error);
-      }
-    };
-    loadDiscordMembers();
-  }, []);
 
   // getDiscordStatus est maintenant importé depuis @/lib/compositions/discord-utils
 
@@ -205,6 +172,18 @@ export default function DefaultCompositionsPage() {
   // Grouper les équipes par type (masculin/féminin)
   const equipesByType = useEquipesByType(filteredEquipes);
 
+  // Gérer les tabs masculin/féminin et les calculs associés
+  const {
+    currentTab: defaultCompositionTab,
+    currentTeams,
+    championshipType: championshipTypeForAssignments,
+    handleTabChange,
+  } = useChampionshipTab({
+    isParis,
+    equipesByType,
+    initialTab: "masculin",
+  });
+
   const mergedDefaultCompositions = useMemo(
     () => ({
       ...defaultCompositions.masculin,
@@ -229,21 +208,6 @@ export default function DefaultCompositionsPage() {
     availablePlayers,
     searchQuery
   );
-
-  // Calculer les joueurs sans assignation
-  const currentTeams = useMemo(() => {
-    return selectedEpreuve === "championnat_paris"
-      ? [...equipesByType.masculin, ...equipesByType.feminin]
-      : defaultCompositionTab === "masculin"
-      ? equipesByType.masculin
-      : equipesByType.feminin;
-  }, [selectedEpreuve, defaultCompositionTab, equipesByType]);
-
-  const championshipTypeForAssignments = useMemo(() => {
-    return selectedEpreuve === "championnat_paris"
-      ? "masculin"
-      : defaultCompositionTab;
-  }, [selectedEpreuve, defaultCompositionTab]);
 
   const assignments = useMemo(() => {
     return defaultCompositions[championshipTypeForAssignments];
@@ -733,13 +697,6 @@ export default function DefaultCompositionsPage() {
 
   const currentTabIndex = defaultCompositionTab === "masculin" ? 0 : 1;
 
-  const handleTabChange = useCallback(
-    (_event: React.SyntheticEvent, newValue: number) => {
-      setDefaultCompositionTab(newValue === 0 ? "masculin" : "feminin");
-    },
-    []
-  );
-
   // Règles de composition
   const rulesForDefaults = useCompositionRules(selectedEpreuve, "defaults");
 
@@ -829,19 +786,15 @@ export default function DefaultCompositionsPage() {
               </Box>
             )}
 
-            <Box sx={{ display: "flex", gap: 2, position: "relative" }}>
-              <AvailablePlayersPanel
-                title="Joueurs"
-                subtitle={availablePlayersSubtitle}
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-                totalCount={availablePlayersWithoutAssignment.length}
-                filteredPlayers={filteredAvailablePlayersWithoutAssignment}
-                emptyMessage="Aucun joueur disponible"
-                noResultMessage={(query) =>
-                  `Aucun joueur trouvé pour “${query}”`
-                }
-                renderPlayerItem={(player) => {
+            <CompositionPageLayout
+              availablePlayersPanel={{
+                title: "Joueurs",
+                subtitle: availablePlayersSubtitle,
+                searchQuery,
+                onSearchChange: setSearchQuery,
+                totalCount: availablePlayersWithoutAssignment.length,
+                filteredPlayers: filteredAvailablePlayersWithoutAssignment,
+                renderPlayerItem: (player) => {
                   const phase = (selectedPhase || "aller") as
                     | "aller"
                     | "retour";
@@ -854,13 +807,12 @@ export default function DefaultCompositionsPage() {
                       isParis={isParis}
                       selectedEpreuve={selectedEpreuve}
                       draggedPlayerId={draggedPlayerId}
-                      discordMembers={discordMembers}
                       onDragStart={handleDragStart}
                       onDragEnd={handleDragEnd}
                     />
                   );
-                }}
-                actions={
+                },
+                actions: (
                   <FormControlLabel
                     control={
                       <Switch
@@ -877,98 +829,43 @@ export default function DefaultCompositionsPage() {
                         : "Afficher tous les joueurs (hors championnat et sans licence)"
                     }
                   />
-                }
-              />
-
-              <Box sx={{ flex: 1 }}>
-                <CompositionsSummary
-                  totalTeams={compositionSummary.totalTeams}
-                  completedTeams={compositionSummary.completedTeams}
-                  incompleteTeams={compositionSummary.incompleteTeams}
-                  invalidTeams={compositionSummary.invalidTeams}
-                  matchesPlayed={0}
-                  showMatchesPlayed={false}
-                  percentage={compositionSummary.percentage}
-                  title="Bilan des compositions par défaut"
-                />
-
-                <CompositionTabPanel
-                  value={currentTabIndex}
-                  index={0}
-                  prefix="default-compositions"
-                >
-                  {(() => {
-                    // Pour le championnat de Paris, afficher toutes les équipes (masculin + féminin)
-                    const equipesToDisplay =
-                      selectedEpreuve === "championnat_paris"
-                        ? [...equipesByType.masculin, ...equipesByType.feminin]
-                        : equipesByType.masculin;
-
-                    if (equipesToDisplay.length === 0) {
-                      return (
-                        <Typography variant="body2" color="text.secondary">
-                          {selectedEpreuve === "championnat_paris"
-                            ? "Aucune équipe"
-                            : "Aucune équipe masculine"}
-                        </Typography>
-                      );
-                    }
-
-                    return (
-                      <CompositionTeamList
-                        equipes={equipesToDisplay}
-                        players={players}
-                        defaultCompositions={defaultCompositions}
-                        selectedEpreuve={selectedEpreuve}
-                        selectedJournee={null}
-                        selectedPhase={selectedPhase}
-                        defaultCompositionTab={defaultCompositionTab}
-                        isParis={selectedEpreuve === "championnat_paris"}
-                        draggedPlayerId={draggedPlayerId}
-                        dragOverTeamId={dragOverTeamId}
-                        defaultCompositionErrors={defaultCompositionErrors}
-                        mode="defaults"
-                        onRemovePlayer={handleRemoveDefaultPlayer}
-                        onDragStart={handleDragStart}
-                        onDragEnd={handleDragEnd}
-                        onDragOver={handleDragOver}
-                        onDragLeave={handleDragLeave}
-                        onDrop={handleDrop}
-                        completionThreshold={MIN_PLAYERS_FOR_DEFAULT_COMPLETION}
-                      />
-                    );
-                  })()}
-                </CompositionTabPanel>
-
-                <CompositionTabPanel
-                  value={currentTabIndex}
-                  index={1}
-                  prefix="default-compositions"
-                >
-                  <CompositionTeamList
-                    equipes={equipesByType.feminin}
-                    players={players}
-                    defaultCompositions={defaultCompositions}
-                    selectedEpreuve={selectedEpreuve}
-                    selectedJournee={null}
-                    selectedPhase={selectedPhase}
-                    defaultCompositionTab={defaultCompositionTab}
-                    isParis={selectedEpreuve === "championnat_paris"}
-                    draggedPlayerId={draggedPlayerId}
-                    dragOverTeamId={dragOverTeamId}
-                    defaultCompositionErrors={defaultCompositionErrors}
-                    mode="defaults"
-                    onRemovePlayer={handleRemoveDefaultPlayer}
-                    onDragStart={handleDragStart}
-                    onDragEnd={handleDragEnd}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                    completionThreshold={MIN_PLAYERS_FOR_DEFAULT_COMPLETION}
-                  />
-                </CompositionTabPanel>
-              </Box>
-            </Box>
+                ),
+              }}
+              summary={{
+                totalTeams: compositionSummary.totalTeams,
+                completedTeams: compositionSummary.completedTeams,
+                incompleteTeams: compositionSummary.incompleteTeams,
+                invalidTeams: compositionSummary.invalidTeams,
+                matchesPlayed: 0,
+                showMatchesPlayed: false,
+                percentage: compositionSummary.percentage,
+                title: "Bilan des compositions par défaut",
+              }}
+              tabsContent={{
+                mode: "defaults",
+                tabValue: currentTabIndex,
+                prefix: "default-compositions",
+                equipesByType,
+                players,
+                defaultCompositions,
+                selectedJournee: null,
+                defaultCompositionTab,
+                draggedPlayerId,
+                dragOverTeamId,
+                defaultCompositionErrors,
+                onRemovePlayer: handleRemoveDefaultPlayer,
+                onDragStart: handleDragStart,
+                onDragEnd: handleDragEnd,
+                onDragOver: handleDragOver,
+                onDragLeave: handleDragLeave,
+                onDrop: handleDrop,
+                completionThreshold: MIN_PLAYERS_FOR_DEFAULT_COMPLETION,
+                emptyMessage:
+                  selectedEpreuve === "championnat_paris"
+                    ? "Aucune équipe"
+                    : "Aucune équipe masculine",
+              }}
+            />
           </>
         )}
       </Box>
