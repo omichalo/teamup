@@ -769,7 +769,7 @@ export const getParisTeamStructure = (
 ): { groups: number; playersPerGroup: number; totalPlayers: number } | null => {
   const divisionLower = division.toLowerCase();
   
-  // 3 groupes (9 joueurs) : EXCELLENCE, PROMO EXCELLENCE, HONNEUR
+  // 3 groupes (9 joueurs) : Excellence, Promo Excellence, Honneur
   if (
     divisionLower.includes("excellence") ||
     divisionLower.includes("honneur")
@@ -777,13 +777,23 @@ export const getParisTeamStructure = (
     return { groups: 3, playersPerGroup: 3, totalPlayers: 9 };
   }
   
-  // 2 groupes (6 joueurs) : DIVISION 1
-  if (divisionLower.includes("division 1") || divisionLower.includes("div 1")) {
+  // 2 groupes (6 joueurs) : 1ere Division ou 1ère Division
+  if (
+    divisionLower.includes("1ere division") ||
+    divisionLower.includes("1ère division") ||
+    divisionLower.includes("1ere div") ||
+    divisionLower.includes("1ère div")
+  ) {
     return { groups: 2, playersPerGroup: 3, totalPlayers: 6 };
   }
   
-  // 1 groupe (3 joueurs) : DIVISION 2
-  if (divisionLower.includes("division 2") || divisionLower.includes("div 2")) {
+  // 1 groupe (3 joueurs) : 2eme Division ou 2ème Division
+  if (
+    divisionLower.includes("2eme division") ||
+    divisionLower.includes("2ème division") ||
+    divisionLower.includes("2eme div") ||
+    divisionLower.includes("2ème div")
+  ) {
     return { groups: 1, playersPerGroup: 3, totalPlayers: 3 };
   }
   
