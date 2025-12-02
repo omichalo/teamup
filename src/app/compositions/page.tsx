@@ -1740,7 +1740,9 @@ export default function CompositionsPage() {
                                       <Box sx={{ mt: 1 }}>
                                         <DiscordMessageEditor
                                           teamId={equipe.team.id}
-                                          value={customMessages[equipe.team.id] || ""}
+                                          value={
+                                            customMessages[equipe.team.id] || ""
+                                          }
                                           onChange={(newValue) => {
                                             setCustomMessages((prev) => ({
                                               ...prev,
@@ -1748,7 +1750,10 @@ export default function CompositionsPage() {
                                             }));
                                           }}
                                           onSave={(newValue) => {
-                                            if (selectedJournee && selectedPhase) {
+                                            if (
+                                              selectedJournee &&
+                                              selectedPhase
+                                            ) {
                                               handleSaveCustomMessage(
                                                 equipe.team.id,
                                                 newValue,
@@ -2197,7 +2202,9 @@ export default function CompositionsPage() {
                                     <Box sx={{ mt: 1 }}>
                                       <DiscordMessageEditor
                                         teamId={equipe.team.id}
-                                        value={customMessages[equipe.team.id] || ""}
+                                        value={
+                                          customMessages[equipe.team.id] || ""
+                                        }
                                         onChange={(newValue) => {
                                           setCustomMessages((prev) => ({
                                             ...prev,
@@ -2205,7 +2212,10 @@ export default function CompositionsPage() {
                                           }));
                                         }}
                                         onSave={(newValue) => {
-                                          if (selectedJournee && selectedPhase) {
+                                          if (
+                                            selectedJournee &&
+                                            selectedPhase
+                                          ) {
                                             handleSaveCustomMessage(
                                               equipe.team.id,
                                               newValue,
