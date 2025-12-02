@@ -36,14 +36,11 @@ import {
   ListItemText,
 } from "@mui/material";
 import {
-  DragIndicator,
   ContentCopy,
   RestartAlt,
   Message,
   Close,
   Send,
-  AlternateEmail,
-  Warning,
 } from "@mui/icons-material";
 import {
   useEquipesWithMatches,
@@ -58,7 +55,6 @@ import { Player } from "@/types/team-management";
 import { Match } from "@/types";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
-import { getCurrentPhase } from "@/lib/shared/phase-utils";
 import {
   EpreuveType,
   getIdEpreuve,
@@ -66,47 +62,30 @@ import {
 } from "@/lib/shared/epreuve-utils";
 import { useChampionshipTypes } from "@/hooks/useChampionshipTypes";
 import {
-  JOURNEE_CONCERNEE_PAR_REGLE,
-  AssignmentValidationResult,
-  canAssignPlayerToTeam,
   getMatchForTeamAndJournee,
   getPlayersFromMatch,
   isMatchPlayed,
-  validateTeamCompositionState,
   extractTeamNumber,
-  calculateFutureBurnout,
-  getParisTeamStructure,
 } from "@/lib/compositions/validation";
 import { AvailablePlayersPanel } from "@/components/compositions/AvailablePlayersPanel";
 import { TeamCompositionCard } from "@/components/compositions/TeamCompositionCard";
 import { CompositionsSummary } from "@/components/compositions/CompositionsSummary";
-import { createDragImage } from "@/lib/compositions/drag-utils";
-import {
-  CompositionRulesHelp,
-  type CompositionRuleItem,
-} from "@/components/compositions/CompositionRulesHelp";
+import { CompositionRulesHelp } from "@/components/compositions/CompositionRulesHelp";
+import { CompositionTabPanel } from "@/components/compositions/CompositionTabPanel";
+import { PlayerBurnoutIndicators } from "@/components/compositions/PlayerBurnoutIndicators";
+import { useMaxPlayersForTeam } from "@/hooks/useMaxPlayersForTeam";
+import { useFilteredEquipes } from "@/hooks/useFilteredEquipes";
+import { useEquipesByType } from "@/hooks/useEquipesByType";
+import { useCanDropPlayer } from "@/hooks/useCanDropPlayer";
+import { useCompositionValidation } from "@/hooks/useCompositionValidation";
+import { useCompositionDragDrop } from "@/hooks/useCompositionDragDrop";
+import { useCompositionRules } from "@/hooks/useCompositionRules";
+import { useFilteredPlayers } from "@/hooks/useFilteredPlayers";
+import { usePlayersWithoutAssignment } from "@/hooks/usePlayersWithoutAssignment";
+import { useCurrentPhase } from "@/hooks/useCurrentPhase";
+import { AvailablePlayerItem } from "@/components/compositions/AvailablePlayerItem";
 
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`compositions-tabpanel-${index}`}
-      aria-labelledby={`compositions-tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box sx={{ p: 5 }}>{children}</Box>}
-    </div>
-  );
-}
+// TabPanel remplacé par CompositionTabPanel
 
 // Composant pour afficher les suggestions de mentions
 function MentionSuggestions({
@@ -295,9 +274,12 @@ export default function CompositionsPage() {
     null
   );
   const { loadBoth, createEmpty, isParisChampionship } = useChampionshipTypes();
-  
+
   // Calculer isParis une fois pour éviter les appels répétés
-  const isParis = useMemo(() => isParisChampionship(selectedEpreuve), [isParisChampionship, selectedEpreuve]);
+  const isParis = useMemo(
+    () => isParisChampionship(selectedEpreuve),
+    [isParisChampionship, selectedEpreuve]
+  );
   const [selectedJournee, setSelectedJournee] = useState<number | null>(null);
   const [selectedPhase, setSelectedPhase] = useState<"aller" | "retour" | null>(
     null
@@ -307,10 +289,7 @@ export default function CompositionsPage() {
   const [compositions, setCompositions] = useState<Record<string, string[]>>(
     {}
   );
-  // État pour le joueur actuellement en train d'être dragué
-  const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
-  // État pour l'équipe sur laquelle on survole avec le drag
-  const [dragOverTeamId, setDragOverTeamId] = useState<string | null>(null);
+  // draggedPlayerId et dragOverTeamId sont maintenant gérés par useCompositionDragDrop
   // État pour la recherche de joueurs
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isResetting, setIsResetting] = useState(false);
@@ -336,12 +315,7 @@ export default function CompositionsPage() {
     masculin: {},
     feminin: {},
   });
-  const [teamValidationErrors, setTeamValidationErrors] = useState<
-    Record<
-      string,
-      { reason: string; offendingPlayerIds?: string[] } | undefined
-    >
-  >({});
+  // teamValidationErrors est maintenant géré par useCompositionValidation
   const [defaultCompositionsLoaded, setDefaultCompositionsLoaded] =
     useState(false);
   const [availabilitiesLoaded, setAvailabilitiesLoaded] = useState(false);
@@ -381,20 +355,7 @@ export default function CompositionsPage() {
   const [mentionQuery, setMentionQuery] = useState<string>("");
   const saveTimeoutRef = React.useRef<Record<string, NodeJS.Timeout>>({});
 
-  // Fonction helper pour vérifier le statut Discord d'un joueur
-  const getDiscordStatus = useCallback(
-    (player: Player): "none" | "invalid" | "valid" => {
-      if (!player.discordMentions || player.discordMentions.length === 0) {
-        return "none";
-      }
-      const validMemberIds = new Set(discordMembers.map((m) => m.id));
-      const hasInvalidMention = player.discordMentions.some(
-        (mentionId) => !validMemberIds.has(mentionId)
-      );
-      return hasInvalidMention ? "invalid" : "valid";
-    },
-    [discordMembers]
-  );
+  // getDiscordStatus est maintenant importé depuis @/lib/compositions/discord-utils
 
   const playerService = useMemo(() => new FirestorePlayerService(), []);
   const compositionService = useMemo(() => new CompositionService(), []);
@@ -411,107 +372,21 @@ export default function CompositionsPage() {
     return base;
   }, [tabValue, selectedJournee]);
 
-  const compositionRules: CompositionRuleItem[] = useMemo(() => {
-    if (isParis) {
-      // Règles spécifiques au championnat de Paris
-      return [
-        {
-          id: "paris-structure",
-          label:
-            "Structure par groupes : 3 groupes de 3 joueurs (Excellence, Promo Excellence, Honneur), 2 groupes de 3 (Division 1), 1 groupe de 3 (Division 2)",
-          scope: "both",
-        },
-        {
-          id: "paris-article8",
-          label:
-            "Article 8 : Les joueurs du groupe 2 doivent avoir des points entre le max du groupe 1 et le min du groupe 3. Permutation possible dans un même groupe.",
-          scope: "both",
-        },
-        {
-          id: "paris-article12",
-          label:
-            "Article 12 : Maximum 1 joueur brûlé par groupe de 3. Si 2 joueurs brûlés dans un même groupe, les 2 sont non qualifiés.",
-          scope: "both",
-        },
-        {
-          id: "paris-burning",
-          label:
-            "Brûlage : Un joueur est brûlé s'il a joué 3 matchs ou plus dans UNE équipe de numéro inférieur. Il ne peut alors jouer que dans cette équipe ou une équipe de numéro supérieur.",
-          scope: "both",
-        },
-        {
-          id: "paris-mixte",
-          label:
-            "Championnat mixte : pas de distinction masculin/féminin, une seule phase",
-          scope: "both",
-        },
-      ];
-    }
-
-    // Règles pour le championnat par équipes
-    return [
-      {
-        id: "maxPlayersDaily",
-        label: "Une composition de journée ne peut aligner que 4 joueurs",
-        scope: "daily",
-      },
-      {
-        id: "maxPlayersDefaults",
-        label: "Une composition par défaut peut contenir jusqu'à 5 joueurs",
-        scope: "defaults",
-      },
-      {
-        id: "foreign",
-        label: "Maximum un joueur étranger (ETR) par équipe",
-        scope: "both",
-      },
-      {
-        id: "female-in-male",
-        label: "Une équipe masculine ne peut comporter plus de deux joueuses",
-        scope: "both",
-      },
-      {
-        id: "burning",
-        label:
-          "Brûlage : Un joueur est brûlé s'il a joué 2 matchs ou plus dans une équipe de numéro inférieur. Il ne peut alors jouer que dans cette équipe ou une équipe de numéro supérieur.",
-        scope: "both",
-      },
-      {
-        id: "fftt",
-        label:
-          "Points minimum selon division : Messieurs N1 (≥1800), N2 (≥1600), N3 (≥1400) | Dames N1 (≥1100), N2 (≥900 pour 2 sur 4)",
-        scope: "both",
-      },
-      {
-        id: "journee2",
-        label:
-          "Journée 2 : au plus un joueur ayant joué la J1 dans une équipe de numéro inférieur",
-        scope: "daily",
-        description:
-          "Cette règle ne s'applique que sur la page des compositions de journée lorsque la J2 est sélectionnée.",
-      },
-    ];
-  }, [isParis]);
+  // Règles de composition
+  const compositionRules = useCompositionRules(selectedEpreuve, "daily");
 
   // Déterminer la phase en cours
-  const currentPhase = useMemo(() => {
-    if (loadingEquipes || equipes.length === 0) {
-      return "aller" as const;
-    }
-    return getCurrentPhase(equipes);
-  }, [equipes, loadingEquipes]);
+  // Gestion de la phase actuelle
+  const { currentPhase } = useCurrentPhase({
+    equipes,
+    loadingEquipes,
+    selectedEpreuve,
+    selectedPhase,
+    setSelectedPhase,
+  });
 
-  // Grouper les équipes par type (masculin/féminin)
   // Filtrer les équipes selon l'épreuve sélectionnée
-  const filteredEquipes = useMemo(() => {
-    if (!selectedEpreuve) {
-      return equipes;
-    }
-    return equipes.filter((equipe) => {
-      const epreuve = getMatchEpreuve(equipe.matches[0] || {}, equipe.team);
-      return epreuve === selectedEpreuve;
-    });
-  }, [equipes, selectedEpreuve]);
+  const { filteredEquipes } = useFilteredEquipes(equipes, selectedEpreuve);
 
   // Extraire les journées depuis les matchs, groupées par épreuve et phase avec leurs dates
   // Utiliser toutes les équipes (pas filteredEquipes) pour calculer defaultEpreuve correctement
@@ -685,11 +560,10 @@ export default function CompositionsPage() {
     }
   }, [currentPhase, selectedPhase]);
 
-    // Initialiser selectedJournee avec la première journée dont la date de début est après aujourd'hui
+  // Initialiser selectedJournee avec la première journée dont la date de début est après aujourd'hui
   useEffect(() => {
     // Pour le championnat de Paris, utiliser "aller" comme phase par défaut
-    const phaseToUse =
-      isParis ? "aller" : selectedPhase;
+    const phaseToUse = isParis ? "aller" : selectedPhase;
 
     if (
       selectedEpreuve === null ||
@@ -853,123 +727,22 @@ export default function CompositionsPage() {
     feminin?: Record<string, { available?: boolean; comment?: string }>;
   }>({});
 
-  // Fonction helper pour calculer le maxPlayers selon l'épreuve et la division
-  const getMaxPlayersForTeam = useCallback(
-    (equipe: EquipeWithMatches): number => {
-      // Vérifier directement si l'équipe fait partie du championnat de Paris
-      if (isParis) {
-        const structure = getParisTeamStructure(equipe.team.division || "");
-        return structure?.totalPlayers || 4; // Fallback à 4 si structure non reconnue
-      }
-      return 4; // Championnat par équipes : 4 joueurs
-    },
-    [isParis]
-  );
+  // Calculer le maxPlayers selon l'épreuve et la division
+  const { getMaxPlayersForTeam } = useMaxPlayersForTeam({ isParis });
 
-  useEffect(() => {
-    if (
-      loadingEquipes ||
-      loadingPlayers ||
-      selectedPhase === null ||
-      selectedJournee === null
-    ) {
-      setTeamValidationErrors({});
-      return;
-    }
-
-    const nextErrors: Record<
-      string,
-      { reason: string; offendingPlayerIds?: string[] } | undefined
-    > = {};
-
-    filteredEquipes.forEach((equipe) => {
-      const maxPlayers = getMaxPlayersForTeam(equipe);
-      const validation = validateTeamCompositionState({
-        teamId: equipe.team.id,
-        players,
-        equipes,
-        compositions,
-        selectedPhase,
-        selectedJournee,
-        journeeRule: JOURNEE_CONCERNEE_PAR_REGLE,
-        maxPlayersPerTeam: maxPlayers,
-      });
-
-      if (!validation.valid) {
-        const errorInfo: { reason: string; offendingPlayerIds?: string[] } = {
-          reason: validation.reason || "Composition invalide",
-        };
-        if (validation.offendingPlayerIds) {
-          errorInfo.offendingPlayerIds = validation.offendingPlayerIds;
-        }
-        nextErrors[equipe.team.id] = errorInfo;
-      }
-
-      const championshipType = equipe.matches.some(
-        (match) => match.isFemale === true
-      )
-        ? "feminin"
-        : "masculin";
-      const availabilityMap =
-        (championshipType === "masculin"
-          ? availabilities.masculin
-          : availabilities.feminin) || {};
-      const teamPlayerIds = compositions[equipe.team.id] || [];
-      const unavailablePlayers = teamPlayerIds.filter((playerId) => {
-        const availability = availabilityMap[playerId];
-        return !availability || availability.available !== true;
-      });
-
-      if (unavailablePlayers.length > 0) {
-        const unavailablePlayerNames = unavailablePlayers
-          .map((playerId) => players.find((p) => p.id === playerId))
-          .filter((p): p is Player => p !== undefined)
-          .map((p) => `${p.firstName} ${p.name}`);
-
-        const reasonText =
-          unavailablePlayerNames.length > 0
-            ? `Joueur${
-                unavailablePlayerNames.length > 1 ? "s" : ""
-              } indisponible${
-                unavailablePlayerNames.length > 1 ? "s" : ""
-              }: ${unavailablePlayerNames.join(", ")}`
-            : "Un ou plusieurs joueurs de cette équipe ne sont pas disponibles.";
-
-        const existing = nextErrors[equipe.team.id];
-        if (existing) {
-          const hasReason = existing.reason.includes(reasonText);
-          existing.reason = hasReason
-            ? existing.reason
-            : `${existing.reason} • ${reasonText}`;
-          existing.offendingPlayerIds = Array.from(
-            new Set([
-              ...(existing.offendingPlayerIds ?? []),
-              ...unavailablePlayers,
-            ])
-          );
-        } else {
-          nextErrors[equipe.team.id] = {
-            reason: reasonText,
-            offendingPlayerIds: unavailablePlayers,
-          };
-        }
-      }
-    });
-
-    setTeamValidationErrors(nextErrors);
-  }, [
-    compositions,
-    equipes,
+  // Validation des compositions
+  const { validationErrors: teamValidationErrors } = useCompositionValidation({
+    filteredEquipes,
     players,
-    loadingEquipes,
-    loadingPlayers,
+    equipes,
+    compositions,
     selectedPhase,
     selectedJournee,
-    selectedEpreuve,
     availabilities,
-    filteredEquipes,
-    getMaxPlayersForTeam,
-  ]);
+    loadingEquipes,
+    loadingPlayers,
+    isParis,
+  });
 
   // Charger les disponibilités pour la journée et phase sélectionnées
   useEffect(() => {
@@ -985,8 +758,10 @@ export default function CompositionsPage() {
       try {
         // Utiliser loadBoth pour charger les compositions en parallèle
         const result = await loadBoth({
-          loadMasculin: () => compositionDefaultsService.getDefaults(selectedPhase, "masculin"),
-          loadFeminin: () => compositionDefaultsService.getDefaults(selectedPhase, "feminin"),
+          loadMasculin: () =>
+            compositionDefaultsService.getDefaults(selectedPhase, "masculin"),
+          loadFeminin: () =>
+            compositionDefaultsService.getDefaults(selectedPhase, "feminin"),
           defaultValue: null,
         });
 
@@ -1073,12 +848,11 @@ export default function CompositionsPage() {
     }
 
     // Pour le championnat de Paris, utiliser "masculin" comme type par défaut (mixte)
-    const championshipType =
-      isParis
-        ? "masculin"
-        : tabValue === 0
-        ? "masculin"
-        : "feminin";
+    const championshipType = isParis
+      ? "masculin"
+      : tabValue === 0
+      ? "masculin"
+      : "feminin";
     const availabilityMap = availabilities[championshipType] || {};
 
     return players.filter((player) => {
@@ -1103,27 +877,15 @@ export default function CompositionsPage() {
   ]);
 
   // Filtrer les joueurs disponibles selon la recherche
-  const filteredAvailablePlayers = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return availablePlayers;
-    }
-
-    const query = searchQuery.toLowerCase().trim();
-    return availablePlayers.filter((player) => {
-      const fullName = `${player.firstName} ${player.name}`.toLowerCase();
-      const licenseId = player.id.toLowerCase();
-      return fullName.includes(query) || licenseId.includes(query);
-    });
-  }, [availablePlayers, searchQuery]);
+  const filteredAvailablePlayers = useFilteredPlayers(
+    availablePlayers,
+    searchQuery
+  );
 
   // Déterminer le type de championnat selon l'onglet actif
   // Pour le championnat de Paris, utiliser "masculin" comme type par défaut (mixte)
   const championshipType = useMemo(() => {
-    return isParis
-      ? "masculin"
-      : tabValue === 0
-      ? "masculin"
-      : "feminin";
+    return isParis ? "masculin" : tabValue === 0 ? "masculin" : "feminin";
   }, [isParis, tabValue]);
 
   // Écouter les compositions en temps réel
@@ -1190,23 +952,8 @@ export default function CompositionsPage() {
     }
   }, [compositionError]);
 
-  const equipesByType = useMemo(() => {
-    const masculin: typeof equipes = [];
-    const feminin: typeof equipes = [];
-
-    filteredEquipes.forEach((equipe) => {
-      // Déterminer si c'est une équipe féminine en regardant les matchs
-      const isFemale = equipe.matches.some((match) => match.isFemale === true);
-
-      if (isFemale) {
-        feminin.push(equipe);
-      } else {
-        masculin.push(equipe);
-      }
-    });
-
-    return { masculin, feminin };
-  }, [filteredEquipes]);
+  // Grouper les équipes par type (masculin/féminin)
+  const equipesByType = useEquipesByType(filteredEquipes);
 
   // Vérifier le statut d'envoi des messages Discord
   useEffect(() => {
@@ -1316,42 +1063,24 @@ export default function CompositionsPage() {
     ]
   );
 
+  // Calculer les joueurs sans assignation
+  const currentTypeEquipes = useMemo(() => {
+    return isParis
+      ? [...equipesByType.masculin, ...equipesByType.feminin]
+      : tabValue === 0
+      ? equipesByType.masculin
+      : equipesByType.feminin;
+  }, [isParis, tabValue, equipesByType]);
+
   const {
     availablePlayersWithoutAssignment,
     filteredAvailablePlayersWithoutAssignment,
-  } = useMemo(() => {
-    // Pour le championnat de Paris, utiliser toutes les équipes (masculin + féminin)
-    const sameTypeEquipes =
-      isParis
-        ? [...equipesByType.masculin, ...equipesByType.feminin]
-        : tabValue === 0
-        ? equipesByType.masculin
-        : equipesByType.feminin;
-    const assignedIds = new Set<string>();
-    sameTypeEquipes.forEach((equipe) => {
-      const assigned = compositions[equipe.team.id] || [];
-      assigned.forEach((playerId) => assignedIds.add(playerId));
-    });
-
-    const base = availablePlayers.filter(
-      (player) => !assignedIds.has(player.id)
-    );
-    const filtered = filteredAvailablePlayers.filter(
-      (player) => !assignedIds.has(player.id)
-    );
-
-    return {
-      availablePlayersWithoutAssignment: base,
-      filteredAvailablePlayersWithoutAssignment: filtered,
-    };
-  }, [
+  } = usePlayersWithoutAssignment({
     availablePlayers,
     filteredAvailablePlayers,
-    tabValue,
-    equipesByType,
-    compositions,
-    isParis,
-  ]);
+    currentTeams: currentTypeEquipes,
+    assignments: compositions,
+  });
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
@@ -1644,12 +1373,11 @@ export default function CompositionsPage() {
 
   const compositionSummary = useMemo(() => {
     // Pour le championnat de Paris, utiliser toutes les équipes (masculin + féminin)
-    const currentTypeEquipes =
-      isParis
-        ? [...equipesByType.masculin, ...equipesByType.feminin]
-        : tabValue === 0
-        ? equipesByType.masculin
-        : equipesByType.feminin;
+    const currentTypeEquipes = isParis
+      ? [...equipesByType.masculin, ...equipesByType.feminin]
+      : tabValue === 0
+      ? equipesByType.masculin
+      : equipesByType.feminin;
 
     let equipesCompletes = 0;
     let equipesIncompletes = 0;
@@ -1712,325 +1440,40 @@ export default function CompositionsPage() {
     teamValidationErrors,
   ]);
 
-  // Fonction pour vérifier si un drop est possible
-  const canDropPlayer = (
-    playerId: string,
-    teamId: string
-  ): AssignmentValidationResult => {
-    const equipe = equipes.find((e) => e.team.id === teamId);
-    const maxPlayers = equipe ? getMaxPlayersForTeam(equipe) : 4;
-
-    return canAssignPlayerToTeam({
-      playerId,
-      teamId,
-      players,
-      equipes,
-      compositions,
-      selectedPhase,
-      selectedJournee,
-      journeeRule: JOURNEE_CONCERNEE_PAR_REGLE,
-      maxPlayersPerTeam: maxPlayers,
-    });
-  };
+  // Vérifier si un drop est possible
+  const { canDropPlayer } = useCanDropPlayer({
+    players,
+    equipes,
+    compositions,
+    selectedPhase,
+    selectedJournee,
+    isParis,
+  });
 
   // Gestion du drag & drop
-  const handleDragStart = (e: React.DragEvent, playerId: string) => {
-    // Empêcher le drag si on clique sur le Chip de suppression ou un de ses enfants
-    const target = e.target as HTMLElement;
-
-    // Vérifier si le clic provient du Chip de suppression ou d'un de ses enfants
-    const clickedChip =
-      target.closest('[data-chip="remove"]') ||
-      target.closest('button[aria-label*="remove"]') ||
-      (target.tagName === "BUTTON" && target.textContent?.trim() === "×");
-
-    if (clickedChip || target.textContent?.trim() === "×") {
-      e.preventDefault();
-      e.stopPropagation();
-      return;
-    }
-
-    e.dataTransfer.setData("playerId", playerId);
-    e.dataTransfer.effectAllowed = "move";
-    setDraggedPlayerId(playerId);
-    // S'assurer que dragOverTeamId est null au début du drag
-    setDragOverTeamId(null);
-
-    // Ajouter une classe au <html> pour forcer le curseur pendant le drag
-    // Le style CSS global gérera le curseur (défini dans globals.css)
-    document.documentElement.classList.add("dragging");
-
-    // Créer une image personnalisée pour le drag (seulement le contenu de l'élément)
-    const player = players.find((p) => p.id === playerId);
-
-    if (!player) {
-      return;
-    }
-
-    // Déterminer le type de championnat pour le brûlage
-    // Si le joueur est dans une équipe, utiliser le type de l'équipe
-    // Sinon, utiliser le tab actuel (liste disponible)
-    const equipe = filteredEquipes.find((eq) => {
-      const teamPlayers = compositions[eq.team.id] || [];
-      return teamPlayers.includes(playerId);
-    });
-    const championshipType = equipe
-      ? equipe.matches.some((match) => match.isFemale === true)
-        ? "feminin"
-        : "masculin"
-      : tabValue === 0
-      ? "masculin"
-      : "feminin";
-
-    // Créer l'image de drag uniforme (mutualisée pour les deux cas)
-    const tempDiv = createDragImage(player, {
-      championshipType,
-      phase: (selectedPhase || "aller") as "aller" | "retour",
-    });
-    document.body.appendChild(tempDiv);
-
-    // Forcer un reflow pour s'assurer que les dimensions sont calculées
-    void tempDiv.offsetHeight;
-
-    // Utiliser l'élément temporaire comme image de drag
-    e.dataTransfer.setDragImage(tempDiv, 0, 0);
-
-    // Nettoyer après un court délai
-    setTimeout(() => {
-      if (document.body.contains(tempDiv)) {
-        document.body.removeChild(tempDiv);
-      }
-    }, 0);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedPlayerId(null);
-    setDragOverTeamId(null);
-
-    // Retirer la classe du <html> pour restaurer le curseur par défaut
-    document.documentElement.classList.remove("dragging");
-
-    // Nettoyer le style injecté si présent (sécurité)
-    const style = document.getElementById("drag-cursor-style");
-    if (style) {
-      style.remove();
-    }
-  };
-
-  // Nettoyer le drag si le drop se fait hors zone
-  useEffect(() => {
-    const clearDrag = () => {
-      document.documentElement.classList.remove("dragging");
-      const style = document.getElementById("drag-cursor-style");
-      if (style) {
-        style.remove();
-      }
-      setDraggedPlayerId(null);
-      setDragOverTeamId(null);
-    };
-
-    window.addEventListener("drop", clearDrag);
-    window.addEventListener("dragend", clearDrag);
-
-    return () => {
-      window.removeEventListener("drop", clearDrag);
-      window.removeEventListener("dragend", clearDrag);
-    };
-  }, []);
-
-  const handleDragOver = (e: React.DragEvent, teamId: string) => {
-    e.preventDefault();
-    setDragOverTeamId(teamId);
-
-    if (draggedPlayerId) {
-      const validation = canDropPlayer(draggedPlayerId, teamId);
-      e.dataTransfer.dropEffect = validation.canAssign ? "move" : "none";
-    } else {
-      e.dataTransfer.dropEffect = "move";
-    }
-  };
-
-  const handleDragLeave = () => {
-    setDragOverTeamId(null);
-  };
-
-  const handleDrop = (e: React.DragEvent, teamId: string) => {
-    e.preventDefault();
-    const playerId = e.dataTransfer.getData("playerId");
-
-    // Réinitialiser les états de drag immédiatement
-    setDragOverTeamId(null);
-
-    if (!playerId) {
-      setDraggedPlayerId(null);
-      return;
-    }
-
-    // Trouver le joueur et l'équipe
-    const player = players.find((p) => p.id === playerId);
-    const equipe = equipes.find((eq) => eq.team.id === teamId);
-
-    if (!player || !equipe) {
-      return;
-    }
-
-    const validation = canDropPlayer(playerId, teamId);
-    if (!validation.canAssign) {
-      setDraggedPlayerId(null);
-      return;
-    }
-
-    const isFemaleTeam = equipe.matches.some(
-      (match) => match.isFemale === true
-    );
-    const championshipType = isFemaleTeam ? "feminin" : "masculin";
-
-    setCompositions((prev) => {
-      const equipeForMax = equipes.find((e) => e.team.id === teamId);
-      const maxPlayers = equipeForMax ? getMaxPlayersForTeam(equipeForMax) : 4;
-
-      const latestValidation = canAssignPlayerToTeam({
-        playerId,
-        teamId,
-        players,
-        equipes,
-        compositions: prev,
-        selectedPhase,
-        selectedJournee,
-        journeeRule: JOURNEE_CONCERNEE_PAR_REGLE,
-        maxPlayersPerTeam: maxPlayers,
-      });
-
-      if (!latestValidation.canAssign) {
-        return prev;
-      }
-
-      const currentTeamPlayers = prev[teamId] || [];
-
-      // Ne pas ajouter si le joueur est déjà dans l'équipe (même équipe)
-      if (currentTeamPlayers.includes(playerId)) {
-        return prev;
-      }
-
-      // Retirer le joueur de toutes les autres équipes du même type (masculin/féminin)
-      const updatedCompositions = { ...prev };
-      const isFemaleTeam = equipe.matches.some(
-        (match) => match.isFemale === true
-      );
-
-      // Trouver toutes les équipes du même type (masculin ou féminin)
-      const sameTypeEquipes = filteredEquipes.filter((eq) => {
-        const eqIsFemale = eq.matches.some((match) => match.isFemale === true);
-        return eqIsFemale === isFemaleTeam;
-      });
-
-      // Retirer le joueur de toutes les équipes du même type
-      sameTypeEquipes.forEach((eq) => {
-        if (updatedCompositions[eq.team.id]) {
-          updatedCompositions[eq.team.id] = updatedCompositions[
-            eq.team.id
-          ].filter((id) => id !== playerId);
-        }
-      });
-
-      // Limiter selon le maxPlayers de l'équipe
-      const targetTeamPlayers = updatedCompositions[teamId] || [];
-      if (targetTeamPlayers.length >= maxPlayers) {
-        return prev;
-      }
-
-      // Vérifier si le joueur est étranger (ETR) et si l'équipe a déjà un joueur étranger
-      if (player.nationality === "ETR") {
-        const targetTeamPlayersData = targetTeamPlayers
-          .map((pid) => players.find((p) => p.id === pid))
-          .filter((p): p is Player => p !== undefined);
-
-        const hasForeignPlayer = targetTeamPlayersData.some(
-          (p) => p.nationality === "ETR"
-        );
-
-        if (hasForeignPlayer) {
-          return prev; // Ne pas ajouter le joueur
-        }
-      }
-
-      // Ajouter le joueur à la nouvelle équipe
-      const newCompositions = {
-        ...updatedCompositions,
-        [teamId]: [...targetTeamPlayers, playerId],
-      };
-
-      setDefaultCompositions((prev) => ({
-        ...prev,
-        [championshipType]: newCompositions,
-      }));
-
-      // Sauvegarder les compositions
-      if (selectedJournee !== null && selectedPhase !== null) {
-        const saveComposition = async () => {
-          try {
-            await compositionService.saveComposition({
-              journee: selectedJournee,
-              phase: selectedPhase,
-              championshipType,
-              teams: newCompositions,
-            });
-          } catch (error) {
-            console.error("Erreur lors de la sauvegarde:", error);
-          }
-        };
-        saveComposition();
-      }
-
-      return newCompositions;
-    });
-
-    // Réinitialiser draggedPlayerId après le drop pour éviter que le message s'affiche
-    setDraggedPlayerId(null);
-  };
-
-  // Retirer un joueur d'une équipe
-  const handleRemovePlayer = (teamId: string, playerId: string) => {
-    setCompositions((prev) => {
-      const currentTeamPlayers = prev[teamId] || [];
-      const equipe = filteredEquipes.find((eq) => eq.team.id === teamId);
-      const isFemaleTeam = equipe?.matches.some(
-        (match) => match.isFemale === true
-      );
-      const championshipType = isFemaleTeam ? "feminin" : "masculin";
-
-      const newCompositions = {
-        ...prev,
-        [teamId]: currentTeamPlayers.filter((id) => id !== playerId),
-      };
-
-      if (championshipType) {
-        setDefaultCompositions((prevDefaults) => ({
-          ...prevDefaults,
-          [championshipType]: newCompositions,
-        }));
-      }
-
-      // Sauvegarder les compositions
-      if (selectedJournee !== null && selectedPhase !== null) {
-        const saveComposition = async () => {
-          try {
-            await compositionService.saveComposition({
-              journee: selectedJournee,
-              phase: selectedPhase,
-              championshipType,
-              teams: newCompositions,
-            });
-          } catch (error) {
-            console.error("Erreur lors de la sauvegarde:", error);
-          }
-        };
-        saveComposition();
-      }
-
-      return newCompositions;
-    });
-  };
+  const {
+    draggedPlayerId,
+    dragOverTeamId,
+    handleDragStart,
+    handleDragEnd,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+    handleRemovePlayer,
+  } = useCompositionDragDrop({
+    players,
+    equipes,
+    filteredEquipes,
+    compositions,
+    setCompositions,
+    selectedPhase,
+    selectedJournee,
+    tabValue,
+    isParis,
+    compositionService,
+    setDefaultCompositions,
+    canDropPlayer,
+  });
 
   const runResetCompositions = useCallback(async () => {
     if (
@@ -2531,17 +1974,13 @@ export default function CompositionsPage() {
                     )
                   }
                   disabled={
-                    (isParis
-                      ? false
-                      : selectedPhase === null) || selectedEpreuve === null
+                    (isParis ? false : selectedPhase === null) ||
+                    selectedEpreuve === null
                   }
                 >
                   {(() => {
                     // Pour le championnat de Paris, utiliser "aller" comme phase
-                    const phaseToUse =
-                      isParis
-                        ? "aller"
-                        : selectedPhase;
+                    const phaseToUse = isParis ? "aller" : selectedPhase;
 
                     if (!phaseToUse) return null;
 
@@ -2615,8 +2054,7 @@ export default function CompositionsPage() {
           </Button>
         </Box>
 
-        {selectedJournee &&
-        (isParis || selectedPhase) ? (
+        {selectedJournee && (isParis || selectedPhase) ? (
           <>
             <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
               {!isParis && (
@@ -2640,187 +2078,23 @@ export default function CompositionsPage() {
                   `Aucun joueur trouvé pour “${query}”`
                 }
                 renderPlayerItem={(player) => {
-                  const phase = selectedPhase || "aller";
+                  const phase = (selectedPhase || "aller") as
+                    | "aller"
+                    | "retour";
                   const championshipType =
                     tabValue === 0 ? "masculin" : "feminin";
-                  // Utiliser les bonnes propriétés selon le championnat
-                  const burnedTeam = isParis
-                    ? player.highestTeamNumberByPhaseParis?.[phase]
-                    : championshipType === "masculin"
-                    ? player.highestMasculineTeamNumberByPhase?.[phase]
-                    : player.highestFeminineTeamNumberByPhase?.[phase];
-                  const isForeign = player.nationality === "ETR";
-                  const isEuropean = player.nationality === "C";
-
                   return (
-                    <ListItem
-                      disablePadding
-                      sx={{ mb: 1 }}
-                      secondaryAction={null}
-                    >
-                      <ListItemButton
-                        draggable
-                        onDragStart={(event) =>
-                          handleDragStart(event, player.id)
-                        }
-                        onDragEnd={handleDragEnd}
-                        sx={{
-                          cursor: "grab",
-                          border: "1px solid",
-                          borderColor: "divider",
-                          borderRadius: 1,
-                          backgroundColor: "background.paper",
-                          "&:hover": {
-                            backgroundColor: "action.hover",
-                            borderColor: "primary.main",
-                            boxShadow: 1,
-                            cursor: "grab",
-                          },
-                          "&:active": {
-                            cursor: "grabbing",
-                            opacity: 0.6,
-                          },
-                        }}
-                      >
-                        <IconButton
-                          edge="start"
-                          size="small"
-                          sx={{
-                            mr: 1,
-                            color: "text.secondary",
-                            cursor:
-                              draggedPlayerId === player.id
-                                ? "grabbing"
-                                : "grab",
-                            "&:hover": {
-                              cursor: "grab",
-                            },
-                            "&:active": {
-                              cursor: "grabbing",
-                            },
-                          }}
-                          disabled
-                        >
-                          <DragIndicator fontSize="small" />
-                        </IconButton>
-                        <ListItemText
-                          primary={
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                                flexWrap: "wrap",
-                              }}
-                            >
-                              <Typography variant="body2" component="span">
-                                {player.firstName} {player.name}
-                              </Typography>
-                              {isEuropean && (
-                                <Chip
-                                  label="EUR"
-                                  size="small"
-                                  color="info"
-                                  variant="outlined"
-                                  sx={{
-                                    height: 20,
-                                    fontSize: "0.7rem",
-                                  }}
-                                />
-                              )}
-                              {isForeign && (
-                                <Chip
-                                  label="ETR"
-                                  size="small"
-                                  color="warning"
-                                  variant="outlined"
-                                  sx={{
-                                    height: 20,
-                                    fontSize: "0.7rem",
-                                  }}
-                                />
-                              )}
-                              {burnedTeam !== undefined &&
-                                burnedTeam !== null && (
-                                  <Chip
-                                    label={`Brûlé Éq. ${burnedTeam}`}
-                                    size="small"
-                                    color="error"
-                                    variant="outlined"
-                                    sx={{
-                                      height: 20,
-                                      fontSize: "0.7rem",
-                                    }}
-                                  />
-                                )}
-                              {player.isTemporary && (
-                                <Chip
-                                  label="Temporaire"
-                                  size="small"
-                                  color="error"
-                                  variant="outlined"
-                                  sx={{
-                                    height: 20,
-                                    fontSize: "0.7rem",
-                                  }}
-                                />
-                              )}
-                              {(() => {
-                                const discordStatus = getDiscordStatus(player);
-                                if (discordStatus === "none") {
-                                  return (
-                                    <Tooltip title="Aucun login Discord configuré">
-                                      <Chip
-                                        icon={
-                                          <AlternateEmail fontSize="small" />
-                                        }
-                                        label="Pas Discord"
-                                        size="small"
-                                        color="default"
-                                        variant="outlined"
-                                        sx={{
-                                          height: 20,
-                                          fontSize: "0.7rem",
-                                        }}
-                                      />
-                                    </Tooltip>
-                                  );
-                                }
-                                if (discordStatus === "invalid") {
-                                  return (
-                                    <Tooltip title="Au moins un login Discord n'existe plus sur le serveur">
-                                      <Chip
-                                        icon={<Warning fontSize="small" />}
-                                        label="Discord invalide"
-                                        size="small"
-                                        color="warning"
-                                        variant="outlined"
-                                        sx={{
-                                          height: 20,
-                                          fontSize: "0.7rem",
-                                        }}
-                                      />
-                                    </Tooltip>
-                                  );
-                                }
-                                return null;
-                              })()}
-                            </Box>
-                          }
-                          secondary={
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              {player.points !== undefined &&
-                              player.points !== null
-                                ? `${player.points} points`
-                                : "Points non disponibles"}
-                            </Typography>
-                          }
-                        />
-                      </ListItemButton>
-                    </ListItem>
+                    <AvailablePlayerItem
+                      player={player}
+                      phase={phase}
+                      championshipType={championshipType}
+                      isParis={isParis}
+                      selectedEpreuve={selectedEpreuve}
+                      draggedPlayerId={draggedPlayerId}
+                      discordMembers={discordMembers}
+                      onDragStart={handleDragStart}
+                      onDragEnd={handleDragEnd}
+                    />
                   );
                 }}
               />
@@ -2834,12 +2108,11 @@ export default function CompositionsPage() {
                   matchesPlayed={compositionSummary.equipesMatchsJoues}
                   percentage={compositionSummary.percentage}
                   discordMessagesSent={(() => {
-                    const currentTypeEquipes =
-                      isParis
-                        ? [...equipesByType.masculin, ...equipesByType.feminin]
-                        : tabValue === 0
-                        ? equipesByType.masculin
-                        : equipesByType.feminin;
+                    const currentTypeEquipes = isParis
+                      ? [...equipesByType.masculin, ...equipesByType.feminin]
+                      : tabValue === 0
+                      ? equipesByType.masculin
+                      : equipesByType.feminin;
                     return currentTypeEquipes.filter((equipe) => {
                       const match = getMatchForTeam(equipe);
                       const matchPlayed = isMatchPlayed(match);
@@ -2850,12 +2123,11 @@ export default function CompositionsPage() {
                     }).length;
                   })()}
                   discordMessagesTotal={(() => {
-                    const currentTypeEquipes =
-                      isParis
-                        ? [...equipesByType.masculin, ...equipesByType.feminin]
-                        : tabValue === 0
-                        ? equipesByType.masculin
-                        : equipesByType.feminin;
+                    const currentTypeEquipes = isParis
+                      ? [...equipesByType.masculin, ...equipesByType.feminin]
+                      : tabValue === 0
+                      ? equipesByType.masculin
+                      : equipesByType.feminin;
                     return currentTypeEquipes.filter((equipe) => {
                       const match = getMatchForTeam(equipe);
                       return !isMatchPlayed(match);
@@ -2863,13 +2135,16 @@ export default function CompositionsPage() {
                   })()}
                 />
 
-                <TabPanel value={tabValue} index={0}>
+                <CompositionTabPanel
+                  value={tabValue}
+                  index={0}
+                  prefix="compositions"
+                >
                   {(() => {
                     // Pour le championnat de Paris, afficher toutes les équipes (masculin + féminin)
-                    const equipesToDisplay =
-                      isParis
-                        ? [...equipesByType.masculin, ...equipesByType.feminin]
-                        : equipesByType.masculin;
+                    const equipesToDisplay = isParis
+                      ? [...equipesByType.masculin, ...equipesByType.feminin]
+                      : equipesByType.masculin;
 
                     if (equipesToDisplay.length === 0) {
                       return (
@@ -2907,10 +2182,9 @@ export default function CompositionsPage() {
                               : [];
 
                           // Pour le championnat de Paris, utiliser les disponibilités "masculin" (mixte)
-                          const teamAvailabilityMap =
-                            isParis
-                              ? availabilities.masculin || {}
-                              : availabilities.masculin || {};
+                          const teamAvailabilityMap = isParis
+                            ? availabilities.masculin || {}
+                            : availabilities.masculin || {};
 
                           const isDragOver =
                             !matchPlayed &&
@@ -3050,210 +2324,25 @@ export default function CompositionsPage() {
                                   renderPlayerIndicators={(player) => {
                                     const phase = selectedPhase || "aller";
                                     // Pour le championnat de Paris, utiliser "masculin" comme type par défaut (mixte)
-                                    const championshipType =
-                                      isParis
-                                        ? "masculin"
-                                        : tabValue === 0
-                                        ? "masculin"
-                                        : "feminin";
-                                    // Utiliser les bonnes propriétés selon le championnat
-                                    const burnedTeam = isParis
-                                      ? player.highestTeamNumberByPhaseParis?.[
-                                          phase
-                                        ]
-                                      : championshipType === "masculin"
-                                      ? player
-                                          .highestMasculineTeamNumberByPhase?.[
-                                          phase
-                                        ]
-                                      : player
-                                          .highestFeminineTeamNumberByPhase?.[
-                                          phase
-                                        ];
-
-                                    // Calculer le brûlage futur en simulant l'ajout d'un match dans l'équipe cible
-                                    const teamNumber = extractTeamNumber(
-                                      equipe.team.name
-                                    );
-                                    const matchesByTeamByPhase = isParis
-                                      ? player.matchesByTeamByPhaseParis?.[
-                                          phase
-                                        ]
-                                      : championshipType === "masculin"
-                                      ? player.masculineMatchesByTeamByPhase?.[
-                                          phase
-                                        ]
-                                      : player.feminineMatchesByTeamByPhase?.[
-                                          phase
-                                        ];
-
-                                    const futureBurnedTeam =
-                                      teamNumber > 0
-                                        ? calculateFutureBurnout(
-                                            matchesByTeamByPhase,
-                                            teamNumber
-                                          )
-                                        : null;
-
-                                    // Le joueur sera brûlé si :
-                                    // 1. Le brûlage futur est différent du brûlage actuel (changement d'équipe brûlée)
-                                    // 2. OU le joueur devient brûlé alors qu'il ne l'était pas (actuel = null/undefined, futur ≠ null)
-                                    const willBeBurned =
-                                      futureBurnedTeam !== null &&
-                                      (burnedTeam === null ||
-                                        burnedTeam === undefined ||
-                                        futureBurnedTeam !== burnedTeam);
-
-                                    const availability =
-                                      teamAvailabilityMap[player.id];
-                                    const isPlayerAvailable =
-                                      availability?.available === true;
-                                    const showUnavailableIndicator =
-                                      !isPlayerAvailable;
-                                    const showJ2Indicator =
-                                      offendingPlayerIds.includes(player.id) &&
-                                      (
-                                        validationError?.toLowerCase() || ""
-                                      ).includes("journée 2") &&
-                                      isPlayerAvailable;
+                                    const championshipType = isParis
+                                      ? "masculin"
+                                      : tabValue === 0
+                                      ? "masculin"
+                                      : "feminin";
                                     return (
-                                      <>
-                                        {player.nationality === "C" && (
-                                          <Chip
-                                            label="EUR"
-                                            size="small"
-                                            color="info"
-                                            variant="outlined"
-                                            sx={{
-                                              height: 18,
-                                              fontSize: "0.65rem",
-                                            }}
-                                          />
-                                        )}
-                                        {player.nationality === "ETR" && (
-                                          <Chip
-                                            label="ETR"
-                                            size="small"
-                                            color="warning"
-                                            variant="outlined"
-                                            sx={{
-                                              height: 18,
-                                              fontSize: "0.65rem",
-                                            }}
-                                          />
-                                        )}
-                                        {burnedTeam !== undefined &&
-                                          burnedTeam !== null && (
-                                            <Chip
-                                              label={`Brûlé Éq. ${burnedTeam}`}
-                                              size="small"
-                                              color="error"
-                                              variant="outlined"
-                                              sx={{
-                                                height: 18,
-                                                fontSize: "0.65rem",
-                                              }}
-                                            />
-                                          )}
-                                        {willBeBurned &&
-                                          futureBurnedTeam !== null && (
-                                            <Chip
-                                              label={`Sera brûlé Éq. ${futureBurnedTeam}`}
-                                              size="small"
-                                              color="warning"
-                                              variant="outlined"
-                                              sx={{
-                                                height: 18,
-                                                fontSize: "0.65rem",
-                                              }}
-                                              title={
-                                                burnedTeam === null ||
-                                                burnedTeam === undefined
-                                                  ? "Ce joueur deviendra brûlé dans cette équipe"
-                                                  : `Ce joueur changera d'équipe brûlée (actuellement Éq. ${burnedTeam}, deviendra Éq. ${futureBurnedTeam})`
-                                              }
-                                            />
-                                          )}
-                                        {showUnavailableIndicator && (
-                                          <Chip
-                                            label="Indispo"
-                                            size="small"
-                                            color="error"
-                                            variant="filled"
-                                            sx={{
-                                              height: 18,
-                                              fontSize: "0.65rem",
-                                            }}
-                                          />
-                                        )}
-                                        {showJ2Indicator && (
-                                          <Chip
-                                            label="J2"
-                                            size="small"
-                                            color="error"
-                                            variant="filled"
-                                            sx={{
-                                              height: 18,
-                                              fontSize: "0.65rem",
-                                            }}
-                                          />
-                                        )}
-                                        {player.isTemporary && (
-                                          <Chip
-                                            label="Temporaire"
-                                            size="small"
-                                            color="error"
-                                            variant="outlined"
-                                            sx={{
-                                              height: 18,
-                                              fontSize: "0.65rem",
-                                            }}
-                                          />
-                                        )}
-                                        {(() => {
-                                          const discordStatus =
-                                            getDiscordStatus(player);
-                                          if (discordStatus === "none") {
-                                            return (
-                                              <Tooltip title="Aucun login Discord configuré">
-                                                <Chip
-                                                  icon={
-                                                    <AlternateEmail fontSize="small" />
-                                                  }
-                                                  label="Pas Discord"
-                                                  size="small"
-                                                  color="default"
-                                                  variant="outlined"
-                                                  sx={{
-                                                    height: 18,
-                                                    fontSize: "0.65rem",
-                                                  }}
-                                                />
-                                              </Tooltip>
-                                            );
-                                          }
-                                          if (discordStatus === "invalid") {
-                                            return (
-                                              <Tooltip title="Au moins un login Discord n'existe plus sur le serveur">
-                                                <Chip
-                                                  icon={
-                                                    <Warning fontSize="small" />
-                                                  }
-                                                  label="Discord invalide"
-                                                  size="small"
-                                                  color="warning"
-                                                  variant="outlined"
-                                                  sx={{
-                                                    height: 18,
-                                                    fontSize: "0.65rem",
-                                                  }}
-                                                />
-                                              </Tooltip>
-                                            );
-                                          }
-                                          return null;
-                                        })()}
-                                      </>
+                                      <PlayerBurnoutIndicators
+                                        player={player}
+                                        equipe={equipe}
+                                        phase={phase}
+                                        championshipType={championshipType}
+                                        isParis={isParis}
+                                        teamAvailabilityMap={
+                                          teamAvailabilityMap
+                                        }
+                                        offendingPlayerIds={offendingPlayerIds}
+                                        validationError={validationError}
+                                        discordMembers={discordMembers}
+                                      />
                                     );
                                   }}
                                   renderPlayerSecondary={(player) =>
@@ -3669,9 +2758,13 @@ export default function CompositionsPage() {
                       </Box>
                     );
                   })()}
-                </TabPanel>
+                </CompositionTabPanel>
 
-                <TabPanel value={tabValue} index={1}>
+                <CompositionTabPanel
+                  value={tabValue}
+                  index={1}
+                  prefix="compositions"
+                >
                   {equipesByType.feminin.length === 0 ? (
                     <Typography variant="body2" color="text.secondary">
                       Aucune équipe féminine
@@ -3702,10 +2795,9 @@ export default function CompositionsPage() {
                             : [];
 
                         // Pour le championnat de Paris, utiliser les disponibilités "masculin" (mixte)
-                        const teamAvailabilityMap =
-                          isParis
-                            ? availabilities.masculin || {}
-                            : availabilities.feminin || {};
+                        const teamAvailabilityMap = isParis
+                          ? availabilities.masculin || {}
+                          : availabilities.feminin || {};
 
                         const isDragOver =
                           !matchPlayed &&
@@ -3843,141 +2935,20 @@ export default function CompositionsPage() {
                                 }
                                 renderPlayerIndicators={(player) => {
                                   const phase = selectedPhase || "aller";
-                                  const burnedTeam =
-                                    player.highestFeminineTeamNumberByPhase?.[
-                                      phase
-                                    ];
-                                  const availability =
-                                    teamAvailabilityMap[player.id];
-                                  const isPlayerAvailable =
-                                    availability?.available === true;
-                                  const showUnavailableIndicator =
-                                    !isPlayerAvailable;
-                                  const showJ2Indicator =
-                                    offendingPlayerIds.includes(player.id) &&
-                                    (
-                                      validationError?.toLowerCase() || ""
-                                    ).includes("journée 2") &&
-                                    isPlayerAvailable;
+                                  // Pour les équipes féminines, utiliser "feminin" comme type
+                                  const championshipType = "feminin";
                                   return (
-                                    <>
-                                      {player.nationality === "C" && (
-                                        <Chip
-                                          label="EUR"
-                                          size="small"
-                                          color="info"
-                                          variant="outlined"
-                                          sx={{
-                                            height: 18,
-                                            fontSize: "0.65rem",
-                                          }}
-                                        />
-                                      )}
-                                      {player.nationality === "ETR" && (
-                                        <Chip
-                                          label="ETR"
-                                          size="small"
-                                          color="warning"
-                                          variant="outlined"
-                                          sx={{
-                                            height: 18,
-                                            fontSize: "0.65rem",
-                                          }}
-                                        />
-                                      )}
-                                      {burnedTeam !== undefined &&
-                                        burnedTeam !== null && (
-                                          <Chip
-                                            label={`Brûlé Éq. ${burnedTeam}`}
-                                            size="small"
-                                            color="error"
-                                            variant="outlined"
-                                            sx={{
-                                              height: 18,
-                                              fontSize: "0.65rem",
-                                            }}
-                                          />
-                                        )}
-                                      {showUnavailableIndicator && (
-                                        <Chip
-                                          label="Indispo"
-                                          size="small"
-                                          color="error"
-                                          variant="filled"
-                                          sx={{
-                                            height: 18,
-                                            fontSize: "0.65rem",
-                                          }}
-                                        />
-                                      )}
-                                      {showJ2Indicator && (
-                                        <Chip
-                                          label="J2"
-                                          size="small"
-                                          color="error"
-                                          variant="filled"
-                                          sx={{
-                                            height: 18,
-                                            fontSize: "0.65rem",
-                                          }}
-                                        />
-                                      )}
-                                      {player.isTemporary && (
-                                        <Chip
-                                          label="Temporaire"
-                                          size="small"
-                                          color="error"
-                                          variant="outlined"
-                                          sx={{
-                                            height: 18,
-                                            fontSize: "0.65rem",
-                                          }}
-                                        />
-                                      )}
-                                      {(() => {
-                                        const discordStatus =
-                                          getDiscordStatus(player);
-                                        if (discordStatus === "none") {
-                                          return (
-                                            <Tooltip title="Aucun login Discord configuré">
-                                              <Chip
-                                                icon={
-                                                  <AlternateEmail fontSize="small" />
-                                                }
-                                                label="Pas Discord"
-                                                size="small"
-                                                color="default"
-                                                variant="outlined"
-                                                sx={{
-                                                  height: 18,
-                                                  fontSize: "0.65rem",
-                                                }}
-                                              />
-                                            </Tooltip>
-                                          );
-                                        }
-                                        if (discordStatus === "invalid") {
-                                          return (
-                                            <Tooltip title="Au moins un login Discord n'existe plus sur le serveur">
-                                              <Chip
-                                                icon={
-                                                  <Warning fontSize="small" />
-                                                }
-                                                label="Discord invalide"
-                                                size="small"
-                                                color="warning"
-                                                variant="outlined"
-                                                sx={{
-                                                  height: 18,
-                                                  fontSize: "0.65rem",
-                                                }}
-                                              />
-                                            </Tooltip>
-                                          );
-                                        }
-                                        return null;
-                                      })()}
-                                    </>
+                                    <PlayerBurnoutIndicators
+                                      player={player}
+                                      equipe={equipe}
+                                      phase={phase}
+                                      championshipType={championshipType}
+                                      isParis={isParis}
+                                      teamAvailabilityMap={teamAvailabilityMap}
+                                      offendingPlayerIds={offendingPlayerIds}
+                                      validationError={validationError}
+                                      discordMembers={discordMembers}
+                                    />
                                   );
                                 }}
                                 renderPlayerSecondary={(player) =>
@@ -4389,7 +3360,7 @@ export default function CompositionsPage() {
                       })}
                     </Box>
                   )}
-                </TabPanel>
+                </CompositionTabPanel>
               </Box>
             </Box>
           </>

@@ -19,79 +19,56 @@ import {
   Tabs,
   Tab,
   Chip,
-  ListItem,
-  ListItemButton,
-  ListItemText,
-  IconButton,
   FormControlLabel,
   Switch,
-  Tooltip,
   Card,
   CardContent,
 } from "@mui/material";
-import { DragIndicator, AlternateEmail, Warning } from "@mui/icons-material";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
-import {
-  useEquipesWithMatches,
-  type EquipeWithMatches,
-} from "@/hooks/useEquipesWithMatches";
+import { useEquipesWithMatches } from "@/hooks/useEquipesWithMatches";
 import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
 import { CompositionDefaultsService } from "@/lib/services/composition-defaults-service";
-import { getCurrentPhase } from "@/lib/shared/phase-utils";
-import { EpreuveType, getMatchEpreuve } from "@/lib/shared/epreuve-utils";
+import { EpreuveType } from "@/lib/shared/epreuve-utils";
 import { useChampionshipTypes } from "@/hooks/useChampionshipTypes";
 import {
   JOURNEE_CONCERNEE_PAR_REGLE,
-  canAssignPlayerToTeam,
   validateTeamCompositionState,
-  AssignmentValidationResult,
-  getParisTeamStructure,
-  isParisChampionship,
 } from "@/lib/compositions/validation";
 import type { Player } from "@/types/team-management";
 import { AvailablePlayersPanel } from "@/components/compositions/AvailablePlayersPanel";
 import { TeamCompositionCard } from "@/components/compositions/TeamCompositionCard";
 import { CompositionsSummary } from "@/components/compositions/CompositionsSummary";
-import { createDragImage } from "@/lib/compositions/drag-utils";
-import { CompositionRulesHelp, type CompositionRuleItem } from "@/components/compositions/CompositionRulesHelp";
+import { CompositionRulesHelp } from "@/components/compositions/CompositionRulesHelp";
+import { CompositionTabPanel } from "@/components/compositions/CompositionTabPanel";
+import { useMaxPlayersForTeam } from "@/hooks/useMaxPlayersForTeam";
+import { useFilteredEquipes } from "@/hooks/useFilteredEquipes";
+import { useEquipesByType } from "@/hooks/useEquipesByType";
+import { useCanDropPlayer } from "@/hooks/useCanDropPlayer";
+import { PlayerBurnoutIndicators } from "@/components/compositions/PlayerBurnoutIndicators";
+import { useCompositionDragDrop } from "@/hooks/useCompositionDragDrop";
+import { AvailablePlayerItem } from "@/components/compositions/AvailablePlayerItem";
+import { useCurrentPhase } from "@/hooks/useCurrentPhase";
+import { useFilteredPlayers } from "@/hooks/useFilteredPlayers";
+import { usePlayersWithoutAssignment } from "@/hooks/usePlayersWithoutAssignment";
+import { useCompositionRules } from "@/hooks/useCompositionRules";
+import { isParisChampionship as isParisChampionshipValidation } from "@/lib/compositions/validation";
 
 interface PhaseSelectOption {
   value: "aller" | "retour";
   label: string;
 }
 
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
 const MAX_PLAYERS_PER_DEFAULT_TEAM = 5;
 const MIN_PLAYERS_FOR_DEFAULT_COMPLETION = 4;
 
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`default-compositions-tabpanel-${index}`}
-      aria-labelledby={`default-compositions-tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box sx={{ p: 5 }}>{children}</Box>}
-    </div>
-  );
-}
-
 export default function DefaultCompositionsPage() {
-  const { loadBoth, createEmpty } = useChampionshipTypes();
+  const { loadBoth, createEmpty, isParisChampionship } = useChampionshipTypes();
   const { equipes, loading: loadingEquipes } = useEquipesWithMatches();
   const [players, setPlayers] = useState<Player[]>([]);
   const [loadingPlayers, setLoadingPlayers] = useState(true);
   const [selectedEpreuve, setSelectedEpreuve] = useState<EpreuveType>("championnat_equipes");
+  const isParis = useMemo(() => isParisChampionship(selectedEpreuve), [isParisChampionship, selectedEpreuve]);
   const [selectedPhase, setSelectedPhase] = useState<"aller" | "retour" | null>(
     null
   );
@@ -114,8 +91,7 @@ export default function DefaultCompositionsPage() {
     string | null
   >(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
-  const [dragOverTeamId, setDragOverTeamId] = useState<string | null>(null);
+  // draggedPlayerId et dragOverTeamId sont maintenant gérés par useCompositionDragDrop
   const [includeAllPlayers, setIncludeAllPlayers] = useState(false);
   const [discordMembers, setDiscordMembers] = useState<Array<{ id: string; username: string; displayName: string }>>([]);
 
@@ -125,23 +101,14 @@ export default function DefaultCompositionsPage() {
     []
   );
 
-  const currentPhase = useMemo(() => {
-    if (loadingEquipes || equipes.length === 0) {
-      return "aller" as const;
-    }
-    return getCurrentPhase(equipes);
-  }, [equipes, loadingEquipes]);
-
-  useEffect(() => {
-    // Pour le championnat de Paris, définir automatiquement la phase à "aller"
-    if (selectedEpreuve === "championnat_paris") {
-      if (selectedPhase !== "aller") {
-        setSelectedPhase("aller");
-      }
-    } else if (selectedPhase === null && currentPhase) {
-      setSelectedPhase(currentPhase);
-    }
-  }, [currentPhase, selectedPhase, selectedEpreuve]);
+  // Gestion de la phase actuelle
+  useCurrentPhase({
+    equipes,
+    loadingEquipes,
+    selectedEpreuve,
+    selectedPhase,
+    setSelectedPhase,
+  });
 
   const loadPlayers = useCallback(async () => {
     try {
@@ -193,15 +160,7 @@ export default function DefaultCompositionsPage() {
     loadDiscordMembers();
   }, []);
 
-  // Fonction helper pour vérifier le statut Discord d'un joueur
-  const getDiscordStatus = useCallback((player: Player): "none" | "invalid" | "valid" => {
-    if (!player.discordMentions || player.discordMentions.length === 0) {
-      return "none";
-    }
-    const validMemberIds = new Set(discordMembers.map(m => m.id));
-    const hasInvalidMention = player.discordMentions.some(mentionId => !validMemberIds.has(mentionId));
-    return hasInvalidMention ? "invalid" : "valid";
-  }, [discordMembers]);
+  // getDiscordStatus est maintenant importé depuis @/lib/compositions/discord-utils
 
   useEffect(() => {
     if (!selectedPhase) {
@@ -258,34 +217,10 @@ export default function DefaultCompositionsPage() {
   }, [selectedPhase, compositionDefaultsService, loadBoth, createEmpty]);
 
   // Filtrer les équipes selon l'épreuve sélectionnée
-  const filteredEquipes = useMemo(() => {
-    if (!selectedEpreuve) {
-      return equipes;
-    }
-    return equipes.filter((equipe) => {
-      const epreuve = getMatchEpreuve(
-        equipe.matches[0] || {},
-        equipe.team
-      );
-      return epreuve === selectedEpreuve;
-    });
-  }, [equipes, selectedEpreuve]);
+  const { filteredEquipes } = useFilteredEquipes(equipes, selectedEpreuve);
 
-  const equipesByType = useMemo(() => {
-    const masculin: EquipeWithMatches[] = [];
-    const feminin: EquipeWithMatches[] = [];
-
-    filteredEquipes.forEach((equipe) => {
-      const isFemale = equipe.matches.some((match) => match.isFemale === true);
-      if (isFemale) {
-        feminin.push(equipe);
-      } else {
-        masculin.push(equipe);
-      }
-    });
-
-    return { masculin, feminin };
-  }, [filteredEquipes]);
+  // Grouper les équipes par type (masculin/féminin)
+  const equipesByType = useEquipesByType(filteredEquipes);
 
   const mergedDefaultCompositions = useMemo(
     () => ({
@@ -333,103 +268,51 @@ export default function DefaultCompositionsPage() {
     }
   }, [playerPool, defaultCompositionTab]);
 
-  const filteredAvailablePlayers = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return availablePlayers;
-    }
-    const normalized = searchQuery.trim().toLowerCase();
-    return availablePlayers.filter((player) => {
-      const fullName = `${player.firstName} ${player.name}`.toLowerCase();
-      const license = player.license?.toLowerCase() ?? "";
-      return (
-        fullName.includes(normalized) ||
-        license.includes(normalized)
-      );
-    });
-  }, [availablePlayers, searchQuery]);
-
-  const {
-    availablePlayersWithoutAssignment,
-    filteredAvailablePlayersWithoutAssignment,
-  } = useMemo(() => {
-    const currentTeams =
-      // Pour le championnat de Paris, utiliser toutes les équipes (masculin + féminin)
-      selectedEpreuve === "championnat_paris"
-        ? [...equipesByType.masculin, ...equipesByType.feminin]
-        : defaultCompositionTab === "masculin"
-          ? equipesByType.masculin
-          : equipesByType.feminin;
-    const championshipTypeForAssignments =
-      selectedEpreuve === "championnat_paris"
-        ? "masculin"
-        : defaultCompositionTab;
-    const assignments = defaultCompositions[championshipTypeForAssignments];
-
-    const assignedIds = new Set<string>();
-    currentTeams.forEach((equipe) => {
-      (assignments[equipe.team.id] || []).forEach((id) =>
-        assignedIds.add(id)
-      );
-    });
-
-    const base = availablePlayers.filter(
-      (player) => !assignedIds.has(player.id)
-    );
-    const filtered = filteredAvailablePlayers.filter(
-      (player) => !assignedIds.has(player.id)
-    );
-
-    return {
-      availablePlayersWithoutAssignment: base,
-      filteredAvailablePlayersWithoutAssignment: filtered,
-    };
-  }, [
+  // Filtrer les joueurs disponibles selon la recherche
+  const filteredAvailablePlayers = useFilteredPlayers(
     availablePlayers,
-    filteredAvailablePlayers,
-    defaultCompositionTab,
-    selectedEpreuve,
-    defaultCompositions,
-    equipesByType,
-  ]);
-
-  // Fonction helper pour calculer le maxPlayers selon l'épreuve et la division
-  const getMaxPlayersForTeam = useCallback(
-    (equipe: EquipeWithMatches): number => {
-      // Vérifier directement si l'équipe fait partie du championnat de Paris
-      if (isParisChampionship(equipe)) {
-        const structure = getParisTeamStructure(equipe.team.division || "");
-        return structure?.totalPlayers || MAX_PLAYERS_PER_DEFAULT_TEAM; // Fallback si structure non reconnue
-      }
-      return MAX_PLAYERS_PER_DEFAULT_TEAM; // Championnat par équipes : 5 joueurs par défaut
-    },
-    []
+    searchQuery
   );
 
-  const canDropPlayer = useCallback(
-    (playerId: string, teamId: string): AssignmentValidationResult => {
-      const equipe = equipes.find((e) => e.team.id === teamId);
-      const maxPlayers = equipe ? getMaxPlayersForTeam(equipe) : MAX_PLAYERS_PER_DEFAULT_TEAM;
-      
-      return canAssignPlayerToTeam({
-        playerId,
-        teamId,
-        players,
-        equipes,
-        compositions: mergedDefaultCompositions,
-        selectedPhase,
-        selectedJournee: null,
-        journeeRule: JOURNEE_CONCERNEE_PAR_REGLE,
-        maxPlayersPerTeam: maxPlayers,
-      });
-    },
-    [
-      players,
-      equipes,
-      mergedDefaultCompositions,
-      selectedPhase,
-      getMaxPlayersForTeam,
-    ]
-  );
+  // Calculer les joueurs sans assignation
+  const currentTeams = useMemo(() => {
+    return selectedEpreuve === "championnat_paris"
+      ? [...equipesByType.masculin, ...equipesByType.feminin]
+      : defaultCompositionTab === "masculin"
+      ? equipesByType.masculin
+      : equipesByType.feminin;
+  }, [selectedEpreuve, defaultCompositionTab, equipesByType]);
+
+  const championshipTypeForAssignments = useMemo(() => {
+    return selectedEpreuve === "championnat_paris"
+      ? "masculin"
+      : defaultCompositionTab;
+  }, [selectedEpreuve, defaultCompositionTab]);
+
+  const assignments = useMemo(() => {
+    return defaultCompositions[championshipTypeForAssignments];
+  }, [defaultCompositions, championshipTypeForAssignments]);
+
+  const { availablePlayersWithoutAssignment, filteredAvailablePlayersWithoutAssignment } =
+    usePlayersWithoutAssignment({
+      availablePlayers,
+      filteredAvailablePlayers,
+      currentTeams,
+      assignments,
+    });
+
+  // Calculer le maxPlayers selon l'épreuve et la division
+  const { getMaxPlayersForTeam } = useMaxPlayersForTeam({ isParis });
+
+  // Vérifier si un drop est possible
+  const { canDropPlayer } = useCanDropPlayer({
+    players,
+    equipes,
+    compositions: mergedDefaultCompositions,
+    selectedPhase,
+    selectedJournee: null,
+    isParis,
+  });
 
   useEffect(() => {
     if (!defaultCompositionsLoaded || selectedPhase === null) {
@@ -791,127 +674,32 @@ export default function DefaultCompositionsPage() {
     [selectedPhase, equipes, compositionDefaultsService, selectedEpreuve]
   );
 
-  const handleDragStart = useCallback(
-    (event: React.DragEvent, playerId: string) => {
-      const target = event.target as HTMLElement;
-      const clickedChip =
-        target.closest('[data-chip="remove"]') ||
-        target.closest('button[aria-label*="remove"]') ||
-        (target.tagName === "BUTTON" && target.textContent?.trim() === "×");
-
-      if (clickedChip || target.textContent?.trim() === "×") {
-        event.preventDefault();
-        event.stopPropagation();
-        return;
-      }
-
-      event.dataTransfer.setData("playerId", playerId);
-      event.dataTransfer.effectAllowed = "move";
-      setDraggedPlayerId(playerId);
-      setDragOverTeamId(null);
-      document.documentElement.classList.add("dragging");
-
-      const player = players.find((p) => p.id === playerId);
-      if (!player) {
-        return;
-      }
-
-      let championshipType: "masculin" | "feminin" = defaultCompositionTab;
-      const assignmentsByType = defaultCompositions;
-      (["masculin", "feminin"] as const).forEach((type) => {
-        const assignment = assignmentsByType[type];
-        if (
-          Object.values(assignment).some((ids) => ids?.includes(playerId))
-        ) {
-          championshipType = type;
-        }
-      });
-
-      const tempDiv = createDragImage(player, {
-        championshipType,
-        phase: (selectedPhase || "aller") as "aller" | "retour",
-      });
-      document.body.appendChild(tempDiv);
-      void tempDiv.offsetHeight;
-      event.dataTransfer.setDragImage(tempDiv, 0, 0);
-      setTimeout(() => {
-        if (document.body.contains(tempDiv)) {
-          document.body.removeChild(tempDiv);
-        }
-      }, 0);
-    },
-    [
-      players,
-      defaultCompositionTab,
-      defaultCompositions,
-      selectedPhase,
-    ]
-  );
-
-  const handleDragEnd = useCallback(() => {
-    setDraggedPlayerId(null);
-    setDragOverTeamId(null);
-    document.documentElement.classList.remove("dragging");
-  }, []);
-
-  const handleDragOver = useCallback(
-    (event: React.DragEvent, teamId: string) => {
-      event.preventDefault();
-      if (!draggedPlayerId) {
-        return;
-      }
-
-      const validation = canDropPlayer(draggedPlayerId, teamId);
-      event.dataTransfer.dropEffect = validation.canAssign ? "move" : "none";
-      setDragOverTeamId(teamId);
-    },
-    [draggedPlayerId, canDropPlayer]
-  );
-
-  const handleDragLeave = useCallback(() => {
-    setDragOverTeamId(null);
-  }, []);
-
-  const handleDrop = useCallback(
-    async (event: React.DragEvent, teamId: string) => {
-      event.preventDefault();
-      const playerId = event.dataTransfer.getData("playerId");
-
-      console.log("[DefaultCompositions] Drop event", { teamId, playerId });
-
-      setDragOverTeamId(null);
-      document.documentElement.classList.remove("dragging");
-
-      if (!playerId) {
-        setDraggedPlayerId(null);
-        console.log("[DefaultCompositions] Drop aborted: missing playerId");
-        return;
-      }
-
-      const validation = canDropPlayer(playerId, teamId);
-      if (!validation.canAssign) {
-        setDefaultCompositionMessage(
-          validation.reason || "Composition invalide."
-        );
-        console.log("[DefaultCompositions] Drop refused by validation", {
-          teamId,
-          playerId,
-          reason: validation.reason,
-        });
-        setDraggedPlayerId(null);
-        return;
-      }
-
+  // Gestion du drag & drop avec callbacks personnalisés
+  const {
+    draggedPlayerId,
+    dragOverTeamId,
+    handleDragStart,
+    handleDragEnd,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+  } = useCompositionDragDrop({
+    players,
+    equipes,
+    filteredEquipes,
+    compositions: mergedDefaultCompositions,
+    selectedPhase,
+    selectedJournee: null,
+    defaultCompositionTab,
+    isParis,
+    canDropPlayer,
+    onDrop: async (playerId: string, teamId: string) => {
       await assignPlayerToTeam(teamId, playerId);
-      console.log("[DefaultCompositions] Drop processed, assignment triggered", {
-        teamId,
-        playerId,
-      });
-      event.dataTransfer.clearData();
-      setDraggedPlayerId(null);
     },
-    [assignPlayerToTeam, canDropPlayer]
-  );
+    onRemovePlayer: async (teamId: string, playerId: string) => {
+      await handleRemoveDefaultPlayer(teamId, playerId);
+    },
+  });
 
   const compositionSummary = useMemo(() => {
     const currentTeams =
@@ -977,82 +765,8 @@ export default function DefaultCompositionsPage() {
     []
   );
 
-  const rulesForDefaults: CompositionRuleItem[] = useMemo(
-    () => {
-      if (selectedEpreuve === "championnat_paris") {
-        // Règles spécifiques au championnat de Paris
-        return [
-          {
-            id: "paris-structure",
-            label: "Structure par groupes : 3 groupes de 3 joueurs (Excellence, Promo Excellence, Honneur), 2 groupes de 3 (Division 1), 1 groupe de 3 (Division 2)",
-            scope: "both",
-          },
-          {
-            id: "paris-article8",
-            label: "Article 8 : Les joueurs du groupe 2 doivent avoir des points entre le max du groupe 1 et le min du groupe 3. Permutation possible dans un même groupe.",
-            scope: "both",
-          },
-          {
-            id: "paris-article12",
-            label: "Article 12 : Maximum 1 joueur brûlé par groupe de 3. Si 2 joueurs brûlés dans un même groupe, les 2 sont non qualifiés.",
-            scope: "both",
-          },
-          {
-            id: "paris-burning",
-            label: "Brûlage : Un joueur est brûlé s'il a joué 3 matchs ou plus dans UNE équipe de numéro inférieur. Il ne peut alors jouer que dans cette équipe ou une équipe de numéro supérieur.",
-            scope: "both",
-          },
-          {
-            id: "paris-mixte",
-            label: "Championnat mixte : pas de distinction masculin/féminin, une seule phase",
-            scope: "both",
-          },
-        ];
-      }
-      
-      // Règles pour le championnat par équipes
-      return [
-        {
-          id: "maxPlayersDefaults",
-          label: "Une composition par défaut peut contenir jusqu'à 5 joueurs",
-          scope: "defaults",
-        },
-        {
-          id: "maxPlayersDaily",
-          label: "Une composition de journée ne peut aligner que 4 joueurs",
-          scope: "daily",
-        },
-        {
-          id: "foreign",
-          label: "Maximum un joueur étranger (ETR) par équipe",
-          scope: "both",
-        },
-        {
-          id: "female-in-male",
-          label: "Une équipe masculine ne peut comporter plus de deux joueuses",
-          scope: "both",
-        },
-        {
-          id: "burning",
-          label: "Brûlage : Un joueur est brûlé s'il a joué 2 matchs ou plus dans une équipe de numéro inférieur. Il ne peut alors jouer que dans cette équipe ou une équipe de numéro supérieur.",
-          scope: "both",
-        },
-        {
-          id: "fftt",
-          label: "Points minimum selon division : Messieurs N1 (≥1800), N2 (≥1600), N3 (≥1400) | Dames N1 (≥1100), N2 (≥900 pour 2 sur 4)",
-          scope: "both",
-        },
-        {
-          id: "defaults-specific",
-          label: "Aucune limitation de journée (J2) sur cette page",
-          scope: "defaults",
-          description:
-            "Les règles spécifiques à la J2 ne sont appliquées que lors de la préparation d'une composition de journée.",
-        },
-      ];
-    },
-    [selectedEpreuve]
-  );
+  // Règles de composition
+  const rulesForDefaults = useCompositionRules(selectedEpreuve, "defaults");
 
   const phaseOptions: PhaseSelectOption[] = [
     { value: "aller", label: "Phase aller" },
@@ -1187,174 +901,18 @@ export default function DefaultCompositionsPage() {
                   renderPlayerItem={(player) => {
                     const phase = (selectedPhase || "aller") as "aller" | "retour";
                     const championshipType = defaultCompositionTab;
-                    // Pour les compositions par défaut, on ne peut pas déterminer directement le championnat
-                    // On utilise les propriétés par défaut (championnat par équipes)
-                    // Note: Si besoin, on pourrait passer l'équipe en paramètre pour utiliser isParisChampionship
-                    const burnedTeam =
-                      championshipType === "masculin"
-                        ? player.highestMasculineTeamNumberByPhase?.[phase]
-                        : player.highestFeminineTeamNumberByPhase?.[phase];
-                    const isForeign = player.nationality === "ETR";
-                    const isEuropean = player.nationality === "C";
-
                     return (
-                      <ListItem
-                        disablePadding
-                        sx={{ mb: 1 }}
-                        secondaryAction={null}
-                      >
-                        <ListItemButton
-                          draggable
-                          onDragStart={(event) => handleDragStart(event, player.id)}
-                          onDragEnd={handleDragEnd}
-                          sx={{
-                            cursor: "grab",
-                            border: "1px solid",
-                            borderColor: "divider",
-                            borderRadius: 1,
-                            backgroundColor: "background.paper",
-                            "&:hover": {
-                              backgroundColor: "action.hover",
-                              borderColor: "primary.main",
-                              boxShadow: 1,
-                              cursor: "grab",
-                            },
-                            "&:active": {
-                              cursor: "grabbing",
-                              opacity: 0.6,
-                            },
-                          }}
-                        >
-                          <IconButton
-                            edge="start"
-                            size="small"
-                            sx={{
-                              mr: 1,
-                              color: "text.secondary",
-                              cursor:
-                                draggedPlayerId === player.id ? "grabbing" : "grab",
-                              "&:hover": {
-                                cursor: "grab",
-                              },
-                              "&:active": {
-                                cursor: "grabbing",
-                              },
-                            }}
-                            disabled
-                          >
-                            <DragIndicator fontSize="small" />
-                          </IconButton>
-                          <ListItemText
-                            primary={
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 1,
-                                  flexWrap: "wrap",
-                                }}
-                              >
-                                <Typography variant="body2" component="span">
-                                  {player.firstName} {player.name}
-                                </Typography>
-                                {isEuropean && (
-                                  <Chip
-                                    label="EUR"
-                                    size="small"
-                                    color="info"
-                                    variant="outlined"
-                                    sx={{
-                                      height: 20,
-                                      fontSize: "0.7rem",
-                                    }}
-                                  />
-                                )}
-                                {isForeign && (
-                                  <Chip
-                                    label="ETR"
-                                    size="small"
-                                    color="warning"
-                                    variant="outlined"
-                                    sx={{
-                                      height: 20,
-                                      fontSize: "0.7rem",
-                                    }}
-                                  />
-                                )}
-                                {burnedTeam !== undefined && burnedTeam !== null && (
-                                  <Chip
-                                    label={`Brûlé Éq. ${burnedTeam}`}
-                                    size="small"
-                                    color="error"
-                                    variant="outlined"
-                                    sx={{
-                                      height: 20,
-                                      fontSize: "0.7rem",
-                                    }}
-                                  />
-                                )}
-                                {(() => {
-                                  // Afficher le chip "Hors championnat" selon l'épreuve sélectionnée
-                                  const isOutOfChampionship = selectedEpreuve === "championnat_paris"
-                                    ? !player.participation?.championnatParis
-                                    : !player.participation?.championnat;
-                                  
-                                  if (isOutOfChampionship) {
-                                    return (
-                                      <Chip
-                                        label={
-                                          selectedEpreuve === "championnat_paris"
-                                            ? "Hors championnat de Paris"
-                                            : "Hors championnat"
-                                        }
-                                        size="small"
-                                        color="default"
-                                        variant="outlined"
-                                        sx={{
-                                          height: 20,
-                                          fontSize: "0.7rem",
-                                        }}
-                                      />
-                                    );
-                                  }
-                                  return null;
-                                })()}
-                                {!player.isActive && !player.isTemporary && (
-                                  <Chip
-                                    label="Sans licence"
-                                    size="small"
-                                    color="default"
-                                    variant="outlined"
-                                    sx={{
-                                      height: 20,
-                                      fontSize: "0.7rem",
-                                    }}
-                                  />
-                                )}
-                                {player.isTemporary && (
-                                  <Chip
-                                    label="Temporaire"
-                                    size="small"
-                                    color="error"
-                                    variant="outlined"
-                                    sx={{
-                                      height: 20,
-                                      fontSize: "0.7rem",
-                                    }}
-                                  />
-                                )}
-                              </Box>
-                            }
-                            secondary={
-                              <Typography variant="caption" color="text.secondary">
-                                {player.points !== undefined && player.points !== null
-                                  ? `${player.points} points`
-                                  : "Points non disponibles"}
-                              </Typography>
-                            }
-                          />
-                        </ListItemButton>
-                      </ListItem>
+                      <AvailablePlayerItem
+                        player={player}
+                        phase={phase}
+                        championshipType={championshipType}
+                        isParis={isParis}
+                        selectedEpreuve={selectedEpreuve}
+                        draggedPlayerId={draggedPlayerId}
+                        discordMembers={discordMembers}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEnd}
+                      />
                     );
                   }}
                   actions={
@@ -1389,7 +947,7 @@ export default function DefaultCompositionsPage() {
                     title="Bilan des compositions par défaut"
                   />
 
-                  <TabPanel value={currentTabIndex} index={0}>
+                  <CompositionTabPanel value={currentTabIndex} index={0} prefix="default-compositions">
                     {(() => {
                       // Pour le championnat de Paris, afficher toutes les équipes (masculin + féminin)
                       const equipesToDisplay =
@@ -1488,105 +1046,19 @@ export default function DefaultCompositionsPage() {
                               MIN_PLAYERS_FOR_DEFAULT_COMPLETION
                             }
                                 renderPlayerIndicators={(player) => {
-                                  const phase = (selectedPhase ||
-                                    "aller") as "aller" | "retour";
-                                  // Utiliser les bonnes propriétés selon le championnat
-                                  const isParis = isParisChampionship(equipe);
-                                  const burnedTeam = isParis
-                                    ? player.highestTeamNumberByPhaseParis?.[phase]
-                                    : player.highestMasculineTeamNumberByPhase?.[
-                                        phase
-                                      ];
+                                  const phase = (selectedPhase || "aller") as "aller" | "retour";
+                                  // Pour les équipes masculines, utiliser "masculin" comme type
+                                  const championshipType = "masculin";
+                                  const isParisMatch = isParisChampionshipValidation(equipe);
                                   return (
-                                    <>
-                                      {player.nationality === "C" && (
-                                        <Chip
-                                          label="EUR"
-                                          size="small"
-                                          color="info"
-                                          variant="outlined"
-                                          sx={{
-                                            height: 18,
-                                            fontSize: "0.65rem",
-                                          }}
-                                        />
-                                      )}
-                                      {player.nationality === "ETR" && (
-                                        <Chip
-                                          label="ETR"
-                                          size="small"
-                                          color="warning"
-                                          variant="outlined"
-                                          sx={{
-                                            height: 18,
-                                            fontSize: "0.65rem",
-                                          }}
-                                        />
-                                      )}
-                                      {burnedTeam !== undefined &&
-                                        burnedTeam !== null && (
-                                          <Chip
-                                            label={`Brûlé Éq. ${burnedTeam}`}
-                                            size="small"
-                                            color="error"
-                                            variant="outlined"
-                                            sx={{
-                                              height: 18,
-                                              fontSize: "0.65rem",
-                                            }}
-                                          />
-                                        )}
-                                      {player.isTemporary && (
-                                        <Chip
-                                          label="Temporaire"
-                                          size="small"
-                                          color="error"
-                                          variant="outlined"
-                                          sx={{
-                                            height: 18,
-                                            fontSize: "0.65rem",
-                                          }}
-                                        />
-                                      )}
-                                      {(() => {
-                                        const discordStatus = getDiscordStatus(player);
-                                        if (discordStatus === "none") {
-                                          return (
-                                            <Tooltip title="Aucun login Discord configuré">
-                                              <Chip
-                                                icon={<AlternateEmail fontSize="small" />}
-                                                label="Pas Discord"
-                                                size="small"
-                                                color="default"
-                                                variant="outlined"
-                                                sx={{
-                                                  height: 18,
-                                                  fontSize: "0.65rem",
-                                                }}
-                                              />
-                                            </Tooltip>
-                                          );
-                                        }
-                                        if (discordStatus === "invalid") {
-                                          return (
-                                            <Tooltip title="Au moins un login Discord n'existe plus sur le serveur">
-                                              <Chip
-                                                icon={<Warning fontSize="small" />}
-                                                label="Discord invalide"
-                                                size="small"
-                                                color="warning"
-                                                variant="outlined"
-                                                sx={{
-                                                  height: 18,
-                                                  fontSize: "0.65rem",
-                                                }}
-                                              />
-                                            </Tooltip>
-                                          );
-                                        }
-                                        return null;
-                                      })()}
-                                    </>
+                                    <PlayerBurnoutIndicators
+                                      player={player}
+                                      equipe={equipe}
+                                      phase={phase}
+                                      championshipType={championshipType}
+                                      isParis={isParisMatch}
+                                      discordMembers={discordMembers}
+                                    />
                                   );
                                 }}
                                 renderPlayerSecondary={(player) =>
@@ -1611,9 +1083,9 @@ export default function DefaultCompositionsPage() {
                       </Box>
                       );
                     })()}
-                  </TabPanel>
+                  </CompositionTabPanel>
 
-                  <TabPanel value={currentTabIndex} index={1}>
+                  <CompositionTabPanel value={currentTabIndex} index={1} prefix="default-compositions">
                     {equipesByType.feminin.length === 0 ? (
                       <Typography variant="body2" color="text.secondary">
                         Aucune équipe féminine
@@ -1692,105 +1164,19 @@ export default function DefaultCompositionsPage() {
                               MIN_PLAYERS_FOR_DEFAULT_COMPLETION
                             }
                                 renderPlayerIndicators={(player) => {
-                                  const phase = (selectedPhase ||
-                                    "aller") as "aller" | "retour";
-                                  // Utiliser les bonnes propriétés selon le championnat
-                                  const isParis = isParisChampionship(equipe);
-                                  const burnedTeam = isParis
-                                    ? player.highestTeamNumberByPhaseParis?.[phase]
-                                    : player.highestFeminineTeamNumberByPhase?.[
-                                        phase
-                                      ];
+                                  const phase = (selectedPhase || "aller") as "aller" | "retour";
+                                  // Pour les équipes féminines, utiliser "feminin" comme type
+                                  const championshipType = "feminin";
+                                  const isParisMatch = isParisChampionshipValidation(equipe);
                                   return (
-                                    <>
-                                      {player.nationality === "C" && (
-                                        <Chip
-                                          label="EUR"
-                                          size="small"
-                                          color="info"
-                                          variant="outlined"
-                                          sx={{
-                                            height: 18,
-                                            fontSize: "0.65rem",
-                                          }}
-                                        />
-                                      )}
-                                      {player.nationality === "ETR" && (
-                                        <Chip
-                                          label="ETR"
-                                          size="small"
-                                          color="warning"
-                                          variant="outlined"
-                                          sx={{
-                                            height: 18,
-                                            fontSize: "0.65rem",
-                                          }}
-                                        />
-                                      )}
-                                      {burnedTeam !== undefined &&
-                                        burnedTeam !== null && (
-                                          <Chip
-                                            label={`Brûlé Éq. ${burnedTeam}`}
-                                            size="small"
-                                            color="error"
-                                            variant="outlined"
-                                            sx={{
-                                              height: 18,
-                                              fontSize: "0.65rem",
-                                            }}
-                                          />
-                                        )}
-                                      {player.isTemporary && (
-                                        <Chip
-                                          label="Temporaire"
-                                          size="small"
-                                          color="error"
-                                          variant="outlined"
-                                          sx={{
-                                            height: 18,
-                                            fontSize: "0.65rem",
-                                          }}
-                                        />
-                                      )}
-                                      {(() => {
-                                        const discordStatus = getDiscordStatus(player);
-                                        if (discordStatus === "none") {
-                                          return (
-                                            <Tooltip title="Aucun login Discord configuré">
-                                              <Chip
-                                                icon={<AlternateEmail fontSize="small" />}
-                                                label="Pas Discord"
-                                                size="small"
-                                                color="default"
-                                                variant="outlined"
-                                                sx={{
-                                                  height: 18,
-                                                  fontSize: "0.65rem",
-                                                }}
-                                              />
-                                            </Tooltip>
-                                          );
-                                        }
-                                        if (discordStatus === "invalid") {
-                                          return (
-                                            <Tooltip title="Au moins un login Discord n'existe plus sur le serveur">
-                                              <Chip
-                                                icon={<Warning fontSize="small" />}
-                                                label="Discord invalide"
-                                                size="small"
-                                                color="warning"
-                                                variant="outlined"
-                                                sx={{
-                                                  height: 18,
-                                                  fontSize: "0.65rem",
-                                                }}
-                                              />
-                                            </Tooltip>
-                                          );
-                                        }
-                                        return null;
-                                      })()}
-                                    </>
+                                    <PlayerBurnoutIndicators
+                                      player={player}
+                                      equipe={equipe}
+                                      phase={phase}
+                                      championshipType={championshipType}
+                                      isParis={isParisMatch}
+                                      discordMembers={discordMembers}
+                                    />
                                   );
                                 }}
                                 renderPlayerSecondary={(player) =>
@@ -1814,7 +1200,7 @@ export default function DefaultCompositionsPage() {
                         })}
                       </Box>
                     )}
-                  </TabPanel>
+                  </CompositionTabPanel>
                 </Box>
               </Box>
             </>
