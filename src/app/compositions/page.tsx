@@ -21,11 +21,6 @@ import {
   CircularProgress,
   IconButton,
   Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
   TextField,
   Tooltip,
   Popper,
@@ -65,7 +60,6 @@ import {
   getMatchForTeamAndJournee,
   getPlayersFromMatch,
   isMatchPlayed,
-  extractTeamNumber,
 } from "@/lib/compositions/validation";
 import { AvailablePlayersPanel } from "@/components/compositions/AvailablePlayersPanel";
 import { TeamCompositionCard } from "@/components/compositions/TeamCompositionCard";
@@ -84,6 +78,8 @@ import { useFilteredPlayers } from "@/hooks/useFilteredPlayers";
 import { usePlayersWithoutAssignment } from "@/hooks/usePlayersWithoutAssignment";
 import { useCurrentPhase } from "@/hooks/useCurrentPhase";
 import { AvailablePlayerItem } from "@/components/compositions/AvailablePlayerItem";
+import { useCompositionState } from "@/hooks/useCompositionState";
+import { CompositionDialogs } from "@/components/compositions/CompositionDialogs";
 
 // TabPanel remplacé par CompositionTabPanel
 
@@ -280,20 +276,30 @@ export default function CompositionsPage() {
     () => isParisChampionship(selectedEpreuve),
     [isParisChampionship, selectedEpreuve]
   );
+  // États pour les compositions
   const [selectedJournee, setSelectedJournee] = useState<number | null>(null);
   const [selectedPhase, setSelectedPhase] = useState<"aller" | "retour" | null>(
     null
   );
   const [tabValue, setTabValue] = useState(0); // 0 = masculin, 1 = féminin
-  // État pour stocker les compositions : Map<teamId, playerIds[]>
   const [compositions, setCompositions] = useState<Record<string, string[]>>(
     {}
   );
+  const [defaultCompositions, setDefaultCompositions] = useState<{
+    masculin: Record<string, string[]>;
+    feminin: Record<string, string[]>;
+  }>({
+    masculin: {},
+    feminin: {},
+  });
+  const [defaultCompositionsLoaded, setDefaultCompositionsLoaded] =
+    useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [isApplyingDefaults, setIsApplyingDefaults] = useState(false);
+  
   // draggedPlayerId et dragOverTeamId sont maintenant gérés par useCompositionDragDrop
   // État pour la recherche de joueurs
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [isResetting, setIsResetting] = useState(false);
-  const [isApplyingDefaults, setIsApplyingDefaults] = useState(false);
   const [confirmationDialog, setConfirmationDialog] = useState<{
     open: boolean;
     title: string;
@@ -308,17 +314,6 @@ export default function CompositionsPage() {
     confirmLabel: "Confirmer",
     cancelLabel: "Annuler",
   });
-  const [defaultCompositions, setDefaultCompositions] = useState<{
-    masculin: Record<string, string[]>;
-    feminin: Record<string, string[]>;
-  }>({
-    masculin: {},
-    feminin: {},
-  });
-  // teamValidationErrors est maintenant géré par useCompositionValidation
-  const [defaultCompositionsLoaded, setDefaultCompositionsLoaded] =
-    useState(false);
-  const [availabilitiesLoaded, setAvailabilitiesLoaded] = useState(false);
   // État pour gérer l'affichage du message d'informations du match par équipe
   const [showMatchInfo, setShowMatchInfo] = useState<Record<string, boolean>>(
     {}
@@ -726,6 +721,7 @@ export default function CompositionsPage() {
     masculin?: Record<string, { available?: boolean; comment?: string }>;
     feminin?: Record<string, { available?: boolean; comment?: string }>;
   }>({});
+  const [availabilitiesLoaded, setAvailabilitiesLoaded] = useState(false);
 
   // Calculer le maxPlayers selon l'épreuve et la division
   const { getMaxPlayersForTeam } = useMaxPlayersForTeam({ isParis });
@@ -1035,6 +1031,31 @@ export default function CompositionsPage() {
     ).some((playerIds) => Array.isArray(playerIds) && playerIds.length > 0);
     return hasMasculineDefaults || hasFeminineDefaults;
   }, [defaultCompositions]);
+
+  // Utiliser le hook useCompositionState pour gérer les fonctions de composition
+  const {
+    resetCompositions: runResetCompositions,
+    applyDefaults: runApplyDefaultCompositions,
+  } = useCompositionState({
+    selectedJournee,
+    selectedPhase,
+    equipesByType,
+    filteredEquipes,
+    players,
+    availabilities,
+    defaultCompositions,
+    defaultCompositionsLoaded,
+    availabilitiesLoaded,
+    compositionService,
+    hasAssignedPlayers,
+    hasDefaultCompositions,
+    compositions,
+    setCompositions,
+    isResetting,
+    setIsResetting,
+    isApplyingDefaults,
+    setIsApplyingDefaults,
+  });
 
   const canResetButton = useMemo(
     () =>
@@ -1475,318 +1496,6 @@ export default function CompositionsPage() {
     canDropPlayer,
   });
 
-  const runResetCompositions = useCallback(async () => {
-    if (
-      selectedJournee === null ||
-      selectedPhase === null ||
-      !hasAssignedPlayers ||
-      isResetting
-    ) {
-      console.log("[Compositions] Reset cancelled", {
-        selectedJournee,
-        selectedPhase,
-        hasAssignedPlayers,
-        isResetting,
-      });
-      return;
-    }
-
-    console.log("[Compositions] Reset compositions started", {
-      journee: selectedJournee,
-      phase: selectedPhase,
-    });
-
-    setIsResetting(true);
-
-    const previousState: Record<string, string[]> = Object.fromEntries(
-      Object.entries(compositions).map(([teamId, playerIds]) => [
-        teamId,
-        [...playerIds],
-      ])
-    );
-
-    const masculineTeamIds = equipesByType.masculin.map(
-      (equipe) => equipe.team.id
-    );
-    const feminineTeamIds = equipesByType.feminin.map(
-      (equipe) => equipe.team.id
-    );
-
-    const emptyTeamsEntries = [
-      ...masculineTeamIds.map<[string, string[]]>((teamId) => [teamId, []]),
-      ...feminineTeamIds.map<[string, string[]]>((teamId) => [teamId, []]),
-    ];
-    const emptyTeams = Object.fromEntries(emptyTeamsEntries);
-
-    setCompositions(emptyTeams);
-
-    try {
-      await Promise.all([
-        masculineTeamIds.length > 0
-          ? compositionService.saveComposition({
-              journee: selectedJournee,
-              phase: selectedPhase,
-              championshipType: "masculin",
-              teams: Object.fromEntries(
-                masculineTeamIds.map<[string, string[]]>((teamId) => [
-                  teamId,
-                  [],
-                ])
-              ),
-            })
-          : Promise.resolve(),
-        feminineTeamIds.length > 0
-          ? compositionService.saveComposition({
-              journee: selectedJournee,
-              phase: selectedPhase,
-              championshipType: "feminin",
-              teams: Object.fromEntries(
-                feminineTeamIds.map<[string, string[]]>((teamId) => [
-                  teamId,
-                  [],
-                ])
-              ),
-            })
-          : Promise.resolve(),
-      ]);
-    } catch (error) {
-      console.error(
-        "Erreur lors de la réinitialisation des compositions:",
-        error
-      );
-      console.log("[Compositions] Reset compositions failed", {
-        journee: selectedJournee,
-        phase: selectedPhase,
-        error,
-      });
-      setCompositions(previousState);
-    } finally {
-      setIsResetting(false);
-      console.log("[Compositions] Reset compositions finished", {
-        journee: selectedJournee,
-        phase: selectedPhase,
-      });
-    }
-  }, [
-    compositions,
-    compositionService,
-    equipesByType,
-    hasAssignedPlayers,
-    isResetting,
-    selectedJournee,
-    selectedPhase,
-  ]);
-
-  const runApplyDefaultCompositions = useCallback(async () => {
-    if (
-      selectedJournee === null ||
-      selectedPhase === null ||
-      !defaultCompositionsLoaded ||
-      !availabilitiesLoaded ||
-      !hasDefaultCompositions ||
-      isApplyingDefaults
-    ) {
-      console.log("[Compositions] Apply defaults cancelled", {
-        selectedJournee,
-        selectedPhase,
-        defaultCompositionsLoaded,
-        availabilitiesLoaded,
-        hasDefaultCompositions,
-        isApplyingDefaults,
-      });
-      return;
-    }
-
-    setIsApplyingDefaults(true);
-
-    const previousState: Record<string, string[]> = Object.fromEntries(
-      Object.entries(compositions).map(([teamId, playerIds]) => [
-        teamId,
-        [...playerIds],
-      ])
-    );
-
-    try {
-      const masculineTeamIds = equipesByType.masculin.map(
-        (equipe) => equipe.team.id
-      );
-      const feminineTeamIds = equipesByType.feminin.map(
-        (equipe) => equipe.team.id
-      );
-
-      console.log("[Compositions] Apply defaults started", {
-        journee: selectedJournee,
-        phase: selectedPhase,
-        masculineTeamIds,
-        feminineTeamIds,
-      });
-
-      const nextCompositions: Record<string, string[]> = Object.fromEntries([
-        ...masculineTeamIds.map<[string, string[]]>((teamId) => [teamId, []]),
-        ...feminineTeamIds.map<[string, string[]]>((teamId) => [teamId, []]),
-      ]);
-
-      const processType = (
-        championshipType: "masculin" | "feminin",
-        teamIds: string[]
-      ) => {
-        const defaultsForType = defaultCompositions[championshipType] || {};
-        const availabilityMap =
-          (championshipType === "masculin"
-            ? availabilities.masculin
-            : availabilities.feminin) || {};
-
-        teamIds.forEach((teamId) => {
-          const defaultPlayers = defaultsForType[teamId] || [];
-          const nextTeamPlayers: string[] = [];
-
-          defaultPlayers.forEach((playerId) => {
-            const availability = availabilityMap[playerId];
-            if (!availability || availability.available !== true) {
-              console.log("[Compositions] Player skipped (not available)", {
-                playerId,
-                teamId,
-                championshipType,
-                availability,
-              });
-              return;
-            }
-
-            const player = players.find((p) => p.id === playerId);
-            if (!player) {
-              console.log("[Compositions] Player skipped (not found)", {
-                playerId,
-                teamId,
-                championshipType,
-              });
-              return;
-            }
-
-            if (nextTeamPlayers.length >= 5) {
-              console.log("[Compositions] Player skipped (team full)", {
-                playerId,
-                teamId,
-                championshipType,
-              });
-              return;
-            }
-
-            const maxMasculine =
-              player.highestMasculineTeamNumberByPhase?.[
-                selectedPhase || "aller"
-              ];
-            const maxFeminine =
-              player.highestFeminineTeamNumberByPhase?.[
-                selectedPhase || "aller"
-              ];
-            const teamNumber = extractTeamNumber(
-              filteredEquipes.find((eq) => eq.team.id === teamId)?.team.name ||
-                ""
-            );
-
-            if (
-              teamNumber > 0 &&
-              ((championshipType === "masculin" &&
-                maxMasculine !== undefined &&
-                maxMasculine !== null &&
-                teamNumber > maxMasculine) ||
-                (championshipType === "feminin" &&
-                  maxFeminine !== undefined &&
-                  maxFeminine !== null &&
-                  teamNumber > maxFeminine))
-            ) {
-              console.log("[Compositions] Player skipped (burning rule)", {
-                playerId,
-                teamId,
-                championshipType,
-                phase: selectedPhase,
-                journee: selectedJournee,
-                maxMasculine,
-                maxFeminine,
-              });
-              return;
-            }
-
-            nextTeamPlayers.push(playerId);
-            console.log("[Compositions] Player added from defaults", {
-              playerId,
-              teamId,
-              championshipType,
-              nextTeamPlayers,
-            });
-          });
-
-          nextCompositions[teamId] = nextTeamPlayers;
-        });
-      };
-
-      processType("masculin", masculineTeamIds);
-      processType("feminin", feminineTeamIds);
-
-      setCompositions(nextCompositions);
-      console.log("[Compositions] Apply defaults next state", nextCompositions);
-
-      await Promise.all([
-        masculineTeamIds.length > 0
-          ? compositionService.saveComposition({
-              journee: selectedJournee,
-              phase: selectedPhase,
-              championshipType: "masculin",
-              teams: Object.fromEntries(
-                masculineTeamIds.map<[string, string[]]>((teamId) => [
-                  teamId,
-                  nextCompositions[teamId] || [],
-                ])
-              ),
-            })
-          : Promise.resolve(),
-        feminineTeamIds.length > 0
-          ? compositionService.saveComposition({
-              journee: selectedJournee,
-              phase: selectedPhase,
-              championshipType: "feminin",
-              teams: Object.fromEntries(
-                feminineTeamIds.map<[string, string[]]>((teamId) => [
-                  teamId,
-                  nextCompositions[teamId] || [],
-                ])
-              ),
-            })
-          : Promise.resolve(),
-      ]);
-    } catch (error) {
-      console.error(
-        "Erreur lors de la copie des compositions par défaut:",
-        error
-      );
-      console.log("[Compositions] Apply defaults failed", {
-        journee: selectedJournee,
-        phase: selectedPhase,
-        error,
-      });
-      setCompositions(previousState);
-    } finally {
-      setIsApplyingDefaults(false);
-      console.log("[Compositions] Apply defaults finished", {
-        journee: selectedJournee,
-        phase: selectedPhase,
-      });
-    }
-  }, [
-    availabilities,
-    availabilitiesLoaded,
-    compositionService,
-    compositions,
-    defaultCompositions,
-    defaultCompositionsLoaded,
-    equipesByType,
-    hasDefaultCompositions,
-    isApplyingDefaults,
-    players,
-    selectedJournee,
-    selectedPhase,
-    filteredEquipes,
-  ]);
 
   const handleResetButtonClick = useCallback(() => {
     if (!canResetButton) {
@@ -1880,32 +1589,40 @@ export default function CompositionsPage() {
       redirectWhenUnauthorized="/joueur"
     >
       <Box sx={{ p: 5 }}>
-        <Dialog
-          open={confirmationDialog.open}
-          onClose={handleCancelConfirmation}
-          aria-labelledby="composition-confirmation-dialog-title"
-        >
-          <DialogTitle id="composition-confirmation-dialog-title">
-            {confirmationDialog.title}
-          </DialogTitle>
-          <DialogContent>
-            <DialogContentText>
-              {confirmationDialog.description}
-            </DialogContentText>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCancelConfirmation}>
-              {confirmationDialog.cancelLabel ?? "Annuler"}
-            </Button>
-            <Button
-              onClick={handleConfirmDialog}
-              variant="contained"
-              color="primary"
-            >
-              {confirmationDialog.confirmLabel ?? "Confirmer"}
-            </Button>
-          </DialogActions>
-        </Dialog>
+        <CompositionDialogs
+          confirmationDialog={confirmationDialog}
+          onCloseConfirmation={handleCancelConfirmation}
+          onConfirmConfirmation={handleConfirmDialog}
+          confirmResendDialog={confirmResendDialog}
+          onCloseResend={() =>
+            setConfirmResendDialog({
+              open: false,
+              teamId: null,
+              matchInfo: null,
+            })
+          }
+          onConfirmResend={() => {
+            if (
+              confirmResendDialog.teamId &&
+              confirmResendDialog.matchInfo &&
+              selectedJournee &&
+              selectedPhase
+            ) {
+              handleSendDiscordMessage(
+                confirmResendDialog.teamId,
+                confirmResendDialog.matchInfo,
+                selectedJournee,
+                selectedPhase,
+                confirmResendDialog.channelId
+              );
+              setConfirmResendDialog({
+                open: false,
+                teamId: null,
+                matchInfo: null,
+              });
+            }
+          }}
+        />
 
         <Typography variant="h4" gutterBottom>
           Composition des Équipes
@@ -3366,65 +3083,6 @@ export default function CompositionsPage() {
           </>
         ) : null}
 
-        {/* Dialog de confirmation pour renvoyer le message Discord */}
-        <Dialog
-          open={confirmResendDialog.open}
-          onClose={() =>
-            setConfirmResendDialog({
-              open: false,
-              teamId: null,
-              matchInfo: null,
-            })
-          }
-        >
-          <DialogTitle>Renvoyer le message Discord ?</DialogTitle>
-          <DialogContent>
-            <DialogContentText>
-              Un message a déjà été envoyé pour ce match. Voulez-vous vraiment
-              le renvoyer ?
-            </DialogContentText>
-          </DialogContent>
-          <DialogActions>
-            <Button
-              onClick={() =>
-                setConfirmResendDialog({
-                  open: false,
-                  teamId: null,
-                  matchInfo: null,
-                })
-              }
-            >
-              Annuler
-            </Button>
-            <Button
-              onClick={() => {
-                if (
-                  confirmResendDialog.teamId &&
-                  confirmResendDialog.matchInfo &&
-                  selectedJournee &&
-                  selectedPhase
-                ) {
-                  handleSendDiscordMessage(
-                    confirmResendDialog.teamId,
-                    confirmResendDialog.matchInfo,
-                    selectedJournee,
-                    selectedPhase,
-                    confirmResendDialog.channelId
-                  );
-                  setConfirmResendDialog({
-                    open: false,
-                    teamId: null,
-                    matchInfo: null,
-                  });
-                }
-              }}
-              color="warning"
-              variant="contained"
-            >
-              Renvoyer
-            </Button>
-          </DialogActions>
-        </Dialog>
 
         {(!selectedJournee || !selectedPhase) && (
           <Card>
