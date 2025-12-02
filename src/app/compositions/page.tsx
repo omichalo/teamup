@@ -5,7 +5,6 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import Link from "next/link";
 import {
   Box,
   Typography,
@@ -20,7 +19,6 @@ import {
   Chip,
   CircularProgress,
   IconButton,
-  Button,
   TextField,
   Tooltip,
   Popper,
@@ -31,8 +29,6 @@ import {
   ListItemText,
 } from "@mui/material";
 import {
-  ContentCopy,
-  RestartAlt,
   Message,
   Close,
   Send,
@@ -80,6 +76,7 @@ import { AvailablePlayerItem } from "@/components/compositions/AvailablePlayerIt
 import { useCompositionState } from "@/hooks/useCompositionState";
 import { CompositionDialogs } from "@/components/compositions/CompositionDialogs";
 import { useDiscordMessage } from "@/hooks/useDiscordMessage";
+import { CompositionToolbar } from "@/components/compositions/CompositionToolbar";
 
 // TabPanel remplacé par CompositionTabPanel
 
@@ -1331,41 +1328,12 @@ export default function CompositionsPage() {
 
         <CompositionRulesHelp rules={compositionRules} />
 
-        <Box
-          sx={{
-            mb: 3,
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 1.5,
-            alignItems: "center",
-          }}
-        >
-          <Button
-            component={Link}
-            href="/compositions/defaults"
-            variant="outlined"
-          >
-            Gérer les compositions par défaut
-          </Button>
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<ContentCopy />}
-            disabled={!canCopyDefaultsButton}
-            onClick={handleApplyDefaultsClick}
-          >
-            Copier les compos par défaut (toutes équipes)
-          </Button>
-          <Button
-            variant="outlined"
-            color="error"
-            startIcon={<RestartAlt />}
-            disabled={!canResetButton}
-            onClick={handleResetButtonClick}
-          >
-            Réinitialiser toutes les compos
-          </Button>
-        </Box>
+        <CompositionToolbar
+          canCopyDefaultsButton={canCopyDefaultsButton}
+          canResetButton={canResetButton}
+          onApplyDefaultsClick={handleApplyDefaultsClick}
+          onResetClick={handleResetButtonClick}
+        />
 
         {selectedJournee && (isParis || selectedPhase) ? (
           <>
