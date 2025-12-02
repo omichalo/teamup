@@ -19,20 +19,9 @@ import {
   Chip,
   CircularProgress,
   IconButton,
-  TextField,
   Tooltip,
-  Popper,
-  Paper,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
 } from "@mui/material";
-import {
-  Message,
-  Close,
-  Send,
-} from "@mui/icons-material";
+import { Message, Close, Send } from "@mui/icons-material";
 import {
   useEquipesWithMatches,
   type EquipeWithMatches,
@@ -77,115 +66,11 @@ import { useCompositionState } from "@/hooks/useCompositionState";
 import { CompositionDialogs } from "@/components/compositions/CompositionDialogs";
 import { useDiscordMessage } from "@/hooks/useDiscordMessage";
 import { CompositionToolbar } from "@/components/compositions/CompositionToolbar";
+import { DiscordMessageEditor } from "@/components/compositions/DiscordMessageEditor";
 
 // TabPanel remplacé par CompositionTabPanel
 
-// Composant pour afficher les suggestions de mentions
-function MentionSuggestions({
-  members,
-  query,
-  anchorEl,
-  onSelect,
-}: {
-  members: Array<{ id: string; username: string; displayName: string }>;
-  query: string;
-  anchorEl: HTMLElement;
-  onSelect: (member: {
-    id: string;
-    username: string;
-    displayName: string;
-  }) => void;
-}) {
-  const filteredMembers = members
-    .filter((member) => {
-      const searchQuery = query.toLowerCase();
-      return (
-        member.displayName.toLowerCase().includes(searchQuery) ||
-        member.username.toLowerCase().includes(searchQuery)
-      );
-    })
-    .slice(0, 10); // Limiter à 10 résultats
-
-  if (filteredMembers.length === 0) {
-    return null;
-  }
-
-  return (
-    <Popper
-      open={true}
-      anchorEl={anchorEl}
-      placement="bottom-start"
-      sx={{ zIndex: 1300, mt: 0.5 }}
-    >
-      <Paper
-        elevation={8}
-        sx={{
-          maxHeight: 300,
-          overflow: "auto",
-          minWidth: 280,
-          borderRadius: 2,
-          border: "1px solid",
-          borderColor: "divider",
-          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.15)",
-        }}
-      >
-        <List dense sx={{ py: 0.5 }}>
-          {filteredMembers.map((member) => (
-            <ListItem key={member.id} disablePadding>
-              <ListItemButton
-                onMouseDown={(e) => {
-                  // Empêcher le onBlur du TextField de se déclencher
-                  e.preventDefault();
-                }}
-                onClick={() => {
-                  onSelect(member);
-                }}
-                sx={{
-                  borderRadius: 1,
-                  mx: 0.5,
-                  my: 0.25,
-                  "&:hover": {
-                    backgroundColor: "action.hover",
-                  },
-                }}
-              >
-                <Box
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    width: 32,
-                    height: 32,
-                    borderRadius: "50%",
-                    backgroundColor: "primary.main",
-                    color: "primary.contrastText",
-                    mr: 1.5,
-                    fontSize: "0.875rem",
-                    fontWeight: 600,
-                  }}
-                >
-                  {member.displayName.charAt(0).toUpperCase()}
-                </Box>
-                <ListItemText
-                  primary={
-                    <Typography variant="body2" fontWeight={500}>
-                      {member.displayName}
-                    </Typography>
-                  }
-                  secondary={
-                    <Typography variant="caption" color="text.secondary">
-                      @{member.username}
-                    </Typography>
-                  }
-                />
-              </ListItemButton>
-            </ListItem>
-          ))}
-        </List>
-      </Paper>
-    </Popper>
-  );
-}
+// Le composant MentionSuggestions est maintenant dans DiscordMessageEditor
 
 // Fonction pour nettoyer le nom de l'équipe (retirer "Phase X")
 function cleanTeamName(teamName: string): string {
@@ -863,10 +748,6 @@ export default function CompositionsPage() {
     setConfirmResendDialog,
     discordMembers,
     discordChannels,
-    mentionAnchor,
-    setMentionAnchor,
-    mentionQuery,
-    setMentionQuery,
     sendMessage: handleSendDiscordMessage,
     formatMatchInfo,
     insertMention,
@@ -1856,179 +1737,32 @@ export default function CompositionsPage() {
                                       >
                                         {matchInfo}
                                       </Typography>
-                                      <Box sx={{ mt: 1, position: "relative" }}>
-                                        <TextField
-                                          label="Message personnalisé (optionnel)"
-                                          multiline
-                                          rows={3}
-                                          fullWidth
-                                          value={
-                                            customMessages[equipe.team.id] || ""
-                                          }
-                                          onChange={(e) => {
-                                            const value = e.target.value;
-                                            const cursorPos =
-                                              e.target.selectionStart || 0;
-
-                                            // Détecter si on tape "@" ou si on est en train de taper après "@"
-                                            const textBeforeCursor =
-                                              value.substring(0, cursorPos);
-                                            const lastAtIndex =
-                                              textBeforeCursor.lastIndexOf("@");
-
-                                            if (lastAtIndex !== -1) {
-                                              // Vérifier qu'il n'y a pas d'espace entre "@" et le curseur
-                                              const textAfterAt =
-                                                textBeforeCursor.substring(
-                                                  lastAtIndex + 1
-                                                );
-                                              if (
-                                                !textAfterAt.includes(" ") &&
-                                                !textAfterAt.includes("\n")
-                                              ) {
-                                                // On est en train de taper une mention
-                                                const query =
-                                                  textAfterAt.toLowerCase();
-                                                setMentionQuery(query);
-                                                setMentionAnchor({
-                                                  teamId: equipe.team.id,
-                                                  anchorEl: e.target,
-                                                  startPos: lastAtIndex,
-                                                });
-                                              } else {
-                                                setMentionAnchor(null);
-                                              }
-                                            } else {
-                                              setMentionAnchor(null);
-                                            }
-
+                                      <Box sx={{ mt: 1 }}>
+                                        <DiscordMessageEditor
+                                          teamId={equipe.team.id}
+                                          value={customMessages[equipe.team.id] || ""}
+                                          onChange={(newValue) => {
                                             setCustomMessages((prev) => ({
                                               ...prev,
-                                              [equipe.team.id]: value,
+                                              [equipe.team.id]: newValue,
                                             }));
-
-                                            // Debounce pour sauvegarder automatiquement après 1 seconde d'inactivité
-                                            if (
-                                              saveTimeoutRef.current[
-                                                equipe.team.id
-                                              ]
-                                            ) {
-                                              clearTimeout(
-                                                saveTimeoutRef.current[
-                                                  equipe.team.id
-                                                ]
-                                              );
-                                            }
-                                            saveTimeoutRef.current[
-                                              equipe.team.id
-                                            ] = setTimeout(() => {
-                                              if (
-                                                selectedJournee &&
-                                                selectedPhase
-                                              ) {
-                                                handleSaveCustomMessage(
-                                                  equipe.team.id,
-                                                  value,
-                                                  selectedJournee,
-                                                  selectedPhase
-                                                );
-                                              }
-                                            }, 1000);
                                           }}
-                                          onKeyDown={(e) => {
-                                            if (
-                                              mentionAnchor &&
-                                              mentionAnchor.teamId ===
-                                                equipe.team.id
-                                            ) {
-                                              const filteredMembers =
-                                                discordMembers.filter(
-                                                  (member) => {
-                                                    const query =
-                                                      mentionQuery.toLowerCase();
-                                                    return (
-                                                      member.displayName
-                                                        .toLowerCase()
-                                                        .includes(query) ||
-                                                      member.username
-                                                        .toLowerCase()
-                                                        .includes(query)
-                                                    );
-                                                  }
-                                                );
-
-                                              if (
-                                                e.key === "ArrowDown" ||
-                                                e.key === "ArrowUp" ||
-                                                e.key === "Enter" ||
-                                                e.key === "Escape"
-                                              ) {
-                                                e.preventDefault();
-                                                if (e.key === "Escape") {
-                                                  setMentionAnchor(null);
-                                                } else if (
-                                                  e.key === "Enter" &&
-                                                  filteredMembers.length > 0
-                                                ) {
-                                                  // Insérer la première mention
-                                                  const selectedMember =
-                                                    filteredMembers[0];
-                                                  insertMention(
-                                                    equipe.team.id,
-                                                    mentionAnchor.startPos,
-                                                    selectedMember
-                                                  );
-                                                }
-                                              }
-                                            }
-                                          }}
-                                          onBlur={(e) => {
-                                            // Ne pas fermer si on clique sur une suggestion
-                                            // Le onMouseDown de la suggestion empêchera le blur
-                                            const relatedTarget =
-                                              e.relatedTarget as HTMLElement | null;
-                                            if (
-                                              relatedTarget &&
-                                              relatedTarget.closest(
-                                                '[role="listbox"]'
-                                              )
-                                            ) {
-                                              return;
-                                            }
-
-                                            // Délai pour permettre le clic sur une suggestion
-                                            setTimeout(() => {
-                                              setMentionAnchor(null);
+                                          onSave={(newValue) => {
+                                            if (selectedJournee && selectedPhase) {
                                               handleSaveCustomMessage(
                                                 equipe.team.id,
-                                                customMessages[
-                                                  equipe.team.id
-                                                ] || "",
+                                                newValue,
                                                 selectedJournee,
                                                 selectedPhase
                                               );
-                                            }, 200);
+                                            }
                                           }}
-                                          placeholder="Tapez @ pour mentionner un membre Discord..."
-                                          size="small"
-                                          helperText="Tapez @ suivi du nom d'un membre pour le mentionner"
+                                          discordMembers={discordMembers}
+                                          selectedJournee={selectedJournee}
+                                          selectedPhase={selectedPhase}
+                                          saveTimeoutRef={saveTimeoutRef}
+                                          onInsertMention={insertMention}
                                         />
-                                        {mentionAnchor &&
-                                          mentionAnchor.teamId ===
-                                            equipe.team.id && (
-                                            <MentionSuggestions
-                                              members={discordMembers}
-                                              query={mentionQuery}
-                                              anchorEl={mentionAnchor.anchorEl}
-                                              onSelect={(member) => {
-                                                insertMention(
-                                                  equipe.team.id,
-                                                  mentionAnchor.startPos,
-                                                  member
-                                                );
-                                              }}
-                                            />
-                                          )}
                                       </Box>
                                     </CardContent>
                                   </Card>
@@ -2460,178 +2194,32 @@ export default function CompositionsPage() {
                                     >
                                       {matchInfo}
                                     </Typography>
-                                    <Box sx={{ mt: 1, position: "relative" }}>
-                                      <TextField
-                                        label="Message personnalisé (optionnel)"
-                                        multiline
-                                        rows={3}
-                                        fullWidth
-                                        value={
-                                          customMessages[equipe.team.id] || ""
-                                        }
-                                        onChange={(e) => {
-                                          const value = e.target.value;
-                                          const cursorPos =
-                                            e.target.selectionStart || 0;
-
-                                          // Détecter si on tape "@" ou si on est en train de taper après "@"
-                                          const textBeforeCursor =
-                                            value.substring(0, cursorPos);
-                                          const lastAtIndex =
-                                            textBeforeCursor.lastIndexOf("@");
-
-                                          if (lastAtIndex !== -1) {
-                                            // Vérifier qu'il n'y a pas d'espace entre "@" et le curseur
-                                            const textAfterAt =
-                                              textBeforeCursor.substring(
-                                                lastAtIndex + 1
-                                              );
-                                            if (
-                                              !textAfterAt.includes(" ") &&
-                                              !textAfterAt.includes("\n")
-                                            ) {
-                                              // On est en train de taper une mention
-                                              const query =
-                                                textAfterAt.toLowerCase();
-                                              setMentionQuery(query);
-                                              setMentionAnchor({
-                                                teamId: equipe.team.id,
-                                                anchorEl: e.target,
-                                                startPos: lastAtIndex,
-                                              });
-                                            } else {
-                                              setMentionAnchor(null);
-                                            }
-                                          } else {
-                                            setMentionAnchor(null);
-                                          }
-
+                                    <Box sx={{ mt: 1 }}>
+                                      <DiscordMessageEditor
+                                        teamId={equipe.team.id}
+                                        value={customMessages[equipe.team.id] || ""}
+                                        onChange={(newValue) => {
                                           setCustomMessages((prev) => ({
                                             ...prev,
-                                            [equipe.team.id]: value,
+                                            [equipe.team.id]: newValue,
                                           }));
-
-                                          // Debounce pour sauvegarder automatiquement après 1 seconde d'inactivité
-                                          if (
-                                            saveTimeoutRef.current[
-                                              equipe.team.id
-                                            ]
-                                          ) {
-                                            clearTimeout(
-                                              saveTimeoutRef.current[
-                                                equipe.team.id
-                                              ]
-                                            );
-                                          }
-                                          saveTimeoutRef.current[
-                                            equipe.team.id
-                                          ] = setTimeout(() => {
-                                            if (
-                                              selectedJournee &&
-                                              selectedPhase
-                                            ) {
-                                              handleSaveCustomMessage(
-                                                equipe.team.id,
-                                                value,
-                                                selectedJournee,
-                                                selectedPhase
-                                              );
-                                            }
-                                          }, 1000);
                                         }}
-                                        onKeyDown={(e) => {
-                                          if (
-                                            mentionAnchor &&
-                                            mentionAnchor.teamId ===
-                                              equipe.team.id
-                                          ) {
-                                            const filteredMembers =
-                                              discordMembers.filter(
-                                                (member) => {
-                                                  const query =
-                                                    mentionQuery.toLowerCase();
-                                                  return (
-                                                    member.displayName
-                                                      .toLowerCase()
-                                                      .includes(query) ||
-                                                    member.username
-                                                      .toLowerCase()
-                                                      .includes(query)
-                                                  );
-                                                }
-                                              );
-
-                                            if (
-                                              e.key === "ArrowDown" ||
-                                              e.key === "ArrowUp" ||
-                                              e.key === "Enter" ||
-                                              e.key === "Escape"
-                                            ) {
-                                              e.preventDefault();
-                                              if (e.key === "Escape") {
-                                                setMentionAnchor(null);
-                                              } else if (
-                                                e.key === "Enter" &&
-                                                filteredMembers.length > 0
-                                              ) {
-                                                // Insérer la première mention
-                                                const selectedMember =
-                                                  filteredMembers[0];
-                                                insertMention(
-                                                  equipe.team.id,
-                                                  mentionAnchor.startPos,
-                                                  selectedMember
-                                                );
-                                              }
-                                            }
-                                          }
-                                        }}
-                                        onBlur={(e) => {
-                                          // Ne pas fermer si on clique sur une suggestion
-                                          // Le onMouseDown de la suggestion empêchera le blur
-                                          const relatedTarget =
-                                            e.relatedTarget as HTMLElement | null;
-                                          if (
-                                            relatedTarget &&
-                                            relatedTarget.closest(
-                                              '[role="listbox"]'
-                                            )
-                                          ) {
-                                            return;
-                                          }
-
-                                          // Délai pour permettre le clic sur une suggestion
-                                          setTimeout(() => {
-                                            setMentionAnchor(null);
+                                        onSave={(newValue) => {
+                                          if (selectedJournee && selectedPhase) {
                                             handleSaveCustomMessage(
                                               equipe.team.id,
-                                              customMessages[equipe.team.id] ||
-                                                "",
+                                              newValue,
                                               selectedJournee,
                                               selectedPhase
                                             );
-                                          }, 200);
+                                          }
                                         }}
-                                        placeholder="Tapez @ pour mentionner un membre Discord..."
-                                        size="small"
-                                        helperText="Tapez @ suivi du nom d'un membre pour le mentionner"
+                                        discordMembers={discordMembers}
+                                        selectedJournee={selectedJournee}
+                                        selectedPhase={selectedPhase}
+                                        saveTimeoutRef={saveTimeoutRef}
+                                        onInsertMention={insertMention}
                                       />
-                                      {mentionAnchor &&
-                                        mentionAnchor.teamId ===
-                                          equipe.team.id && (
-                                          <MentionSuggestions
-                                            members={discordMembers}
-                                            query={mentionQuery}
-                                            anchorEl={mentionAnchor.anchorEl}
-                                            onSelect={(member) => {
-                                              insertMention(
-                                                equipe.team.id,
-                                                mentionAnchor.startPos,
-                                                member
-                                              );
-                                            }}
-                                          />
-                                        )}
                                     </Box>
                                   </CardContent>
                                 </Card>

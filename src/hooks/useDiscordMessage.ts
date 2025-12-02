@@ -48,12 +48,6 @@ interface UseDiscordMessageResult {
   };
   discordMembers: DiscordMember[];
   discordChannels: DiscordChannel[];
-  mentionAnchor: {
-    teamId: string;
-    anchorEl: HTMLElement;
-    startPos: number;
-  } | null;
-  mentionQuery: string;
   // Fonctions
   sendMessage: (
     teamId: string,
@@ -84,14 +78,6 @@ interface UseDiscordMessageResult {
   setCustomMessages: React.Dispatch<
     React.SetStateAction<Record<string, string>>
   >;
-  setMentionAnchor: React.Dispatch<
-    React.SetStateAction<{
-      teamId: string;
-      anchorEl: HTMLElement;
-      startPos: number;
-    } | null>
-  >;
-  setMentionQuery: React.Dispatch<React.SetStateAction<string>>;
   setConfirmResendDialog: React.Dispatch<
     React.SetStateAction<{
       open: boolean;
@@ -136,12 +122,6 @@ export function useDiscordMessage(
   }>({ open: false, teamId: null, matchInfo: null });
   const [discordMembers, setDiscordMembers] = useState<DiscordMember[]>([]);
   const [discordChannels, setDiscordChannels] = useState<DiscordChannel[]>([]);
-  const [mentionAnchor, setMentionAnchor] = useState<{
-    teamId: string;
-    anchorEl: HTMLElement;
-    startPos: number;
-  } | null>(null);
-  const [mentionQuery, setMentionQuery] = useState<string>("");
   const saveTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({});
 
   // Charger les membres Discord
@@ -361,7 +341,6 @@ export function useDiscordMessage(
 
         return { ...prev, [teamId]: newMessage };
       });
-      setMentionAnchor(null);
     },
     [selectedJournee, selectedPhase, saveCustomMessage]
   );
@@ -560,16 +539,12 @@ export function useDiscordMessage(
     confirmResendDialog,
     discordMembers,
     discordChannels,
-    mentionAnchor,
-    mentionQuery,
     // Fonctions
     sendMessage,
     formatMatchInfo,
     insertMention,
     saveCustomMessage,
     setCustomMessages,
-    setMentionAnchor,
-    setMentionQuery,
     setConfirmResendDialog,
     saveTimeoutRef,
   };
