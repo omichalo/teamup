@@ -3009,6 +3009,13 @@ export default function CompositionsPage() {
                                           title={
                                             !equipe.team.discordChannelId
                                               ? "Aucun canal Discord configuré pour cette équipe. Configurez-le dans la page des équipes."
+                                              : !equipe.team.location ||
+                                                !locations.find(
+                                                  (l) =>
+                                                    l.id ===
+                                                    equipe.team.location
+                                                )
+                                              ? "Aucun lieu configuré pour cette équipe. Configurez-le dans la page des équipes."
                                               : showMatchInfo[equipe.team.id]
                                               ? "Masquer le message"
                                               : "Afficher le message"
@@ -3025,7 +3032,13 @@ export default function CompositionsPage() {
                                                 }));
                                               }}
                                               disabled={
-                                                !equipe.team.discordChannelId
+                                                !equipe.team.discordChannelId ||
+                                                !equipe.team.location ||
+                                                !locations.find(
+                                                  (l) =>
+                                                    l.id ===
+                                                    equipe.team.location
+                                                )
                                               }
                                               color={
                                                 showMatchInfo[equipe.team.id]
@@ -3380,6 +3393,13 @@ export default function CompositionsPage() {
                                             title={
                                               !equipe.team.discordChannelId
                                                 ? "Aucun canal Discord configuré pour cette équipe. Configurez-le dans la page des équipes."
+                                                : !equipe.team.location ||
+                                                  !locations.find(
+                                                    (l) =>
+                                                      l.id ===
+                                                      equipe.team.location
+                                                  )
+                                                ? "Aucun lieu configuré pour cette équipe. Configurez-le dans la page des équipes."
                                                 : discordSentStatus[
                                                     equipe.team.id
                                                   ]?.sent
@@ -3426,7 +3446,14 @@ export default function CompositionsPage() {
                                                     equipe.team.id
                                                   ] ||
                                                   !matchInfo ||
-                                                  !equipe.team.discordChannelId
+                                                  !equipe.team
+                                                    .discordChannelId ||
+                                                  !equipe.team.location ||
+                                                  !locations.find(
+                                                    (l) =>
+                                                      l.id ===
+                                                      equipe.team.location
+                                                  )
                                                 }
                                                 sx={{ p: 0.5 }}
                                                 color={
@@ -3805,6 +3832,12 @@ export default function CompositionsPage() {
                                         title={
                                           !equipe.team.discordChannelId
                                             ? "Aucun canal Discord configuré pour cette équipe. Configurez-le dans la page des équipes."
+                                            : !equipe.team.location ||
+                                              !locations.find(
+                                                (l) =>
+                                                  l.id === equipe.team.location
+                                              )
+                                            ? "Aucun lieu configuré pour cette équipe. Configurez-le dans la page des équipes."
                                             : showMatchInfo[equipe.team.id]
                                             ? "Masquer le message"
                                             : "Afficher le message"
@@ -3821,7 +3854,12 @@ export default function CompositionsPage() {
                                               }));
                                             }}
                                             disabled={
-                                              !equipe.team.discordChannelId
+                                              !equipe.team.discordChannelId ||
+                                              !equipe.team.location ||
+                                              !locations.find(
+                                                (l) =>
+                                                  l.id === equipe.team.location
+                                              )
                                             }
                                             color={
                                               showMatchInfo[equipe.team.id]
@@ -4103,6 +4141,13 @@ export default function CompositionsPage() {
                                           title={
                                             !equipe.team.discordChannelId
                                               ? "Aucun canal Discord configuré pour cette équipe. Configurez-le dans la page des équipes."
+                                              : !equipe.team.location ||
+                                                !locations.find(
+                                                  (l) =>
+                                                    l.id ===
+                                                    equipe.team.location
+                                                )
+                                              ? "Aucun lieu configuré pour cette équipe. Configurez-le dans la page des équipes."
                                               : discordSentStatus[
                                                   equipe.team.id
                                                 ]?.sent
@@ -4148,7 +4193,13 @@ export default function CompositionsPage() {
                                                   equipe.team.id
                                                 ] ||
                                                 !matchInfo ||
-                                                !equipe.team.discordChannelId
+                                                !equipe.team.discordChannelId ||
+                                                !equipe.team.location ||
+                                                !locations.find(
+                                                  (l) =>
+                                                    l.id ===
+                                                    equipe.team.location
+                                                )
                                               }
                                               sx={{ p: 0.5 }}
                                               color={
