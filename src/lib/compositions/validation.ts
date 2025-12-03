@@ -1,5 +1,5 @@
 import { Player } from "@/types/team-management";
-import { Match } from "@/types";
+import { ChampionshipType, Match } from "@/types";
 import { EquipeWithMatches } from "@/hooks/useEquipesWithMatches";
 import { validateFFTTRules } from "@/lib/shared/fftt-utils";
 import { getMatchEpreuve, ID_EPREUVE_PARIS } from "@/lib/shared/epreuve-utils";
@@ -18,6 +18,7 @@ export interface AssignmentValidationParams {
   compositions: CompositionMap;
   selectedPhase: PhaseType | null;
   selectedJournee: number | null;
+  championshipType: ChampionshipType;
   journeeRule?: number;
   maxPlayersPerTeam?: number;
 }
@@ -37,6 +38,7 @@ export interface TeamCompositionValidationParams {
   compositions: CompositionMap;
   selectedPhase: PhaseType | null;
   selectedJournee: number | null;
+  championshipType: ChampionshipType;
   journeeRule?: number;
   maxPlayersPerTeam?: number;
 }
@@ -234,8 +236,10 @@ const buildSimulatedPlayers = (
  */
 export const calculateFutureBurnout = (
   matchesByTeamByPhase: { [teamNumber: number]: number } | undefined,
-  targetTeamNumber: number
+  targetTeamNumber: number,
+  _championshipType: ChampionshipType
 ): number | null => {
+  void _championshipType;
   // Créer une copie des matchs actuels
   const futureMatchesByTeam = new Map<number, number>();
   
@@ -277,8 +281,10 @@ export const calculateFutureBurnout = (
  */
 export const calculateFutureBurnoutParis = (
   matchesByTeamByPhase: { [teamNumber: number]: number } | undefined,
-  targetTeamNumber: number
+  targetTeamNumber: number,
+  _championshipType: ChampionshipType
 ): number | null => {
+  void _championshipType;
   if (!matchesByTeamByPhase) {
     return null;
   }
@@ -331,6 +337,7 @@ export const canAssignPlayerToTeam = (
     compositions,
     selectedPhase,
     selectedJournee,
+    championshipType,
     journeeRule = DEFAULT_JOURNEE_RULE,
     maxPlayersPerTeam = 4,
   } = params;
@@ -355,7 +362,7 @@ export const canAssignPlayerToTeam = (
     };
   }
 
-  const isFemaleTeam = equipe.matches.some((match) => match.isFemale === true);
+  const isFemaleTeam = championshipType === "feminin";
   const isParis = isParisChampionship(equipe);
 
   // Pour le championnat de Paris : pas de limite sur les joueurs étrangers
@@ -391,7 +398,6 @@ export const canAssignPlayerToTeam = (
     };
   }
 
-  const championshipType = isFemaleTeam ? "feminin" : "masculin";
   const phase = selectedPhase || "aller";
 
   // Pour le championnat de Paris, utiliser les données spécifiques à Paris
@@ -432,8 +438,8 @@ export const canAssignPlayerToTeam = (
       : player.masculineMatchesByTeamByPhase?.[phase];
   
   const futureBurnedTeam = isParis
-    ? calculateFutureBurnoutParis(matchesByTeamByPhase, teamNumber)
-    : calculateFutureBurnout(matchesByTeamByPhase, teamNumber);
+    ? calculateFutureBurnoutParis(matchesByTeamByPhase, teamNumber, championshipType)
+    : calculateFutureBurnout(matchesByTeamByPhase, teamNumber, championshipType);
   
   // Le joueur sera brûlé si :
   // 1. Le brûlage futur est différent du brûlage actuel (changement d'équipe brûlée)
@@ -566,6 +572,7 @@ export const validateTeamCompositionState = (
     compositions,
     selectedPhase,
     selectedJournee,
+    championshipType,
     journeeRule = DEFAULT_JOURNEE_RULE,
     maxPlayersPerTeam = 4,
   } = params;
@@ -597,7 +604,7 @@ export const validateTeamCompositionState = (
     };
   }
 
-  const isFemaleTeam = equipe.matches.some((match) => match.isFemale === true);
+  const isFemaleTeam = championshipType === "feminin";
   const isParis = isParisChampionship(equipe);
 
   // Pour le championnat de Paris : pas de limite sur les joueurs étrangers

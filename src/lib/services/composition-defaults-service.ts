@@ -5,10 +5,11 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { getDbInstanceDirect } from "@/lib/firebase";
+import { ChampionshipType } from "@/types";
 
 export interface PhaseCompositionDefaults {
   phase: "aller" | "retour";
-  championshipType: "masculin" | "feminin";
+  championshipType: ChampionshipType;
   teams: Record<string, string[]>;
   updatedAt?: Date;
 }
@@ -18,14 +19,14 @@ export class CompositionDefaultsService {
 
   private getDocumentId(
     phase: "aller" | "retour",
-    championshipType: "masculin" | "feminin"
+    championshipType: ChampionshipType
   ): string {
     return `${phase}_${championshipType}`;
   }
 
   async getDefaults(
     phase: "aller" | "retour",
-    championshipType: "masculin" | "feminin"
+    championshipType: ChampionshipType
   ): Promise<PhaseCompositionDefaults | null> {
     try {
       const docId = this.getDocumentId(phase, championshipType);
@@ -41,8 +42,7 @@ export class CompositionDefaultsService {
       return {
         phase: (data.phase as "aller" | "retour") ?? phase,
         championshipType:
-          (data.championshipType as "masculin" | "feminin") ??
-          championshipType,
+          (data.championshipType as ChampionshipType) ?? championshipType,
         teams: (data.teams as Record<string, string[]>) ?? {},
         updatedAt:
           data.updatedAt instanceof Timestamp
@@ -60,7 +60,7 @@ export class CompositionDefaultsService {
 
   async saveDefaults(params: {
     phase: "aller" | "retour";
-    championshipType: "masculin" | "feminin";
+    championshipType: ChampionshipType;
     teams: Record<string, string[]>;
   }): Promise<void> {
     const { phase, championshipType, teams } = params;

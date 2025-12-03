@@ -41,9 +41,14 @@ import { FirestorePlayerService } from "@/lib/services/firestore-player-service"
 import { AvailabilityService, DayAvailability } from "@/lib/services/availability-service";
 import { CompositionService } from "@/lib/services/composition-service";
 import { Player } from "@/types/team-management";
+import { ChampionshipType } from "@/types";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
 import { getCurrentPhase } from "@/lib/shared/phase-utils";
+import {
+  getPlayersByType,
+  getTeamsByType,
+} from "@/lib/compositions/championship-utils";
 
 interface AvailabilityResponse {
   available?: boolean;
@@ -51,8 +56,6 @@ interface AvailabilityResponse {
 }
 
 import { EpreuveType, getIdEpreuve, getMatchEpreuve } from "@/lib/shared/epreuve-utils";
-
-type ChampionshipType = "masculin" | "feminin";
 
 type PlayerAvailabilityByType = {
   masculin?: AvailabilityResponse;
@@ -219,6 +222,7 @@ const buildPlayersPayload = (
 
 export default function DisponibilitesPage() {
   const { equipes, loading: loadingEquipes } = useEquipesWithMatches();
+  const equipesByType = useMemo(() => getTeamsByType(equipes), [equipes]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [loadingPlayers, setLoadingPlayers] = useState(true);
   const [selectedEpreuve, setSelectedEpreuve] = useState<EpreuveType | null>(null);
@@ -339,7 +343,12 @@ export default function DisponibilitesPage() {
       })),
     });
 
-    equipes.forEach((equipe) => {
+    const equipesForJournees = [
+      ...equipesByType.masculin,
+      ...equipesByType.feminin,
+    ];
+
+    equipesForJournees.forEach((equipe) => {
       equipe.matches.forEach((match) => {
         const epreuve = getMatchEpreuve(match, equipe.team);
         
@@ -443,7 +452,7 @@ export default function DisponibilitesPage() {
     });
 
     return journeesMap;
-  }, [equipes]);
+  }, [equipes, equipesByType.feminin, equipesByType.masculin]);
 
   // Extraire les journées pour l'épreuve sélectionnée
   const journeesByPhase = useMemo(() => {
@@ -580,6 +589,13 @@ export default function DisponibilitesPage() {
         filtered = filtered.filter((p) => p.participation?.championnat === true);
       }
     }
+
+    const championshipTypeForFilter: ChampionshipType =
+      selectedEpreuve?.toLowerCase().includes("femin") === true
+        ? "feminin"
+        : "masculin";
+
+    filtered = getPlayersByType(filtered, championshipTypeForFilter);
 
     // Filtre de recherche
     if (searchQuery) {
@@ -1432,12 +1448,12 @@ interface PlayerListProps {
   >;
   onAvailabilityChange: (
     playerId: string,
-    championshipType: "masculin" | "feminin",
+    championshipType: ChampionshipType,
     available: boolean
   ) => void;
   onCommentChange: (
     playerId: string,
-    championshipType: "masculin" | "feminin",
+    championshipType: ChampionshipType,
     comment: string
   ) => void;
   selectedEpreuve?: EpreuveType | null;
@@ -1453,7 +1469,7 @@ function PlayerList({
   const isParisChampionship = selectedEpreuve === "championnat_paris";
   const [expandedPlayer, setExpandedPlayer] = useState<{
     id: string;
-    type: "masculin" | "feminin" | "both";
+    type: ChampionshipType | "both";
   } | null>(null);
 
   return (

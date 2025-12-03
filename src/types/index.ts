@@ -1,5 +1,7 @@
 // Types de base pour l&apos;application SQY Ping
 
+export type { ChampionshipType } from "./championship";
+
 export interface Player {
   id: string;
   ffttId: string;

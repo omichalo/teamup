@@ -1,8 +1,9 @@
 import type { Player } from "@/types/team-management";
 import type { PhaseType } from "@/lib/compositions/validation";
+import { ChampionshipType } from "@/types";
 
 interface CreateDragImageOptions {
-  championshipType?: "masculin" | "feminin";
+  championshipType?: ChampionshipType;
   phase?: PhaseType;
 }
 

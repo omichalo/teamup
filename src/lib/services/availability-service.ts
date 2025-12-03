@@ -1,5 +1,6 @@
 import { doc, getDoc, setDoc, Timestamp, onSnapshot, Unsubscribe } from "firebase/firestore";
 import { getDbInstanceDirect } from "@/lib/firebase";
+import { ChampionshipType } from "@/types";
 
 export interface AvailabilityResponse {
   available?: boolean;
@@ -59,7 +60,7 @@ export interface PlayerAvailability {
 export interface DayAvailability {
   journee: number;
   phase: "aller" | "retour";
-  championshipType: "masculin" | "feminin";
+  championshipType: ChampionshipType;
   idEpreuve?: number; // ID de l'épreuve FFTT (15954, 15955, 15980, etc.) pour différencier les calendriers
   date?: string;
   players: PlayerAvailability;
@@ -73,7 +74,7 @@ export class AvailabilityService {
   private getDocumentId(
     journee: number,
     phase: "aller" | "retour",
-    championshipType: "masculin" | "feminin",
+    championshipType: ChampionshipType,
     idEpreuve?: number
   ): string {
     // Si idEpreuve est fourni, l'inclure dans l'ID pour différencier les calendriers
@@ -87,7 +88,7 @@ export class AvailabilityService {
   async getAvailability(
     journee: number,
     phase: "aller" | "retour",
-    championshipType: "masculin" | "feminin",
+    championshipType: ChampionshipType,
     idEpreuve?: number
   ): Promise<DayAvailability | null> {
     try {
@@ -194,7 +195,7 @@ export class AvailabilityService {
   async updatePlayerAvailability(
     journee: number,
     phase: "aller" | "retour",
-    championshipType: "masculin" | "feminin",
+    championshipType: ChampionshipType,
     playerId: string,
     response: AvailabilityResponse
   ): Promise<void> {
@@ -222,7 +223,7 @@ export class AvailabilityService {
   async isPlayerAvailable(
     playerId: string,
     _date: string,
-    gender: "masculin" | "feminin"
+    gender: ChampionshipType
   ): Promise<boolean> {
     try {
       // Extraire journee et phase depuis la date
@@ -259,7 +260,7 @@ export class AvailabilityService {
   subscribeToAvailability(
     journee: number,
     phase: "aller" | "retour",
-    championshipType: "masculin" | "feminin",
+    championshipType: ChampionshipType,
     callback: (availability: DayAvailability | null) => void,
     idEpreuve?: number
   ): Unsubscribe {

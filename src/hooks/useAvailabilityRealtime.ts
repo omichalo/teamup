@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AvailabilityService, DayAvailability } from "@/lib/services/availability-service";
+import { ChampionshipType } from "@/types";
 
 /**
  * Hook pour écouter les changements de disponibilité en temps réel
@@ -11,7 +12,7 @@ import { AvailabilityService, DayAvailability } from "@/lib/services/availabilit
 export const useAvailabilityRealtime = (
   journee: number | null,
   phase: "aller" | "retour" | null,
-  championshipType: "masculin" | "feminin",
+  championshipType: ChampionshipType,
   idEpreuve?: number
 ) => {
   const [availability, setAvailability] = useState<DayAvailability | null>(null);
