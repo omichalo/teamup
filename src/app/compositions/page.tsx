@@ -80,11 +80,11 @@ import {
 import { AvailablePlayersPanel } from "@/components/compositions/AvailablePlayersPanel";
 import { TeamCompositionCard } from "@/components/compositions/TeamCompositionCard";
 import { CompositionsSummary } from "@/components/compositions/CompositionsSummary";
-import { createDragImage } from "@/lib/compositions/drag-utils";
 import {
   CompositionRulesHelp,
   type CompositionRuleItem,
 } from "@/components/compositions/CompositionRulesHelp";
+import { usePlayerDrag } from "@/hooks/usePlayerDrag";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -303,10 +303,6 @@ export default function CompositionsPage() {
   const [compositions, setCompositions] = useState<Record<string, string[]>>(
     {}
   );
-  // État pour le joueur actuellement en train d'être dragué
-  const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
-  // État pour l'équipe sur laquelle on survole avec le drag
-  const [dragOverTeamId, setDragOverTeamId] = useState<string | null>(null);
   // État pour la recherche de joueurs
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isResetting, setIsResetting] = useState(false);
@@ -1725,261 +1721,155 @@ export default function CompositionsPage() {
     });
   };
 
-  // Gestion du drag & drop
-  const handleDragStart = (e: React.DragEvent, playerId: string) => {
-    // Empêcher le drag si on clique sur le Chip de suppression ou un de ses enfants
-    const target = e.target as HTMLElement;
-
-    // Vérifier si le clic provient du Chip de suppression ou d'un de ses enfants
-    const clickedChip =
-      target.closest('[data-chip="remove"]') ||
-      target.closest('button[aria-label*="remove"]') ||
-      (target.tagName === "BUTTON" && target.textContent?.trim() === "×");
-
-    if (clickedChip || target.textContent?.trim() === "×") {
-      e.preventDefault();
-      e.stopPropagation();
-      return;
-    }
-
-    e.dataTransfer.setData("playerId", playerId);
-    e.dataTransfer.effectAllowed = "move";
-    setDraggedPlayerId(playerId);
-    // S'assurer que dragOverTeamId est null au début du drag
-    setDragOverTeamId(null);
-
-    // Ajouter une classe au <html> pour forcer le curseur pendant le drag
-    // Le style CSS global gérera le curseur (défini dans globals.css)
-    document.documentElement.classList.add("dragging");
-
-    // Créer une image personnalisée pour le drag (seulement le contenu de l'élément)
-    const player = players.find((p) => p.id === playerId);
-
-    if (!player) {
-      return;
-    }
-
-    // Déterminer le type de championnat pour le brûlage
-    // Si le joueur est dans une équipe, utiliser le type de l'équipe
-    // Sinon, utiliser le tab actuel (liste disponible)
-    const equipe = filteredEquipes.find((eq) => {
-      const teamPlayers = compositions[eq.team.id] || [];
-      return teamPlayers.includes(playerId);
-    });
-    const championshipType = equipe
-      ? equipe.matches.some((match) => match.isFemale === true)
-        ? "feminin"
-        : "masculin"
-      : tabValue === 0
-      ? "masculin"
-      : "feminin";
-
-    // Créer l'image de drag uniforme (mutualisée pour les deux cas)
-    const tempDiv = createDragImage(player, {
-      championshipType,
-      phase: (selectedPhase || "aller") as "aller" | "retour",
-    });
-    document.body.appendChild(tempDiv);
-
-    // Forcer un reflow pour s'assurer que les dimensions sont calculées
-    void tempDiv.offsetHeight;
-
-    // Utiliser l'élément temporaire comme image de drag
-    e.dataTransfer.setDragImage(tempDiv, 0, 0);
-
-    // Nettoyer après un court délai
-    setTimeout(() => {
-      if (document.body.contains(tempDiv)) {
-        document.body.removeChild(tempDiv);
-      }
-    }, 0);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedPlayerId(null);
-    setDragOverTeamId(null);
-
-    // Retirer la classe du <html> pour restaurer le curseur par défaut
-    document.documentElement.classList.remove("dragging");
-
-    // Nettoyer le style injecté si présent (sécurité)
-    const style = document.getElementById("drag-cursor-style");
-    if (style) {
-      style.remove();
-    }
-  };
-
-  // Nettoyer le drag si le drop se fait hors zone
-  useEffect(() => {
-    const clearDrag = () => {
-      document.documentElement.classList.remove("dragging");
-      const style = document.getElementById("drag-cursor-style");
-      if (style) {
-        style.remove();
-      }
-      setDraggedPlayerId(null);
-      setDragOverTeamId(null);
-    };
-
-    window.addEventListener("drop", clearDrag);
-    window.addEventListener("dragend", clearDrag);
-
-    return () => {
-      window.removeEventListener("drop", clearDrag);
-      window.removeEventListener("dragend", clearDrag);
-    };
-  }, []);
-
-  const handleDragOver = (e: React.DragEvent, teamId: string) => {
-    e.preventDefault();
-    setDragOverTeamId(teamId);
-
-    if (draggedPlayerId) {
-      const validation = canDropPlayer(draggedPlayerId, teamId);
-      e.dataTransfer.dropEffect = validation.canAssign ? "move" : "none";
-    } else {
-      e.dataTransfer.dropEffect = "move";
-    }
-  };
-
-  const handleDragLeave = () => {
-    setDragOverTeamId(null);
-  };
-
-  const handleDrop = (e: React.DragEvent, teamId: string) => {
-    e.preventDefault();
-    const playerId = e.dataTransfer.getData("playerId");
-
-    // Réinitialiser les états de drag immédiatement
-    setDragOverTeamId(null);
-
-    if (!playerId) {
-      setDraggedPlayerId(null);
-      return;
-    }
-
-    // Trouver le joueur et l'équipe
-    const player = players.find((p) => p.id === playerId);
-    const equipe = equipes.find((eq) => eq.team.id === teamId);
-
-    if (!player || !equipe) {
-      return;
-    }
-
-    const validation = canDropPlayer(playerId, teamId);
-    if (!validation.canAssign) {
-      setDraggedPlayerId(null);
-      return;
-    }
-
-    const isFemaleTeam = equipe.matches.some(
-      (match) => match.isFemale === true
-    );
-    const championshipType = isFemaleTeam ? "feminin" : "masculin";
-
-    setCompositions((prev) => {
-      const equipeForMax = equipes.find((e) => e.team.id === teamId);
-      const maxPlayers = equipeForMax ? getMaxPlayersForTeam(equipeForMax) : 4;
-
-      const latestValidation = canAssignPlayerToTeam({
-        playerId,
-        teamId,
-        players,
-        equipes,
-        compositions: prev,
-        selectedPhase,
-        selectedJournee,
-        journeeRule: JOURNEE_CONCERNEE_PAR_REGLE,
-        maxPlayersPerTeam: maxPlayers,
+  const getDragPreviewOptions = useCallback(
+    (playerId: string) => {
+      const equipe = filteredEquipes.find((eq) => {
+        const teamPlayers = compositions[eq.team.id] || [];
+        return teamPlayers.includes(playerId);
       });
 
-      if (!latestValidation.canAssign) {
-        return prev;
-      }
+      const championshipType: "masculin" | "feminin" = equipe
+        ? equipe.matches.some((match) => match.isFemale === true)
+          ? "feminin"
+          : "masculin"
+        : tabValue === 0
+        ? "masculin"
+        : "feminin";
 
-      const currentTeamPlayers = prev[teamId] || [];
-
-      // Ne pas ajouter si le joueur est déjà dans l'équipe (même équipe)
-      if (currentTeamPlayers.includes(playerId)) {
-        return prev;
-      }
-
-      // Retirer le joueur de toutes les autres équipes du même type (masculin/féminin)
-      const updatedCompositions = { ...prev };
-      const isFemaleTeam = equipe.matches.some(
-        (match) => match.isFemale === true
-      );
-
-      // Trouver toutes les équipes du même type (masculin ou féminin)
-      const sameTypeEquipes = filteredEquipes.filter((eq) => {
-        const eqIsFemale = eq.matches.some((match) => match.isFemale === true);
-        return eqIsFemale === isFemaleTeam;
-      });
-
-      // Retirer le joueur de toutes les équipes du même type
-      sameTypeEquipes.forEach((eq) => {
-        if (updatedCompositions[eq.team.id]) {
-          updatedCompositions[eq.team.id] = updatedCompositions[
-            eq.team.id
-          ].filter((id) => id !== playerId);
-        }
-      });
-
-      // Limiter selon le maxPlayers de l'équipe
-      const targetTeamPlayers = updatedCompositions[teamId] || [];
-      if (targetTeamPlayers.length >= maxPlayers) {
-        return prev;
-      }
-
-      // Vérifier si le joueur est étranger (ETR) et si l'équipe a déjà un joueur étranger
-      if (player.nationality === "ETR") {
-        const targetTeamPlayersData = targetTeamPlayers
-          .map((pid) => players.find((p) => p.id === pid))
-          .filter((p): p is Player => p !== undefined);
-
-        const hasForeignPlayer = targetTeamPlayersData.some(
-          (p) => p.nationality === "ETR"
-        );
-
-        if (hasForeignPlayer) {
-          return prev; // Ne pas ajouter le joueur
-        }
-      }
-
-      // Ajouter le joueur à la nouvelle équipe
-      const newCompositions = {
-        ...updatedCompositions,
-        [teamId]: [...targetTeamPlayers, playerId],
+      return {
+        championshipType,
+        phase: (selectedPhase || "aller") as "aller" | "retour",
       };
+    },
+    [compositions, filteredEquipes, selectedPhase, tabValue]
+  );
 
-      setDefaultCompositions((prev) => ({
-        ...prev,
-        [championshipType]: newCompositions,
-      }));
+  const handlePlayerDrop = useCallback(
+    async (teamId: string, playerId: string) => {
+      const player = players.find((p) => p.id === playerId);
+      const equipe = equipes.find((eq) => eq.team.id === teamId);
 
-      // Sauvegarder les compositions
-      if (selectedJournee !== null && selectedPhase !== null) {
-        const saveComposition = async () => {
-          try {
-            await compositionService.saveComposition({
-              journee: selectedJournee,
-              phase: selectedPhase,
-              championshipType,
-              teams: newCompositions,
-            });
-          } catch (error) {
-            console.error("Erreur lors de la sauvegarde:", error);
-          }
-        };
-        saveComposition();
+      if (!player || !equipe) {
+        return;
       }
 
-      return newCompositions;
-    });
+      const isFemaleTeam = equipe.matches.some((match) => match.isFemale === true);
+      const championshipType = isFemaleTeam ? "feminin" : "masculin";
 
-    // Réinitialiser draggedPlayerId après le drop pour éviter que le message s'affiche
-    setDraggedPlayerId(null);
-  };
+      setCompositions((prev) => {
+        const equipeForMax = equipes.find((e) => e.team.id === teamId);
+        const maxPlayers = equipeForMax ? getMaxPlayersForTeam(equipeForMax) : 4;
+
+        const latestValidation = canAssignPlayerToTeam({
+          playerId,
+          teamId,
+          players,
+          equipes,
+          compositions: prev,
+          selectedPhase,
+          selectedJournee,
+          journeeRule: JOURNEE_CONCERNEE_PAR_REGLE,
+          maxPlayersPerTeam: maxPlayers,
+        });
+
+        if (!latestValidation.canAssign) {
+          return prev;
+        }
+
+        const currentTeamPlayers = prev[teamId] || [];
+
+        if (currentTeamPlayers.includes(playerId)) {
+          return prev;
+        }
+
+        const updatedCompositions = { ...prev };
+
+        const sameTypeEquipes = filteredEquipes.filter((eq) => {
+          const eqIsFemale = eq.matches.some((match) => match.isFemale === true);
+          return eqIsFemale === isFemaleTeam;
+        });
+
+        sameTypeEquipes.forEach((eq) => {
+          if (updatedCompositions[eq.team.id]) {
+            updatedCompositions[eq.team.id] = updatedCompositions[eq.team.id].filter(
+              (id) => id !== playerId
+            );
+          }
+        });
+
+        const targetTeamPlayers = updatedCompositions[teamId] || [];
+        if (targetTeamPlayers.length >= maxPlayers) {
+          return prev;
+        }
+
+        if (player.nationality === "ETR") {
+          const targetTeamPlayersData = targetTeamPlayers
+            .map((pid) => players.find((p) => p.id === pid))
+            .filter((p): p is Player => p !== undefined);
+
+          const hasForeignPlayer = targetTeamPlayersData.some(
+            (p) => p.nationality === "ETR"
+          );
+
+          if (hasForeignPlayer) {
+            return prev;
+          }
+        }
+
+        const newCompositions = {
+          ...updatedCompositions,
+          [teamId]: [...targetTeamPlayers, playerId],
+        };
+
+        setDefaultCompositions((prevDefaults) => ({
+          ...prevDefaults,
+          [championshipType]: newCompositions,
+        }));
+
+        if (selectedJournee !== null && selectedPhase !== null) {
+          const saveComposition = async () => {
+            try {
+              await compositionService.saveComposition({
+                journee: selectedJournee,
+                phase: selectedPhase,
+                championshipType,
+                teams: newCompositions,
+              });
+            } catch (error) {
+              console.error("Erreur lors de la sauvegarde:", error);
+            }
+          };
+          saveComposition();
+        }
+
+        return newCompositions;
+      });
+    },
+    [
+      compositionService,
+      equipes,
+      filteredEquipes,
+      getMaxPlayersForTeam,
+      players,
+      selectedJournee,
+      selectedPhase,
+    ]
+  );
+
+  const {
+    draggedPlayerId,
+    dragOverTeamId,
+    handleDragStart,
+    handleDragEnd,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+  } = usePlayerDrag({
+    players,
+    canDropPlayer,
+    getPreviewOptions: getDragPreviewOptions,
+    onDrop: handlePlayerDrop,
+  });
 
   // Retirer un joueur d'une équipe
   const handleRemovePlayer = (teamId: string, playerId: string) => {
