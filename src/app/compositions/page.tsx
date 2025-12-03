@@ -15,17 +15,10 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Tabs,
-  Tab,
   Chip,
   CircularProgress,
   IconButton,
   Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
   TextField,
   Tooltip,
   Popper,
@@ -85,28 +78,12 @@ import {
   type CompositionRuleItem,
 } from "@/components/compositions/CompositionRulesHelp";
 import { usePlayerDrag } from "@/hooks/usePlayerDrag";
-
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`compositions-tabpanel-${index}`}
-      aria-labelledby={`compositions-tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box sx={{ p: 5 }}>{children}</Box>}
-    </div>
-  );
-}
+import { EpreuveSelect } from "@/components/compositions/Filters/EpreuveSelect";
+import { PhaseSelect } from "@/components/compositions/Filters/PhaseSelect";
+import { TeamPicker } from "@/components/compositions/Filters/TeamPicker";
+import { TabPanel } from "@/components/compositions/Filters/TabPanel";
+import { ConfirmationDialog } from "@/components/compositions/dialogs/ConfirmationDialog";
+import { DiscordResendDialog } from "@/components/compositions/dialogs/DiscordResendDialog";
 
 // Composant pour afficher les suggestions de mentions
 function MentionSuggestions({
@@ -2319,32 +2296,15 @@ export default function CompositionsPage() {
       redirectWhenUnauthorized="/joueur"
     >
       <Box sx={{ p: 5 }}>
-        <Dialog
+        <ConfirmationDialog
           open={confirmationDialog.open}
-          onClose={handleCancelConfirmation}
-          aria-labelledby="composition-confirmation-dialog-title"
-        >
-          <DialogTitle id="composition-confirmation-dialog-title">
-            {confirmationDialog.title}
-          </DialogTitle>
-          <DialogContent>
-            <DialogContentText>
-              {confirmationDialog.description}
-            </DialogContentText>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCancelConfirmation}>
-              {confirmationDialog.cancelLabel ?? "Annuler"}
-            </Button>
-            <Button
-              onClick={handleConfirmDialog}
-              variant="contained"
-              color="primary"
-            >
-              {confirmationDialog.confirmLabel ?? "Confirmer"}
-            </Button>
-          </DialogActions>
-        </Dialog>
+          title={confirmationDialog.title}
+          description={confirmationDialog.description}
+          cancelLabel={confirmationDialog.cancelLabel ?? "Annuler"}
+          confirmLabel={confirmationDialog.confirmLabel ?? "Confirmer"}
+          onCancel={handleCancelConfirmation}
+          onConfirm={handleConfirmDialog}
+        />
 
         <Typography variant="h4" gutterBottom>
           Composition des Équipes
@@ -2357,48 +2317,23 @@ export default function CompositionsPage() {
         <Card sx={{ mb: 3 }}>
           <CardContent sx={{ pt: 2.5, pb: 1.5 }}>
             <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
-              <FormControl size="small" sx={{ minWidth: 200 }}>
-                <InputLabel id="epreuve-select-label">Épreuve</InputLabel>
-                <Select
-                  labelId="epreuve-select-label"
-                  id="epreuve-select"
-                  value={selectedEpreuve || ""}
-                  label="Épreuve"
-                  onChange={(e) => {
-                    const epreuve = e.target.value as EpreuveType;
-                    setSelectedEpreuve(epreuve);
-                    setSelectedPhase(null); // Réinitialiser la phase lors du changement d'épreuve
-                    setSelectedJournee(null); // Réinitialiser la journée lors du changement d'épreuve
-                  }}
-                >
-                  <MenuItem value="championnat_equipes">
-                    Championnat par Équipes
-                  </MenuItem>
-                  <MenuItem value="championnat_paris">
-                    Championnat de Paris IDF
-                  </MenuItem>
-                </Select>
-              </FormControl>
-              {/* Masquer le sélecteur de phase pour le championnat de Paris (une seule phase) */}
+              <EpreuveSelect
+                value={selectedEpreuve}
+                onChange={(epreuve) => {
+                  setSelectedEpreuve(epreuve);
+                  setSelectedPhase(null);
+                  setSelectedJournee(null);
+                }}
+              />
               {selectedEpreuve !== "championnat_paris" && (
-                <FormControl size="small" sx={{ minWidth: 150 }}>
-                  <InputLabel id="phase-select-label">Phase</InputLabel>
-                  <Select
-                    labelId="phase-select-label"
-                    id="phase-select"
-                    value={selectedPhase || ""}
-                    label="Phase"
-                    onChange={(e) => {
-                      const phase = e.target.value as "aller" | "retour";
-                      setSelectedPhase(phase);
-                      setSelectedJournee(null); // Réinitialiser la journée lors du changement de phase
-                    }}
-                    disabled={selectedEpreuve === null}
-                  >
-                    <MenuItem value="aller">Phase Aller</MenuItem>
-                    <MenuItem value="retour">Phase Retour</MenuItem>
-                  </Select>
-                </FormControl>
+                <PhaseSelect
+                  value={selectedPhase}
+                  onChange={(phase) => {
+                    setSelectedPhase(phase);
+                    setSelectedJournee(null);
+                  }}
+                  disabled={selectedEpreuve === null}
+                />
               )}
               <FormControl size="small" sx={{ minWidth: 150 }}>
                 <InputLabel id="journee-select-label">Journée</InputLabel>
@@ -2500,14 +2435,11 @@ export default function CompositionsPage() {
         {selectedJournee &&
         (selectedEpreuve === "championnat_paris" || selectedPhase) ? (
           <>
-            <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
-              {selectedEpreuve !== "championnat_paris" && (
-                <Tabs value={tabValue} onChange={handleTabChange}>
-                  <Tab label="Équipes Masculines" />
-                  <Tab label="Équipes Féminines" />
-                </Tabs>
-              )}
-            </Box>
+            <TeamPicker
+              value={tabValue}
+              onChange={handleTabChange}
+              showFemale={selectedEpreuve !== "championnat_paris"}
+            />
 
             <Box sx={{ display: "flex", gap: 2, position: "relative" }}>
               <AvailablePlayersPanel
@@ -4331,65 +4263,43 @@ export default function CompositionsPage() {
           </>
         ) : null}
 
-        {/* Dialog de confirmation pour renvoyer le message Discord */}
-        <Dialog
+        <DiscordResendDialog
           open={confirmResendDialog.open}
-          onClose={() =>
+          matchInfo={confirmResendDialog.matchInfo}
+          teamName={(() => {
+            if (!confirmResendDialog.teamId) return null;
+            const team = equipes.find((e) => e.team.id === confirmResendDialog.teamId);
+            return team?.team.name ?? null;
+          })()}
+          onCancel={() =>
             setConfirmResendDialog({
               open: false,
               teamId: null,
               matchInfo: null,
             })
           }
-        >
-          <DialogTitle>Renvoyer le message Discord ?</DialogTitle>
-          <DialogContent>
-            <DialogContentText>
-              Un message a déjà été envoyé pour ce match. Voulez-vous vraiment
-              le renvoyer ?
-            </DialogContentText>
-          </DialogContent>
-          <DialogActions>
-            <Button
-              onClick={() =>
-                setConfirmResendDialog({
-                  open: false,
-                  teamId: null,
-                  matchInfo: null,
-                })
-              }
-            >
-              Annuler
-            </Button>
-            <Button
-              onClick={() => {
-                if (
-                  confirmResendDialog.teamId &&
-                  confirmResendDialog.matchInfo &&
-                  selectedJournee &&
-                  selectedPhase
-                ) {
-                  handleSendDiscordMessage(
-                    confirmResendDialog.teamId,
-                    confirmResendDialog.matchInfo,
-                    selectedJournee,
-                    selectedPhase,
-                    confirmResendDialog.channelId
-                  );
-                  setConfirmResendDialog({
-                    open: false,
-                    teamId: null,
-                    matchInfo: null,
-                  });
-                }
-              }}
-              color="warning"
-              variant="contained"
-            >
-              Renvoyer
-            </Button>
-          </DialogActions>
-        </Dialog>
+          onConfirm={() => {
+            if (
+              confirmResendDialog.teamId &&
+              confirmResendDialog.matchInfo &&
+              selectedJournee &&
+              selectedPhase
+            ) {
+              handleSendDiscordMessage(
+                confirmResendDialog.teamId,
+                confirmResendDialog.matchInfo,
+                selectedJournee,
+                selectedPhase,
+                confirmResendDialog.channelId
+              );
+              setConfirmResendDialog({
+                open: false,
+                teamId: null,
+                matchInfo: null,
+              });
+            }
+          }}
+        />
 
         {(!selectedJournee || !selectedPhase) && (
           <Card>

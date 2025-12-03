@@ -8,16 +8,10 @@ import Link from "next/link";
 import {
   Box,
   Typography,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Stack,
   Button,
   Alert,
   CircularProgress,
-  Tabs,
-  Tab,
   Chip,
   ListItem,
   ListItemButton,
@@ -54,36 +48,18 @@ import { TeamCompositionCard } from "@/components/compositions/TeamCompositionCa
 import { CompositionsSummary } from "@/components/compositions/CompositionsSummary";
 import { CompositionRulesHelp, type CompositionRuleItem } from "@/components/compositions/CompositionRulesHelp";
 import { usePlayerDrag } from "@/hooks/usePlayerDrag";
+import { EpreuveSelect } from "@/components/compositions/Filters/EpreuveSelect";
+import { PhaseSelect } from "@/components/compositions/Filters/PhaseSelect";
+import { TeamPicker } from "@/components/compositions/Filters/TeamPicker";
+import { TabPanel } from "@/components/compositions/Filters/TabPanel";
 
 interface PhaseSelectOption {
   value: "aller" | "retour";
   label: string;
 }
 
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
 const MAX_PLAYERS_PER_DEFAULT_TEAM = 5;
 const MIN_PLAYERS_FOR_DEFAULT_COMPLETION = 4;
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`default-compositions-tabpanel-${index}`}
-      aria-labelledby={`default-compositions-tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box sx={{ p: 5 }}>{children}</Box>}
-    </div>
-  );
-}
 
 export default function DefaultCompositionsPage() {
   const { equipes, loading: loadingEquipes } = useEquipesWithMatches();
@@ -996,50 +972,20 @@ export default function DefaultCompositionsPage() {
           <Card sx={{ mb: 3 }}>
             <CardContent sx={{ pt: 2.5, pb: 1.5 }}>
               <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
-                <FormControl size="small" sx={{ minWidth: 200 }}>
-                  <InputLabel id="epreuve-select-label">Épreuve</InputLabel>
-                  <Select
-                    labelId="epreuve-select-label"
-                    id="epreuve-select"
-                    value={selectedEpreuve || ""}
-                    label="Épreuve"
-                    onChange={(e) => {
-                      const epreuve = e.target.value as EpreuveType;
-                      setSelectedEpreuve(epreuve);
-                      setSelectedPhase(null); // Réinitialiser la phase lors du changement d'épreuve
-                    }}
-                  >
-                    <MenuItem value="championnat_equipes">
-                      Championnat par Équipes
-                    </MenuItem>
-                    <MenuItem value="championnat_paris">
-                      Championnat de Paris IDF
-                    </MenuItem>
-                  </Select>
-                </FormControl>
-                {/* Masquer le sélecteur de phase pour le championnat de Paris (une seule phase) */}
+                <EpreuveSelect
+                  value={selectedEpreuve}
+                  onChange={(epreuve) => {
+                    setSelectedEpreuve(epreuve);
+                    setSelectedPhase(null);
+                  }}
+                />
                 {selectedEpreuve !== "championnat_paris" && (
-                  <FormControl size="small" sx={{ minWidth: 180 }}>
-                    <InputLabel id="default-phase-label">Phase</InputLabel>
-                    <Select
-                      labelId="default-phase-label"
-                      label="Phase"
-                      value={selectedPhase || ""}
-                      onChange={(event) =>
-                        setSelectedPhase(
-                          event.target.value
-                            ? (event.target.value as "aller" | "retour")
-                            : null
-                        )
-                      }
-                    >
-                      {phaseOptions.map((option) => (
-                        <MenuItem key={option.value} value={option.value}>
-                          {option.label}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
+                  <PhaseSelect
+                    value={selectedPhase}
+                    onChange={(phase) => setSelectedPhase(phase)}
+                    options={phaseOptions}
+                    minWidth={180}
+                  />
                 )}
               </Box>
             </CardContent>
@@ -1071,14 +1017,11 @@ export default function DefaultCompositionsPage() {
                 </Alert>
               )}
 
-              {selectedEpreuve !== "championnat_paris" && (
-                <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
-                  <Tabs value={currentTabIndex} onChange={handleTabChange}>
-                    <Tab label="Équipes Masculines" />
-                    <Tab label="Équipes Féminines" />
-                  </Tabs>
-                </Box>
-              )}
+              <TeamPicker
+                value={currentTabIndex}
+                onChange={handleTabChange}
+                showFemale={selectedEpreuve !== "championnat_paris"}
+              />
 
               <Box sx={{ display: "flex", gap: 2, position: "relative" }}>
                 <AvailablePlayersPanel
@@ -1277,7 +1220,11 @@ export default function DefaultCompositionsPage() {
                     title="Bilan des compositions par défaut"
                   />
 
-                  <TabPanel value={currentTabIndex} index={0}>
+                  <TabPanel
+                    value={currentTabIndex}
+                    index={0}
+                    baseId="default-compositions"
+                  >
                     {(() => {
                       // Pour le championnat de Paris, afficher toutes les équipes (masculin + féminin)
                       const equipesToDisplay =
@@ -1501,7 +1448,11 @@ export default function DefaultCompositionsPage() {
                     })()}
                   </TabPanel>
 
-                  <TabPanel value={currentTabIndex} index={1}>
+                  <TabPanel
+                    value={currentTabIndex}
+                    index={1}
+                    baseId="default-compositions"
+                  >
                     {equipesByType.feminin.length === 0 ? (
                       <Typography variant="body2" color="text.secondary">
                         Aucune équipe féminine
