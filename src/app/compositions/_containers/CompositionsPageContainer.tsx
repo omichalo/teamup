@@ -38,20 +38,17 @@ import {
   AlternateEmail,
   Warning,
 } from "@mui/icons-material";
-import {
-  useEquipesWithMatches,
-  type EquipeWithMatches,
-} from "@/hooks/useEquipesWithMatches";
-import { useCompositionRealtime } from "@/hooks/useCompositionRealtime";
-import { useAvailabilityRealtime } from "@/hooks/useAvailabilityRealtime";
-import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
+import { useTeamData, type EquipeWithMatches } from "@/hooks/useTeamData";
+import { useAvailabilities } from "@/hooks/useAvailabilities";
+import { useCompositions } from "@/hooks/useCompositions";
+import { usePlayers } from "@/hooks/usePlayers";
+import { useDiscordMembers } from "@/hooks/useDiscordMembers";
 import { CompositionService } from "@/lib/services/composition-service";
 import { CompositionDefaultsService } from "@/lib/services/composition-defaults-service";
 import { Player } from "@/types/team-management";
 import { ChampionshipType, Match } from "@/types";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
-import { getCurrentPhase } from "@/lib/shared/phase-utils";
 import {
   EpreuveType,
   getIdEpreuve,
@@ -270,9 +267,8 @@ function formatDivision(division: string): string {
 }
 
 export function CompositionsPageContainer() {
-  const { equipes, loading: loadingEquipes } = useEquipesWithMatches();
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [loadingPlayers, setLoadingPlayers] = useState(true);
+  const { equipes, loading: loadingEquipes, currentPhase } = useTeamData();
+  const { players, loading: loadingPlayers } = usePlayers();
   const [selectedEpreuve, setSelectedEpreuve] = useState<EpreuveType | null>(
     null
   );
@@ -341,9 +337,7 @@ export function CompositionsPageContainer() {
     matchInfo: string | null;
     channelId?: string;
   }>({ open: false, teamId: null, matchInfo: null });
-  const [discordMembers, setDiscordMembers] = useState<
-    Array<{ id: string; username: string; displayName: string }>
-  >([]);
+  const { members: discordMembers } = useDiscordMembers();
   const [discordChannels, setDiscordChannels] = useState<
     Array<{ id: string; name: string }>
   >([]);
@@ -370,7 +364,6 @@ export function CompositionsPageContainer() {
     [discordMembers]
   );
 
-  const playerService = useMemo(() => new FirestorePlayerService(), []);
   const compositionService = useMemo(() => new CompositionService(), []);
   const compositionDefaultsService = useMemo(
     () => new CompositionDefaultsService(),
@@ -468,13 +461,6 @@ export function CompositionsPageContainer() {
   }, [selectedEpreuve]);
 
   // Déterminer la phase en cours
-  const currentPhase = useMemo(() => {
-    if (loadingEquipes || equipes.length === 0) {
-      return "aller" as const;
-    }
-    return getCurrentPhase(equipes);
-  }, [equipes, loadingEquipes]);
-
   // Grouper les équipes par type (masculin/féminin)
   // Filtrer les équipes selon l'épreuve sélectionnée
   const filteredEquipes = useMemo(() => {
@@ -701,23 +687,6 @@ export function CompositionsPageContainer() {
     }
   }, [selectedPhase, selectedEpreuve, journeesByPhase]);
 
-  // Charger les joueurs
-  const loadPlayers = useCallback(async () => {
-    try {
-      setLoadingPlayers(true);
-      const allPlayers = await playerService.getAllPlayers();
-      setPlayers(allPlayers);
-    } catch (error) {
-      console.error("Erreur lors du chargement des joueurs:", error);
-    } finally {
-      setLoadingPlayers(false);
-    }
-  }, [playerService]);
-
-  useEffect(() => {
-    loadPlayers();
-  }, [loadPlayers]);
-
   // Charger les locations via l'API route (évite les problèmes de permissions Firestore côté client)
   useEffect(() => {
     const loadLocations = async () => {
@@ -741,50 +710,6 @@ export function CompositionsPageContainer() {
       }
     };
     void loadLocations();
-  }, []);
-
-  // Charger les membres Discord pour l'autocomplete
-  useEffect(() => {
-    const loadDiscordMembers = async () => {
-      try {
-        console.log("[Compositions] Chargement des membres Discord...");
-        const response = await fetch("/api/discord/members", {
-          method: "GET",
-          credentials: "include",
-        });
-        console.log("[Compositions] Réponse status:", response.status);
-        if (response.ok) {
-          const result = await response.json();
-          console.log("[Compositions] Résultat:", result);
-          if (result.success) {
-            console.log(
-              "[Compositions] Membres reçus:",
-              result.members?.length || 0
-            );
-            setDiscordMembers(result.members || []);
-          } else {
-            console.error(
-              "[Compositions] Erreur dans la réponse:",
-              result.error
-            );
-          }
-        } else {
-          const errorText = await response.text();
-          console.error(
-            "[Compositions] Erreur HTTP:",
-            response.status,
-            errorText
-          );
-        }
-      } catch (error) {
-        console.error(
-          "[Compositions] Erreur lors du chargement des membres Discord:",
-          error
-        );
-      } finally {
-      }
-    };
-    void loadDiscordMembers();
   }, []);
 
   // Charger les canaux Discord
@@ -991,23 +916,22 @@ export function CompositionsPageContainer() {
   const {
     availability: masculineAvailability,
     error: errorMasculineAvailability,
-  } = useAvailabilityRealtime(
-    selectedJournee,
-    selectedPhase,
-    "masculin",
-    idEpreuve
-  );
+  } = useAvailabilities({
+    journee: selectedJournee,
+    phase: selectedPhase,
+    championshipType: "masculin",
+    ...(idEpreuve !== undefined ? { idEpreuve } : {}),
+  });
 
-  // Écouter les disponibilités en temps réel (féminin)
   const {
     availability: feminineAvailability,
     error: errorFeminineAvailability,
-  } = useAvailabilityRealtime(
-    selectedJournee,
-    selectedPhase,
-    "feminin",
-    idEpreuve
-  );
+  } = useAvailabilities({
+    journee: selectedJournee,
+    phase: selectedPhase,
+    championshipType: "feminin",
+    ...(idEpreuve !== undefined ? { idEpreuve } : {}),
+  });
 
   // Mettre à jour les disponibilités en temps réel
   useEffect(() => {
@@ -1100,7 +1024,11 @@ export function CompositionsPageContainer() {
 
   // Écouter les compositions en temps réel
   const { composition: realtimeComposition, error: compositionError } =
-    useCompositionRealtime(selectedJournee, selectedPhase, championshipType);
+    useCompositions({
+      journee: selectedJournee,
+      phase: selectedPhase,
+      championshipType,
+    });
 
   // Mettre à jour les compositions en fonction de la composition en temps réel ou des defaults
   useEffect(() => {

@@ -1,6 +1,6 @@
 import { Player } from "@/types/team-management";
 import { ChampionshipType, Match } from "@/types";
-import { EquipeWithMatches } from "@/hooks/useEquipesWithMatches";
+import { EquipeWithMatches } from "@/hooks/useTeamData";
 import { validateFFTTRules } from "@/lib/shared/fftt-utils";
 import { getMatchEpreuve, ID_EPREUVE_PARIS } from "@/lib/shared/epreuve-utils";
 

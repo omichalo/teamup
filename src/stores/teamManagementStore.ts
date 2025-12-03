@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { EquipeWithMatches } from "@/hooks/useEquipesWithMatches";
+import { EquipeWithMatches } from "@/hooks/useTeamData";
 import {
   transformAggregatedTeamEntry,
   type AggregatedTeamEntry,
@@ -19,7 +19,7 @@ const availabilityService = new AvailabilityService();
 const compositionService = new CompositionService();
 const compositionDefaultsService = new CompositionDefaultsService();
 
-const getDayKey = (params: {
+export const getDayKey = (params: {
   journee: number;
   phase: "aller" | "retour";
   championshipType: ChampionshipType;

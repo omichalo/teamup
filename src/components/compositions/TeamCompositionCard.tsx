@@ -11,7 +11,7 @@ import {
 } from "@mui/material";
 import { DragIndicator } from "@mui/icons-material";
 import type { Player } from "@/types/team-management";
-import type { EquipeWithMatches } from "@/hooks/useEquipesWithMatches";
+import type { EquipeWithMatches } from "@/hooks/useTeamData";
 import type { EpreuveType } from "@/lib/shared/epreuve-utils";
 
 export interface TeamCompositionCardProps {

@@ -39,7 +39,7 @@ import {
   Message,
   LocationOn,
 } from "@mui/icons-material";
-import { useEquipesWithMatches } from "@/hooks/useEquipesWithMatches";
+import { useTeamData } from "@/hooks/useTeamData";
 import { Match } from "@/types";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
@@ -47,7 +47,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 export default function EquipesPage() {
   const { user } = useAuth();
-  const { equipes: initialEquipes, loading, error } = useEquipesWithMatches();
+  const { equipes: initialEquipes, loading, error } = useTeamData();
   const [equipes, setEquipes] = React.useState(initialEquipes);
   const [tabValue, setTabValue] = React.useState(0);
   const [selectedMatch, setSelectedMatch] = React.useState<Match | null>(null);

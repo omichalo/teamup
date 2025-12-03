@@ -100,7 +100,7 @@ export const determineMatchResult = (
 ### Flux de données
 
 1. **Page équipes** (`src/app/equipes/page.tsx`) :
-   - Utilise le hook `useEquipesWithMatches()`
+   - Utilise le hook `useTeamData()`
    - Appelle l'API `/api/teams/matches`
 
 2. **API Route** (`src/app/api/teams/matches/route.ts`) :
