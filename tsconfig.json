@@ -31,6 +31,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "zustand": [
+        "./src/lib/zustand"
       ]
     }
   },
