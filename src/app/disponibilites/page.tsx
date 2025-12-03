@@ -23,14 +23,12 @@ import {
   Tabs,
   Tab,
   Alert,
-  InputAdornment,
   Snackbar,
 } from "@mui/material";
 import {
   CheckCircle,
   Cancel,
   HourglassEmpty,
-  Search as SearchIcon,
   Group as GroupIcon,
   Comment as CommentIcon,
   DoneAll,
@@ -49,191 +47,43 @@ import {
   getPlayersByType,
   getTeamsByType,
 } from "@/lib/compositions/championship-utils";
-
-interface AvailabilityResponse {
-  available?: boolean;
-  comment?: string;
-}
+import { AvailabilityResponse } from "@/lib/services/availability-service";
+import {
+  AvailabilityState,
+  sanitizeAvailabilityEntry,
+  buildPlayersPayload,
+} from "@/lib/availability/utils";
+import { useAvailabilityStore } from "@/stores/availabilityStore";
+import { EpreuveSelect } from "@/components/compositions/Filters/EpreuveSelect";
+import { PhaseSelect } from "@/components/compositions/Filters/PhaseSelect";
+import { TeamPicker } from "@/components/compositions/Filters/TeamPicker";
+import { SearchInput } from "@/components/compositions/Filters/SearchInput";
+import { AvailabilityStatusChip } from "@/components/disponibilites/AvailabilityStatusChip";
 
 import { EpreuveType, getIdEpreuve, getMatchEpreuve } from "@/lib/shared/epreuve-utils";
 
-type PlayerAvailabilityByType = {
-  masculin?: AvailabilityResponse;
-  feminin?: AvailabilityResponse;
-};
-
-type AvailabilityState = Record<string, PlayerAvailabilityByType>;
-
-const sanitizeAvailabilityEntry = (
-  entry?: AvailabilityResponse | null
-): AvailabilityResponse | undefined => {
-  if (!entry) {
-    return undefined;
-  }
-
-  const sanitized: AvailabilityResponse = {};
-
-  if (typeof entry.available === "boolean") {
-    sanitized.available = entry.available;
-  }
-
-  if (typeof entry.comment === "string") {
-    const trimmed = entry.comment.trim();
-    if (trimmed.length > 0) {
-      sanitized.comment = trimmed;
-    }
-  }
-
-  if (sanitized.available === undefined && sanitized.comment === undefined) {
-    return undefined;
-  }
-
-  return sanitized;
-};
-
-const availabilityEntriesEqual = (
-  current?: AvailabilityResponse | null,
-  next?: AvailabilityResponse | null,
-  skipNormalization: boolean = false
-): boolean => {
-  // Pour les commentaires, on compare les valeurs brutes pour permettre les espaces
-  const normalizedCurrent = skipNormalization ? current : sanitizeAvailabilityEntry(current);
-  const normalizedNext = skipNormalization ? next : sanitizeAvailabilityEntry(next);
-
-  if (!normalizedCurrent && !normalizedNext) {
-    return true;
-  }
-  if (!normalizedCurrent || !normalizedNext) {
-    return false;
-  }
-
-  return (
-    normalizedCurrent.available === normalizedNext.available &&
-    normalizedCurrent.comment === normalizedNext.comment
-  );
-};
-
-const updateAvailabilityState = (
-  previousState: AvailabilityState,
-  playerId: string,
-  championshipType: ChampionshipType,
-  computeNextEntry: (
-    currentEntry: AvailabilityResponse | undefined
-  ) => AvailabilityResponse | undefined,
-  skipNormalization: boolean = false
-): { nextState: AvailabilityState; changed: boolean } => {
-  const currentPlayerState = previousState[playerId];
-  const currentEntry = currentPlayerState?.[championshipType];
-
-  const computedEntry = computeNextEntry(currentEntry);
-  
-  // Pour les commentaires, on compare les valeurs brutes pour permettre les espaces
-  // La normalisation sera faite uniquement lors de la sauvegarde
-  const normalizedCurrent = skipNormalization ? currentEntry : sanitizeAvailabilityEntry(currentEntry);
-  const normalizedNext = skipNormalization ? computedEntry : sanitizeAvailabilityEntry(computedEntry);
-
-  if (availabilityEntriesEqual(normalizedCurrent, normalizedNext, skipNormalization)) {
-    return { nextState: previousState, changed: false };
-  }
-
-  const nextState: AvailabilityState = { ...previousState };
-
-  // Si on skip la normalisation, on vérifie si l'entrée est vide différemment
-  if (skipNormalization) {
-    if (!computedEntry || (computedEntry.available === undefined && (!computedEntry.comment || computedEntry.comment.trim().length === 0))) {
-      if (!currentPlayerState) {
-        return { nextState: previousState, changed: false };
-      }
-
-      const nextPlayerState: PlayerAvailabilityByType = {
-        ...currentPlayerState,
-      };
-      delete nextPlayerState[championshipType];
-
-      if (Object.keys(nextPlayerState).length === 0) {
-        delete nextState[playerId];
-      } else {
-        nextState[playerId] = nextPlayerState;
-      }
-
-      return { nextState, changed: true };
-    }
-
-    // Stocker la valeur brute (avec espaces) pour les commentaires
-    const nextPlayerState: PlayerAvailabilityByType = {
-      ...(currentPlayerState ?? {}),
-      [championshipType]: { ...computedEntry },
-    };
-
-    nextState[playerId] = nextPlayerState;
-
-    return { nextState, changed: true };
-  }
-
-  // Comportement normal avec normalisation
-  if (!normalizedNext) {
-    if (!currentPlayerState) {
-      return { nextState: previousState, changed: false };
-    }
-
-    const nextPlayerState: PlayerAvailabilityByType = {
-      ...currentPlayerState,
-    };
-    delete nextPlayerState[championshipType];
-
-    if (Object.keys(nextPlayerState).length === 0) {
-      delete nextState[playerId];
-    } else {
-      nextState[playerId] = nextPlayerState;
-    }
-
-    return { nextState, changed: true };
-  }
-
-  const sanitizedEntry: AvailabilityResponse = {
-    ...normalizedNext,
-  };
-
-  const nextPlayerState: PlayerAvailabilityByType = {
-    ...(currentPlayerState ?? {}),
-    [championshipType]: sanitizedEntry,
-  };
-
-  nextState[playerId] = nextPlayerState;
-
-  return { nextState, changed: true };
-};
-
-const buildPlayersPayload = (
-  state: AvailabilityState,
-  championshipType: ChampionshipType
-): Record<string, AvailabilityResponse> => {
-  const payload: Record<string, AvailabilityResponse> = {};
-
-  Object.entries(state).forEach(([playerId, playerState]) => {
-    const entry = sanitizeAvailabilityEntry(playerState[championshipType]);
-    if (entry) {
-      payload[playerId] = entry;
-    }
-  });
-
-  return payload;
-};
 
 export default function DisponibilitesPage() {
   const { equipes, loading: loadingEquipes } = useEquipesWithMatches();
   const equipesByType = useMemo(() => getTeamsByType(equipes), [equipes]);
+  const {
+    selectedEpreuve,
+    selectedJournee,
+    selectedPhase,
+    showAllPlayers,
+    searchQuery,
+    availabilities,
+    setSelectedEpreuve,
+    setSelectedJournee,
+    setSelectedPhase,
+    setShowAllPlayers,
+    setSearchQuery,
+    setAvailabilities,
+    updateAvailabilityEntry,
+  } = useAvailabilityStore();
   const [players, setPlayers] = useState<Player[]>([]);
   const [loadingPlayers, setLoadingPlayers] = useState(true);
-  const [selectedEpreuve, setSelectedEpreuve] = useState<EpreuveType | null>(null);
-  const [selectedJournee, setSelectedJournee] = useState<number | null>(null);
-  const [selectedPhase, setSelectedPhase] = useState<"aller" | "retour" | null>(
-    null
-  );
-  const [showAllPlayers, setShowAllPlayers] = useState(false);
-  // Structure: { playerId: { masculin?: AvailabilityResponse, feminin?: AvailabilityResponse } }
-  const [availabilities, setAvailabilities] = useState<AvailabilityState>({});
-  const [searchQuery, setSearchQuery] = useState("");
+  const [teamTabValue, setTeamTabValue] = useState(0);
   const commentSaveTimeoutRef = React.useRef<
     Record<string, { masculin?: NodeJS.Timeout; feminin?: NodeJS.Timeout }>
   >({});
@@ -522,14 +372,14 @@ export default function DisponibilitesPage() {
         }
       }
     }
-  }, [defaultEpreuve, selectedEpreuve, journeesByEpreuveAndPhase]);
+    }, [defaultEpreuve, journeesByEpreuveAndPhase, selectedEpreuve, setSelectedEpreuve]);
 
   // Initialiser selectedPhase avec la phase en cours
   useEffect(() => {
     if (selectedPhase === null && currentPhase) {
       setSelectedPhase(currentPhase);
     }
-  }, [currentPhase, selectedPhase]);
+    }, [currentPhase, selectedPhase, setSelectedPhase]);
 
   // Initialiser selectedJournee avec la prochaine journée dans le futur (basée sur la date de début)
   useEffect(() => {
@@ -573,7 +423,7 @@ export default function DisponibilitesPage() {
       const lastJournee = journees.sort((a, b) => b.journee - a.journee)[0];
       setSelectedJournee(lastJournee.journee);
     }
-  }, [selectedPhase, selectedEpreuve, journeesByPhase]);
+    }, [journeesByPhase, selectedEpreuve, selectedPhase, setSelectedJournee]);
 
   // Filtrer les joueurs selon les critères
   const filteredPlayers = useMemo(() => {
@@ -597,6 +447,12 @@ export default function DisponibilitesPage() {
 
     filtered = getPlayersByType(filtered, championshipTypeForFilter);
 
+    if (teamTabValue === 0) {
+      filtered = filtered.filter((p) => p.gender === "M");
+    } else if (teamTabValue === 1) {
+      filtered = filtered.filter((p) => p.gender === "F");
+    }
+
     // Filtre de recherche
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -609,7 +465,7 @@ export default function DisponibilitesPage() {
     }
 
     return filtered;
-  }, [players, showAllPlayers, searchQuery, selectedEpreuve]);
+  }, [players, showAllPlayers, searchQuery, selectedEpreuve, teamTabValue]);
 
   // Séparer les joueurs ayant répondu et ceux en attente
   const { respondedPlayers, pendingPlayers } = useMemo(() => {
@@ -776,7 +632,13 @@ export default function DisponibilitesPage() {
     }
 
     setAvailabilities(mergedAvailabilities);
-  }, [masculineAvailability, feminineAvailability, selectedJournee, selectedPhase]);
+  }, [
+    masculineAvailability,
+    feminineAvailability,
+    selectedJournee,
+    selectedPhase,
+    setAvailabilities,
+  ]);
 
   // Gérer les erreurs de chargement
   useEffect(() => {
@@ -909,51 +771,37 @@ export default function DisponibilitesPage() {
       delete commentSaveTimeoutRef.current[playerId][championshipType];
     }
 
-    let nextStateSnapshot: AvailabilityState | null = null;
-    let stateChanged = false;
-
-    setAvailabilities((prev) => {
-      const { nextState, changed } = updateAvailabilityState(
-        prev,
-        playerId,
-        championshipType,
-        (currentEntry) => {
-          if (currentEntry?.available === available) {
-            const nextEntry: AvailabilityResponse = {};
-            if (
-              typeof currentEntry?.comment === "string" &&
-              currentEntry.comment.trim().length > 0
-            ) {
-              nextEntry.comment = currentEntry.comment;
-            }
-            return nextEntry;
-          }
-
-          const nextEntry: AvailabilityResponse = {
-            available,
-          };
-
+    const nextStateSnapshot = updateAvailabilityEntry(
+      playerId,
+      championshipType,
+      (currentEntry) => {
+        if (currentEntry?.available === available) {
+          const nextEntry: AvailabilityResponse = {};
           if (
             typeof currentEntry?.comment === "string" &&
             currentEntry.comment.trim().length > 0
           ) {
             nextEntry.comment = currentEntry.comment;
           }
-
           return nextEntry;
         }
-      );
 
-      if (!changed) {
-        return prev;
+        const nextEntry: AvailabilityResponse = {
+          available,
+        };
+
+        if (
+          typeof currentEntry?.comment === "string" &&
+          currentEntry.comment.trim().length > 0
+        ) {
+          nextEntry.comment = currentEntry.comment;
+        }
+
+        return nextEntry;
       }
+    );
 
-      nextStateSnapshot = nextState;
-      stateChanged = true;
-      return nextState;
-    });
-
-    if (stateChanged && nextStateSnapshot) {
+    if (nextStateSnapshot) {
       void persistAvailability(nextStateSnapshot, championshipType);
 
       const resultingEntry = nextStateSnapshot[playerId]?.[
@@ -988,7 +836,7 @@ export default function DisponibilitesPage() {
   const handleCommentChange = (
     playerId: string,
     championshipType: ChampionshipType,
-    comment: string
+  comment: string
   ) => {
     if (selectedJournee === null || selectedPhase === null) return;
 
@@ -999,45 +847,26 @@ export default function DisponibilitesPage() {
     // Stocker la valeur brute pour permettre la saisie d'espaces
     // Le trim sera fait uniquement lors de la sauvegarde
 
-    let nextStateSnapshot: AvailabilityState | null = null;
-    let stateChanged = false;
+    const nextStateSnapshot = updateAvailabilityEntry(
+      playerId,
+      championshipType,
+      (currentEntry) => {
+        const nextEntry: AvailabilityResponse = {};
 
-    setAvailabilities((prev) => {
-      const { nextState, changed } = updateAvailabilityState(
-        prev,
-        playerId,
-        championshipType,
-        (currentEntry) => {
-          const nextEntry: AvailabilityResponse = {};
+        if (typeof currentEntry?.available === "boolean") {
+          nextEntry.available = currentEntry.available;
+        }
 
-          if (typeof currentEntry?.available === "boolean") {
-            nextEntry.available = currentEntry.available;
-          }
+        if (comment.length > 0) {
+          nextEntry.comment = comment;
+        }
 
-          // Stocker la valeur brute (avec espaces) pour permettre la saisie
-          // Le trim sera fait uniquement lors de la sauvegarde dans sanitizeAvailabilityEntry
-          if (comment.length > 0) {
-            nextEntry.comment = comment;
-          } else {
-            // Si le commentaire est vide, ne pas l'inclure dans l'entrée
-            // Cela permet de supprimer le commentaire si l'utilisateur efface tout
-          }
+        return nextEntry;
+      },
+      { skipNormalization: true }
+    );
 
-          return nextEntry;
-        },
-        true // Skip la normalisation pour permettre les espaces dans les commentaires
-      );
-
-      if (!changed) {
-        return prev;
-      }
-
-      nextStateSnapshot = nextState;
-      stateChanged = true;
-      return nextState;
-    });
-
-    if (!stateChanged || !nextStateSnapshot) {
+    if (!nextStateSnapshot) {
       return;
     }
 
@@ -1106,139 +935,104 @@ export default function DisponibilitesPage() {
             championnat sont affichés.
         </Typography>
 
-          <Card sx={{ mb: 1 }}>
-            <CardContent sx={{ pt: 2.5, pb: 1.5 }}>
-              <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
-                <FormControl size="small" sx={{ minWidth: 200 }}>
-                  <InputLabel id="epreuve-select-label">Épreuve</InputLabel>
-                  <Select
-                    labelId="epreuve-select-label"
-                    id="epreuve-select"
-                    value={selectedEpreuve || ""}
-                    label="Épreuve"
-                    onChange={(e) => {
-                      const epreuve = e.target.value as EpreuveType;
-                      setSelectedEpreuve(epreuve);
-                      setSelectedPhase(null); // Réinitialiser la phase lors du changement d'épreuve
-                      setSelectedJournee(null); // Réinitialiser la journée lors du changement d'épreuve
-                    }}
-                  >
-                    <MenuItem value="championnat_equipes">
-                      Championnat par Équipes
-                    </MenuItem>
-                    <MenuItem value="championnat_paris">
-                      Championnat de Paris IDF
-                    </MenuItem>
-                  </Select>
-                </FormControl>
-                {/* Masquer le sélecteur de phase pour le championnat de Paris (une seule phase) */}
-                {selectedEpreuve !== "championnat_paris" && (
-                  <FormControl size="small" sx={{ minWidth: 150 }}>
-                    <InputLabel id="phase-select-label">Phase</InputLabel>
-                    <Select
-                      labelId="phase-select-label"
-                      id="phase-select"
-                      value={selectedPhase || ""}
-                      label="Phase"
-                      onChange={(e) => {
-                        const phase = e.target.value as "aller" | "retour";
-                        setSelectedPhase(phase);
-                        setSelectedJournee(null); // Réinitialiser la journée lors du changement de phase
-                      }}
-                      disabled={selectedEpreuve === null}
-                    >
-                      <MenuItem value="aller">Phase Aller</MenuItem>
-                      <MenuItem value="retour">Phase Retour</MenuItem>
-                    </Select>
-                  </FormControl>
-                )}
-                <FormControl size="small" sx={{ minWidth: 150 }}>
-                  <InputLabel id="journee-select-label">Journée</InputLabel>
-                  <Select
-                    labelId="journee-select-label"
-                    id="journee-select"
-                    value={selectedJournee || ""}
-                    label="Journée"
-                    onChange={(e) =>
-                      setSelectedJournee(
-                        e.target.value ? Number(e.target.value) : null
-                      )
-                    }
-                    disabled={
-                      (selectedEpreuve === "championnat_paris" 
-                        ? false 
-                        : selectedPhase === null) || 
-                      selectedEpreuve === null
-                    }
-                  >
-                    {(() => {
-                      // Pour le championnat de Paris, utiliser "aller" comme phase
-                      const phaseToUse = selectedEpreuve === "championnat_paris" 
-                        ? "aller" 
-                        : selectedPhase;
-                      
-                      if (!phaseToUse) return null;
-                      
-                      const journeesArray = Array.from(
-                        journeesByPhase.get(phaseToUse)?.values() || []
-                      ) as Array<{ journee: number; phase: "aller" | "retour"; dates: Date[] }>;
-                      
-                      return journeesArray
-                        .sort((a, b) => a.journee - b.journee)
-                        .map(({ journee, dates }) => {
-                          // Formater les dates pour l'affichage
-                          const datesFormatted = dates
-                            .map((date: Date) => {
-                              return new Intl.DateTimeFormat("fr-FR", {
-                                day: "2-digit",
-                                month: "2-digit",
-                              }).format(date);
-                            })
-                            .join(", ");
-                          return (
-                            <MenuItem key={journee} value={journee}>
-                              Journée {journee} - {datesFormatted}
-                            </MenuItem>
-                          );
-                        });
-                    })()}
-                  </Select>
-                </FormControl>
-
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={showAllPlayers}
-                      onChange={(e) => setShowAllPlayers(e.target.checked)}
-                    />
-                  }
-                  label="Afficher tous les joueurs"
-                />
-              </Box>
-
-              {selectedJournee && (
-                <TextField
-                  fullWidth
-                  size="small"
-                  placeholder="Rechercher un joueur..."
-                  id="player-search"
-                  name="player-search"
-                  aria-label="Rechercher un joueur"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon />
-                      </InputAdornment>
-                    ),
+        <Card sx={{ mb: 1 }}>
+          <CardContent sx={{ pt: 2.5, pb: 1.5 }}>
+            <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
+              <EpreuveSelect
+                value={selectedEpreuve}
+                onChange={(epreuve) => {
+                  setSelectedEpreuve(epreuve);
+                  setSelectedPhase(null);
+                  setSelectedJournee(null);
+                }}
+              />
+              {selectedEpreuve !== "championnat_paris" && (
+                <PhaseSelect
+                  value={selectedPhase}
+                  onChange={(phase) => {
+                    setSelectedPhase(phase);
+                    setSelectedJournee(null);
                   }}
-                  InputLabelProps={{ shrink: true }}
-                  sx={{ mt: 2.5, mb: 0.75 }}
+                  disabled={selectedEpreuve === null}
                 />
               )}
-            </CardContent>
-          </Card>
+              <FormControl size="small" sx={{ minWidth: 150 }}>
+                <InputLabel id="journee-select-label">Journée</InputLabel>
+                <Select
+                  labelId="journee-select-label"
+                  id="journee-select"
+                  value={selectedJournee || ""}
+                  label="Journée"
+                  onChange={(e) =>
+                    setSelectedJournee(
+                      e.target.value ? Number(e.target.value) : null
+                    )
+                  }
+                  disabled={
+                    (selectedEpreuve === "championnat_paris"
+                      ? false
+                      : selectedPhase === null) ||
+                    selectedEpreuve === null
+                  }
+                >
+                  {(() => {
+                    const phaseToUse = selectedEpreuve === "championnat_paris"
+                      ? "aller"
+                      : selectedPhase;
+
+                    if (!phaseToUse) return null;
+
+                    const journeesArray = Array.from(
+                      journeesByPhase.get(phaseToUse)?.values() || []
+                    ) as Array<{ journee: number; phase: "aller" | "retour"; dates: Date[] }>;
+
+                    return journeesArray
+                      .sort((a, b) => a.journee - b.journee)
+                      .map(({ journee, dates }) => {
+                        const datesFormatted = dates
+                          .map((date: Date) => {
+                            return new Intl.DateTimeFormat("fr-FR", {
+                              day: "2-digit",
+                              month: "2-digit",
+                            }).format(date);
+                          })
+                          .join(", ");
+                        return (
+                          <MenuItem key={journee} value={journee}>
+                            Journée {journee} - {datesFormatted}
+                          </MenuItem>
+                        );
+                      });
+                  })()}
+                </Select>
+              </FormControl>
+
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={showAllPlayers}
+                    onChange={(e) => setShowAllPlayers(e.target.checked)}
+                  />
+                }
+                label="Afficher tous les joueurs"
+              />
+
+              <TeamPicker
+                value={teamTabValue}
+                onChange={(_, value) => setTeamTabValue(value)}
+              />
+            </Box>
+
+            {selectedJournee && (
+              <SearchInput
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Rechercher un joueur..."
+                sx={{ mt: 2.5, mb: 0.75 }}
+              />
+            )}
+          </CardContent>
+        </Card>
 
           {selectedJournee === null ? (
             <Alert severity="warning">
@@ -1552,6 +1346,34 @@ function PlayerList({
                       {player.license}
                     </Typography>
                   )}
+                  <Box display="flex" gap={1} alignItems="center" flexWrap="wrap">
+                    <AvailabilityStatusChip
+                      status={
+                        masculinAvailability?.available === true
+                          ? "available"
+                          : masculinAvailability?.available === false
+                          ? "unavailable"
+                          : masculinAvailability?.comment
+                          ? "pending"
+                          : "unknown"
+                      }
+                      label="Masculin"
+                    />
+                    {isFemale && (
+                      <AvailabilityStatusChip
+                        status={
+                          femininAvailability?.available === true
+                            ? "available"
+                            : femininAvailability?.available === false
+                            ? "unavailable"
+                            : femininAvailability?.comment
+                            ? "pending"
+                            : "unknown"
+                        }
+                        label="Féminin"
+                      />
+                    )}
+                  </Box>
                 </Box>
 
                 <Box
