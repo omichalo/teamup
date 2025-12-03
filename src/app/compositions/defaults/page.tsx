@@ -34,6 +34,7 @@ import { FirestorePlayerService } from "@/lib/services/firestore-player-service"
 import { CompositionDefaultsService } from "@/lib/services/composition-defaults-service";
 import { getCurrentPhase } from "@/lib/shared/phase-utils";
 import { EpreuveType, getMatchEpreuve } from "@/lib/shared/epreuve-utils";
+import { ChampionshipType } from "@/types";
 import {
   JOURNEE_CONCERNEE_PAR_REGLE,
   canAssignPlayerToTeam,
@@ -42,6 +43,10 @@ import {
   getParisTeamStructure,
   isParisChampionship,
 } from "@/lib/compositions/validation";
+import {
+  getPlayersByType,
+  getTeamsByType,
+} from "@/lib/compositions/championship-utils";
 import type { Player } from "@/types/team-management";
 import { AvailablePlayersPanel } from "@/components/compositions/AvailablePlayersPanel";
 import { TeamCompositionCard } from "@/components/compositions/TeamCompositionCard";
@@ -82,7 +87,7 @@ export default function DefaultCompositionsPage() {
     Record<string, string | undefined>
   >({});
   const [defaultCompositionTab, setDefaultCompositionTab] = useState<
-    "masculin" | "feminin"
+    ChampionshipType
   >("masculin");
   const [defaultCompositionMessage, setDefaultCompositionMessage] = useState<
     string | null
@@ -240,21 +245,10 @@ export default function DefaultCompositionsPage() {
     });
   }, [equipes, selectedEpreuve]);
 
-  const equipesByType = useMemo(() => {
-    const masculin: EquipeWithMatches[] = [];
-    const feminin: EquipeWithMatches[] = [];
-
-    filteredEquipes.forEach((equipe) => {
-      const isFemale = equipe.matches.some((match) => match.isFemale === true);
-      if (isFemale) {
-        feminin.push(equipe);
-      } else {
-        masculin.push(equipe);
-      }
-    });
-
-    return { masculin, feminin };
-  }, [filteredEquipes]);
+  const equipesByType = useMemo(
+    () => getTeamsByType(filteredEquipes),
+    [filteredEquipes]
+  );
 
   const mergedDefaultCompositions = useMemo(
     () => ({
@@ -282,15 +276,10 @@ export default function DefaultCompositionsPage() {
   // Filtrer les joueurs selon le type de championnat
   // Masculin : hommes ET femmes
   // Féminin : uniquement les femmes
-  const availablePlayers = useMemo(() => {
-    if (defaultCompositionTab === "masculin") {
-      // Championnat masculin : afficher tous les joueurs (hommes et femmes)
-      return playerPool;
-    } else {
-      // Championnat féminin : afficher uniquement les femmes
-      return playerPool.filter((player) => player.gender === "F");
-    }
-  }, [playerPool, defaultCompositionTab]);
+  const availablePlayers = useMemo(
+    () => getPlayersByType(playerPool, defaultCompositionTab),
+    [defaultCompositionTab, playerPool]
+  );
 
   const filteredAvailablePlayers = useMemo(() => {
     if (!searchQuery.trim()) {
@@ -368,7 +357,11 @@ export default function DefaultCompositionsPage() {
     (playerId: string, teamId: string): AssignmentValidationResult => {
       const equipe = equipes.find((e) => e.team.id === teamId);
       const maxPlayers = equipe ? getMaxPlayersForTeam(equipe) : MAX_PLAYERS_PER_DEFAULT_TEAM;
-      
+      const championshipType: ChampionshipType = equipe &&
+        equipe.matches.some((match) => match.isFemale)
+          ? "feminin"
+          : "masculin";
+
       return canAssignPlayerToTeam({
         playerId,
         teamId,
@@ -377,6 +370,7 @@ export default function DefaultCompositionsPage() {
         compositions: mergedDefaultCompositions,
         selectedPhase,
         selectedJournee: null,
+        championshipType,
         journeeRule: JOURNEE_CONCERNEE_PAR_REGLE,
         maxPlayersPerTeam: maxPlayers,
       });
@@ -401,7 +395,11 @@ export default function DefaultCompositionsPage() {
     Object.keys(mergedDefaultCompositions).forEach((teamId) => {
       const equipe = equipes.find((e) => e.team.id === teamId);
       const maxPlayers = equipe ? getMaxPlayersForTeam(equipe) : MAX_PLAYERS_PER_DEFAULT_TEAM;
-      
+      const championshipType: ChampionshipType = equipe &&
+        equipe.matches.some((match) => match.isFemale)
+          ? "feminin"
+          : "masculin";
+
       const validation = validateTeamCompositionState({
         teamId,
         players,
@@ -409,6 +407,7 @@ export default function DefaultCompositionsPage() {
         compositions: mergedDefaultCompositions,
         selectedPhase,
         selectedJournee: null,
+        championshipType,
         journeeRule: JOURNEE_CONCERNEE_PAR_REGLE,
         maxPlayersPerTeam: maxPlayers,
       });
@@ -752,7 +751,7 @@ export default function DefaultCompositionsPage() {
 
   const getDragPreviewOptions = useCallback(
     (playerId: string) => {
-      let championshipType: "masculin" | "feminin" = defaultCompositionTab;
+      let championshipType: ChampionshipType = defaultCompositionTab;
       const assignmentsByType = defaultCompositions;
 
       (["masculin", "feminin"] as const).forEach((type) => {

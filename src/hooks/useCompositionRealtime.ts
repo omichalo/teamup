@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { CompositionService, DayComposition } from "@/lib/services/composition-service";
+import { ChampionshipType } from "@/types";
 
 /**
  * Hook pour écouter les changements de composition en temps réel
@@ -11,7 +12,7 @@ import { CompositionService, DayComposition } from "@/lib/services/composition-s
 export const useCompositionRealtime = (
   journee: number | null,
   phase: "aller" | "retour" | null,
-  championshipType: "masculin" | "feminin"
+  championshipType: ChampionshipType
 ) => {
   const [composition, setComposition] = useState<DayComposition | null>(null);
   const [loading, setLoading] = useState(true);

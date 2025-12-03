@@ -48,7 +48,7 @@ import { FirestorePlayerService } from "@/lib/services/firestore-player-service"
 import { CompositionService } from "@/lib/services/composition-service";
 import { CompositionDefaultsService } from "@/lib/services/composition-defaults-service";
 import { Player } from "@/types/team-management";
-import { Match } from "@/types";
+import { ChampionshipType, Match } from "@/types";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
 import { getCurrentPhase } from "@/lib/shared/phase-utils";
@@ -70,6 +70,10 @@ import {
   getParisTeamStructure,
   isParisChampionship,
 } from "@/lib/compositions/validation";
+import {
+  getPlayersByType,
+  getTeamsByType,
+} from "@/lib/compositions/championship-utils";
 import { AvailablePlayersPanel } from "@/components/compositions/AvailablePlayersPanel";
 import { TeamCompositionCard } from "@/components/compositions/TeamCompositionCard";
 import { CompositionsSummary } from "@/components/compositions/CompositionsSummary";
@@ -853,6 +857,11 @@ export default function CompositionsPage() {
 
     filteredEquipes.forEach((equipe) => {
       const maxPlayers = getMaxPlayersForTeam(equipe);
+      const championshipType: ChampionshipType = equipe.matches.some(
+        (match) => match.isFemale === true
+      )
+        ? "feminin"
+        : "masculin";
       const validation = validateTeamCompositionState({
         teamId: equipe.team.id,
         players,
@@ -860,6 +869,7 @@ export default function CompositionsPage() {
         compositions,
         selectedPhase,
         selectedJournee,
+        championshipType,
         journeeRule: JOURNEE_CONCERNEE_PAR_REGLE,
         maxPlayersPerTeam: maxPlayers,
       });
@@ -874,11 +884,6 @@ export default function CompositionsPage() {
         nextErrors[equipe.team.id] = errorInfo;
       }
 
-      const championshipType = equipe.matches.some(
-        (match) => match.isFemale === true
-      )
-        ? "feminin"
-        : "masculin";
       const availabilityMap =
         (championshipType === "masculin"
           ? availabilities.masculin
@@ -1048,7 +1053,7 @@ export default function CompositionsPage() {
         : "feminin";
     const availabilityMap = availabilities[championshipType] || {};
 
-    return players.filter((player) => {
+    return getPlayersByType(players, championshipType).filter((player) => {
       // Vérifier la disponibilité selon le type de championnat
       const playerAvailability = availabilityMap[player.id];
 
@@ -1156,23 +1161,10 @@ export default function CompositionsPage() {
     }
   }, [compositionError]);
 
-  const equipesByType = useMemo(() => {
-    const masculin: typeof equipes = [];
-    const feminin: typeof equipes = [];
-
-    filteredEquipes.forEach((equipe) => {
-      // Déterminer si c'est une équipe féminine en regardant les matchs
-      const isFemale = equipe.matches.some((match) => match.isFemale === true);
-
-      if (isFemale) {
-        feminin.push(equipe);
-      } else {
-        masculin.push(equipe);
-      }
-    });
-
-    return { masculin, feminin };
-  }, [filteredEquipes]);
+  const equipesByType = useMemo(
+    () => getTeamsByType(filteredEquipes),
+    [filteredEquipes]
+  );
 
   // Vérifier le statut d'envoi des messages Discord
   useEffect(() => {
@@ -1684,6 +1676,10 @@ export default function CompositionsPage() {
   ): AssignmentValidationResult => {
     const equipe = equipes.find((e) => e.team.id === teamId);
     const maxPlayers = equipe ? getMaxPlayersForTeam(equipe) : 4;
+    const championshipType: ChampionshipType = equipe &&
+      equipe.matches.some((match) => match.isFemale === true)
+        ? "feminin"
+        : "masculin";
 
     return canAssignPlayerToTeam({
       playerId,
@@ -1693,6 +1689,7 @@ export default function CompositionsPage() {
       compositions,
       selectedPhase,
       selectedJournee,
+      championshipType,
       journeeRule: JOURNEE_CONCERNEE_PAR_REGLE,
       maxPlayersPerTeam: maxPlayers,
     });
@@ -1705,7 +1702,7 @@ export default function CompositionsPage() {
         return teamPlayers.includes(playerId);
       });
 
-      const championshipType: "masculin" | "feminin" = equipe
+      const championshipType: ChampionshipType = equipe
         ? equipe.matches.some((match) => match.isFemale === true)
           ? "feminin"
           : "masculin"
@@ -1731,7 +1728,7 @@ export default function CompositionsPage() {
       }
 
       const isFemaleTeam = equipe.matches.some((match) => match.isFemale === true);
-      const championshipType = isFemaleTeam ? "feminin" : "masculin";
+      const championshipType: ChampionshipType = isFemaleTeam ? "feminin" : "masculin";
 
       setCompositions((prev) => {
         const equipeForMax = equipes.find((e) => e.team.id === teamId);
@@ -1745,6 +1742,7 @@ export default function CompositionsPage() {
           compositions: prev,
           selectedPhase,
           selectedJournee,
+          championshipType,
           journeeRule: JOURNEE_CONCERNEE_PAR_REGLE,
           maxPlayersPerTeam: maxPlayers,
         });
@@ -2043,7 +2041,7 @@ export default function CompositionsPage() {
       ]);
 
       const processType = (
-        championshipType: "masculin" | "feminin",
+        championshipType: ChampionshipType,
         teamIds: string[]
       ) => {
         const defaultsForType = defaultCompositions[championshipType] || {};
@@ -2921,7 +2919,8 @@ export default function CompositionsPage() {
                                       teamNumber > 0
                                         ? calculateFutureBurnout(
                                             matchesByTeamByPhase,
-                                            teamNumber
+                                            teamNumber,
+                                            championshipType
                                           )
                                         : null;
 

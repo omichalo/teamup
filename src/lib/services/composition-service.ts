@@ -7,11 +7,12 @@ import {
   Unsubscribe,
 } from "firebase/firestore";
 import { getDbInstanceDirect } from "@/lib/firebase";
+import { ChampionshipType } from "@/types";
 
 export interface DayComposition {
   journee: number;
   phase: "aller" | "retour";
-  championshipType: "masculin" | "feminin";
+  championshipType: ChampionshipType;
   teams: {
     [teamId: string]: string[]; // teamId -> playerIds[]
   };
@@ -25,7 +26,7 @@ export class CompositionService {
   private getDocumentId(
     journee: number,
     phase: "aller" | "retour",
-    championshipType: "masculin" | "feminin"
+    championshipType: ChampionshipType
   ): string {
     return `${phase}_${journee}_${championshipType}`;
   }
@@ -33,7 +34,7 @@ export class CompositionService {
   async getComposition(
     journee: number,
     phase: "aller" | "retour",
-    championshipType: "masculin" | "feminin"
+    championshipType: ChampionshipType
   ): Promise<DayComposition | null> {
     try {
       const docId = this.getDocumentId(journee, phase, championshipType);
@@ -105,7 +106,7 @@ export class CompositionService {
   subscribeToComposition(
     journee: number,
     phase: "aller" | "retour",
-    championshipType: "masculin" | "feminin",
+    championshipType: ChampionshipType,
     callback: (composition: DayComposition | null) => void
   ): Unsubscribe {
     try {

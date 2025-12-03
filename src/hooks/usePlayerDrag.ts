@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import { createDragImage } from "@/lib/compositions/drag-utils";
 import type { AssignmentValidationResult } from "@/lib/compositions/validation";
 import type { Player } from "@/types/team-management";
+import { ChampionshipType } from "@/types";
 
 interface DragPreviewOptions {
-  championshipType?: "masculin" | "feminin";
+  championshipType?: ChampionshipType;
   phase?: "aller" | "retour";
 }
 

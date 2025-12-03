@@ -12,8 +12,7 @@ import {
 import { CompositionService, DayComposition } from "@/lib/services/composition-service";
 import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
 import { Player } from "@/types/team-management";
-
-type ChampionshipType = "masculin" | "feminin";
+import { ChampionshipType } from "@/types";
 
 const playerService = new FirestorePlayerService();
 const availabilityService = new AvailabilityService();
