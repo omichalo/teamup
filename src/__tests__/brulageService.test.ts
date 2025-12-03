@@ -78,15 +78,23 @@ describe("BrulageService", () => {
     });
 
     it("should reject composition with too many female players", () => {
-      // Créer une joueuse supplémentaire pour le test
-      const femalePlayer: Player = {
-        ...mockPlayers[1],
-        id: "4",
-        firstName: "Sophie",
-        lastName: "Bernard",
-      };
+      // Créer deux joueuses supplémentaires pour le test
+      const extraFemalePlayers: Player[] = [
+        {
+          ...mockPlayers[1],
+          id: "4",
+          firstName: "Sophie",
+          lastName: "Bernard",
+        },
+        {
+          ...mockPlayers[1],
+          id: "5",
+          firstName: "Julie",
+          lastName: "Lambert",
+        },
+      ];
 
-      const playersWithExtraFemale = [...mockPlayers, femalePlayer];
+      const playersWithExtraFemale = [...mockPlayers, ...extraFemalePlayers];
       const serviceWithExtraFemale = new BrulageService(
         mockBurnRecords,
         playersWithExtraFemale
@@ -95,8 +103,8 @@ describe("BrulageService", () => {
       const compositionWithThreeFemales = {
         A: "2", // Marie
         B: "4", // Sophie
-        C: "1",
-        D: "3",
+        C: "5", // Julie
+        D: "1",
       };
 
       const result = serviceWithExtraFemale.validateComposition(
