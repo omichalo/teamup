@@ -26,13 +26,10 @@ import {
 import { DragIndicator, AlternateEmail, Warning } from "@mui/icons-material";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
-import {
-  useEquipesWithMatches,
-  type EquipeWithMatches,
-} from "@/hooks/useEquipesWithMatches";
-import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
+import { useTeamData, type EquipeWithMatches } from "@/hooks/useTeamData";
+import { usePlayers } from "@/hooks/usePlayers";
+import { useDiscordMembers } from "@/hooks/useDiscordMembers";
 import { CompositionDefaultsService } from "@/lib/services/composition-defaults-service";
-import { getCurrentPhase } from "@/lib/shared/phase-utils";
 import { EpreuveType, getMatchEpreuve } from "@/lib/shared/epreuve-utils";
 import { ChampionshipType } from "@/types";
 import {
@@ -68,9 +65,8 @@ const MAX_PLAYERS_PER_DEFAULT_TEAM = 5;
 const MIN_PLAYERS_FOR_DEFAULT_COMPLETION = 4;
 
 export function DefaultCompositionsContainer() {
-  const { equipes, loading: loadingEquipes } = useEquipesWithMatches();
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [loadingPlayers, setLoadingPlayers] = useState(true);
+  const { equipes, loading: loadingEquipes, currentPhase } = useTeamData();
+  const { players, loading: loadingPlayers } = usePlayers();
   const [selectedEpreuve, setSelectedEpreuve] = useState<EpreuveType>("championnat_equipes");
   const [selectedPhase, setSelectedPhase] = useState<"aller" | "retour" | null>(
     null
@@ -95,20 +91,11 @@ export function DefaultCompositionsContainer() {
   >(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [includeAllPlayers, setIncludeAllPlayers] = useState(false);
-  const [discordMembers, setDiscordMembers] = useState<Array<{ id: string; username: string; displayName: string }>>([]);
-
-  const playerService = useMemo(() => new FirestorePlayerService(), []);
+  const { members: discordMembers } = useDiscordMembers();
   const compositionDefaultsService = useMemo(
     () => new CompositionDefaultsService(),
     []
   );
-
-  const currentPhase = useMemo(() => {
-    if (loadingEquipes || equipes.length === 0) {
-      return "aller" as const;
-    }
-    return getCurrentPhase(equipes);
-  }, [equipes, loadingEquipes]);
 
   useEffect(() => {
     // Pour le championnat de Paris, définir automatiquement la phase à "aller"
@@ -120,56 +107,6 @@ export function DefaultCompositionsContainer() {
       setSelectedPhase(currentPhase);
     }
   }, [currentPhase, selectedPhase, selectedEpreuve]);
-
-  const loadPlayers = useCallback(async () => {
-    try {
-      setLoadingPlayers(true);
-      const fetchedPlayers = await playerService.getAllPlayers();
-      setPlayers(
-        fetchedPlayers.sort((a, b) => {
-          const pointsDiff = (b.points || 0) - (a.points || 0);
-          if (pointsDiff !== 0) {
-            return pointsDiff;
-          }
-          return `${a.firstName} ${a.name}`.localeCompare(
-            `${b.firstName} ${b.name}`
-          );
-        })
-      );
-    } catch (error) {
-      console.error(
-        "Erreur lors du chargement des joueurs depuis Firestore:",
-        error
-      );
-      setPlayers([]);
-    } finally {
-      setLoadingPlayers(false);
-    }
-  }, [playerService]);
-
-  useEffect(() => {
-    loadPlayers();
-  }, [loadPlayers]);
-
-  // Charger les membres Discord
-  useEffect(() => {
-    const loadDiscordMembers = async () => {
-      try {
-        const response = await fetch("/api/discord/members", {
-          credentials: "include",
-        });
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success && result.members) {
-            setDiscordMembers(result.members);
-          }
-        }
-      } catch (error) {
-        console.error("Erreur lors du chargement des membres Discord:", error);
-      }
-    };
-    loadDiscordMembers();
-  }, []);
 
   // Fonction helper pour vérifier le statut Discord d'un joueur
   const getDiscordStatus = useCallback((player: Player): "none" | "invalid" | "valid" => {

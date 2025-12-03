@@ -1,4 +1,4 @@
-import { EquipeWithMatches } from "@/hooks/useEquipesWithMatches";
+import { EquipeWithMatches } from "@/hooks/useTeamData";
 import { ChampionshipType } from "@/types";
 import { Player } from "@/types/team-management";
 

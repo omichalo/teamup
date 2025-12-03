@@ -46,8 +46,8 @@ import {
 import { Player } from "@/types/team-management";
 import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
 import { AuthGuard } from "@/components/AuthGuard";
-import { useEquipesWithMatches } from "@/hooks/useEquipesWithMatches";
-import { getCurrentPhase } from "@/lib/shared/phase-utils";
+import { useTeamData } from "@/hooks/useTeamData";
+import { useDiscordMembers } from "@/hooks/useDiscordMembers";
 import { USER_ROLES } from "@/lib/auth/roles";
 import { doc, getDoc } from "firebase/firestore";
 import { getDbInstanceDirect } from "@/lib/firebase";
@@ -77,7 +77,7 @@ function TabPanel(props: TabPanelProps) {
 // Composant pour afficher les suggestions de mentions Discord
 
 export default function JoueursPage() {
-  const { equipes, loading: loadingEquipes } = useEquipesWithMatches();
+  const { currentPhase } = useTeamData();
   const [players, setPlayers] = useState<Player[]>([]);
   const [playersWithoutLicense, setPlayersWithoutLicense] = useState<Player[]>(
     []
@@ -114,24 +114,13 @@ export default function JoueursPage() {
   });
   const [licenseExists, setLicenseExists] = useState(false);
   const [licenseExistsForOther, setLicenseExistsForOther] = useState(false);
-  const [discordMembers, setDiscordMembers] = useState<
-    Array<{ id: string; username: string; displayName: string }>
-  >([]);
+  const { members: discordMembers } = useDiscordMembers();
   const [discordMentions, setDiscordMentions] = useState<string[]>([]); // IDs des membres Discord sélectionnés
   const [discordMentionError, setDiscordMentionError] = useState<string | null>(
     null
   );
 
   const playerService = useMemo(() => new FirestorePlayerService(), []);
-
-  // Déterminer la phase en cours à partir des équipes et leurs matchs
-  const currentPhase = useMemo(() => {
-    if (loadingEquipes || equipes.length === 0) {
-      return "aller"; // Par défaut si pas de données
-    }
-    // Passer directement les équipes avec leurs matchs
-    return getCurrentPhase(equipes);
-  }, [equipes, loadingEquipes]);
 
   const loadPlayers = useCallback(async () => {
     try {
@@ -151,28 +140,6 @@ export default function JoueursPage() {
       setLoadingPlayers(false);
     }
   }, [playerService]);
-
-  // Charger les membres Discord
-  useEffect(() => {
-    const loadDiscordMembers = async () => {
-      try {
-        const response = await fetch("/api/discord/members", {
-          method: "GET",
-          credentials: "include",
-        });
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success) {
-            setDiscordMembers(result.members || []);
-          }
-        }
-      } catch (error) {
-        console.error("Erreur lors du chargement des membres Discord:", error);
-      } finally {
-      }
-    };
-    void loadDiscordMembers();
-  }, []);
 
   // Fonction helper pour vérifier si un joueur a des IDs Discord invalides
   const hasInvalidDiscordMentions = useCallback(

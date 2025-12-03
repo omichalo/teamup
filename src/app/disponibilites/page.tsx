@@ -33,16 +33,15 @@ import {
   Comment as CommentIcon,
   DoneAll,
 } from "@mui/icons-material";
-import { useEquipesWithMatches } from "@/hooks/useEquipesWithMatches";
-import { useAvailabilityRealtime } from "@/hooks/useAvailabilityRealtime";
-import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
+import { useTeamData } from "@/hooks/useTeamData";
+import { useAvailabilities } from "@/hooks/useAvailabilities";
+import { usePlayers } from "@/hooks/usePlayers";
 import { AvailabilityService, DayAvailability } from "@/lib/services/availability-service";
 import { CompositionService } from "@/lib/services/composition-service";
 import { Player } from "@/types/team-management";
 import { ChampionshipType } from "@/types";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
-import { getCurrentPhase } from "@/lib/shared/phase-utils";
 import {
   getPlayersByType,
   getTeamsByType,
@@ -64,7 +63,7 @@ import { EpreuveType, getIdEpreuve, getMatchEpreuve } from "@/lib/shared/epreuve
 
 
 export default function DisponibilitesPage() {
-  const { equipes, loading: loadingEquipes } = useEquipesWithMatches();
+  const { equipes, loading: loadingEquipes, currentPhase } = useTeamData();
   const equipesByType = useMemo(() => getTeamsByType(equipes), [equipes]);
   const {
     selectedEpreuve,
@@ -81,8 +80,7 @@ export default function DisponibilitesPage() {
     setAvailabilities,
     updateAvailabilityEntry,
   } = useAvailabilityStore();
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [loadingPlayers, setLoadingPlayers] = useState(true);
+  const { players, loading: loadingPlayers } = usePlayers();
   const [teamTabValue, setTeamTabValue] = useState(0);
   const commentSaveTimeoutRef = React.useRef<
     Record<string, { masculin?: NodeJS.Timeout; feminin?: NodeJS.Timeout }>
@@ -97,7 +95,6 @@ export default function DisponibilitesPage() {
     feminin: Record<string, string[]>;
   }>({ masculin: {}, feminin: {} });
 
-  const playerService = useMemo(() => new FirestorePlayerService(), []);
   const availabilityService = useMemo(() => new AvailabilityService(), []);
   const compositionService = useMemo(() => new CompositionService(), []);
   const [availabilityWarning, setAvailabilityWarning] = useState<string | null>(
@@ -150,15 +147,6 @@ export default function DisponibilitesPage() {
   useEffect(() => {
     availabilitiesRef.current = availabilities;
   }, [availabilities]);
-
-  // Déterminer la phase en cours
-  const currentPhase = useMemo(() => {
-    if (loadingEquipes || equipes.length === 0) {
-      return "aller" as const;
-    }
-    return getCurrentPhase(equipes);
-  }, [equipes, loadingEquipes]);
-
 
   // Extraire les journées depuis les matchs, groupées par épreuve et phase avec leurs dates
   const journeesByEpreuveAndPhase = useMemo(() => {
@@ -556,22 +544,6 @@ export default function DisponibilitesPage() {
     });
   }, [filteredPlayers, availabilities]);
 
-  const loadPlayers = useCallback(async () => {
-    try {
-      setLoadingPlayers(true);
-      const allPlayers = await playerService.getAllPlayers();
-      setPlayers(allPlayers);
-    } catch (error) {
-      console.error("Erreur lors du chargement des joueurs:", error);
-    } finally {
-      setLoadingPlayers(false);
-    }
-  }, [playerService]);
-
-  useEffect(() => {
-    loadPlayers();
-  }, [loadPlayers]);
-
   // Calculer l'idEpreuve pour les hooks
   const idEpreuveForHooks = useMemo(() => {
     return getIdEpreuve(selectedEpreuve);
@@ -581,13 +553,22 @@ export default function DisponibilitesPage() {
   const {
     availability: masculineAvailability,
     error: errorMasculineAvailability,
-  } = useAvailabilityRealtime(selectedJournee, selectedPhase, "masculin", idEpreuveForHooks);
+  } = useAvailabilities({
+    journee: selectedJournee,
+    phase: selectedPhase,
+    championshipType: "masculin",
+    ...(idEpreuveForHooks !== undefined ? { idEpreuve: idEpreuveForHooks } : {}),
+  });
 
-  // Écouter les disponibilités en temps réel (féminin)
   const {
     availability: feminineAvailability,
     error: errorFeminineAvailability,
-  } = useAvailabilityRealtime(selectedJournee, selectedPhase, "feminin", idEpreuveForHooks);
+  } = useAvailabilities({
+    journee: selectedJournee,
+    phase: selectedPhase,
+    championshipType: "feminin",
+    ...(idEpreuveForHooks !== undefined ? { idEpreuve: idEpreuveForHooks } : {}),
+  });
 
   // Fusionner les disponibilités masculines et féminines en temps réel
   useEffect(() => {
