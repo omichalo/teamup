@@ -8,16 +8,10 @@ import Link from "next/link";
 import {
   Box,
   Typography,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Stack,
   Button,
   Alert,
   CircularProgress,
-  Tabs,
-  Tab,
   Chip,
   ListItem,
   ListItemButton,
@@ -52,38 +46,20 @@ import type { Player } from "@/types/team-management";
 import { AvailablePlayersPanel } from "@/components/compositions/AvailablePlayersPanel";
 import { TeamCompositionCard } from "@/components/compositions/TeamCompositionCard";
 import { CompositionsSummary } from "@/components/compositions/CompositionsSummary";
-import { createDragImage } from "@/lib/compositions/drag-utils";
 import { CompositionRulesHelp, type CompositionRuleItem } from "@/components/compositions/CompositionRulesHelp";
+import { usePlayerDrag } from "@/hooks/usePlayerDrag";
+import { EpreuveSelect } from "@/components/compositions/Filters/EpreuveSelect";
+import { PhaseSelect } from "@/components/compositions/Filters/PhaseSelect";
+import { TeamPicker } from "@/components/compositions/Filters/TeamPicker";
+import { TabPanel } from "@/components/compositions/Filters/TabPanel";
 
 interface PhaseSelectOption {
   value: "aller" | "retour";
   label: string;
 }
 
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
 const MAX_PLAYERS_PER_DEFAULT_TEAM = 5;
 const MIN_PLAYERS_FOR_DEFAULT_COMPLETION = 4;
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`default-compositions-tabpanel-${index}`}
-      aria-labelledby={`default-compositions-tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box sx={{ p: 5 }}>{children}</Box>}
-    </div>
-  );
-}
 
 export default function DefaultCompositionsPage() {
   const { equipes, loading: loadingEquipes } = useEquipesWithMatches();
@@ -112,8 +88,6 @@ export default function DefaultCompositionsPage() {
     string | null
   >(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
-  const [dragOverTeamId, setDragOverTeamId] = useState<string | null>(null);
   const [includeAllPlayers, setIncludeAllPlayers] = useState(false);
   const [discordMembers, setDiscordMembers] = useState<Array<{ id: string; username: string; displayName: string }>>([]);
 
@@ -776,127 +750,50 @@ export default function DefaultCompositionsPage() {
     [selectedPhase, equipes, compositionDefaultsService, selectedEpreuve]
   );
 
-  const handleDragStart = useCallback(
-    (event: React.DragEvent, playerId: string) => {
-      const target = event.target as HTMLElement;
-      const clickedChip =
-        target.closest('[data-chip="remove"]') ||
-        target.closest('button[aria-label*="remove"]') ||
-        (target.tagName === "BUTTON" && target.textContent?.trim() === "×");
-
-      if (clickedChip || target.textContent?.trim() === "×") {
-        event.preventDefault();
-        event.stopPropagation();
-        return;
-      }
-
-      event.dataTransfer.setData("playerId", playerId);
-      event.dataTransfer.effectAllowed = "move";
-      setDraggedPlayerId(playerId);
-      setDragOverTeamId(null);
-      document.documentElement.classList.add("dragging");
-
-      const player = players.find((p) => p.id === playerId);
-      if (!player) {
-        return;
-      }
-
+  const getDragPreviewOptions = useCallback(
+    (playerId: string) => {
       let championshipType: "masculin" | "feminin" = defaultCompositionTab;
       const assignmentsByType = defaultCompositions;
+
       (["masculin", "feminin"] as const).forEach((type) => {
         const assignment = assignmentsByType[type];
-        if (
-          Object.values(assignment).some((ids) => ids?.includes(playerId))
-        ) {
+        if (Object.values(assignment).some((ids) => ids?.includes(playerId))) {
           championshipType = type;
         }
       });
 
-      const tempDiv = createDragImage(player, {
+      return {
         championshipType,
         phase: (selectedPhase || "aller") as "aller" | "retour",
-      });
-      document.body.appendChild(tempDiv);
-      void tempDiv.offsetHeight;
-      event.dataTransfer.setDragImage(tempDiv, 0, 0);
-      setTimeout(() => {
-        if (document.body.contains(tempDiv)) {
-          document.body.removeChild(tempDiv);
-        }
-      }, 0);
+      };
     },
-    [
-      players,
-      defaultCompositionTab,
-      defaultCompositions,
-      selectedPhase,
-    ]
+    [defaultCompositionTab, defaultCompositions, selectedPhase]
   );
 
-  const handleDragEnd = useCallback(() => {
-    setDraggedPlayerId(null);
-    setDragOverTeamId(null);
-    document.documentElement.classList.remove("dragging");
-  }, []);
-
-  const handleDragOver = useCallback(
-    (event: React.DragEvent, teamId: string) => {
-      event.preventDefault();
-      if (!draggedPlayerId) {
-        return;
-      }
-
-      const validation = canDropPlayer(draggedPlayerId, teamId);
-      event.dataTransfer.dropEffect = validation.canAssign ? "move" : "none";
-      setDragOverTeamId(teamId);
+  const handleInvalidDrop = useCallback(
+    (validation: AssignmentValidationResult) => {
+      setDefaultCompositionMessage(validation.reason || "Composition invalide.");
     },
-    [draggedPlayerId, canDropPlayer]
+    []
   );
 
-  const handleDragLeave = useCallback(() => {
-    setDragOverTeamId(null);
-  }, []);
-
-  const handleDrop = useCallback(
-    async (event: React.DragEvent, teamId: string) => {
-      event.preventDefault();
-      const playerId = event.dataTransfer.getData("playerId");
-
-      console.log("[DefaultCompositions] Drop event", { teamId, playerId });
-
-      setDragOverTeamId(null);
-      document.documentElement.classList.remove("dragging");
-
-      if (!playerId) {
-        setDraggedPlayerId(null);
-        console.log("[DefaultCompositions] Drop aborted: missing playerId");
-        return;
-      }
-
-      const validation = canDropPlayer(playerId, teamId);
-      if (!validation.canAssign) {
-        setDefaultCompositionMessage(
-          validation.reason || "Composition invalide."
-        );
-        console.log("[DefaultCompositions] Drop refused by validation", {
-          teamId,
-          playerId,
-          reason: validation.reason,
-        });
-        setDraggedPlayerId(null);
-        return;
-      }
-
+  const {
+    draggedPlayerId,
+    dragOverTeamId,
+    handleDragStart,
+    handleDragEnd,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+  } = usePlayerDrag({
+    players,
+    canDropPlayer,
+    getPreviewOptions: getDragPreviewOptions,
+    onDrop: async (teamId, playerId) => {
       await assignPlayerToTeam(teamId, playerId);
-      console.log("[DefaultCompositions] Drop processed, assignment triggered", {
-        teamId,
-        playerId,
-      });
-      event.dataTransfer.clearData();
-      setDraggedPlayerId(null);
     },
-    [assignPlayerToTeam, canDropPlayer]
-  );
+    onInvalidDrop: handleInvalidDrop,
+  });
 
   const compositionSummary = useMemo(() => {
     const currentTeams =
@@ -1075,50 +972,20 @@ export default function DefaultCompositionsPage() {
           <Card sx={{ mb: 3 }}>
             <CardContent sx={{ pt: 2.5, pb: 1.5 }}>
               <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
-                <FormControl size="small" sx={{ minWidth: 200 }}>
-                  <InputLabel id="epreuve-select-label">Épreuve</InputLabel>
-                  <Select
-                    labelId="epreuve-select-label"
-                    id="epreuve-select"
-                    value={selectedEpreuve || ""}
-                    label="Épreuve"
-                    onChange={(e) => {
-                      const epreuve = e.target.value as EpreuveType;
-                      setSelectedEpreuve(epreuve);
-                      setSelectedPhase(null); // Réinitialiser la phase lors du changement d'épreuve
-                    }}
-                  >
-                    <MenuItem value="championnat_equipes">
-                      Championnat par Équipes
-                    </MenuItem>
-                    <MenuItem value="championnat_paris">
-                      Championnat de Paris IDF
-                    </MenuItem>
-                  </Select>
-                </FormControl>
-                {/* Masquer le sélecteur de phase pour le championnat de Paris (une seule phase) */}
+                <EpreuveSelect
+                  value={selectedEpreuve}
+                  onChange={(epreuve) => {
+                    setSelectedEpreuve(epreuve);
+                    setSelectedPhase(null);
+                  }}
+                />
                 {selectedEpreuve !== "championnat_paris" && (
-                  <FormControl size="small" sx={{ minWidth: 180 }}>
-                    <InputLabel id="default-phase-label">Phase</InputLabel>
-                    <Select
-                      labelId="default-phase-label"
-                      label="Phase"
-                      value={selectedPhase || ""}
-                      onChange={(event) =>
-                        setSelectedPhase(
-                          event.target.value
-                            ? (event.target.value as "aller" | "retour")
-                            : null
-                        )
-                      }
-                    >
-                      {phaseOptions.map((option) => (
-                        <MenuItem key={option.value} value={option.value}>
-                          {option.label}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
+                  <PhaseSelect
+                    value={selectedPhase}
+                    onChange={(phase) => setSelectedPhase(phase)}
+                    options={phaseOptions}
+                    minWidth={180}
+                  />
                 )}
               </Box>
             </CardContent>
@@ -1150,14 +1017,11 @@ export default function DefaultCompositionsPage() {
                 </Alert>
               )}
 
-              {selectedEpreuve !== "championnat_paris" && (
-                <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
-                  <Tabs value={currentTabIndex} onChange={handleTabChange}>
-                    <Tab label="Équipes Masculines" />
-                    <Tab label="Équipes Féminines" />
-                  </Tabs>
-                </Box>
-              )}
+              <TeamPicker
+                value={currentTabIndex}
+                onChange={handleTabChange}
+                showFemale={selectedEpreuve !== "championnat_paris"}
+              />
 
               <Box sx={{ display: "flex", gap: 2, position: "relative" }}>
                 <AvailablePlayersPanel
@@ -1356,7 +1220,11 @@ export default function DefaultCompositionsPage() {
                     title="Bilan des compositions par défaut"
                   />
 
-                  <TabPanel value={currentTabIndex} index={0}>
+                  <TabPanel
+                    value={currentTabIndex}
+                    index={0}
+                    baseId="default-compositions"
+                  >
                     {(() => {
                       // Pour le championnat de Paris, afficher toutes les équipes (masculin + féminin)
                       const equipesToDisplay =
@@ -1580,7 +1448,11 @@ export default function DefaultCompositionsPage() {
                     })()}
                   </TabPanel>
 
-                  <TabPanel value={currentTabIndex} index={1}>
+                  <TabPanel
+                    value={currentTabIndex}
+                    index={1}
+                    baseId="default-compositions"
+                  >
                     {equipesByType.feminin.length === 0 ? (
                       <Typography variant="body2" color="text.secondary">
                         Aucune équipe féminine
