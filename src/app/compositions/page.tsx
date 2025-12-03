@@ -49,6 +49,7 @@ import {
   useEquipesWithMatches,
   type EquipeWithMatches,
 } from "@/hooks/useEquipesWithMatches";
+import { usePlayerDrag } from "@/hooks/usePlayerDrag";
 import { useCompositionRealtime } from "@/hooks/useCompositionRealtime";
 import { useAvailabilityRealtime } from "@/hooks/useAvailabilityRealtime";
 import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
@@ -80,33 +81,13 @@ import {
 import { AvailablePlayersPanel } from "@/components/compositions/AvailablePlayersPanel";
 import { TeamCompositionCard } from "@/components/compositions/TeamCompositionCard";
 import { CompositionsSummary } from "@/components/compositions/CompositionsSummary";
-import { createDragImage } from "@/lib/compositions/drag-utils";
 import {
   CompositionRulesHelp,
   type CompositionRuleItem,
 } from "@/components/compositions/CompositionRulesHelp";
-
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
-
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`compositions-tabpanel-${index}`}
-      aria-labelledby={`compositions-tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box sx={{ p: 5 }}>{children}</Box>}
-    </div>
-  );
-}
+import { TabPanel } from "@/components/compositions/Filters/TabPanel";
+import { EpreuveSelect } from "@/components/compositions/Filters/EpreuveSelect";
+import { PhaseSelect } from "@/components/compositions/Filters/PhaseSelect";
 
 // Composant pour afficher les suggestions de mentions
 function MentionSuggestions({
@@ -303,10 +284,6 @@ export default function CompositionsPage() {
   const [compositions, setCompositions] = useState<Record<string, string[]>>(
     {}
   );
-  // État pour le joueur actuellement en train d'être dragué
-  const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
-  // État pour l'équipe sur laquelle on survole avec le drag
-  const [dragOverTeamId, setDragOverTeamId] = useState<string | null>(null);
   // État pour la recherche de joueurs
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isResetting, setIsResetting] = useState(false);
@@ -1725,126 +1702,42 @@ export default function CompositionsPage() {
     });
   };
 
-  // Gestion du drag & drop
-  const handleDragStart = (e: React.DragEvent, playerId: string) => {
-    // Empêcher le drag si on clique sur le Chip de suppression ou un de ses enfants
-    const target = e.target as HTMLElement;
-
-    // Vérifier si le clic provient du Chip de suppression ou d'un de ses enfants
-    const clickedChip =
-      target.closest('[data-chip="remove"]') ||
-      target.closest('button[aria-label*="remove"]') ||
-      (target.tagName === "BUTTON" && target.textContent?.trim() === "×");
-
-    if (clickedChip || target.textContent?.trim() === "×") {
-      e.preventDefault();
-      e.stopPropagation();
-      return;
-    }
-
-    e.dataTransfer.setData("playerId", playerId);
-    e.dataTransfer.effectAllowed = "move";
-    setDraggedPlayerId(playerId);
-    // S'assurer que dragOverTeamId est null au début du drag
-    setDragOverTeamId(null);
-
-    // Ajouter une classe au <html> pour forcer le curseur pendant le drag
-    // Le style CSS global gérera le curseur (défini dans globals.css)
-    document.documentElement.classList.add("dragging");
-
-    // Créer une image personnalisée pour le drag (seulement le contenu de l'élément)
-    const player = players.find((p) => p.id === playerId);
-
-    if (!player) {
-      return;
-    }
-
-    // Déterminer le type de championnat pour le brûlage
-    // Si le joueur est dans une équipe, utiliser le type de l'équipe
-    // Sinon, utiliser le tab actuel (liste disponible)
-    const equipe = filteredEquipes.find((eq) => {
-      const teamPlayers = compositions[eq.team.id] || [];
-      return teamPlayers.includes(playerId);
-    });
-    const championshipType = equipe
-      ? equipe.matches.some((match) => match.isFemale === true)
-        ? "feminin"
-        : "masculin"
-      : tabValue === 0
-      ? "masculin"
-      : "feminin";
-
-    // Créer l'image de drag uniforme (mutualisée pour les deux cas)
-    const tempDiv = createDragImage(player, {
-      championshipType,
-      phase: (selectedPhase || "aller") as "aller" | "retour",
-    });
-    document.body.appendChild(tempDiv);
-
-    // Forcer un reflow pour s'assurer que les dimensions sont calculées
-    void tempDiv.offsetHeight;
-
-    // Utiliser l'élément temporaire comme image de drag
-    e.dataTransfer.setDragImage(tempDiv, 0, 0);
-
-    // Nettoyer après un court délai
-    setTimeout(() => {
-      if (document.body.contains(tempDiv)) {
-        document.body.removeChild(tempDiv);
+  const getChampionshipTypeForPlayer = useCallback(
+    (playerId: string): "masculin" | "feminin" => {
+      const equipe = filteredEquipes.find((eq) => {
+        const teamPlayers = compositions[eq.team.id] || [];
+        return teamPlayers.includes(playerId);
+      });
+      if (equipe) {
+        return equipe.matches.some((match) => match.isFemale === true)
+          ? "feminin"
+          : "masculin";
       }
-    }, 0);
-  };
 
-  const handleDragEnd = () => {
-    setDraggedPlayerId(null);
-    setDragOverTeamId(null);
-
-    // Retirer la classe du <html> pour restaurer le curseur par défaut
-    document.documentElement.classList.remove("dragging");
-
-    // Nettoyer le style injecté si présent (sécurité)
-    const style = document.getElementById("drag-cursor-style");
-    if (style) {
-      style.remove();
-    }
-  };
-
-  // Nettoyer le drag si le drop se fait hors zone
-  useEffect(() => {
-    const clearDrag = () => {
-      document.documentElement.classList.remove("dragging");
-      const style = document.getElementById("drag-cursor-style");
-      if (style) {
-        style.remove();
+      if (selectedEpreuve === "championnat_paris") {
+        return "masculin";
       }
-      setDraggedPlayerId(null);
-      setDragOverTeamId(null);
-    };
 
-    window.addEventListener("drop", clearDrag);
-    window.addEventListener("dragend", clearDrag);
+      return tabValue === 0 ? "masculin" : "feminin";
+    },
+    [filteredEquipes, compositions, selectedEpreuve, tabValue]
+  );
 
-    return () => {
-      window.removeEventListener("drop", clearDrag);
-      window.removeEventListener("dragend", clearDrag);
-    };
-  }, []);
-
-  const handleDragOver = (e: React.DragEvent, teamId: string) => {
-    e.preventDefault();
-    setDragOverTeamId(teamId);
-
-    if (draggedPlayerId) {
-      const validation = canDropPlayer(draggedPlayerId, teamId);
-      e.dataTransfer.dropEffect = validation.canAssign ? "move" : "none";
-    } else {
-      e.dataTransfer.dropEffect = "move";
-    }
-  };
-
-  const handleDragLeave = () => {
-    setDragOverTeamId(null);
-  };
+  const {
+    draggedPlayerId,
+    dragOverTeamId,
+    handleDragStart,
+    handleDragEnd,
+    handleDragOver,
+    handleDragLeave,
+    setDragOverTeamId,
+    setDraggedPlayerId,
+  } = usePlayerDrag({
+    players,
+    selectedPhase,
+    getChampionshipTypeForPlayer,
+    canDropPlayer,
+  });
 
   const handleDrop = (e: React.DragEvent, teamId: string) => {
     e.preventDefault();
@@ -2467,49 +2360,23 @@ export default function CompositionsPage() {
         <Card sx={{ mb: 3 }}>
           <CardContent sx={{ pt: 2.5, pb: 1.5 }}>
             <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
-              <FormControl size="small" sx={{ minWidth: 200 }}>
-                <InputLabel id="epreuve-select-label">Épreuve</InputLabel>
-                <Select
-                  labelId="epreuve-select-label"
-                  id="epreuve-select"
-                  value={selectedEpreuve || ""}
-                  label="Épreuve"
-                  onChange={(e) => {
-                    const epreuve = e.target.value as EpreuveType;
-                    setSelectedEpreuve(epreuve);
-                    setSelectedPhase(null); // Réinitialiser la phase lors du changement d'épreuve
-                    setSelectedJournee(null); // Réinitialiser la journée lors du changement d'épreuve
-                  }}
-                >
-                  <MenuItem value="championnat_equipes">
-                    Championnat par Équipes
-                  </MenuItem>
-                  <MenuItem value="championnat_paris">
-                    Championnat de Paris IDF
-                  </MenuItem>
-                </Select>
-              </FormControl>
-              {/* Masquer le sélecteur de phase pour le championnat de Paris (une seule phase) */}
-              {selectedEpreuve !== "championnat_paris" && (
-                <FormControl size="small" sx={{ minWidth: 150 }}>
-                  <InputLabel id="phase-select-label">Phase</InputLabel>
-                  <Select
-                    labelId="phase-select-label"
-                    id="phase-select"
-                    value={selectedPhase || ""}
-                    label="Phase"
-                    onChange={(e) => {
-                      const phase = e.target.value as "aller" | "retour";
-                      setSelectedPhase(phase);
-                      setSelectedJournee(null); // Réinitialiser la journée lors du changement de phase
-                    }}
-                    disabled={selectedEpreuve === null}
-                  >
-                    <MenuItem value="aller">Phase Aller</MenuItem>
-                    <MenuItem value="retour">Phase Retour</MenuItem>
-                  </Select>
-                </FormControl>
-              )}
+              <EpreuveSelect
+                value={selectedEpreuve}
+                onChange={(epreuve) => {
+                  setSelectedEpreuve(epreuve);
+                  setSelectedPhase(null);
+                  setSelectedJournee(null);
+                }}
+              />
+              <PhaseSelect
+                value={selectedPhase}
+                onChange={(phase) => {
+                  setSelectedPhase(phase);
+                  setSelectedJournee(null);
+                }}
+                disabled={selectedEpreuve === null}
+                hidden={selectedEpreuve === "championnat_paris"}
+              />
               <FormControl size="small" sx={{ minWidth: 150 }}>
                 <InputLabel id="journee-select-label">Journée</InputLabel>
                 <Select

@@ -1,14 +1,8 @@
 "use client";
 
 import React from "react";
-import {
-  Paper,
-  Box,
-  Typography,
-  TextField,
-  Divider,
-  List,
-} from "@mui/material";
+import { Paper, Box, Typography, Divider, List } from "@mui/material";
+import { SearchInput } from "./Filters/SearchInput";
 import type { Player } from "@/types/team-management";
 
 export interface AvailablePlayersPanelProps {
@@ -74,14 +68,9 @@ export const AvailablePlayersPanel: React.FC<AvailablePlayersPanelProps> = ({
           </Typography>
         )}
         <Divider sx={{ mb: 2 }} />
-        <TextField
-          fullWidth
-          size="small"
-          placeholder="Rechercher un joueur..."
+        <SearchInput
           value={searchQuery}
-          onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-            onSearchChange(event.target.value)
-          }
+          onChange={onSearchChange}
           sx={{ mb: actions ? 1.5 : 2 }}
         />
 
