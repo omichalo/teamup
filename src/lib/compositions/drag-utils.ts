@@ -1,5 +1,5 @@
 import type { Player } from "@/types/team-management";
-import type { PhaseType } from "@/lib/compositions/validation";
+import type { PhaseType } from "@/lib/compositions/validators";
 import { ChampionshipType } from "@/types";
 
 interface CreateDragImageOptions {

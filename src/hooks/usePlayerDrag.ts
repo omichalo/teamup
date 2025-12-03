@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { createDragImage } from "@/lib/compositions/drag-utils";
-import type { AssignmentValidationResult } from "@/lib/compositions/validation";
+import type { AssignmentValidationResult } from "@/lib/compositions/validators";
 import type { Player } from "@/types/team-management";
 import { ChampionshipType } from "@/types";
 
