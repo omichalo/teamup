@@ -52,8 +52,8 @@ import type { Player } from "@/types/team-management";
 import { AvailablePlayersPanel } from "@/components/compositions/AvailablePlayersPanel";
 import { TeamCompositionCard } from "@/components/compositions/TeamCompositionCard";
 import { CompositionsSummary } from "@/components/compositions/CompositionsSummary";
-import { createDragImage } from "@/lib/compositions/drag-utils";
 import { CompositionRulesHelp, type CompositionRuleItem } from "@/components/compositions/CompositionRulesHelp";
+import { usePlayerDrag } from "@/hooks/usePlayerDrag";
 
 interface PhaseSelectOption {
   value: "aller" | "retour";
@@ -112,8 +112,6 @@ export default function DefaultCompositionsPage() {
     string | null
   >(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
-  const [dragOverTeamId, setDragOverTeamId] = useState<string | null>(null);
   const [includeAllPlayers, setIncludeAllPlayers] = useState(false);
   const [discordMembers, setDiscordMembers] = useState<Array<{ id: string; username: string; displayName: string }>>([]);
 
@@ -776,127 +774,50 @@ export default function DefaultCompositionsPage() {
     [selectedPhase, equipes, compositionDefaultsService, selectedEpreuve]
   );
 
-  const handleDragStart = useCallback(
-    (event: React.DragEvent, playerId: string) => {
-      const target = event.target as HTMLElement;
-      const clickedChip =
-        target.closest('[data-chip="remove"]') ||
-        target.closest('button[aria-label*="remove"]') ||
-        (target.tagName === "BUTTON" && target.textContent?.trim() === "×");
-
-      if (clickedChip || target.textContent?.trim() === "×") {
-        event.preventDefault();
-        event.stopPropagation();
-        return;
-      }
-
-      event.dataTransfer.setData("playerId", playerId);
-      event.dataTransfer.effectAllowed = "move";
-      setDraggedPlayerId(playerId);
-      setDragOverTeamId(null);
-      document.documentElement.classList.add("dragging");
-
-      const player = players.find((p) => p.id === playerId);
-      if (!player) {
-        return;
-      }
-
+  const getDragPreviewOptions = useCallback(
+    (playerId: string) => {
       let championshipType: "masculin" | "feminin" = defaultCompositionTab;
       const assignmentsByType = defaultCompositions;
+
       (["masculin", "feminin"] as const).forEach((type) => {
         const assignment = assignmentsByType[type];
-        if (
-          Object.values(assignment).some((ids) => ids?.includes(playerId))
-        ) {
+        if (Object.values(assignment).some((ids) => ids?.includes(playerId))) {
           championshipType = type;
         }
       });
 
-      const tempDiv = createDragImage(player, {
+      return {
         championshipType,
         phase: (selectedPhase || "aller") as "aller" | "retour",
-      });
-      document.body.appendChild(tempDiv);
-      void tempDiv.offsetHeight;
-      event.dataTransfer.setDragImage(tempDiv, 0, 0);
-      setTimeout(() => {
-        if (document.body.contains(tempDiv)) {
-          document.body.removeChild(tempDiv);
-        }
-      }, 0);
+      };
     },
-    [
-      players,
-      defaultCompositionTab,
-      defaultCompositions,
-      selectedPhase,
-    ]
+    [defaultCompositionTab, defaultCompositions, selectedPhase]
   );
 
-  const handleDragEnd = useCallback(() => {
-    setDraggedPlayerId(null);
-    setDragOverTeamId(null);
-    document.documentElement.classList.remove("dragging");
-  }, []);
-
-  const handleDragOver = useCallback(
-    (event: React.DragEvent, teamId: string) => {
-      event.preventDefault();
-      if (!draggedPlayerId) {
-        return;
-      }
-
-      const validation = canDropPlayer(draggedPlayerId, teamId);
-      event.dataTransfer.dropEffect = validation.canAssign ? "move" : "none";
-      setDragOverTeamId(teamId);
+  const handleInvalidDrop = useCallback(
+    (validation: AssignmentValidationResult) => {
+      setDefaultCompositionMessage(validation.reason || "Composition invalide.");
     },
-    [draggedPlayerId, canDropPlayer]
+    []
   );
 
-  const handleDragLeave = useCallback(() => {
-    setDragOverTeamId(null);
-  }, []);
-
-  const handleDrop = useCallback(
-    async (event: React.DragEvent, teamId: string) => {
-      event.preventDefault();
-      const playerId = event.dataTransfer.getData("playerId");
-
-      console.log("[DefaultCompositions] Drop event", { teamId, playerId });
-
-      setDragOverTeamId(null);
-      document.documentElement.classList.remove("dragging");
-
-      if (!playerId) {
-        setDraggedPlayerId(null);
-        console.log("[DefaultCompositions] Drop aborted: missing playerId");
-        return;
-      }
-
-      const validation = canDropPlayer(playerId, teamId);
-      if (!validation.canAssign) {
-        setDefaultCompositionMessage(
-          validation.reason || "Composition invalide."
-        );
-        console.log("[DefaultCompositions] Drop refused by validation", {
-          teamId,
-          playerId,
-          reason: validation.reason,
-        });
-        setDraggedPlayerId(null);
-        return;
-      }
-
+  const {
+    draggedPlayerId,
+    dragOverTeamId,
+    handleDragStart,
+    handleDragEnd,
+    handleDragOver,
+    handleDragLeave,
+    handleDrop,
+  } = usePlayerDrag({
+    players,
+    canDropPlayer,
+    getPreviewOptions: getDragPreviewOptions,
+    onDrop: async (teamId, playerId) => {
       await assignPlayerToTeam(teamId, playerId);
-      console.log("[DefaultCompositions] Drop processed, assignment triggered", {
-        teamId,
-        playerId,
-      });
-      event.dataTransfer.clearData();
-      setDraggedPlayerId(null);
     },
-    [assignPlayerToTeam, canDropPlayer]
-  );
+    onInvalidDrop: handleInvalidDrop,
+  });
 
   const compositionSummary = useMemo(() => {
     const currentTeams =
