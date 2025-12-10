@@ -1092,16 +1092,6 @@ export default function JoueursPage() {
                               title="Ce joueur a participé à au moins un match au championnat de Paris"
                             />
                           )}
-                          {player.hasPlayedAtLeastOneMatchParis && (
-                            <Chip
-                              icon={<SportsTennisIcon />}
-                              label="A joué Paris"
-                              size="small"
-                              color="secondary"
-                              variant="outlined"
-                              title="Ce joueur a participé à au moins un match au championnat de Paris"
-                            />
-                          )}
                         </Box>
                       </TableCell>
                       <TableCell>{player.license}</TableCell>
@@ -1588,16 +1578,6 @@ export default function JoueursPage() {
                               title="Ce joueur a participé à au moins un match au championnat de Paris"
                             />
                           )}
-                          {player.hasPlayedAtLeastOneMatchParis && (
-                            <Chip
-                              icon={<SportsTennisIcon />}
-                              label="A joué Paris"
-                              size="small"
-                              color="secondary"
-                              variant="outlined"
-                              title="Ce joueur a participé à au moins un match au championnat de Paris"
-                            />
-                          )}
                         </Box>
                       </TableCell>
                       <TableCell>
@@ -1831,16 +1811,6 @@ export default function JoueursPage() {
                               color="success"
                               variant="outlined"
                               title="Ce joueur a participé à au moins un match"
-                            />
-                          )}
-                          {player.hasPlayedAtLeastOneMatchParis && (
-                            <Chip
-                              icon={<SportsTennisIcon />}
-                              label="A joué Paris"
-                              size="small"
-                              color="secondary"
-                              variant="outlined"
-                              title="Ce joueur a participé à au moins un match au championnat de Paris"
                             />
                           )}
                           {player.hasPlayedAtLeastOneMatchParis && (
