@@ -33,6 +33,7 @@ import {
   Send,
   AlternateEmail,
   Warning,
+  Accessible as AccessibleIcon,
 } from "@mui/icons-material";
 import { useTeamData, type EquipeWithMatches } from "@/hooks/useTeamData";
 import { useAvailabilities } from "@/hooks/useAvailabilities";
@@ -756,7 +757,13 @@ export function CompositionsPageContainer() {
         const structure = getParisTeamStructure(equipe.team.division || "");
         return structure?.totalPlayers || 4; // Fallback à 4 si structure non reconnue
       }
-      return 4; // Championnat par équipes : 4 joueurs
+      // Vérifier si c'est une équipe pré-régionale féminine (format: DXX_Pre-Regionale Dames)
+      const division = equipe.team.division || "";
+      const isFemaleTeam = equipe.matches.some((match) => match.isFemale === true);
+      if (division.match(/Pre-Regionale/i) && isFemaleTeam) {
+        return 3; // Pré-régionale féminine : 3 joueurs
+      }
+      return 4; // Championnat par équipes : 4 joueurs par défaut
     },
     []
   );
@@ -1562,7 +1569,8 @@ export function CompositionsPageContainer() {
         return;
       }
 
-      if (teamPlayersData.length >= 4) {
+      const maxPlayers = equipe ? getMaxPlayersForTeam(equipe) : 4;
+      if (teamPlayersData.length >= maxPlayers) {
         equipesCompletes += 1;
       } else {
         equipesIncompletes += 1;
@@ -1592,6 +1600,7 @@ export function CompositionsPageContainer() {
     getMatchForTeam,
     selectedEpreuve,
     teamValidationErrors,
+    getMaxPlayersForTeam,
   ]);
 
   // Fonction pour vérifier si un drop est possible
@@ -2455,6 +2464,14 @@ export function CompositionsPageContainer() {
                               <Typography variant="body2" component="span">
                                 {player.firstName} {player.name}
                               </Typography>
+                              {player.isWheelchair && (
+                                <Tooltip title="Joueur en fauteuil">
+                                  <AccessibleIcon
+                                    fontSize="small"
+                                    sx={{ color: "primary.main", ml: 0.5 }}
+                                  />
+                                </Tooltip>
+                              )}
                               {isEuropean && (
                                 <Chip
                                   label="EUR"

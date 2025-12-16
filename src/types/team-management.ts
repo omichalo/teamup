@@ -10,6 +10,7 @@ export interface Player {
   nationality: "FR" | "ETR" | "C"; // C = Européen non français
   isActive: boolean;
   isTemporary?: boolean; // Joueur temporaire (sans licence FFTT)
+  isWheelchair?: boolean; // Joueur en fauteuil (handisport)
   createdAt: Date;
   updatedAt: Date;
   // Champs additionnels FFTT

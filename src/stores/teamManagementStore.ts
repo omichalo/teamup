@@ -12,7 +12,7 @@ import {
 import { CompositionService, DayComposition } from "@/lib/services/composition-service";
 import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
 import { Player } from "@/types/team-management";
-import { ChampionshipType } from "@/types";
+import { ChampionshipType, Team } from "@/types";
 
 const playerService = new FirestorePlayerService();
 const availabilityService = new AvailabilityService();
@@ -61,7 +61,11 @@ interface TeamManagementState {
   >;
 
   loadPlayers: () => Promise<void>;
+  updatePlayer: (playerId: string, updates: Partial<Player>) => void;
+  addPlayer: (player: Player) => void;
+  removePlayer: (playerId: string) => void;
   loadEquipesWithMatches: () => Promise<void>;
+  updateTeam: (teamId: string, updates: Partial<Team>) => void;
   subscribeToAvailability: (params: {
     journee: number;
     phase: "aller" | "retour";
@@ -123,6 +127,38 @@ export const useTeamManagementStore = create<TeamManagementState>((set, get) => 
     }
   },
 
+  updatePlayer: (playerId: string, updates: Partial<Player>) => {
+    set((state) => {
+      const playerIndex = state.players.findIndex((p) => p.id === playerId);
+      if (playerIndex === -1) {
+        // Joueur non trouvé dans le store, ne rien faire
+        return state;
+      }
+      const updatedPlayers = [...state.players];
+      updatedPlayers[playerIndex] = {
+        ...updatedPlayers[playerIndex],
+        ...updates,
+      };
+      return { players: updatedPlayers };
+    });
+  },
+
+  addPlayer: (player: Player) => {
+    set((state) => {
+      // Vérifier si le joueur existe déjà
+      if (state.players.some((p) => p.id === player.id)) {
+        return state;
+      }
+      return { players: [...state.players, player] };
+    });
+  },
+
+  removePlayer: (playerId: string) => {
+    set((state) => ({
+      players: state.players.filter((p) => p.id !== playerId),
+    }));
+  },
+
   loadEquipesWithMatches: async () => {
     try {
       set({ equipesLoading: true, equipesError: null });
@@ -157,6 +193,27 @@ export const useTeamManagementStore = create<TeamManagementState>((set, get) => 
         equipesError: error instanceof Error ? error.message : "Unknown error",
       });
     }
+  },
+
+  updateTeam: (teamId: string, updates: Partial<Team>) => {
+    set((state) => {
+      const equipeIndex = state.equipesWithMatches.findIndex(
+        (e) => e.team.id === teamId
+      );
+      if (equipeIndex === -1) {
+        // Équipe non trouvée dans le store, ne rien faire
+        return state;
+      }
+      const updatedEquipes = [...state.equipesWithMatches];
+      updatedEquipes[equipeIndex] = {
+        ...updatedEquipes[equipeIndex],
+        team: {
+          ...updatedEquipes[equipeIndex].team,
+          ...updates,
+        },
+      };
+      return { equipesWithMatches: updatedEquipes };
+    });
   },
 
   subscribeToAvailability: ({ journee, phase, championshipType, idEpreuve }) => {

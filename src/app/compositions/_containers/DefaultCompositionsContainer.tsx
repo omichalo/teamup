@@ -20,7 +20,12 @@ import {
   Card,
   CardContent,
 } from "@mui/material";
-import { DragIndicator, AlternateEmail, Warning } from "@mui/icons-material";
+import {
+  DragIndicator,
+  AlternateEmail,
+  Warning,
+  Accessible as AccessibleIcon,
+} from "@mui/icons-material";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
 import { useTeamData, type EquipeWithMatches } from "@/hooks/useTeamData";
@@ -282,6 +287,12 @@ export function DefaultCompositionsContainer() {
       if (isParisChampionship(equipe)) {
         const structure = getParisTeamStructure(equipe.team.division || "");
         return structure?.totalPlayers || MAX_PLAYERS_PER_DEFAULT_TEAM; // Fallback si structure non reconnue
+      }
+      // Vérifier si c'est une équipe pré-régionale féminine (format: DXX_Pre-Regionale Dames)
+      const division = equipe.team.division || "";
+      const isFemaleTeam = equipe.matches.some((match) => match.isFemale === true);
+      if (division.match(/Pre-Regionale/i) && isFemaleTeam) {
+        return 3; // Pré-régionale féminine : 3 joueurs
       }
       return MAX_PLAYERS_PER_DEFAULT_TEAM; // Championnat par équipes : 5 joueurs par défaut
     },
@@ -1041,6 +1052,14 @@ export function DefaultCompositionsContainer() {
                                 <Typography variant="body2" component="span">
                                   {player.firstName} {player.name}
                                 </Typography>
+                                {player.isWheelchair && (
+                                  <Tooltip title="Joueur en fauteuil">
+                                    <AccessibleIcon
+                                      fontSize="small"
+                                      sx={{ color: "primary.main", ml: 0.5 }}
+                                    />
+                                  </Tooltip>
+                                )}
                                 {isEuropean && (
                                   <Chip
                                     label="EUR"
