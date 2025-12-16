@@ -25,6 +25,7 @@ import {
   Tooltip,
   Button,
   Badge,
+  IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -42,6 +43,7 @@ import {
   Delete as DeleteIcon,
   AlternateEmail as AlternateEmailIcon,
   Warning as WarningIcon,
+  Accessible as AccessibleIcon,
 } from "@mui/icons-material";
 import { Player } from "@/types/team-management";
 import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
@@ -51,6 +53,7 @@ import { useDiscordMembers } from "@/hooks/useDiscordMembers";
 import { USER_ROLES } from "@/lib/auth/roles";
 import { doc, getDoc } from "firebase/firestore";
 import { getDbInstanceDirect } from "@/lib/firebase";
+import { useTeamManagementStore } from "@/stores/teamManagementStore";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -78,6 +81,15 @@ function TabPanel(props: TabPanelProps) {
 
 export default function JoueursPage() {
   const { currentPhase } = useTeamData();
+  const updatePlayerInStore = useTeamManagementStore(
+    (state) => state.updatePlayer
+  );
+  const removePlayerFromStore = useTeamManagementStore(
+    (state) => state.removePlayer
+  );
+  const loadPlayersInStore = useTeamManagementStore(
+    (state) => state.loadPlayers
+  );
   const [players, setPlayers] = useState<Player[]>([]);
   const [playersWithoutLicense, setPlayersWithoutLicense] = useState<Player[]>(
     []
@@ -111,6 +123,7 @@ export default function JoueursPage() {
     nationality: "FR" as "FR" | "C" | "ETR",
     points: 500,
     inChampionship: true,
+    isWheelchair: false,
   });
   const [licenseExists, setLicenseExists] = useState(false);
   const [licenseExistsForOther, setLicenseExistsForOther] = useState(false);
@@ -461,6 +474,7 @@ export default function JoueursPage() {
         nationality: newPlayer.nationality,
         isActive: false,
         isTemporary: true,
+        isWheelchair: newPlayer.isWheelchair,
         typeLicence: "",
         points: newPlayer.points || 500,
         preferredTeams: {
@@ -485,12 +499,15 @@ export default function JoueursPage() {
         nationality: "FR",
         points: 500,
         inChampionship: true,
+        isWheelchair: false,
       });
       setLicenseExists(false);
       setCreateDialogOpen(false);
 
       // Recharger les joueurs
       await loadPlayers();
+      // Recharger le store pour synchroniser avec les autres pages
+      await loadPlayersInStore();
     } catch (error) {
       console.error("Erreur lors de la création du joueur temporaire:", error);
       const errorMessage =
@@ -515,6 +532,7 @@ export default function JoueursPage() {
       nationality: player.nationality,
       points: player.points || 500,
       inChampionship: player.participation?.championnat || false,
+      isWheelchair: player.isWheelchair || false,
     });
     setDiscordMentions(player.discordMentions || []);
     setDiscordMentionError(null);
@@ -565,6 +583,7 @@ export default function JoueursPage() {
           nationality: newPlayer.nationality,
           isActive: false,
           isTemporary: true,
+          isWheelchair: newPlayer.isWheelchair,
           typeLicence: editingPlayer.typeLicence || "",
           points: newPlayer.points || 500,
           preferredTeams: editingPlayer.preferredTeams || {
@@ -593,6 +612,7 @@ export default function JoueursPage() {
         // Toujours passer le tableau, même s'il est vide, pour que updatePlayer puisse le gérer
         await playerService.updatePlayer(editingPlayer.id, {
           discordMentions: discordMentions,
+          isWheelchair: newPlayer.isWheelchair,
         });
       }
 
@@ -603,6 +623,7 @@ export default function JoueursPage() {
             ...p,
             // Toujours mettre à jour discordMentions, même s'il est vide (pour refléter la suppression)
             discordMentions: discordMentions.length > 0 ? discordMentions : [],
+            isWheelchair: newPlayer.isWheelchair,
           };
           return updatedPlayer;
         }
@@ -617,6 +638,26 @@ export default function JoueursPage() {
       setPlayers(updatedPlayers);
       setPlayersWithoutLicense(updatedPlayersWithoutLicense);
       setTemporaryPlayers(updatedTemporaryPlayers);
+
+      // Mettre à jour le store Zustand pour synchroniser avec les autres pages
+      if (!editingPlayer.isTemporary) {
+        // Pour les joueurs non-temporaires, mettre à jour le store
+        updatePlayerInStore(editingPlayer.id, {
+          discordMentions: discordMentions.length > 0 ? discordMentions : [],
+          isWheelchair: newPlayer.isWheelchair,
+        });
+      } else {
+        // Pour les joueurs temporaires, mettre à jour la participation si elle a changé
+        const updatedPlayer = updatedPlayers.find(
+          (p) => p.id === editingPlayer.id
+        );
+        if (updatedPlayer && updatedPlayer.participation) {
+          updatePlayerInStore(editingPlayer.id, {
+            participation: updatedPlayer.participation,
+            isWheelchair: newPlayer.isWheelchair,
+          });
+        }
+      }
 
       // Recalculer les joueurs filtrés selon l'onglet actif
       // Utiliser les listes déjà mises à jour
@@ -686,6 +727,7 @@ export default function JoueursPage() {
         nationality: "FR",
         points: 500,
         inChampionship: true,
+        isWheelchair: false,
       });
       setDiscordMentions([]);
       setEditingPlayer(null);
@@ -719,6 +761,8 @@ export default function JoueursPage() {
     try {
       setDeleting(player.id);
       await playerService.deletePlayer(player.id);
+      // Retirer le joueur du store pour synchroniser avec les autres pages
+      removePlayerFromStore(player.id);
       await loadPlayers();
     } catch (error) {
       console.error("Erreur lors de la suppression du joueur:", error);
@@ -755,6 +799,14 @@ export default function JoueursPage() {
             : p
         )
       );
+
+      // Mettre à jour le store Zustand pour synchroniser avec les autres pages
+      updatePlayerInStore(player.id, {
+        participation: {
+          ...player.participation,
+          championnatParis: inChampionshipParis,
+        },
+      });
     } catch (error) {
       console.error(
         "Erreur lors de la mise à jour de la participation au championnat de Paris:",
@@ -796,6 +848,14 @@ export default function JoueursPage() {
       setPlayers(updatedPlayers);
       setTemporaryPlayers(updatedTemporaryPlayers);
       setPlayersWithoutLicense(updatedPlayersWithoutLicense);
+
+      // Mettre à jour le store Zustand pour synchroniser avec les autres pages
+      updatePlayerInStore(player.id, {
+        participation: {
+          ...player.participation,
+          championnat: isParticipating,
+        },
+      });
 
       // Recalculer les joueurs filtrés selon l'onglet actif
       let sourcePlayers: Player[] = [];
@@ -1061,6 +1121,7 @@ export default function JoueursPage() {
                     <TableCell>Brûlage Masculin</TableCell>
                     <TableCell>Brûlage Féminin</TableCell>
                     <TableCell>Brûlage (Paris)</TableCell>
+                    <TableCell>Fauteuil</TableCell>
                     <TableCell>Discord</TableCell>
                   </TableRow>
                 </TableHead>
@@ -1485,6 +1546,131 @@ export default function JoueursPage() {
                         })()}
                       </TableCell>
                       <TableCell>
+                        <Tooltip
+                          title={
+                            player.isWheelchair
+                              ? "Joueur en fauteuil"
+                              : "Cliquer pour indiquer que le joueur est en fauteuil"
+                          }
+                        >
+                          <IconButton
+                            onClick={async () => {
+                              const newValue = !player.isWheelchair;
+                              const oldValue = player.isWheelchair;
+                              // Mise à jour optimiste : mettre à jour l'état local immédiatement
+                              const updateLocalState = () => {
+                                setPlayers((prev) =>
+                                  prev.map((p) =>
+                                    p.id === player.id
+                                      ? {
+                                          ...p,
+                                          isWheelchair: newValue ?? false,
+                                        }
+                                      : p
+                                  )
+                                );
+                                setPlayersWithoutLicense((prev) =>
+                                  prev.map((p) =>
+                                    p.id === player.id
+                                      ? {
+                                          ...p,
+                                          isWheelchair: newValue ?? false,
+                                        }
+                                      : p
+                                  )
+                                );
+                                setTemporaryPlayers((prev) =>
+                                  prev.map((p) =>
+                                    p.id === player.id
+                                      ? {
+                                          ...p,
+                                          isWheelchair: newValue ?? false,
+                                        }
+                                      : p
+                                  )
+                                );
+                                // Mettre à jour filteredPlayers immédiatement
+                                setFilteredPlayers((prev) =>
+                                  prev.map((p) =>
+                                    p.id === player.id
+                                      ? {
+                                          ...p,
+                                          isWheelchair: newValue ?? false,
+                                        }
+                                      : p
+                                  )
+                                );
+                              };
+                              // Mettre à jour l'état local immédiatement
+                              updateLocalState();
+                              try {
+                                await playerService.updatePlayer(player.id, {
+                                  isWheelchair: newValue,
+                                });
+                                // Mettre à jour le store Zustand après succès
+                                updatePlayerInStore(player.id, {
+                                  isWheelchair: newValue,
+                                });
+                              } catch (error) {
+                                // En cas d'erreur, restaurer l'ancienne valeur
+                                console.error(
+                                  "Erreur lors de la mise à jour du flag fauteuil:",
+                                  error
+                                );
+                                setPlayers((prev) =>
+                                  prev.map((p) =>
+                                    p.id === player.id
+                                      ? {
+                                          ...p,
+                                          isWheelchair: oldValue ?? false,
+                                        }
+                                      : p
+                                  )
+                                );
+                                setPlayersWithoutLicense((prev) =>
+                                  prev.map((p) =>
+                                    p.id === player.id
+                                      ? {
+                                          ...p,
+                                          isWheelchair: oldValue ?? false,
+                                        }
+                                      : p
+                                  )
+                                );
+                                setTemporaryPlayers((prev) =>
+                                  prev.map((p) =>
+                                    p.id === player.id
+                                      ? {
+                                          ...p,
+                                          isWheelchair: oldValue ?? false,
+                                        }
+                                      : p
+                                  )
+                                );
+                                setFilteredPlayers((prev) =>
+                                  prev.map((p) =>
+                                    p.id === player.id
+                                      ? {
+                                          ...p,
+                                          isWheelchair: oldValue ?? false,
+                                        }
+                                      : p
+                                  )
+                                );
+                              }
+                            }}
+                            size="small"
+                            sx={{
+                              color: player.isWheelchair
+                                ? "primary.main"
+                                : "action.disabled",
+                            }}
+                          >
+                            <AccessibleIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell>
                         <Badge
                           badgeContent={player.discordMentions?.length || 0}
                           color={
@@ -1547,6 +1733,7 @@ export default function JoueursPage() {
                     <TableCell>Genre</TableCell>
                     <TableCell>Nationalité</TableCell>
                     <TableCell>Participation</TableCell>
+                    <TableCell>Fauteuil</TableCell>
                     <TableCell>Discord</TableCell>
                   </TableRow>
                 </TableHead>
@@ -1702,6 +1889,131 @@ export default function JoueursPage() {
                         </Box>
                       </TableCell>
                       <TableCell>
+                        <Tooltip
+                          title={
+                            player.isWheelchair
+                              ? "Joueur en fauteuil"
+                              : "Cliquer pour indiquer que le joueur est en fauteuil"
+                          }
+                        >
+                          <IconButton
+                            onClick={async () => {
+                              const newValue = !player.isWheelchair;
+                              const oldValue = player.isWheelchair;
+                              // Mise à jour optimiste : mettre à jour l'état local immédiatement
+                              const updateLocalState = () => {
+                                setPlayers((prev) =>
+                                  prev.map((p) =>
+                                    p.id === player.id
+                                      ? {
+                                          ...p,
+                                          isWheelchair: newValue ?? false,
+                                        }
+                                      : p
+                                  )
+                                );
+                                setPlayersWithoutLicense((prev) =>
+                                  prev.map((p) =>
+                                    p.id === player.id
+                                      ? {
+                                          ...p,
+                                          isWheelchair: newValue ?? false,
+                                        }
+                                      : p
+                                  )
+                                );
+                                setTemporaryPlayers((prev) =>
+                                  prev.map((p) =>
+                                    p.id === player.id
+                                      ? {
+                                          ...p,
+                                          isWheelchair: newValue ?? false,
+                                        }
+                                      : p
+                                  )
+                                );
+                                // Mettre à jour filteredPlayers immédiatement
+                                setFilteredPlayers((prev) =>
+                                  prev.map((p) =>
+                                    p.id === player.id
+                                      ? {
+                                          ...p,
+                                          isWheelchair: newValue ?? false,
+                                        }
+                                      : p
+                                  )
+                                );
+                              };
+                              // Mettre à jour l'état local immédiatement
+                              updateLocalState();
+                              try {
+                                await playerService.updatePlayer(player.id, {
+                                  isWheelchair: newValue,
+                                });
+                                // Mettre à jour le store Zustand après succès
+                                updatePlayerInStore(player.id, {
+                                  isWheelchair: newValue,
+                                });
+                              } catch (error) {
+                                // En cas d'erreur, restaurer l'ancienne valeur
+                                console.error(
+                                  "Erreur lors de la mise à jour du flag fauteuil:",
+                                  error
+                                );
+                                setPlayers((prev) =>
+                                  prev.map((p) =>
+                                    p.id === player.id
+                                      ? {
+                                          ...p,
+                                          isWheelchair: oldValue ?? false,
+                                        }
+                                      : p
+                                  )
+                                );
+                                setPlayersWithoutLicense((prev) =>
+                                  prev.map((p) =>
+                                    p.id === player.id
+                                      ? {
+                                          ...p,
+                                          isWheelchair: oldValue ?? false,
+                                        }
+                                      : p
+                                  )
+                                );
+                                setTemporaryPlayers((prev) =>
+                                  prev.map((p) =>
+                                    p.id === player.id
+                                      ? {
+                                          ...p,
+                                          isWheelchair: oldValue ?? false,
+                                        }
+                                      : p
+                                  )
+                                );
+                                setFilteredPlayers((prev) =>
+                                  prev.map((p) =>
+                                    p.id === player.id
+                                      ? {
+                                          ...p,
+                                          isWheelchair: oldValue ?? false,
+                                        }
+                                      : p
+                                  )
+                                );
+                              }
+                            }}
+                            size="small"
+                            sx={{
+                              color: player.isWheelchair
+                                ? "primary.main"
+                                : "action.disabled",
+                            }}
+                          >
+                            <AccessibleIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell>
                         <Badge
                           badgeContent={player.discordMentions?.length || 0}
                           color={
@@ -1756,6 +2068,7 @@ export default function JoueursPage() {
                   nationality: "FR",
                   points: 500,
                   inChampionship: true,
+                  isWheelchair: false,
                 });
                 setLicenseExists(false);
                 setCreateDialogOpen(true);
@@ -1791,6 +2104,7 @@ export default function JoueursPage() {
                     <TableCell>Genre</TableCell>
                     <TableCell>Nationalité</TableCell>
                     <TableCell>Participation</TableCell>
+                    <TableCell>Fauteuil</TableCell>
                     <TableCell>Discord</TableCell>
                     <TableCell>Actions</TableCell>
                   </TableRow>
@@ -1943,6 +2257,131 @@ export default function JoueursPage() {
                         </Box>
                       </TableCell>
                       <TableCell>
+                        <Tooltip
+                          title={
+                            player.isWheelchair
+                              ? "Joueur en fauteuil"
+                              : "Cliquer pour indiquer que le joueur est en fauteuil"
+                          }
+                        >
+                          <IconButton
+                            onClick={async () => {
+                              const newValue = !player.isWheelchair;
+                              const oldValue = player.isWheelchair;
+                              // Mise à jour optimiste : mettre à jour l'état local immédiatement
+                              const updateLocalState = () => {
+                                setPlayers((prev) =>
+                                  prev.map((p) =>
+                                    p.id === player.id
+                                      ? {
+                                          ...p,
+                                          isWheelchair: newValue ?? false,
+                                        }
+                                      : p
+                                  )
+                                );
+                                setPlayersWithoutLicense((prev) =>
+                                  prev.map((p) =>
+                                    p.id === player.id
+                                      ? {
+                                          ...p,
+                                          isWheelchair: newValue ?? false,
+                                        }
+                                      : p
+                                  )
+                                );
+                                setTemporaryPlayers((prev) =>
+                                  prev.map((p) =>
+                                    p.id === player.id
+                                      ? {
+                                          ...p,
+                                          isWheelchair: newValue ?? false,
+                                        }
+                                      : p
+                                  )
+                                );
+                                // Mettre à jour filteredPlayers immédiatement
+                                setFilteredPlayers((prev) =>
+                                  prev.map((p) =>
+                                    p.id === player.id
+                                      ? {
+                                          ...p,
+                                          isWheelchair: newValue ?? false,
+                                        }
+                                      : p
+                                  )
+                                );
+                              };
+                              // Mettre à jour l'état local immédiatement
+                              updateLocalState();
+                              try {
+                                await playerService.updatePlayer(player.id, {
+                                  isWheelchair: newValue,
+                                });
+                                // Mettre à jour le store Zustand après succès
+                                updatePlayerInStore(player.id, {
+                                  isWheelchair: newValue,
+                                });
+                              } catch (error) {
+                                // En cas d'erreur, restaurer l'ancienne valeur
+                                console.error(
+                                  "Erreur lors de la mise à jour du flag fauteuil:",
+                                  error
+                                );
+                                setPlayers((prev) =>
+                                  prev.map((p) =>
+                                    p.id === player.id
+                                      ? {
+                                          ...p,
+                                          isWheelchair: oldValue ?? false,
+                                        }
+                                      : p
+                                  )
+                                );
+                                setPlayersWithoutLicense((prev) =>
+                                  prev.map((p) =>
+                                    p.id === player.id
+                                      ? {
+                                          ...p,
+                                          isWheelchair: oldValue ?? false,
+                                        }
+                                      : p
+                                  )
+                                );
+                                setTemporaryPlayers((prev) =>
+                                  prev.map((p) =>
+                                    p.id === player.id
+                                      ? {
+                                          ...p,
+                                          isWheelchair: oldValue ?? false,
+                                        }
+                                      : p
+                                  )
+                                );
+                                setFilteredPlayers((prev) =>
+                                  prev.map((p) =>
+                                    p.id === player.id
+                                      ? {
+                                          ...p,
+                                          isWheelchair: oldValue ?? false,
+                                        }
+                                      : p
+                                  )
+                                );
+                              }
+                            }}
+                            size="small"
+                            sx={{
+                              color: player.isWheelchair
+                                ? "primary.main"
+                                : "action.disabled",
+                            }}
+                          >
+                            <AccessibleIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell>
                         <Badge
                           badgeContent={player.discordMentions?.length || 0}
                           color={
@@ -2013,6 +2452,7 @@ export default function JoueursPage() {
                 nationality: "FR",
                 points: 500,
                 inChampionship: true,
+                isWheelchair: false,
               });
               setLicenseExists(false);
             }

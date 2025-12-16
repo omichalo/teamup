@@ -44,10 +44,12 @@ import { Match } from "@/types";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
 import { useAuth } from "@/hooks/useAuth";
+import { useTeamManagementStore } from "@/stores/teamManagementStore";
 
 export default function EquipesPage() {
   const { user } = useAuth();
   const { equipes: initialEquipes, loading, error } = useTeamData();
+  const updateTeamInStore = useTeamManagementStore((state) => state.updateTeam);
   const [equipes, setEquipes] = React.useState(initialEquipes);
   const [tabValue, setTabValue] = React.useState(0);
   const [selectedMatch, setSelectedMatch] = React.useState<Match | null>(null);
@@ -293,6 +295,11 @@ export default function EquipesPage() {
               : equipe
           )
         );
+
+        // Mettre à jour le store Zustand pour synchroniser avec les autres pages
+        updateTeamInStore(teamId, {
+          ...(locationId !== null && { location: locationId }),
+        });
       } catch (error) {
         console.error("Erreur lors de la mise à jour du lieu:", error);
         alert(
@@ -306,7 +313,7 @@ export default function EquipesPage() {
         setSelectedLocationId(null);
       }
     },
-    [user]
+    [user, updateTeamInStore]
   );
 
   const handleOpenLocationDialog = React.useCallback(
@@ -360,6 +367,11 @@ export default function EquipesPage() {
               : equipe
           )
         );
+
+        // Mettre à jour le store Zustand pour synchroniser avec les autres pages
+        updateTeamInStore(teamId, {
+          ...(channelId !== null && { discordChannelId: channelId }),
+        });
       } catch (error) {
         console.error("Erreur lors de la mise à jour du canal Discord:", error);
         alert(
@@ -373,7 +385,7 @@ export default function EquipesPage() {
         setSelectedDiscordChannelId(null);
       }
     },
-    [user]
+    [user, updateTeamInStore]
   );
 
   const handleOpenDiscordChannelDialog = React.useCallback(

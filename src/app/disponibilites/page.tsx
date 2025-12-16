@@ -24,6 +24,7 @@ import {
   Tab,
   Alert,
   Snackbar,
+  Tooltip,
 } from "@mui/material";
 import {
   CheckCircle,
@@ -32,11 +33,15 @@ import {
   Group as GroupIcon,
   Comment as CommentIcon,
   DoneAll,
+  Accessible as AccessibleIcon,
 } from "@mui/icons-material";
 import { useTeamData } from "@/hooks/useTeamData";
 import { useAvailabilities } from "@/hooks/useAvailabilities";
 import { usePlayers } from "@/hooks/usePlayers";
-import { AvailabilityService, DayAvailability } from "@/lib/services/availability-service";
+import {
+  AvailabilityService,
+  DayAvailability,
+} from "@/lib/services/availability-service";
 import { CompositionService } from "@/lib/services/composition-service";
 import { Player } from "@/types/team-management";
 import { ChampionshipType } from "@/types";
@@ -59,8 +64,11 @@ import { TeamPicker } from "@/components/compositions/Filters/TeamPicker";
 import { SearchInput } from "@/components/compositions/Filters/SearchInput";
 import { AvailabilityStatusChip } from "@/components/disponibilites/AvailabilityStatusChip";
 
-import { EpreuveType, getIdEpreuve, getMatchEpreuve } from "@/lib/shared/epreuve-utils";
-
+import {
+  EpreuveType,
+  getIdEpreuve,
+  getMatchEpreuve,
+} from "@/lib/shared/epreuve-utils";
 
 export default function DisponibilitesPage() {
   const { equipes, loading: loadingEquipes, currentPhase } = useTeamData();
@@ -105,10 +113,16 @@ export default function DisponibilitesPage() {
     setAvailabilityWarning(null);
   }, []);
 
-
   const persistAvailability = useCallback(
-    async (stateSnapshot: AvailabilityState, championshipType: ChampionshipType) => {
-      if (selectedJournee === null || selectedPhase === null || selectedEpreuve === null) {
+    async (
+      stateSnapshot: AvailabilityState,
+      championshipType: ChampionshipType
+    ) => {
+      if (
+        selectedJournee === null ||
+        selectedPhase === null ||
+        selectedEpreuve === null
+      ) {
         return;
       }
 
@@ -130,14 +144,17 @@ export default function DisponibilitesPage() {
           championshipType,
           players: payload,
         };
-        
+
         if (idEpreuve !== undefined) {
           availabilityData.idEpreuve = idEpreuve;
         }
-        
+
         await availabilityService.saveAvailability(availabilityData);
       } catch (error) {
-        console.error("Erreur lors de la sauvegarde de la disponibilité:", error);
+        console.error(
+          "Erreur lors de la sauvegarde de la disponibilité:",
+          error
+        );
       }
     },
     [availabilityService, selectedJournee, selectedPhase, selectedEpreuve]
@@ -154,15 +171,19 @@ export default function DisponibilitesPage() {
       EpreuveType,
       Map<
         "aller" | "retour",
-        Map<number, { journee: number; phase: "aller" | "retour"; dates: Date[] }>
+        Map<
+          number,
+          { journee: number; phase: "aller" | "retour"; dates: Date[] }
+        >
       >
     >();
 
     // Debug: log pour voir toutes les équipes et leurs matchs
-    const parisEquipes = equipes.filter((equipe) => 
-      equipe.team?.idEpreuve === 15980 || 
-      equipe.team?.epreuve?.toLowerCase().includes("paris idf") ||
-      equipe.team?.epreuve?.toLowerCase().includes("excellence")
+    const parisEquipes = equipes.filter(
+      (equipe) =>
+        equipe.team?.idEpreuve === 15980 ||
+        equipe.team?.epreuve?.toLowerCase().includes("paris idf") ||
+        equipe.team?.epreuve?.toLowerCase().includes("excellence")
     );
     console.log("[Disponibilites] Équipes Paris trouvées:", {
       count: parisEquipes.length,
@@ -189,7 +210,7 @@ export default function DisponibilitesPage() {
     equipesForJournees.forEach((equipe) => {
       equipe.matches.forEach((match) => {
         const epreuve = getMatchEpreuve(match, equipe.team);
-        
+
         // Debug: log pour comprendre pourquoi les matchs de Paris ne sont pas détectés
         if (match.idEpreuve === 15980 || equipe.team?.idEpreuve === 15980) {
           console.log("[Disponibilites] Match Paris détecté:", {
@@ -202,7 +223,7 @@ export default function DisponibilitesPage() {
             matchId: match.id,
           });
         }
-        
+
         if (!epreuve || !match.journee || !match.phase) {
           if (match.idEpreuve === 15980 || equipe.team?.idEpreuve === 15980) {
             console.log("[Disponibilites] Match Paris rejeté:", {
@@ -218,7 +239,7 @@ export default function DisponibilitesPage() {
         // Pour le championnat par équipes, accepter uniquement "aller" et "retour"
         const phaseLower = match.phase.toLowerCase();
         let phase: "aller" | "retour";
-        
+
         if (epreuve === "championnat_paris") {
           // Pour Paris, normaliser toutes les phases en "aller" (car il n'y a qu'une phase)
           phase = "aller";
@@ -278,14 +299,18 @@ export default function DisponibilitesPage() {
       championnat_equipes: equipesPhases?.size || 0,
       championnat_paris: parisPhases?.size || 0,
       details: {
-        championnat_equipes: equipesPhases ? Array.from(equipesPhases.entries()).map(([phase, phaseMap]) => ({
-          phase,
-          journees: Array.from(phaseMap.keys()),
-        })) : [],
-        championnat_paris: parisPhases ? Array.from(parisPhases.entries()).map(([phase, phaseMap]) => ({
-          phase,
-          journees: Array.from(phaseMap.keys()),
-        })) : [],
+        championnat_equipes: equipesPhases
+          ? Array.from(equipesPhases.entries()).map(([phase, phaseMap]) => ({
+              phase,
+              journees: Array.from(phaseMap.keys()),
+            }))
+          : [],
+        championnat_paris: parisPhases
+          ? Array.from(parisPhases.entries()).map(([phase, phaseMap]) => ({
+              phase,
+              journees: Array.from(phaseMap.keys()),
+            }))
+          : [],
       },
     });
 
@@ -297,7 +322,10 @@ export default function DisponibilitesPage() {
     if (!selectedEpreuve) {
       return new Map<
         "aller" | "retour",
-        Map<number, { journee: number; phase: "aller" | "retour"; dates: Date[] }>
+        Map<
+          number,
+          { journee: number; phase: "aller" | "retour"; dates: Date[] }
+        >
       >();
     }
     return journeesByEpreuveAndPhase.get(selectedEpreuve) || new Map();
@@ -325,7 +353,11 @@ export default function DisponibilitesPage() {
               if (!closestDate || debutJournee < closestDate) {
                 closestDate = new Date(debutJournee);
                 closestEpreuve = epreuve;
-                console.log(`[Disponibilites] Nouvelle épreuve la plus proche: ${epreuve}, journée ${journee}, phase ${phase}, date: ${debutJournee.toISOString().split('T')[0]}`);
+                console.log(
+                  `[Disponibilites] Nouvelle épreuve la plus proche: ${epreuve}, journée ${journee}, phase ${phase}, date: ${
+                    debutJournee.toISOString().split("T")[0]
+                  }`
+                );
               }
             }
           }
@@ -333,17 +365,23 @@ export default function DisponibilitesPage() {
       }
     }
 
-    const formattedDate: string = closestDate !== null 
-      ? (closestDate as Date).toISOString().split('T')[0] 
-      : "aucune";
-    console.log(`[Disponibilites] Épreuve par défaut sélectionnée: ${closestEpreuve || "championnat_equipes"}, date la plus proche: ${formattedDate}`);
-    return (closestEpreuve || ("championnat_equipes" as EpreuveType)) as EpreuveType; // Fallback sur championnat_equipes
+    const formattedDate: string =
+      closestDate !== null
+        ? (closestDate as Date).toISOString().split("T")[0]
+        : "aucune";
+    console.log(
+      `[Disponibilites] Épreuve par défaut sélectionnée: ${
+        closestEpreuve || "championnat_equipes"
+      }, date la plus proche: ${formattedDate}`
+    );
+    return (closestEpreuve ||
+      ("championnat_equipes" as EpreuveType)) as EpreuveType; // Fallback sur championnat_equipes
   }, [journeesByEpreuveAndPhase]);
 
   // Initialiser selectedEpreuve avec l'épreuve par défaut
   // Utiliser une ref pour suivre si on a déjà initialisé une fois
   const hasInitializedEpreuve = React.useRef(false);
-  
+
   useEffect(() => {
     // Initialiser seulement si :
     // 1. On n'a pas encore initialisé ET selectedEpreuve est null
@@ -351,31 +389,35 @@ export default function DisponibilitesPage() {
     if (!hasInitializedEpreuve.current) {
       if (defaultEpreuve && journeesByEpreuveAndPhase.has(defaultEpreuve)) {
         // Vérifier que defaultEpreuve a des données réelles (pas juste le fallback)
-        const hasRealData = Array.from(journeesByEpreuveAndPhase.get(defaultEpreuve)?.values() || []).some(
-          (phaseMap) => phaseMap.size > 0
-        );
+        const hasRealData = Array.from(
+          journeesByEpreuveAndPhase.get(defaultEpreuve)?.values() || []
+        ).some((phaseMap) => phaseMap.size > 0);
         if (hasRealData) {
           setSelectedEpreuve(defaultEpreuve);
           hasInitializedEpreuve.current = true;
         }
       }
     }
-    }, [defaultEpreuve, journeesByEpreuveAndPhase, selectedEpreuve, setSelectedEpreuve]);
+  }, [
+    defaultEpreuve,
+    journeesByEpreuveAndPhase,
+    selectedEpreuve,
+    setSelectedEpreuve,
+  ]);
 
   // Initialiser selectedPhase avec la phase en cours
   useEffect(() => {
     if (selectedPhase === null && currentPhase) {
       setSelectedPhase(currentPhase);
     }
-    }, [currentPhase, selectedPhase, setSelectedPhase]);
+  }, [currentPhase, selectedPhase, setSelectedPhase]);
 
   // Initialiser selectedJournee avec la prochaine journée dans le futur (basée sur la date de début)
   useEffect(() => {
     // Pour le championnat de Paris, utiliser "aller" comme phase par défaut
-    const phaseToUse = selectedEpreuve === "championnat_paris" 
-      ? "aller" 
-      : selectedPhase;
-    
+    const phaseToUse =
+      selectedEpreuve === "championnat_paris" ? "aller" : selectedPhase;
+
     if (
       selectedEpreuve === null ||
       phaseToUse === null ||
@@ -383,7 +425,7 @@ export default function DisponibilitesPage() {
     ) {
       return;
     }
-    
+
     const now = new Date();
     now.setHours(0, 0, 0, 0); // Réinitialiser l'heure pour comparer uniquement les dates
 
@@ -411,7 +453,7 @@ export default function DisponibilitesPage() {
       const lastJournee = journees.sort((a, b) => b.journee - a.journee)[0];
       setSelectedJournee(lastJournee.journee);
     }
-    }, [journeesByPhase, selectedEpreuve, selectedPhase, setSelectedJournee]);
+  }, [journeesByPhase, selectedEpreuve, selectedPhase, setSelectedJournee]);
 
   // Filtrer les joueurs selon les critères
   const filteredPlayers = useMemo(() => {
@@ -421,10 +463,14 @@ export default function DisponibilitesPage() {
     if (!showAllPlayers) {
       if (selectedEpreuve === "championnat_paris") {
         // Pour le championnat de Paris, filtrer par participation.championnatParis
-        filtered = filtered.filter((p) => p.participation?.championnatParis === true);
+        filtered = filtered.filter(
+          (p) => p.participation?.championnatParis === true
+        );
       } else {
         // Pour le championnat par équipes, filtrer par participation.championnat
-        filtered = filtered.filter((p) => p.participation?.championnat === true);
+        filtered = filtered.filter(
+          (p) => p.participation?.championnat === true
+        );
       }
     }
 
@@ -498,12 +544,14 @@ export default function DisponibilitesPage() {
       const playerAvailabilities = availabilities[player.id];
       const masculinComment = playerAvailabilities?.masculin?.comment?.trim();
       const femininComment = playerAvailabilities?.feminin?.comment?.trim();
-      
+
       if (player.gender === "M") {
         return masculinComment && masculinComment.length > 0;
       } else {
-        return (masculinComment && masculinComment.length > 0) || 
-               (femininComment && femininComment.length > 0);
+        return (
+          (masculinComment && masculinComment.length > 0) ||
+          (femininComment && femininComment.length > 0)
+        );
       }
     });
   }, [filteredPlayers, availabilities]);
@@ -514,14 +562,16 @@ export default function DisponibilitesPage() {
   const playersWithOK = useMemo(() => {
     return filteredPlayers.filter((player) => {
       const playerAvailabilities = availabilities[player.id];
-      
+
       if (player.gender === "M") {
         return playerAvailabilities?.masculin?.available === true;
       } else {
         // Pour les femmes : au moins une catégorie avec available === true
         // Une femme avec OK féminin et KO masculin apparaîtra dans OK
-        return playerAvailabilities?.masculin?.available === true ||
-               playerAvailabilities?.feminin?.available === true;
+        return (
+          playerAvailabilities?.masculin?.available === true ||
+          playerAvailabilities?.feminin?.available === true
+        );
       }
     });
   }, [filteredPlayers, availabilities]);
@@ -532,14 +582,16 @@ export default function DisponibilitesPage() {
   const playersWithKO = useMemo(() => {
     return filteredPlayers.filter((player) => {
       const playerAvailabilities = availabilities[player.id];
-      
+
       if (player.gender === "M") {
         return playerAvailabilities?.masculin?.available === false;
       } else {
         // Pour les femmes : au moins une catégorie avec available === false
         // Une femme avec OK féminin et KO masculin apparaîtra dans KO
-        return playerAvailabilities?.masculin?.available === false ||
-               playerAvailabilities?.feminin?.available === false;
+        return (
+          playerAvailabilities?.masculin?.available === false ||
+          playerAvailabilities?.feminin?.available === false
+        );
       }
     });
   }, [filteredPlayers, availabilities]);
@@ -557,7 +609,9 @@ export default function DisponibilitesPage() {
     journee: selectedJournee,
     phase: selectedPhase,
     championshipType: "masculin",
-    ...(idEpreuveForHooks !== undefined ? { idEpreuve: idEpreuveForHooks } : {}),
+    ...(idEpreuveForHooks !== undefined
+      ? { idEpreuve: idEpreuveForHooks }
+      : {}),
   });
 
   const {
@@ -567,7 +621,9 @@ export default function DisponibilitesPage() {
     journee: selectedJournee,
     phase: selectedPhase,
     championshipType: "feminin",
-    ...(idEpreuveForHooks !== undefined ? { idEpreuve: idEpreuveForHooks } : {}),
+    ...(idEpreuveForHooks !== undefined
+      ? { idEpreuve: idEpreuveForHooks }
+      : {}),
   });
 
   // Fusionner les disponibilités masculines et féminines en temps réel
@@ -677,11 +733,9 @@ export default function DisponibilitesPage() {
         } = { masculin: {}, feminin: {} };
 
         const processComposition = (
-          composition:
-            | Awaited<
-                ReturnType<typeof compositionService.getComposition>
-              >
-            | null,
+          composition: Awaited<
+            ReturnType<typeof compositionService.getComposition>
+          > | null,
           type: ChampionshipType
         ) => {
           if (!composition?.teams) {
@@ -785,9 +839,9 @@ export default function DisponibilitesPage() {
     if (nextStateSnapshot) {
       void persistAvailability(nextStateSnapshot, championshipType);
 
-      const resultingEntry = nextStateSnapshot[playerId]?.[
-        championshipType
-      ] as AvailabilityResponse | undefined;
+      const resultingEntry = nextStateSnapshot[playerId]?.[championshipType] as
+        | AvailabilityResponse
+        | undefined;
       const isNowAvailable = resultingEntry?.available === true;
       const isPlayerAssigned =
         assignedPlayersByTypeRef.current[championshipType]?.has(playerId) ??
@@ -801,9 +855,7 @@ export default function DisponibilitesPage() {
         const assignedTeams =
           assignedPlayersDetailsRef.current[championshipType]?.[playerId] || [];
         const teamsLabel =
-          assignedTeams.length > 0
-            ? ` (${assignedTeams.join(", ")})`
-            : "";
+          assignedTeams.length > 0 ? ` (${assignedTeams.join(", ")})` : "";
 
         const warningText = `${playerLabel} est actuellement positionné dans une composition${teamsLabel}. Cette équipe sera invalide tant que la disponibilité n'est pas réajustée.`;
         setAvailabilityWarning(warningText);
@@ -817,7 +869,7 @@ export default function DisponibilitesPage() {
   const handleCommentChange = (
     playerId: string,
     championshipType: ChampionshipType,
-  comment: string
+    comment: string
   ) => {
     if (selectedJournee === null || selectedPhase === null) return;
 
@@ -892,28 +944,28 @@ export default function DisponibilitesPage() {
       redirectWhenUnauthorized="/joueur"
     >
       <Box sx={{ p: 5 }}>
-          <Snackbar
-            open={Boolean(availabilityWarning)}
-            autoHideDuration={6000}
+        <Snackbar
+          open={Boolean(availabilityWarning)}
+          autoHideDuration={6000}
+          onClose={handleWarningClose}
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        >
+          <Alert
             onClose={handleWarningClose}
-            anchorOrigin={{ vertical: "top", horizontal: "center" }}
+            severity="warning"
+            sx={{ width: "100%" }}
           >
-            <Alert
-              onClose={handleWarningClose}
-              severity="warning"
-              sx={{ width: "100%" }}
-            >
-              {availabilityWarning}
-            </Alert>
-          </Snackbar>
+            {availabilityWarning}
+          </Alert>
+        </Snackbar>
         <Typography variant="h4" gutterBottom>
-            Disponibilités des Joueurs
+          Disponibilités des Joueurs
         </Typography>
 
         <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-            Saisissez la disponibilité des joueurs pour une journée de
-            championnat. Par défaut, seuls les joueurs participant au
-            championnat sont affichés.
+          Saisissez la disponibilité des joueurs pour une journée de
+          championnat. Par défaut, seuls les joueurs participant au championnat
+          sont affichés.
         </Typography>
 
         <Card sx={{ mb: 1 }}>
@@ -952,20 +1004,24 @@ export default function DisponibilitesPage() {
                   disabled={
                     (selectedEpreuve === "championnat_paris"
                       ? false
-                      : selectedPhase === null) ||
-                    selectedEpreuve === null
+                      : selectedPhase === null) || selectedEpreuve === null
                   }
                 >
                   {(() => {
-                    const phaseToUse = selectedEpreuve === "championnat_paris"
-                      ? "aller"
-                      : selectedPhase;
+                    const phaseToUse =
+                      selectedEpreuve === "championnat_paris"
+                        ? "aller"
+                        : selectedPhase;
 
                     if (!phaseToUse) return null;
 
                     const journeesArray = Array.from(
                       journeesByPhase.get(phaseToUse)?.values() || []
-                    ) as Array<{ journee: number; phase: "aller" | "retour"; dates: Date[] }>;
+                    ) as Array<{
+                      journee: number;
+                      phase: "aller" | "retour";
+                      dates: Date[];
+                    }>;
 
                     return journeesArray
                       .sort((a, b) => a.journee - b.journee)
@@ -1015,199 +1071,199 @@ export default function DisponibilitesPage() {
           </CardContent>
         </Card>
 
-          {selectedJournee === null ? (
-            <Alert severity="warning">
-              Veuillez sélectionner une journée pour commencer la saisie.
-            </Alert>
-          ) : (
-            <>
-              <Box
+        {selectedJournee === null ? (
+          <Alert severity="warning">
+            Veuillez sélectionner une journée pour commencer la saisie.
+          </Alert>
+        ) : (
+          <>
+            <Box
+              sx={{
+                position: "sticky",
+                top: 0,
+                zIndex: 5,
+                backgroundColor: "background.paper",
+                borderBottom: 1,
+                borderColor: "divider",
+                mb: 2,
+                pt: 1,
+                pb: 1,
+              }}
+            >
+              <Tabs
+                value={tabValue}
+                onChange={(_, v) => setTabValue(v)}
                 sx={{
-                  position: "sticky",
-                  top: 0,
-                  zIndex: 5,
-                  backgroundColor: "background.paper",
-                  borderBottom: 1,
-                  borderColor: "divider",
-                  mb: 2,
-                  pt: 1,
-                  pb: 1,
+                  minHeight: 40,
+                  "& .MuiTab-root": {
+                    minHeight: 38,
+                    paddingTop: 0.5,
+                    paddingBottom: 0.5,
+                  },
                 }}
               >
-                <Tabs
-                  value={tabValue}
-                  onChange={(_, v) => setTabValue(v)}
-                  sx={{
-                    minHeight: 40,
-                    "& .MuiTab-root": {
-                      minHeight: 38,
-                      paddingTop: 0.5,
-                      paddingBottom: 0.5,
-                    },
-                  }}
-                >
-                  <Tab
-                    label={`Tous (${filteredPlayers.length})`}
-                    icon={<GroupIcon fontSize="small" />}
-                    iconPosition="start"
-                  />
-                  <Tab
-                    label={`Réponses (${respondedPlayers.length})`}
-                    icon={<DoneAll fontSize="small" color="primary" />}
-                    iconPosition="start"
-                  />
-                  <Tab
-                    label={`En attente (${pendingPlayers.length})`}
-                    icon={<HourglassEmpty fontSize="small" color="warning" />}
-                    iconPosition="start"
-                  />
-                  <Tab
-                    label={`Commentaires (${playersWithComment.length})`}
-                    icon={<CommentIcon fontSize="small" color="info" />}
-                    iconPosition="start"
-                  />
-                  <Tab
-                    label={`OK (${playersWithOK.length})`}
-                    icon={<CheckCircle fontSize="small" color="success" />}
-                    iconPosition="start"
-                  />
-                  <Tab
-                    label={`KO (${playersWithKO.length})`}
-                    icon={<Cancel fontSize="small" color="error" />}
-                    iconPosition="start"
-                  />
-                </Tabs>
-              </Box>
+                <Tab
+                  label={`Tous (${filteredPlayers.length})`}
+                  icon={<GroupIcon fontSize="small" />}
+                  iconPosition="start"
+                />
+                <Tab
+                  label={`Réponses (${respondedPlayers.length})`}
+                  icon={<DoneAll fontSize="small" color="primary" />}
+                  iconPosition="start"
+                />
+                <Tab
+                  label={`En attente (${pendingPlayers.length})`}
+                  icon={<HourglassEmpty fontSize="small" color="warning" />}
+                  iconPosition="start"
+                />
+                <Tab
+                  label={`Commentaires (${playersWithComment.length})`}
+                  icon={<CommentIcon fontSize="small" color="info" />}
+                  iconPosition="start"
+                />
+                <Tab
+                  label={`OK (${playersWithOK.length})`}
+                  icon={<CheckCircle fontSize="small" color="success" />}
+                  iconPosition="start"
+                />
+                <Tab
+                  label={`KO (${playersWithKO.length})`}
+                  icon={<Cancel fontSize="small" color="error" />}
+                  iconPosition="start"
+                />
+              </Tabs>
+            </Box>
 
-              {tabValue === 0 && (
-                <Box>
+            {tabValue === 0 && (
+              <Box>
+                <PlayerList
+                  players={filteredPlayers}
+                  availabilities={availabilities}
+                  onAvailabilityChange={handleAvailabilityChange}
+                  onCommentChange={handleCommentChange}
+                  selectedEpreuve={selectedEpreuve}
+                />
+              </Box>
+            )}
+
+            {tabValue === 1 && (
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Joueurs ayant répondu
+                </Typography>
+                <PlayerList
+                  players={respondedPlayers}
+                  availabilities={availabilities}
+                  onAvailabilityChange={handleAvailabilityChange}
+                  onCommentChange={handleCommentChange}
+                  selectedEpreuve={selectedEpreuve}
+                />
+              </Box>
+            )}
+
+            {tabValue === 2 && (
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Joueurs en attente de réponse
+                </Typography>
+                {pendingPlayers.length === 0 ? (
+                  <Alert severity="success">
+                    Tous les joueurs ont répondu !
+                  </Alert>
+                ) : (
                   <PlayerList
-                    players={filteredPlayers}
+                    players={pendingPlayers}
                     availabilities={availabilities}
                     onAvailabilityChange={handleAvailabilityChange}
                     onCommentChange={handleCommentChange}
                     selectedEpreuve={selectedEpreuve}
                   />
-                </Box>
-              )}
+                )}
+              </Box>
+            )}
 
-              {tabValue === 1 && (
-                <Box>
-                  <Typography variant="h6" gutterBottom>
-                    Joueurs ayant répondu
-                  </Typography>
+            {tabValue === 3 && (
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Joueurs ayant fait un commentaire
+                </Typography>
+                {playersWithComment.length === 0 ? (
+                  <Alert severity="info">
+                    Aucun joueur n&apos;a fait de commentaire.
+                  </Alert>
+                ) : (
                   <PlayerList
-                    players={respondedPlayers}
+                    players={playersWithComment}
                     availabilities={availabilities}
                     onAvailabilityChange={handleAvailabilityChange}
                     onCommentChange={handleCommentChange}
                     selectedEpreuve={selectedEpreuve}
                   />
-                </Box>
-              )}
-
-              {tabValue === 2 && (
-                <Box>
-                  <Typography variant="h6" gutterBottom>
-                    Joueurs en attente de réponse
-                  </Typography>
-                  {pendingPlayers.length === 0 ? (
-                    <Alert severity="success">
-                      Tous les joueurs ont répondu !
-                    </Alert>
-                  ) : (
-                    <PlayerList
-                      players={pendingPlayers}
-                      availabilities={availabilities}
-                      onAvailabilityChange={handleAvailabilityChange}
-                      onCommentChange={handleCommentChange}
-                      selectedEpreuve={selectedEpreuve}
-                    />
-                  )}
-                </Box>
-              )}
-
-              {tabValue === 3 && (
-                <Box>
-                  <Typography variant="h6" gutterBottom>
-                    Joueurs ayant fait un commentaire
-                  </Typography>
-                  {playersWithComment.length === 0 ? (
-                    <Alert severity="info">
-                      Aucun joueur n&apos;a fait de commentaire.
-                    </Alert>
-                  ) : (
-                    <PlayerList
-                      players={playersWithComment}
-                      availabilities={availabilities}
-                      onAvailabilityChange={handleAvailabilityChange}
-                      onCommentChange={handleCommentChange}
-                      selectedEpreuve={selectedEpreuve}
-                    />
-                  )}
-                </Box>
-              )}
-
-              {tabValue === 4 && (
-                <Box>
-                  <Typography variant="h6" gutterBottom>
-                    Joueurs ayant répondu OK (Disponible)
-                  </Typography>
-                  {playersWithOK.length === 0 ? (
-                    <Alert severity="info">
-                      Aucun joueur n&apos;a répondu disponible.
-                    </Alert>
-                  ) : (
-                    <PlayerList
-                      players={playersWithOK}
-                      availabilities={availabilities}
-                      onAvailabilityChange={handleAvailabilityChange}
-                      onCommentChange={handleCommentChange}
-                      selectedEpreuve={selectedEpreuve}
-                    />
-                  )}
-                </Box>
-              )}
-
-              {tabValue === 5 && (
-                <Box>
-                  <Typography variant="h6" gutterBottom>
-                    Joueurs ayant répondu KO (Indisponible)
-                  </Typography>
-                  {playersWithKO.length === 0 ? (
-                    <Alert severity="info">
-                      Aucun joueur n&apos;a répondu indisponible.
-                    </Alert>
-                  ) : (
-                    <PlayerList
-                      players={playersWithKO}
-                      availabilities={availabilities}
-                      onAvailabilityChange={handleAvailabilityChange}
-                      onCommentChange={handleCommentChange}
-                      selectedEpreuve={selectedEpreuve}
-                    />
-                  )}
-                </Box>
-              )}
-
-              <Box sx={{ mt: 4, textAlign: "center" }}>
-                <Button
-                  variant="outlined"
-                  href={
-                    selectedJournee !== null && selectedPhase !== null
-                      ? `/compositions?journee=${selectedJournee}&phase=${selectedPhase}`
-                      : "/compositions"
-                  }
-                  sx={{ px: 3 }}
-                >
-                  {selectedJournee !== null && selectedPhase !== null
-                    ? `Voir les compositions - J${selectedJournee} (${selectedPhase})`
-                    : "Voir les compositions"}
-                </Button>
+                )}
               </Box>
-            </>
-          )}
-        </Box>
+            )}
+
+            {tabValue === 4 && (
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Joueurs ayant répondu OK (Disponible)
+                </Typography>
+                {playersWithOK.length === 0 ? (
+                  <Alert severity="info">
+                    Aucun joueur n&apos;a répondu disponible.
+                  </Alert>
+                ) : (
+                  <PlayerList
+                    players={playersWithOK}
+                    availabilities={availabilities}
+                    onAvailabilityChange={handleAvailabilityChange}
+                    onCommentChange={handleCommentChange}
+                    selectedEpreuve={selectedEpreuve}
+                  />
+                )}
+              </Box>
+            )}
+
+            {tabValue === 5 && (
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Joueurs ayant répondu KO (Indisponible)
+                </Typography>
+                {playersWithKO.length === 0 ? (
+                  <Alert severity="info">
+                    Aucun joueur n&apos;a répondu indisponible.
+                  </Alert>
+                ) : (
+                  <PlayerList
+                    players={playersWithKO}
+                    availabilities={availabilities}
+                    onAvailabilityChange={handleAvailabilityChange}
+                    onCommentChange={handleCommentChange}
+                    selectedEpreuve={selectedEpreuve}
+                  />
+                )}
+              </Box>
+            )}
+
+            <Box sx={{ mt: 4, textAlign: "center" }}>
+              <Button
+                variant="outlined"
+                href={
+                  selectedJournee !== null && selectedPhase !== null
+                    ? `/compositions?journee=${selectedJournee}&phase=${selectedPhase}`
+                    : "/compositions"
+                }
+                sx={{ px: 3 }}
+              >
+                {selectedJournee !== null && selectedPhase !== null
+                  ? `Voir les compositions - J${selectedJournee} (${selectedPhase})`
+                  : "Voir les compositions"}
+              </Button>
+            </Box>
+          </>
+        )}
+      </Box>
     </AuthGuard>
   );
 }
@@ -1260,7 +1316,8 @@ function PlayerList({
         //   - Pour les hommes : vérifier uniquement masculin
         //   - Pour les femmes : vérifier masculin ET féminin
         // Un joueur a répondu seulement s'il a indiqué disponible/indisponible (available est un boolean)
-        const hasRespondedMasculin = typeof masculinAvailability?.available === "boolean";
+        const hasRespondedMasculin =
+          typeof masculinAvailability?.available === "boolean";
         const hasRespondedFeminin = isParisChampionship
           ? true // Pour Paris, pas de distinction
           : isFemale
@@ -1274,18 +1331,18 @@ function PlayerList({
             key={player.id}
             sx={{
               mb: 1,
-              borderLeft:
-                isParisChampionship
-                  ? hasRespondedMasculin
-                    ? `4px solid ${
-                        masculinAvailability?.available ? "#4caf50" : "#f44336"
-                      }`
-                    : "4px solid transparent"
-                  : hasRespondedMasculin && (isFemale ? hasRespondedFeminin : true)
+              borderLeft: isParisChampionship
+                ? hasRespondedMasculin
                   ? `4px solid ${
                       masculinAvailability?.available ? "#4caf50" : "#f44336"
                     }`
-                  : "4px solid transparent",
+                  : "4px solid transparent"
+                : hasRespondedMasculin &&
+                  (isFemale ? hasRespondedFeminin : true)
+                ? `4px solid ${
+                    masculinAvailability?.available ? "#4caf50" : "#f44336"
+                  }`
+                : "4px solid transparent",
             }}
           >
             <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
@@ -1312,6 +1369,14 @@ function PlayerList({
                   >
                     {player.firstName} {player.name}
                   </Typography>
+                  {player.isWheelchair && (
+                    <Tooltip title="Joueur en fauteuil">
+                      <AccessibleIcon
+                        fontSize="small"
+                        sx={{ color: "primary.main", ml: 0.5 }}
+                      />
+                    </Tooltip>
+                  )}
                   <Chip
                     label={player.gender === "M" ? "M" : "F"}
                     size="small"
@@ -1327,7 +1392,12 @@ function PlayerList({
                       {player.license}
                     </Typography>
                   )}
-                  <Box display="flex" gap={1} alignItems="center" flexWrap="wrap">
+                  <Box
+                    display="flex"
+                    gap={1}
+                    alignItems="center"
+                    flexWrap="wrap"
+                  >
                     <AvailabilityStatusChip
                       status={
                         masculinAvailability?.available === true
@@ -1519,84 +1589,84 @@ function PlayerList({
 
                       {/* Disponibilité Féminine (uniquement pour les femmes) */}
                       {isFemale && (
-                    <Box
-                      display="flex"
-                      alignItems="center"
-                      gap={1}
-                      sx={{ flexWrap: "wrap" }}
-                    >
-                      <Typography
-                        variant="caption"
-                        sx={{ minWidth: 80, fontWeight: "medium" }}
-                      >
-                        Féminin:
-                      </Typography>
-                      <Button
-                        variant={
-                          femininAvailability?.available === true
-                            ? "contained"
-                            : "outlined"
-                        }
-                        color="success"
-                        size="small"
-                        onClick={() =>
-                          onAvailabilityChange(player.id, "feminin", true)
-                        }
-                        sx={{ minWidth: 70, flexGrow: { xs: 1, sm: 0 } }}
-                      >
-                        <CheckCircle fontSize="small" sx={{ mr: 0.5 }} />
-                        Oui
-                      </Button>
-                      <Button
-                        variant={
-                          femininAvailability?.available === false
-                            ? "contained"
-                            : "outlined"
-                        }
-                        color="error"
-                        size="small"
-                        onClick={() =>
-                          onAvailabilityChange(player.id, "feminin", false)
-                        }
-                        sx={{ minWidth: 70, flexGrow: { xs: 1, sm: 0 } }}
-                      >
-                        <Cancel fontSize="small" sx={{ mr: 0.5 }} />
-                        Non
-                      </Button>
-                      <Button
-                        size="small"
-                        onClick={() =>
-                          setExpandedPlayer(
-                            isExpanded && expandedPlayer?.type === "feminin"
-                              ? null
-                              : { id: player.id, type: "feminin" }
-                          )
-                        }
-                        sx={{
-                          minWidth: 40,
-                          position: femininAvailability?.comment
-                            ? "relative"
-                            : undefined,
-                          ...(femininAvailability?.comment
-                            ? {
-                                "&::after": {
-                                  content: "''",
-                                  position: "absolute",
-                                  top: 4,
-                                  right: 6,
-                                  width: 6,
-                                  height: 6,
-                                  borderRadius: "50%",
-                                  bgcolor: "info.main",
-                                },
-                              }
-                            : {}),
-                        }}
-                      >
-                        💬
-                      </Button>
-                    </Box>
-                  )}
+                        <Box
+                          display="flex"
+                          alignItems="center"
+                          gap={1}
+                          sx={{ flexWrap: "wrap" }}
+                        >
+                          <Typography
+                            variant="caption"
+                            sx={{ minWidth: 80, fontWeight: "medium" }}
+                          >
+                            Féminin:
+                          </Typography>
+                          <Button
+                            variant={
+                              femininAvailability?.available === true
+                                ? "contained"
+                                : "outlined"
+                            }
+                            color="success"
+                            size="small"
+                            onClick={() =>
+                              onAvailabilityChange(player.id, "feminin", true)
+                            }
+                            sx={{ minWidth: 70, flexGrow: { xs: 1, sm: 0 } }}
+                          >
+                            <CheckCircle fontSize="small" sx={{ mr: 0.5 }} />
+                            Oui
+                          </Button>
+                          <Button
+                            variant={
+                              femininAvailability?.available === false
+                                ? "contained"
+                                : "outlined"
+                            }
+                            color="error"
+                            size="small"
+                            onClick={() =>
+                              onAvailabilityChange(player.id, "feminin", false)
+                            }
+                            sx={{ minWidth: 70, flexGrow: { xs: 1, sm: 0 } }}
+                          >
+                            <Cancel fontSize="small" sx={{ mr: 0.5 }} />
+                            Non
+                          </Button>
+                          <Button
+                            size="small"
+                            onClick={() =>
+                              setExpandedPlayer(
+                                isExpanded && expandedPlayer?.type === "feminin"
+                                  ? null
+                                  : { id: player.id, type: "feminin" }
+                              )
+                            }
+                            sx={{
+                              minWidth: 40,
+                              position: femininAvailability?.comment
+                                ? "relative"
+                                : undefined,
+                              ...(femininAvailability?.comment
+                                ? {
+                                    "&::after": {
+                                      content: "''",
+                                      position: "absolute",
+                                      top: 4,
+                                      right: 6,
+                                      width: 6,
+                                      height: 6,
+                                      borderRadius: "50%",
+                                      bgcolor: "info.main",
+                                    },
+                                  }
+                                : {}),
+                            }}
+                          >
+                            💬
+                          </Button>
+                        </Box>
+                      )}
                     </>
                   )}
                 </Box>
@@ -1647,7 +1717,11 @@ function PlayerList({
                           name={`comment-${player.id}-masculin`}
                           value={masculinAvailability?.comment || ""}
                           onChange={(e) =>
-                            onCommentChange(player.id, "masculin", e.target.value)
+                            onCommentChange(
+                              player.id,
+                              "masculin",
+                              e.target.value
+                            )
                           }
                           multiline
                           rows={2}
@@ -1675,7 +1749,11 @@ function PlayerList({
                             name={`comment-${player.id}-feminin`}
                             value={femininAvailability?.comment || ""}
                             onChange={(e) =>
-                              onCommentChange(player.id, "feminin", e.target.value)
+                              onCommentChange(
+                                player.id,
+                                "feminin",
+                                e.target.value
+                              )
                             }
                             multiline
                             rows={2}
@@ -1720,7 +1798,8 @@ function PlayerList({
                             color="text.secondary"
                             sx={{ fontStyle: "italic" }}
                           >
-                            <strong>Masc:</strong> {masculinAvailability.comment}
+                            <strong>Masc:</strong>{" "}
+                            {masculinAvailability.comment}
                           </Typography>
                         )}
                         {isFemale && femininAvailability?.comment && (

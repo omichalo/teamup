@@ -8,8 +8,9 @@ import {
   Typography,
   Chip,
   Divider,
+  Tooltip,
 } from "@mui/material";
-import { DragIndicator } from "@mui/icons-material";
+import { DragIndicator, Accessible as AccessibleIcon } from "@mui/icons-material";
 import type { Player } from "@/types/team-management";
 import type { EquipeWithMatches } from "@/hooks/useTeamData";
 import type { EpreuveType } from "@/lib/shared/epreuve-utils";
@@ -349,6 +350,14 @@ export const TeamCompositionCard: React.FC<TeamCompositionCardProps> = ({
                         >
                           {player.firstName} {player.name}
                         </Typography>
+                        {player.isWheelchair && (
+                          <Tooltip title="Joueur en fauteuil">
+                            <AccessibleIcon
+                              fontSize="small"
+                              sx={{ color: "primary.main", ml: 0.5 }}
+                            />
+                          </Tooltip>
+                        )}
                         {renderPlayerIndicators?.(player)}
                       </Box>
                       <Typography variant="caption" color="text.secondary">

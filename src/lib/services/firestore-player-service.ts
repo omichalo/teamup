@@ -37,6 +37,7 @@ export class FirestorePlayerService {
           : "ETR",
       isActive: this.calculateIsActive(data.licence, data.typeLicence),
       isTemporary: data.isTemporary || false,
+      isWheelchair: data.isWheelchair || false,
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: data.updatedAt?.toDate() || new Date(),
       // Champs de gestion des équipes
@@ -196,6 +197,12 @@ export class FirestorePlayerService {
         console.log(`[FirestorePlayerService] Mise à jour de participation pour le joueur ${playerId}:`, firestoreUpdates.participation);
       }
       
+      // Gérer isWheelchair : si le champ est présent dans updates, le mettre à jour
+      if (updates.isWheelchair !== undefined) {
+        firestoreUpdates.isWheelchair = updates.isWheelchair;
+        console.log(`[FirestorePlayerService] Mise à jour de isWheelchair pour le joueur ${playerId}:`, updates.isWheelchair);
+      }
+      
       // Utiliser updateDoc pour permettre l'utilisation de deleteField()
       await updateDoc(playerRef, firestoreUpdates);
       console.log(`[FirestorePlayerService] Mise à jour réussie pour le joueur ${playerId}`);
@@ -337,6 +344,7 @@ export class FirestorePlayerService {
         sexe: playerData.gender,
         nationalite: playerData.nationality === "FR" ? "F" : playerData.nationality === "C" ? "C" : "ETR",
         isTemporary: true, // Impératif : marquer comme temporaire
+        isWheelchair: playerData.isWheelchair || false,
         preferredTeams: playerData.preferredTeams || {
           masculine: [],
           feminine: [],
@@ -436,6 +444,7 @@ export class FirestorePlayerService {
         sexe: playerData.gender,
         nationalite: playerData.nationality === "FR" ? "F" : playerData.nationality === "C" ? "C" : "ETR",
         isTemporary: true, // Reste temporaire
+        isWheelchair: playerData.isWheelchair ?? currentData.isWheelchair ?? false,
         preferredTeams: playerData.preferredTeams || currentData.preferredTeams || {
           masculine: [],
           feminine: [],

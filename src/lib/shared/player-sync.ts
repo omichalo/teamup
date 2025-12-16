@@ -340,6 +340,7 @@ export class PlayerSyncService {
           "participation",
           "preferredTeams",
           "isTemporary",
+          "isWheelchair", // Préservé car géré manuellement par l'utilisateur (non remonté par l'API FFTT)
           "hasPlayedAtLeastOneMatch", // Préservé car géré par la synchro des matchs
           "highestMasculineTeamNumberByPhase", // Préservé car géré par la synchro des matchs (règles de brûlage par phase)
           "highestFeminineTeamNumberByPhase", // Préservé car géré par la synchro des matchs (règles de brûlage par phase)
