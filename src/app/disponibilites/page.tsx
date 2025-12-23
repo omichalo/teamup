@@ -63,6 +63,7 @@ import { PhaseSelect } from "@/components/compositions/Filters/PhaseSelect";
 import { TeamPicker } from "@/components/compositions/Filters/TeamPicker";
 import { SearchInput } from "@/components/compositions/Filters/SearchInput";
 import { AvailabilityStatusChip } from "@/components/disponibilites/AvailabilityStatusChip";
+import { DiscordPollManager } from "@/components/disponibilites/DiscordPollManager";
 
 import {
   EpreuveType,
@@ -1070,6 +1071,21 @@ export default function DisponibilitesPage() {
             )}
           </CardContent>
         </Card>
+
+        {selectedJournee !== null && selectedPhase !== null && (
+          <Card sx={{ mb: 2 }}>
+            <CardContent>
+              <DiscordPollManager
+                journee={selectedJournee}
+                phase={selectedPhase}
+                championshipType={teamTabValue === 0 ? "masculin" : "feminin"}
+                {...(selectedEpreuve && getIdEpreuve(selectedEpreuve) !== undefined
+                  ? { idEpreuve: getIdEpreuve(selectedEpreuve) as number }
+                  : {})}
+              />
+            </CardContent>
+          </Card>
+        )}
 
         {selectedJournee === null ? (
           <Alert severity="warning">

@@ -13,6 +13,8 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  FormControl,
+  FormLabel,
   InputAdornment,
   MenuItem,
   Select,
@@ -41,6 +43,7 @@ import {
   Sports as SportsIcon,
   Add as AddIcon,
   Delete as DeleteIcon,
+  Settings as SettingsIcon,
 } from "@mui/icons-material";
 import { AuthGuard } from "@/components/AuthGuard";
 import { useAuth } from "@/hooks/useAuth";
@@ -668,6 +671,11 @@ export default function AdminPage() {
               label="Lieux"
               id="admin-tab-2"
               aria-controls="admin-tabpanel-2"
+            />
+            <Tab
+              label="Configuration Discord"
+              id="admin-tab-3"
+              aria-controls="admin-tabpanel-3"
             />
           </Tabs>
 
@@ -1317,6 +1325,10 @@ export default function AdminPage() {
           <TabPanel value={tabValue} index={2}>
             <LocationsManagement />
           </TabPanel>
+
+          <TabPanel value={tabValue} index={3}>
+            <DiscordAvailabilityConfig />
+          </TabPanel>
         </Box>
     </AuthGuard>
   );
@@ -1535,6 +1547,251 @@ function LocationsManagement() {
               </Table>
             </TableContainer>
           )}
+        </CardContent>
+      </Card>
+    </Box>
+  );
+}
+
+// Composant de configuration Discord pour les sondages de disponibilité
+function DiscordAvailabilityConfig() {
+  const [config, setConfig] = useState<{
+    parisChannelId: string | null;
+    equipesChannelId: string | null;
+  }>({
+    parisChannelId: null,
+    equipesChannelId: null,
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [discordChannels, setDiscordChannels] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [loadingChannels, setLoadingChannels] = useState(false);
+
+  const fetchConfig = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/admin/discord-availability-config", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        setConfig({
+          parisChannelId: result.config?.parisChannelId || null,
+          equipesChannelId: result.config?.equipesChannelId || null,
+        });
+      } else {
+        setError(result.error || "Erreur lors de la récupération de la configuration");
+      }
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : "Erreur réseau"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const fetchDiscordChannels = useCallback(async () => {
+    setLoadingChannels(true);
+    try {
+      const response = await fetch("/api/discord/channels", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        setDiscordChannels(result.channels || []);
+      } else {
+        console.error("Erreur lors de la récupération des channels Discord:", result.error);
+      }
+    } catch (error) {
+      console.error("Erreur réseau lors de la récupération des channels:", error);
+    } finally {
+      setLoadingChannels(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchConfig();
+    void fetchDiscordChannels();
+  }, [fetchConfig, fetchDiscordChannels]);
+
+  const handleSave = useCallback(async () => {
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await fetch("/api/admin/discord-availability-config", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          parisChannelId: config.parisChannelId || null,
+          equipesChannelId: config.equipesChannelId || null,
+        }),
+      });
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        setSuccess("Configuration sauvegardée avec succès");
+        setConfig({
+          parisChannelId: result.config?.parisChannelId || null,
+          equipesChannelId: result.config?.equipesChannelId || null,
+        });
+      } else {
+        setError(result.error || "Erreur lors de la sauvegarde de la configuration");
+      }
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : "Erreur réseau"
+      );
+    } finally {
+      setSaving(false);
+    }
+  }, [config]);
+
+  if (loading) {
+    return (
+      <Box display="flex" alignItems="center" gap={2}>
+        <CircularProgress size={24} />
+        <Typography variant="body2">Chargement de la configuration…</Typography>
+      </Box>
+    );
+  }
+
+  return (
+    <Box>
+      {error && (
+        <Alert
+          severity="error"
+          sx={{ mb: 3 }}
+          onClose={() => setError(null)}
+        >
+          {error}
+        </Alert>
+      )}
+      {success && (
+        <Alert
+          severity="success"
+          sx={{ mb: 3 }}
+          onClose={() => setSuccess(null)}
+        >
+          {success}
+        </Alert>
+      )}
+
+      <Card>
+        <CardContent>
+          <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
+            <SettingsIcon sx={{ mr: 1, color: "primary.main" }} />
+            <Typography variant="h6">
+              Configuration des channels Discord pour les sondages
+            </Typography>
+          </Box>
+
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ mb: 3 }}
+          >
+            Configurez les channels Discord dans lesquels les sondages de disponibilité seront créés.
+            Tous les utilisateurs ayant accès à ces channels pourront voir et répondre aux sondages.
+          </Typography>
+
+          <Stack spacing={3}>
+            <FormControl fullWidth>
+              <FormLabel>Channel pour le championnat de Paris</FormLabel>
+              <Select
+                value={config.parisChannelId || ""}
+                onChange={(e) =>
+                  setConfig((prev) => ({
+                    ...prev,
+                    parisChannelId: e.target.value || null,
+                  }))
+                }
+                disabled={loadingChannels || saving}
+                displayEmpty
+              >
+                <MenuItem value="">
+                  <em>Aucun channel sélectionné</em>
+                </MenuItem>
+                {discordChannels.map((channel) => (
+                  <MenuItem key={channel.id} value={channel.id}>
+                    {channel.name}
+                  </MenuItem>
+                ))}
+              </Select>
+              {loadingChannels && (
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                  Chargement des channels...
+                </Typography>
+              )}
+            </FormControl>
+
+            <FormControl fullWidth>
+              <FormLabel>Channel pour le championnat par équipes</FormLabel>
+              <Select
+                value={config.equipesChannelId || ""}
+                onChange={(e) =>
+                  setConfig((prev) => ({
+                    ...prev,
+                    equipesChannelId: e.target.value || null,
+                  }))
+                }
+                disabled={loadingChannels || saving}
+                displayEmpty
+              >
+                <MenuItem value="">
+                  <em>Aucun channel sélectionné</em>
+                </MenuItem>
+                {discordChannels.map((channel) => (
+                  <MenuItem key={channel.id} value={channel.id}>
+                    {channel.name}
+                  </MenuItem>
+                ))}
+              </Select>
+              {loadingChannels && (
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                  Chargement des channels...
+                </Typography>
+              )}
+            </FormControl>
+
+            <Box sx={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
+              <Button
+                variant="outlined"
+                onClick={() => void fetchConfig()}
+                disabled={saving || loading}
+              >
+                Annuler
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => void handleSave()}
+                disabled={saving || loadingChannels}
+                startIcon={saving ? <CircularProgress size={20} /> : <CheckIcon />}
+              >
+                {saving ? "Sauvegarde..." : "Sauvegarder"}
+              </Button>
+            </Box>
+          </Stack>
         </CardContent>
       </Card>
     </Box>

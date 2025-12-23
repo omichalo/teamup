@@ -8,6 +8,14 @@ import {
 } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import nacl from "tweetnacl";
+import {
+  handleAvailabilityButton,
+  handleCommentButton,
+  handleViewButton,
+  handleModalSubmit,
+  DiscordMessageComponentInteraction,
+  DiscordModalSubmitInteraction,
+} from "@/lib/discord/poll-interactions";
 
 const DISCORD_PUBLIC_KEY = process.env.DISCORD_PUBLIC_KEY; // Clé publique du bot Discord
 
@@ -110,6 +118,194 @@ export async function POST(req: Request) {
         data: {
           content: `❌ Commande inconnue : ${commandName || "N/A"}`,
           flags: 64, // EPHEMERAL
+        },
+      });
+    }
+
+    // Gérer les interactions de composants (boutons, etc.) - type 3
+    if (data.type === InteractionType.MESSAGE_COMPONENT) {
+      await initializeFirebaseAdmin();
+      const interaction = data as unknown as DiscordMessageComponentInteraction;
+      const customId = interaction.data?.custom_id;
+
+      if (!customId) {
+        return NextResponse.json({
+          type: 4,
+          data: {
+            content: "❌ Interaction non reconnue.",
+            flags: 64,
+          },
+        });
+      }
+
+      // Vérifier si c'est une interaction de sondage de disponibilité
+      // Format: availability_${pollId}_available|unavailable|comment
+      if (customId.startsWith("availability_")) {
+        const parts = customId.split("_");
+        if (parts.length < 3) {
+          return NextResponse.json({
+            type: 4,
+            data: {
+              content: "❌ Format d'interaction invalide.",
+              flags: 64,
+            },
+          });
+        }
+
+        // Le pollId est tout ce qui est entre "availability" et le dernier élément (available/unavailable/comment)
+        const action = parts[parts.length - 1]; // Dernier élément
+        const pollId = parts.slice(1, -1).join("_"); // Tout sauf le premier (availability) et dernier (action)
+
+        if (action === "available" || action === "unavailable") {
+          try {
+            return await handleAvailabilityButton(
+              interaction,
+              pollId,
+              action as "available" | "unavailable"
+            );
+          } catch (error) {
+            console.error("[Discord Interactions] Erreur dans handleAvailabilityButton:", error);
+            return NextResponse.json({
+              type: 4,
+              data: {
+                content: "❌ Erreur lors du traitement de votre réponse. Veuillez réessayer.",
+                flags: 64,
+              },
+            });
+          }
+        }
+
+        if (action === "comment") {
+          try {
+            return await handleCommentButton(interaction, pollId);
+          } catch (error) {
+            console.error("[Discord Interactions] Erreur dans handleCommentButton:", error);
+            return NextResponse.json({
+              type: 4,
+              data: {
+                content: "❌ Erreur lors de l'ouverture du formulaire. Veuillez réessayer.",
+                flags: 64,
+              },
+            });
+          }
+        }
+
+        if (action === "modify") {
+          // Ancien handler, rediriger vers handleViewButton
+          try {
+            return await handleViewButton(interaction, pollId);
+          } catch (error) {
+            console.error("[Discord Interactions] Erreur dans handleViewButton:", error);
+            return NextResponse.json({
+              type: 4,
+              data: {
+                content: "❌ Erreur lors de la récupération de votre réponse. Veuillez réessayer.",
+                flags: 64,
+              },
+            });
+          }
+        }
+
+        if (action === "view") {
+          try {
+            return await handleViewButton(interaction, pollId);
+          } catch (error) {
+            console.error("[Discord Interactions] Erreur dans handleViewButton:", error);
+            return NextResponse.json({
+              type: 4,
+              data: {
+                content: "❌ Erreur lors de la récupération de votre réponse. Veuillez réessayer.",
+                flags: 64,
+              },
+            });
+          }
+        }
+      }
+
+      // Interaction de composant non reconnue
+      return NextResponse.json({
+        type: 4,
+        data: {
+          content: "❌ Interaction non reconnue.",
+          flags: 64,
+        },
+      });
+    }
+
+    // Gérer les soumissions de modals - type 5
+    if (data.type === InteractionType.MODAL_SUBMIT) {
+      await initializeFirebaseAdmin();
+      const interaction = data as unknown as DiscordModalSubmitInteraction;
+      const customId = interaction.data?.custom_id;
+
+      if (!customId) {
+        return NextResponse.json({
+          type: 4,
+          data: {
+            content: "❌ Modal non reconnu.",
+            flags: 64,
+          },
+        });
+      }
+
+      // Vérifier si c'est un modal de sondage de disponibilité
+      // Format: availability_${pollId}_license_modal_${responseType} ou availability_${pollId}_comment_modal
+      if (customId.startsWith("availability_")) {
+        const parts = customId.split("_");
+        if (parts.length < 4) {
+          return NextResponse.json({
+            type: 4,
+            data: {
+              content: "❌ Format de modal invalide.",
+              flags: 64,
+            },
+          });
+        }
+
+        // Extraire le pollId
+        // Format: availability_${pollId}_license_modal_${responseType}
+        // ou: availability_${pollId}_comment_modal
+        const pollIdParts: string[] = [];
+        let i = 1; // Commencer après "availability"
+        while (i < parts.length) {
+          if (parts[i] === "license" || parts[i] === "comment") {
+            break;
+          }
+          pollIdParts.push(parts[i]);
+          i++;
+        }
+        const pollId = pollIdParts.join("_");
+
+        if (!pollId) {
+          return NextResponse.json({
+            type: 4,
+            data: {
+              content: "❌ Impossible d'extraire l'ID du sondage.",
+              flags: 64,
+            },
+          });
+        }
+
+        try {
+          return await handleModalSubmit(interaction, pollId);
+        } catch (error) {
+          console.error("[Discord Interactions] Erreur dans handleModalSubmit:", error);
+          return NextResponse.json({
+            type: 4,
+            data: {
+              content: "❌ Erreur lors du traitement. Veuillez réessayer.",
+              flags: 64,
+            },
+          });
+        }
+      }
+
+      // Modal non reconnu
+      return NextResponse.json({
+        type: 4,
+        data: {
+          content: "❌ Modal non reconnu.",
+          flags: 64,
         },
       });
     }
