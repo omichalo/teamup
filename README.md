@@ -41,6 +41,7 @@ L'application sera accessible sur [http://localhost:3000](http://localhost:3000)
 ### Documentation technique
 
 - **[Workflow Git/GitHub](./.github/GIT_WORKFLOW.md)** : Workflow de développement et déploiement
+- **[Stratégie de pull requests multi-tâches](./docs/technical/PR_STRATEGY.md)** : Recommandations pour regrouper un refactoring complet dans une seule PR
 - **[Règles de statut des matchs](./docs/technical/MATCH_STATUS_RULES.md)** : Règles de gestion de l'affichage du statut des matchs
 - **[Suppression de code mort](./docs/technical/DEAD_CODE_REMOVAL.md)** : Documentation des suppressions de code mort
 - **[Tests de non-régression](./docs/technical/TESTS_NON_REGRESSION.md)** : Checklist des tests de non-régression
