@@ -1,0 +1,6 @@
+# Firebase Firestore Rules
+
+## Firestore Rules
+
+- Quand une collection est manipulée, tu t'assures systématiquement que les bonnes règles sont positionnées. Tu n'ouvres que le strict minimum pour que cela fonctionne
+- Appliquer le principe du moindre privilège (least privilege) : ne donner que les permissions strictement nécessaires

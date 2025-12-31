@@ -1,0 +1,66 @@
+# ADR-0001: Migration des règles .cursorrules vers .cursor/rules/
+
+## Statut
+
+Accepté
+
+## Contexte
+
+Le projet utilisait un fichier `.cursorrules` unique contenant toutes les règles de développement (302 lignes). Cette approche monolithique rendait difficile la navigation et la maintenance des règles. Cursor recommande maintenant d'utiliser une structure modulaire avec des fichiers `.mdc` dans `.cursor/rules/` organisés par thème.
+
+## Décision
+
+Migrer toutes les règles de `.cursorrules` vers une structure modulaire dans `.cursor/rules/` avec les fichiers suivants:
+
+- `00-foundation-quality.mdc` - Principes généraux, qualité TypeScript, DRY/SOLID
+- `10-nextjs-app-router.mdc` - App Router, Server/Client Components
+- `20-ui-and-state.mdc` - React composants, hooks, accessibilité
+- `30-firebase-client.mdc` - Firebase client usage
+- `40-firebase-rules.mdc` - Firestore rules, least privilege
+- `50-firebase-functions.mdc` - Cloud Functions patterns
+- `60-api-security.mdc` - CSRF, rate limiting, headers sécurité
+- `70-auth-and-roles.mdc` - Cohérence client/serveur, vérifications de rôles
+- `90-pr-and-release.mdc` - Workflow Git/GitHub, Conventional Commits
+- `99-legacy-cursorrules.mdc` - Référence pour règles spécifiques
+
+Le fichier `.cursorrules` est conservé mais déprécié (non supprimé pour compatibilité).
+
+## Conséquences
+
+### Positives
+- Meilleure organisation des règles par thème
+- Navigation facilitée pour les développeurs et les agents AI
+- Maintenance plus simple (modifier un thème sans toucher aux autres)
+- Alignement avec les recommandations Cursor
+- Structure extensible pour de nouvelles règles
+
+### Négatives
+- Nécessite une période de transition
+- Les développeurs doivent s'habituer à la nouvelle structure
+- Le fichier `.cursorrules` reste présent (mais déprécié)
+
+### Neutres
+- Aucun impact sur le fonctionnement du code
+- Les règles restent les mêmes, seule l'organisation change
+
+## Alternatives considérées
+
+### Alternative 1: Garder .cursorrules uniquement
+- **Description**: Conserver uniquement le fichier `.cursorrules` monolithique
+- **Pourquoi rejetée**: Ne répond pas au besoin d'organisation et ne suit pas les recommandations Cursor
+
+### Alternative 2: Supprimer .cursorrules immédiatement
+- **Description**: Supprimer `.cursorrules` après migration
+- **Pourquoi rejetée**: Risque de casser des workflows existants, période de transition nécessaire
+
+## Références
+
+- [Documentation Cursor Rules](https://cursor.sh/docs)
+- `.cursor/rules/MIGRATION_MAP.md` - Mapping complet de la migration
+- `.cursorrules` - Fichier source original (conservé)
+
+## Notes
+
+- Le fichier `.cursorrules` sera déprécié progressivement
+- Une section "PARITÉ DES RÈGLES" dans `MIGRATION_MAP.md` valide qu'aucune règle n'a été perdue
+- Les développeurs peuvent continuer à référencer `.cursorrules` pendant la transition

@@ -1,0 +1,43 @@
+# Authentication & Authorization
+
+## Sécurité et contrôle d'accès - Cohérence Client/Serveur
+
+### Règle fondamentale : Vérifications de rôles cohérentes
+
+**TOUJOURS vérifier les rôles à la fois côté client ET côté serveur.**
+
+1. **Côté client (UI)** : Utiliser `AuthGuard` avec `allowedRoles` pour protéger les pages
+   - Exemple : `<AuthGuard allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.COACH]}>`
+   - Les vérifications client sont pour l'UX (masquer/afficher), pas pour la sécurité
+
+2. **Côté serveur (API)** : TOUJOURS vérifier les rôles dans les routes API
+   - Utiliser `hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])` après vérification du cookie de session
+   - Retourner 403 si l'utilisateur n'a pas les droits
+   - Ne JAMAIS faire confiance uniquement aux vérifications client
+
+3. **Cohérence obligatoire** : Les rôles autorisés côté client DOIVENT correspondre exactement aux rôles vérifiés côté serveur
+   - Si une page est accessible aux `[ADMIN, COACH]` via `AuthGuard`, la route API correspondante DOIT vérifier `[ADMIN, COACH]`
+   - Si une route API est restreinte à `[ADMIN]` uniquement, la page UI DOIT utiliser `allowedRoles={[USER_ROLES.ADMIN]}`
+
+4. **Vérification systématique** : Avant de créer/modifier une route API ou une page protégée :
+   - Identifier les rôles nécessaires pour l'action
+   - Vérifier que `AuthGuard` (si page) et la route API utilisent les MÊMES rôles
+   - Documenter dans un commentaire les rôles autorisés si nécessaire
+
+5. **Exemples de cohérence** :
+   ```typescript
+   // ✅ BON : Cohérence client/serveur
+   // Page : <AuthGuard allowedRoles={[USER_ROLES.ADMIN]}>
+   // API : if (!hasAnyRole(role, [USER_ROLES.ADMIN])) return 403;
+   
+   // ❌ MAUVAIS : Incohérence
+   // Page : <AuthGuard allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.COACH]}>
+   // API : if (!hasAnyRole(role, [USER_ROLES.ADMIN])) return 403; // Manque COACH
+   ```
+
+6. **Routes admin** : Toutes les routes `/api/admin/*` sont réservées aux ADMIN uniquement
+   - Ne JAMAIS autoriser COACH sur les routes admin
+   - Utiliser `ADMIN_ONLY_ROLES = [USER_ROLES.ADMIN]` pour la clarté
+
+7. **Routes coach/admin** : Les routes accessibles aux coachs ET admins doivent vérifier les deux rôles
+   - Exemple : `/api/teams`, `/api/discord/channels` → `[USER_ROLES.ADMIN, USER_ROLES.COACH]`

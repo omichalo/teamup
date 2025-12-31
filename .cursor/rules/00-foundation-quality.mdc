@@ -1,0 +1,49 @@
+# Foundation & Quality
+
+## Configuration et outils
+
+Pendant le développement (quand npm run dev est actif), utilise npm run check:dev (lint + type-check sans build) pour éviter les conflits avec le serveur de développement.
+Avant chaque commit sur le projet Next.js, exécute npm run check (lint + type-check + build) et corrige toutes les erreurs de build, de lint et de typage avant de t'arrêter.
+Après un npm run check, un npm run build ou un push git, relancer proprement le serveur de dev (arrêter puis redémarrer).
+Ne jamais faire de --no-verify sur les commandes git
+Toujours refuser de pousser sur git un code avec des TODO
+Une fois le code poussé sur github, toujours s'assurer que le serveur de dev est lancé sur le port 3000. Le relancer si besoin.
+
+## Principes généraux
+
+Tu appliques systématiquement les principes de développement DRY et SOLID.
+
+### Qualité production
+
+- Toujours respecter l'architecture existante du projet (structure des dossiers, conventions de nommage, style de code).
+- Utiliser TypeScript de manière stricte : pas de 'any' implicite, pas de 'as any' sauf cas ultra-justifié.
+- Préserver les définitions de types existantes (types, interfaces, schemas Zod, etc.) et les améliorer plutôt que les casser.
+- Ne jamais introduire de code mort, d'imports inutilisés, de console.log permanents ou de TODO laissés sans contexte.
+- Toujours garder le code lisible, modulaire et cohérent : fonctions courtes, composants simples, pas de duplication.
+
+## TypeScript
+
+- Toujours produire du code en TypeScript (pas en JavaScript).
+- Utiliser `strict` TypeScript (pas d'`any` implicite).
+- Toujours typer les props des composants, les retours de fonctions et les paramètres importants.
+- Préférer des types précis (discriminated unions, enums, Record, etc.) plutôt que 'string'/'any' vagues.
+- Garder les types réutilisables dans un endroit cohérent (ex: 'types/', 'lib/types.ts').
+- Respecter l'ESLint/Prettier configuré dans le projet.
+- Interdire la génération de code avec erreurs de compilation.
+
+## Performance
+
+- Ne pas sur-optimiser prématurément, mais éviter les erreurs évidentes (boucles lourdes dans le rendu, re-renders inutiles).
+- Utiliser les imports dynamiques Next.js (dynamic()) pour les composants lourds côté client si besoin.
+
+## Intégration dans le projet existant
+
+- Respecter la configuration ESLint/Prettier du projet (ne pas introduire un autre formatage).
+- Toujours vérifier que le code proposé pourra passer 'npm run lint' et 'npm run build'.
+- Préserver la DX : messages d'erreurs clairs, pas de magie cachée, pas de changements non nécessaires.
+
+## Quand tu écris ou modifies du code dans ce projet
+
+- Appliquer toutes ces règles par défaut.
+- Privilégier un code clair, maintenable et cohérent avec le reste du repo plutôt qu'une solution "clever".
+- Si tu proposes une refactorisation, elle doit simplifier le projet (moins de duplication, meilleure séparation des responsabilités) sans casser le comportement existant.

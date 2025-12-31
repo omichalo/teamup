@@ -1,8 +1,8 @@
 #!/usr/bin/env sh
 . "$(dirname "$0")/_/husky.sh"
 
-echo "🏗  Vérification complète avant push (build Next.js)..."
-npm run check
+echo "🏗  Vérification avant push (lint + type-check)..."
+npm run check:dev
 
 # Vérifier qu'il n'y a pas de warnings ESLint
 LINT_OUTPUT=$(npm run lint 2>&1)

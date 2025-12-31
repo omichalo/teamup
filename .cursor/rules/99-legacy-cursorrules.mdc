@@ -1,0 +1,9 @@
+# Legacy Cursorrules - Règles spécifiques
+
+Ce fichier contient des règles spécifiques qui ne rentrent dans aucune catégorie principale ou qui nécessitent un contexte particulier.
+
+## Notes de migration
+
+Ce fichier sert de référence pour les règles qui ne correspondent pas directement aux catégories standardisées. La plupart des règles ont été migrées vers les fichiers thématiques appropriés (voir MIGRATION_MAP.md pour le mapping complet).
+
+Si une règle semble manquer ou nécessite une clarification, consulter d'abord le fichier MIGRATION_MAP.md pour voir où elle a été migrée.

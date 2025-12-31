@@ -43,3 +43,28 @@ jobs:
             exit 1
           fi
           echo "✅ Aucun TODO trouvé dans le code"
+
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
+
+      - name: Security scan note
+        run: |
+          echo "ℹ️  Note: Secret scanning is managed via GitHub Advanced Security (if enabled)"
+          echo "ℹ️  For local secret scanning, consider using tools like git-secrets or truffleHog"

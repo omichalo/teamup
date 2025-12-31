@@ -1,0 +1,10 @@
+# Next.js App Router
+
+## App Router
+
+- Utiliser l'App Router (dossier 'app/') et respecter la séparation Server Components / Client Components.
+- Par défaut, créer des Server Components. N'ajouter 'use client' que si c'est nécessaire (state, effets, événements, hooks client).
+- Pour les routes API, utiliser les route handlers dans 'app/\*\*/route.ts' avec les bonnes signatures Request/Response.
+- Respecter les conventions Next : 'page.tsx', 'layout.tsx', 'loading.tsx', 'error.tsx', 'not-found.tsx' quand cela a du sens.
+- Utiliser le cache Next/fetch de façon explicite (cache, revalidate) et éviter les appels inutiles côté client.
+- Forcer le runtime Node.js pour les routes API nécessitant des modules Node.js : `export const runtime = "nodejs";`

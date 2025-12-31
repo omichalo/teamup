@@ -1,0 +1,15 @@
+# UI & State Management
+
+## React / Composants
+
+- Écrire des composants fonctionnels simples, bien typés : props claires, pas de logique métier massive dans le JSX.
+- Extraire la logique métier dans des fonctions/utilitaires ou hooks dédiés (ex: 'useXxx', fonctions dans 'lib/').
+- Respecter le principe 'single responsibility' : un composant ne fait qu'une chose (affichage / logique locale).
+- Utiliser les fragments, éviter les wrappers inutiles.
+- Utiliser React.memo, useMemo, useCallback seulement quand il y a un vrai bénéfice (liste lourde, prop stable...).
+
+## Accessibilité & UI
+
+- Utiliser du HTML sémantique : <button> pour les actions, <a> pour les liens, <label> pour les champs de formulaire, etc.
+- Fournir des 'alt' pertinents sur les images, et les attributs ARIA si nécessaire.
+- Veiller à ce que les composants soient utilisables au clavier et lisibles par un lecteur d'écran.
