@@ -1,0 +1,8 @@
+# Firebase Cloud Functions
+
+## Cloud Functions Patterns
+
+- Valider systématiquement les inputs des fonctions
+- Logger les actions importantes sans exposer de données sensibles
+- Gérer les erreurs de manière idempotente quand c'est possible
+- Utiliser les logs conditionnels pour le debug (voir règles de logs conditionnels dans 60-api-security.mdc)

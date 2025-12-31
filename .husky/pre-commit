@@ -1,5 +1,2 @@
-#!/usr/bin/env sh
-. "$(dirname "$0")/_/husky.sh"
-
-echo "🔎 Lint + type-check..."
-npm run lint && npm run type-check
+echo "🔎 Lint + type-check (pre-commit)..."
+npm run lint -- --fix && npm run type-check

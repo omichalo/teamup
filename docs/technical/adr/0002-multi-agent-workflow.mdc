@@ -1,0 +1,63 @@
+# ADR-0002: Workflow Multi-Agent Cursor
+
+## Statut
+
+Accepté
+
+## Contexte
+
+Le développement avec Cursor peut bénéficier d'un workflow structuré utilisant plusieurs agents spécialisés travaillant en parallèle. Cela permet d'améliorer la qualité du code, la cohérence, et la vitesse de développement en parallélisant les tâches.
+
+## Décision
+
+Mettre en place un workflow multi-agent avec les rôles suivants:
+
+1. **RepoScout** - Cartographie le repository et identifie les conventions
+2. **Architect** - Définit la structure et les règles
+3. **DevEx/Automation** - Scripts npm, hooks git, CI
+4. **NextJS** - Conventions front + DX
+5. **Firebase** - Rules, Functions, Emulators, Sécurité
+6. **Tester** - Tests unit/integration + smoke
+7. **Reviewer** - Audit final qualité/sécurité/cohérence
+
+Ce workflow est documenté dans `docs/WORKFLOW.md` avec des commandes prêtes à l'emploi dans `docs/CURSOR_COMMANDS.md`.
+
+## Conséquences
+
+### Positives
+- Parallélisation des tâches (plusieurs agents travaillent simultanément)
+- Spécialisation par domaine (chaque agent maîtrise son domaine)
+- Meilleure qualité (review systématique avant PR)
+- Documentation claire du workflow
+- Commandes standardisées pour Cursor
+
+### Négatives
+- Nécessite une compréhension du workflow multi-agent
+- Peut être perçu comme complexe au début
+- Nécessite une coordination entre agents
+
+### Neutres
+- N'impose pas l'utilisation du workflow (peut être utilisé de manière optionnelle)
+- Compatible avec un workflow séquentiel classique
+
+## Alternatives considérées
+
+### Alternative 1: Workflow séquentiel unique
+- **Description**: Un seul agent fait tout de manière séquentielle
+- **Pourquoi rejetée**: Plus lent, moins de spécialisation, qualité potentiellement moindre
+
+### Alternative 2: Workflow multi-agent sans structure
+- **Description**: Utiliser plusieurs agents sans définir de rôles
+- **Pourquoi rejetée**: Manque de clarté, risque de duplication ou d'incohérence
+
+## Références
+
+- `docs/WORKFLOW.md` - Documentation complète du workflow
+- `docs/CURSOR_COMMANDS.md` - Commandes prêtes à l'emploi
+- `docs/QUALITY_GATES.md` - Description des quality gates
+
+## Notes
+
+- Le workflow est flexible et peut être adapté selon les besoins
+- Les commandes dans `CURSOR_COMMANDS.md` facilitent l'utilisation
+- Le workflow peut être utilisé partiellement (ex: seulement certains agents)

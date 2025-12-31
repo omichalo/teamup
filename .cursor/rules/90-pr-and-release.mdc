@@ -1,0 +1,56 @@
+# Pull Requests & Release
+
+## Workflow Git/GitHub - Branches et commits
+
+### Structure des branches
+
+- NE JAMAIS commiter directement sur `main` ou `master` pour du code de fonctionnalité
+- TOUJOURS créer une branche dédiée avant de développer une fonctionnalité :
+  - `feature/nom-fonctionnalite` pour les nouvelles fonctionnalités
+  - `fix/nom-correction` pour les corrections de bugs
+  - `refactor/nom-refactoring` pour les refactorings
+  - `docs/nom-documentation` pour la documentation
+- Si l'utilisateur demande de commiter/pousser sur main, lui rappeler de créer une branche et une PR d'abord
+
+### Messages de commit (Conventional Commits)
+
+- TOUJOURS utiliser le format Conventional Commits : `<type>(<scope>): <description>`
+- Types autorisés : feat, fix, docs, style, refactor, test, chore
+- Exemples :
+  - `feat(discord): ajout de la vérification de signature Ed25519`
+  - `fix(compositions): correction du calcul de brûlage`
+  - `refactor(validation): simplification de la logique`
+- Si l'utilisateur propose un message de commit non conforme, suggérer un message conforme
+
+### Pull Requests obligatoires
+
+- AVANT de pousser sur main, TOUJOURS créer une Pull Request
+- Rappeler à l'utilisateur de :
+  1. Pousser sa branche feature/fix/etc
+  2. Créer une PR sur GitHub
+  3. Attendre que les checks CI passent
+  4. Obtenir une approbation si nécessaire
+  5. Merge uniquement après validation
+- Si l'utilisateur demande de push/merge direct sur main, refuser et rappeler le workflow PR
+
+### Vérifications avant commit/push
+
+- AVANT chaque commit, vérifier :
+  - npm run check:dev passe (en développement)
+  - Aucun TODO dans le code
+  - Messages de commit conformes
+- AVANT chaque push, vérifier :
+  - npm run check passe (lint + type-check + build)
+  - On est sur une branche feature/fix/etc (pas main)
+  - Le code est prêt pour review
+
+### Déploiement
+
+- Rappeler que chaque merge sur main déclenche un déploiement automatique en production
+- Ne jamais suggérer de push direct sur main pour du code de fonctionnalité
+- Pour les hotfixes urgents, utiliser une branche `hotfix/nom-hotfix` avec PR accélérée
+
+## Tests & Robustesse
+
+- Quand le projet contient déjà des tests, mettre à jour ou ajouter des tests unitaires / d'intégration pertinents (Jest/Vitest/RTL selon le repo).
+- Ne jamais casser la suite de tests existante : adapter le code ou les tests de manière cohérente.

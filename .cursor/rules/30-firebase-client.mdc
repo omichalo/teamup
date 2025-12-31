@@ -1,0 +1,5 @@
+# Firebase Client Usage
+
+## Firestore
+
+- Quand une collection est manipulée, tu t'assures systématiquement que les bonnes règles sont positionnées. Tu n'ouvres que le strict minimum pour que cela fonctionne

@@ -25,6 +25,8 @@
     "functions:logs": "cd functions && npm run logs",
     "deploy:apphosting": "firebase deploy --only apphosting",
     "discord:register-command": "TS_NODE_TRANSPILE_ONLY=1 ts-node scripts/register-discord-command.ts",
+    "smoke:web": "bash scripts/smoke-web.sh",
+    "emulators:smoke": "bash scripts/emulators-smoke.sh",
     "prepare": "husky"
   },
   "dependencies": {
