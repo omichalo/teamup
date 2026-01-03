@@ -9,9 +9,9 @@ import {
 import { FieldValue } from "firebase-admin/firestore";
 import nacl from "tweetnacl";
 import {
-  handleAvailabilityButton,
+  handleRespondButton,
+  handleModifyButton,
   handleCommentButton,
-  handleViewButton,
   handleModalSubmit,
   DiscordMessageComponentInteraction,
   DiscordModalSubmitInteraction,
@@ -122,13 +122,29 @@ export async function POST(req: Request) {
       });
     }
 
-    // Gérer les interactions de composants (boutons, etc.) - type 3
+    // Gérer les interactions de composants (boutons, select menus, etc.) - type 3
     if (data.type === InteractionType.MESSAGE_COMPONENT) {
       await initializeFirebaseAdmin();
       const interaction = data as unknown as DiscordMessageComponentInteraction;
       const customId = interaction.data?.custom_id;
+      const componentType = (interaction.data as { component_type?: number })?.component_type;
 
-      if (!customId) {
+      const interactionData = interaction.data as {
+        values?: string[];
+        component_type?: number;
+        custom_id?: string;
+      };
+      
+      console.log("[Discord Interactions] MESSAGE_COMPONENT received:", {
+        customId,
+        componentType,
+        hasValues: !!interactionData.values,
+        values: interactionData.values,
+        fullInteractionData: JSON.stringify(interactionData),
+        fullInteraction: JSON.stringify(interaction).substring(0, 500), // Limiter la taille du log
+      });
+
+      if (!customId || !customId.startsWith("availability_")) {
         return NextResponse.json({
           type: 4,
           data: {
@@ -138,98 +154,132 @@ export async function POST(req: Request) {
         });
       }
 
-      // Vérifier si c'est une interaction de sondage de disponibilité
-      // Format: availability_${pollId}_available|unavailable|comment
-      if (customId.startsWith("availability_")) {
-        const parts = customId.split("_");
-        if (parts.length < 3) {
-          return NextResponse.json({
-            type: 4,
-            data: {
-              content: "❌ Format d'interaction invalide.",
-              flags: 64,
-            },
-          });
-        }
-
-        // Le pollId est tout ce qui est entre "availability" et le dernier élément (available/unavailable/comment)
-        const action = parts[parts.length - 1]; // Dernier élément
-        const pollId = parts.slice(1, -1).join("_"); // Tout sauf le premier (availability) et dernier (action)
-
-        if (action === "available" || action === "unavailable") {
-          try {
-            return await handleAvailabilityButton(
-              interaction,
-              pollId,
-              action as "available" | "unavailable"
-            );
-          } catch (error) {
-            console.error("[Discord Interactions] Erreur dans handleAvailabilityButton:", error);
-            return NextResponse.json({
-              type: 4,
-              data: {
-                content: "❌ Erreur lors du traitement de votre réponse. Veuillez réessayer.",
-                flags: 64,
-              },
-            });
-          }
-        }
-
-        if (action === "comment") {
-          try {
-            return await handleCommentButton(interaction, pollId);
-          } catch (error) {
-            console.error("[Discord Interactions] Erreur dans handleCommentButton:", error);
-            return NextResponse.json({
-              type: 4,
-              data: {
-                content: "❌ Erreur lors de l'ouverture du formulaire. Veuillez réessayer.",
-                flags: 64,
-              },
-            });
-          }
-        }
-
-        if (action === "modify") {
-          // Ancien handler, rediriger vers handleViewButton
-          try {
-            return await handleViewButton(interaction, pollId);
-          } catch (error) {
-            console.error("[Discord Interactions] Erreur dans handleViewButton:", error);
-            return NextResponse.json({
-              type: 4,
-              data: {
-                content: "❌ Erreur lors de la récupération de votre réponse. Veuillez réessayer.",
-                flags: 64,
-              },
-            });
-          }
-        }
-
-        if (action === "view") {
-          try {
-            return await handleViewButton(interaction, pollId);
-          } catch (error) {
-            console.error("[Discord Interactions] Erreur dans handleViewButton:", error);
-            return NextResponse.json({
-              type: 4,
-              data: {
-                content: "❌ Erreur lors de la récupération de votre réponse. Veuillez réessayer.",
-                flags: 64,
-              },
-            });
-          }
-        }
+      // Extraire le pollId et l'action
+      // Formats possibles:
+      // - availability_${pollId}_respond
+      // - availability_${pollId}_modify
+      // - availability_${pollId}_comment
+      // - availability_${pollId}_men_${responseType}
+      // - availability_${pollId}_women_submit
+      // - availability_${pollId}_women_ven
+      // - availability_${pollId}_women_sat
+      const parts = customId.split("_");
+      if (parts.length < 3) {
+        return NextResponse.json({
+          type: 4,
+          data: {
+            content: "❌ Format d'interaction invalide.",
+            flags: 64,
+          },
+        });
       }
 
-      // Interaction de composant non reconnue
-      return NextResponse.json({
-        type: 4,
-        data: {
-          content: "❌ Interaction non reconnue.",
-          flags: 64,
-        },
+      const lastPart = parts[parts.length - 1];
+      const secondLastPart = parts[parts.length - 2];
+      const thirdLastPart = parts.length >= 3 ? parts[parts.length - 3] : undefined;
+
+      let pollId: string;
+      let action: string;
+      let day: "ven" | "sat" | undefined = undefined;
+
+      // Cas spéciaux :
+      // - availability_${pollId}_men_${responseType}
+      // - availability_${pollId}_women_${action}
+      // - availability_${pollId}_women_${day}_toggle (nouveau format toggle)
+      if (secondLastPart === "men") {
+        // Pour les hommes : availability_${pollId}_men_${responseType}
+        pollId = parts.slice(1, -2).join("_");
+        action = lastPart;
+      } else if (thirdLastPart === "women" && lastPart === "toggle") {
+        // Format toggle : availability_${pollId}_women_${day}_toggle
+        day = secondLastPart as "ven" | "sat";
+        pollId = parts.slice(1, -3).join("_");
+        action = "toggle";
+      } else if (secondLastPart === "women") {
+        // Format classique : availability_${pollId}_women_${action}
+        pollId = parts.slice(1, -2).join("_");
+        action = lastPart;
+      } else {
+        // Cas normaux : availability_${pollId}_${action}
+        pollId = parts.slice(1, -1).join("_");
+        action = lastPart;
+      }
+
+      console.log("[Discord Interactions] Parsing custom_id:", {
+        customId,
+        parts,
+        pollId,
+        action,
+        secondLastPart,
+        thirdLastPart,
+        day,
       });
+
+      if (!pollId || !action) {
+        return NextResponse.json({
+          type: 4,
+          data: {
+            content: "❌ Format d'interaction invalide (pollId ou action manquant).",
+            flags: 64,
+          },
+        });
+      }
+
+      try {
+        // Bouton "Répondre"
+        if (action === "respond") {
+          return await handleRespondButton(interaction, pollId);
+        }
+
+        // Bouton "Modifier"
+        if (action === "modify") {
+          return await handleModifyButton(interaction, pollId);
+        }
+
+        // Bouton "Commentaire"
+        if (action === "comment") {
+          return await handleCommentButton(interaction, pollId);
+        }
+
+        // Réponses hommes toggle : availability_${pollId}_men_toggle
+        if (action === "toggle" && secondLastPart === "men") {
+          console.log("[Discord Interactions] Men toggle detected:", {
+            pollId,
+            action,
+            secondLastPart,
+          });
+          const { handleMenToggle } = await import("@/lib/discord/poll-interactions");
+          return await handleMenToggle(interaction, pollId);
+        }
+
+        // Réponses femmes toggle : availability_${pollId}_women_ven_toggle ou availability_${pollId}_women_sat_toggle
+        if (action === "toggle" && day) {
+          console.log("[Discord Interactions] Women toggle detected:", {
+            pollId,
+            action,
+            day,
+          });
+          const { handleWomenToggle } = await import("@/lib/discord/poll-interactions");
+          return await handleWomenToggle(interaction, pollId, day);
+        }
+
+        return NextResponse.json({
+          type: 4,
+          data: {
+            content: "❌ Action non reconnue.",
+            flags: 64,
+          },
+        });
+      } catch (error) {
+        console.error("[Discord Interactions] Erreur dans le handler:", error);
+        return NextResponse.json({
+          type: 4,
+          data: {
+            content: "❌ Erreur lors du traitement. Veuillez réessayer.",
+            flags: 64,
+          },
+        });
+      }
     }
 
     // Gérer les soumissions de modals - type 5
@@ -249,8 +299,8 @@ export async function POST(req: Request) {
       }
 
       // Vérifier si c'est un modal de sondage de disponibilité
-      // Format: availability_${pollId}_license_modal_${responseType} ou availability_${pollId}_comment_modal
-      if (customId.startsWith("availability_")) {
+      // Format: availability_${pollId}_comment_modal
+      if (customId.startsWith("availability_") && customId.endsWith("_comment_modal")) {
         const parts = customId.split("_");
         if (parts.length < 4) {
           return NextResponse.json({
@@ -262,17 +312,10 @@ export async function POST(req: Request) {
           });
         }
 
-        // Extraire le pollId
-        // Format: availability_${pollId}_license_modal_${responseType}
-        // ou: availability_${pollId}_comment_modal
+        // Extraire le pollId : tout sauf "availability", "comment", "modal"
         const pollIdParts: string[] = [];
-        let i = 1; // Commencer après "availability"
-        while (i < parts.length) {
-          if (parts[i] === "license" || parts[i] === "comment") {
-            break;
-          }
+        for (let i = 1; i < parts.length - 2; i++) {
           pollIdParts.push(parts[i]);
-          i++;
         }
         const pollId = pollIdParts.join("_");
 
@@ -289,7 +332,10 @@ export async function POST(req: Request) {
         try {
           return await handleModalSubmit(interaction, pollId);
         } catch (error) {
-          console.error("[Discord Interactions] Erreur dans handleModalSubmit:", error);
+          console.error(
+            "[Discord Interactions] Erreur dans handleModalSubmit:",
+            error
+          );
           return NextResponse.json({
             type: 4,
             data: {

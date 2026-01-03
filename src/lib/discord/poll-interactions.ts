@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { getFirestoreAdmin, initializeFirebaseAdmin } from "@/lib/firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
+import {
+  getFirestoreAdmin,
+  initializeFirebaseAdmin,
+} from "@/lib/firebase-admin";
 import { AvailabilityServiceAdmin } from "@/lib/services/availability-service-admin";
 import { DiscordPollServiceAdmin } from "@/lib/services/discord-poll-service-admin";
 import { ChampionshipType } from "@/types/championship";
@@ -83,60 +85,230 @@ async function findPlayerByDiscordId(
 }
 
 /**
- * Gère l'interaction d'un bouton de disponibilité (Disponible/Indisponible)
+ * Vérifie qu'un poll est actif
  */
-export async function handleAvailabilityButton(
+async function checkPollActive(pollId: string): Promise<{
+  active: boolean;
+  poll: Awaited<ReturnType<DiscordPollServiceAdmin["getPoll"]>> | null;
+}> {
+  await initializeFirebaseAdmin();
+  const parts = pollId.split("_");
+  if (parts.length < 3) {
+    console.log("[Discord Poll] checkPollActive: pollId format invalide", {
+      pollId,
+      partsLength: parts.length,
+    });
+    return { active: false, poll: null };
+  }
+
+  const phase = parts[0] as "aller" | "retour";
+  const journee = parseInt(parts[1], 10);
+  if (isNaN(journee)) {
+    console.log("[Discord Poll] checkPollActive: journee invalide", {
+      pollId,
+      journeePart: parts[1],
+    });
+    return { active: false, poll: null };
+  }
+  const championshipType = parts[2] as ChampionshipType;
+  const idEpreuve = parts.length > 3 ? parseInt(parts[3], 10) : undefined;
+
+  console.log("[Discord Poll] checkPollActive: parsing pollId", {
+    pollId,
+    phase,
+    journee,
+    championshipType,
+    idEpreuve,
+  });
+
+  const pollService = new DiscordPollServiceAdmin();
+  const poll = await pollService.getPoll(
+    journee,
+    phase,
+    championshipType,
+    idEpreuve
+  );
+
+  console.log("[Discord Poll] checkPollActive: poll found", {
+    pollExists: !!poll,
+    isActive: poll?.isActive,
+    pollId: poll?.id,
+  });
+
+  return { active: poll?.isActive ?? false, poll };
+}
+
+/**
+ * Gère l'interaction du bouton "Répondre"
+ * Détecte le genre et affiche les options appropriées
+ */
+export async function handleRespondButton(
   interaction: DiscordMessageComponentInteraction,
-  pollId: string,
-  responseType: "available" | "unavailable"
+  pollId: string
 ): Promise<NextResponse> {
   try {
-    console.log("[Discord Poll Interactions] handleAvailabilityButton", {
+    console.log("[Discord Poll] Respond button clicked:", {
       pollId,
-      responseType,
-      customId: interaction.data?.custom_id,
+      discordUserId: interaction.member?.user?.id || interaction.user?.id,
     });
 
-    const discordUserId =
-      interaction.member?.user?.id || interaction.user?.id;
+    const discordUserId = interaction.member?.user?.id || interaction.user?.id;
 
     if (!discordUserId) {
-      console.error("[Discord Poll Interactions] Pas d'ID Discord dans l'interaction");
       return NextResponse.json({
-        type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
+        type: 4,
         data: {
           content: "❌ Erreur: Impossible de récupérer votre ID Discord.",
-          flags: 64, // EPHEMERAL
+          flags: 64,
         },
       });
     }
 
-    console.log("[Discord Poll Interactions] Discord User ID:", discordUserId);
-
-    // Vérifier si l'utilisateur a une licence associée
-    const player = await findPlayerByDiscordId(discordUserId);
-    console.log("[Discord Poll Interactions] Player found:", player ? "yes" : "no");
-
-    if (!player) {
-      // Pas de licence associée, demander via modal
+    // Vérifier que le poll est actif
+    const { active, poll } = await checkPollActive(pollId);
+    if (!active || !poll) {
       return NextResponse.json({
-        type: 9, // MODAL
+        type: 4,
         data: {
-          title: "Associer votre licence",
-          custom_id: `availability_${pollId}_license_modal_${responseType}`,
+          content: "❌ Ce sondage n'est plus actif.",
+          flags: 64,
+        },
+      });
+    }
+
+    // Trouver le joueur
+    const player = await findPlayerByDiscordId(discordUserId);
+    if (!player) {
+      return NextResponse.json({
+        type: 4,
+        data: {
+          content:
+            "❌ Votre compte Discord n'est pas lié à une licence. Utilisez `/lier_licence <numéro>` pour associer votre compte.",
+          flags: 64,
+        },
+      });
+    }
+
+    // Détecter le genre
+    const playerGender =
+      (player.playerData.sexe as string | undefined) ||
+      (player.playerData.gender as string | undefined);
+    const normalizedGender =
+      playerGender === "F" || playerGender === "féminin" ? "F" : "M";
+
+    console.log("[Discord Poll] Gender detected:", {
+      gender: normalizedGender,
+      showing: normalizedGender === "M" ? "men_buttons" : "women_selects",
+    });
+
+    if (normalizedGender === "M") {
+      // Homme : 1 bouton toggle (comme pour les femmes)
+      // Récupérer l'état actuel pour afficher le bon style
+      const availabilityService = new AvailabilityServiceAdmin();
+      const parts = pollId.split("_");
+      const phase = parts[0] as "aller" | "retour";
+      const journee = parseInt(parts[1], 10);
+      const championshipType = parts[2] as ChampionshipType;
+      const idEpreuve = parts.length > 3 ? parseInt(parts[3], 10) : undefined;
+
+      const availability = await availabilityService.getAvailability(
+        journee,
+        phase,
+        championshipType,
+        idEpreuve
+      );
+      const currentResponse = availability?.players[player.playerId];
+
+      // Récupérer l'état actuel (undefined, true, false)
+      const isAvailable = currentResponse?.available;
+
+      const getButtonStyle = (available: boolean | undefined): number => {
+        if (available === true) return 3; // SUCCESS (vert)
+        if (available === false) return 4; // DANGER (rouge)
+        return 2; // SECONDARY (gris) pour non renseigné
+      };
+
+      const getButtonLabel = (available: boolean | undefined): string => {
+        if (available === true) return "✅ Disponible";
+        if (available === false) return "❌ Indisponible";
+        return "❓ Non renseigné";
+      };
+
+      return NextResponse.json({
+        type: 4,
+        data: {
+          content: "**Votre disponibilité :**\n💡 Cliquez sur le bouton pour changer l'état (Disponible ↔ Indisponible).",
+          flags: 64,
           components: [
             {
               type: 1, // ACTION_ROW
               components: [
                 {
-                  type: 4, // TEXT_INPUT
-                  custom_id: "license_number",
-                  label: "Numéro de licence",
-                  style: 1, // SHORT
-                  placeholder: "123456",
-                  required: true,
-                  min_length: 1,
-                  max_length: 20,
+                  type: 2, // BUTTON
+                  style: getButtonStyle(isAvailable),
+                  label: getButtonLabel(isAvailable),
+                  custom_id: `availability_${pollId}_men_toggle`,
+                },
+              ],
+            },
+          ],
+        },
+      });
+    } else {
+      // Femme : 2 boutons toggle-like (vendredi et samedi)
+      // Récupérer l'état actuel pour afficher les bons styles
+      const availabilityService = new AvailabilityServiceAdmin();
+      const parts = pollId.split("_");
+      const phase = parts[0] as "aller" | "retour";
+      const journee = parseInt(parts[1], 10);
+      const championshipType = parts[2] as ChampionshipType;
+      const idEpreuve = parts.length > 3 ? parseInt(parts[3], 10) : undefined;
+
+      const availability = await availabilityService.getAvailability(
+        journee,
+        phase,
+        championshipType,
+        idEpreuve
+      );
+      const currentResponse = availability?.players[player.playerId];
+
+      // Récupérer les 3 états possibles : undefined, true, false
+      const venAvailable = currentResponse?.fridayAvailable;
+      const satAvailable = currentResponse?.saturdayAvailable;
+
+      const getButtonStyle = (available: boolean | undefined): number => {
+        if (available === true) return 3; // SUCCESS (vert)
+        if (available === false) return 4; // DANGER (rouge)
+        return 2; // SECONDARY (gris) pour non renseigné
+      };
+
+      const getButtonLabel = (day: "ven" | "sat", available: boolean | undefined): string => {
+        const dayLabel = day === "ven" ? "Vendredi" : "Samedi";
+        if (available === true) return `✅ ${dayLabel} - Disponible`;
+        if (available === false) return `❌ ${dayLabel} - Indisponible`;
+        return `❓ ${dayLabel} - Non renseigné`;
+      };
+
+      return NextResponse.json({
+        type: 4,
+        data: {
+          content: "**Votre disponibilité (vendredi et/ou samedi) :**\n💡 Cliquez sur un bouton pour changer l'état (Disponible ↔ Indisponible).",
+          flags: 64,
+          components: [
+            {
+              type: 1, // ACTION_ROW
+              components: [
+                {
+                  type: 2, // BUTTON
+                  style: getButtonStyle(venAvailable),
+                  label: getButtonLabel("ven", venAvailable),
+                  custom_id: `availability_${pollId}_women_ven_toggle`,
+                },
+                {
+                  type: 2, // BUTTON
+                  style: getButtonStyle(satAvailable),
+                  label: getButtonLabel("sat", satAvailable),
+                  custom_id: `availability_${pollId}_women_sat_toggle`,
                 },
               ],
             },
@@ -144,25 +316,12 @@ export async function handleAvailabilityButton(
         },
       });
     }
-
-    // L'utilisateur a une licence, traiter la réponse
-    return await processAvailabilityResponse(
-      pollId,
-      player.playerId,
-      responseType === "available",
-      undefined,
-      discordUserId,
-      player.playerData
-    );
   } catch (error) {
-    console.error(
-      "[Discord Poll Interactions] Erreur dans handleAvailabilityButton:",
-      error
-    );
+    console.error("[Discord Poll] Erreur dans handleRespondButton:", error);
     return NextResponse.json({
       type: 4,
       data: {
-        content: "❌ Erreur lors du traitement de votre réponse. Veuillez réessayer.",
+        content: "❌ Erreur lors du traitement. Veuillez réessayer.",
         flags: 64,
       },
     });
@@ -170,15 +329,14 @@ export async function handleAvailabilityButton(
 }
 
 /**
- * Gère l'interaction du bouton "Ajouter un commentaire"
+ * Gère l'interaction du bouton "Modifier ma réponse"
  */
-export async function handleCommentButton(
+export async function handleModifyButton(
   interaction: DiscordMessageComponentInteraction,
   pollId: string
 ): Promise<NextResponse> {
   try {
-    const discordUserId =
-      interaction.member?.user?.id || interaction.user?.id;
+    const discordUserId = interaction.member?.user?.id || interaction.user?.id;
 
     if (!discordUserId) {
       return NextResponse.json({
@@ -190,27 +348,621 @@ export async function handleCommentButton(
       });
     }
 
-    // Vérifier si l'utilisateur a une licence associée
-    const player = await findPlayerByDiscordId(discordUserId);
+    // Vérifier que le poll est actif
+    const { active, poll } = await checkPollActive(pollId);
+    if (!active || !poll) {
+      return NextResponse.json({
+        type: 4,
+        data: {
+          content: "❌ Ce sondage n'est plus actif.",
+          flags: 64,
+        },
+      });
+    }
 
+    // Trouver le joueur
+    const player = await findPlayerByDiscordId(discordUserId);
     if (!player) {
-      // Pas de licence, demander d'abord la licence
       return NextResponse.json({
         type: 4,
         data: {
           content:
-            "❌ Vous devez d'abord associer votre licence Discord. Répondez au sondage avec Disponible ou Indisponible pour commencer.",
+            "❌ Votre compte Discord n'est pas lié à une licence. Utilisez `/lier_licence <numéro>` pour associer votre compte.",
+          flags: 64,
+        },
+      });
+    }
+
+    // Charger la réponse actuelle
+    const parts = pollId.split("_");
+    const phase = parts[0] as "aller" | "retour";
+    const journee = parseInt(parts[1], 10);
+    const championshipType = parts[2] as ChampionshipType;
+    const idEpreuve = parts.length > 3 ? parseInt(parts[3], 10) : undefined;
+
+    const availabilityService = new AvailabilityServiceAdmin();
+    const availability = await availabilityService.getAvailability(
+      journee,
+      phase,
+      championshipType,
+      idEpreuve
+    );
+
+    const currentResponse = availability?.players[player.playerId];
+
+    // Détecter le genre
+    const playerGender =
+      (player.playerData.sexe as string | undefined) ||
+      (player.playerData.gender as string | undefined);
+    const normalizedGender =
+      playerGender === "F" || playerGender === "féminin" ? "F" : "M";
+
+    let currentStatusText = "";
+    if (normalizedGender === "M") {
+      if (currentResponse?.available === true) {
+        currentStatusText = "✅ **Disponible**";
+      } else if (currentResponse?.available === false) {
+        currentStatusText = "❌ **Indisponible**";
+      } else {
+        currentStatusText = "❓ **Non renseigné**";
+      }
+    } else {
+      const venStatus =
+        currentResponse?.fridayAvailable === true
+          ? "✅"
+          : currentResponse?.fridayAvailable === false
+          ? "❌"
+          : "❓";
+      const satStatus =
+        currentResponse?.saturdayAvailable === true
+          ? "✅"
+          : currentResponse?.saturdayAvailable === false
+          ? "❌"
+          : "❓";
+      currentStatusText = `VEN: ${venStatus} / SAM: ${satStatus}`;
+    }
+
+    const commentText = currentResponse?.comment
+      ? `\n💬 **Commentaire :** ${currentResponse.comment}`
+      : "";
+
+    // Afficher la réponse actuelle et proposer de modifier
+    if (normalizedGender === "M") {
+      // Homme : 1 bouton toggle (comme pour les femmes)
+      const isAvailable = currentResponse?.available;
+
+      const getButtonStyle = (available: boolean | undefined): number => {
+        if (available === true) return 3; // SUCCESS (vert)
+        if (available === false) return 4; // DANGER (rouge)
+        return 2; // SECONDARY (gris) pour non renseigné
+      };
+
+      const getButtonLabel = (available: boolean | undefined): string => {
+        if (available === true) return "✅ Disponible";
+        if (available === false) return "❌ Indisponible";
+        return "❓ Non renseigné";
+      };
+
+    return NextResponse.json({
+        type: 4,
+      data: {
+          content: `📋 **Votre réponse actuelle :**\n${currentStatusText}${commentText}\n\n**Modifier :**\n💡 Cliquez sur le bouton pour changer l'état (Disponible ↔ Indisponible).`,
+          flags: 64,
+        components: [
+          {
+              type: 1,
+            components: [
+              {
+                  type: 2,
+                  style: getButtonStyle(isAvailable),
+                  label: getButtonLabel(isAvailable),
+                  custom_id: `availability_${pollId}_men_toggle`,
+              },
+            ],
+          },
+        ],
+      },
+    });
+    } else {
+      // Femme : 2 boutons toggle-like (vendredi et samedi)
+      // Récupérer les 3 états possibles : undefined, true, false
+      const venAvailable = currentResponse?.fridayAvailable;
+      const satAvailable = currentResponse?.saturdayAvailable;
+
+      const getButtonStyle = (available: boolean | undefined): number => {
+        if (available === true) return 3; // SUCCESS (vert)
+        if (available === false) return 4; // DANGER (rouge)
+        return 2; // SECONDARY (gris) pour non renseigné
+      };
+
+      const getButtonLabel = (day: "ven" | "sat", available: boolean | undefined): string => {
+        const dayLabel = day === "ven" ? "Vendredi" : "Samedi";
+        if (available === true) return `✅ ${dayLabel} - Disponible`;
+        if (available === false) return `❌ ${dayLabel} - Indisponible`;
+        return `❓ ${dayLabel} - Non renseigné`;
+      };
+
+      return NextResponse.json({
+        type: 4,
+        data: {
+          content: `📋 **Votre réponse actuelle :**\n${currentStatusText}${commentText}\n\n**Modifier :**\n💡 Cliquez sur un bouton pour changer l'état (Disponible ↔ Indisponible).`,
+          flags: 64,
+          components: [
+            {
+              type: 1,
+              components: [
+                {
+                  type: 2,
+                  style: getButtonStyle(venAvailable),
+                  label: getButtonLabel("ven", venAvailable),
+                  custom_id: `availability_${pollId}_women_ven_toggle`,
+                },
+                {
+                  type: 2,
+                  style: getButtonStyle(satAvailable),
+                  label: getButtonLabel("sat", satAvailable),
+                  custom_id: `availability_${pollId}_women_sat_toggle`,
+                },
+              ],
+            },
+          ],
+        },
+      });
+    }
+  } catch (error) {
+    console.error("[Discord Poll] Erreur dans handleModifyButton:", error);
+    return NextResponse.json({
+      type: 4,
+      data: {
+        content: "❌ Erreur lors du traitement. Veuillez réessayer.",
+        flags: 64,
+      },
+    });
+  }
+}
+
+/**
+ * Gère le toggle de disponibilité pour les hommes (cycle disponible ↔ indisponible)
+ */
+export async function handleMenToggle(
+  interaction: DiscordMessageComponentInteraction,
+  pollId: string
+): Promise<NextResponse> {
+  try {
+    const discordUserId = interaction.member?.user?.id || interaction.user?.id;
+
+    if (!discordUserId) {
+      return NextResponse.json({
+        type: 4,
+        data: {
+          content: "❌ Erreur: Impossible de récupérer votre ID Discord.",
+          flags: 64,
+        },
+      });
+    }
+
+    // Vérifier que le poll est actif
+    console.log("[Discord Poll] handleMenToggle: checking poll", { pollId });
+    const { active, poll } = await checkPollActive(pollId);
+    console.log("[Discord Poll] handleMenToggle: poll check result", {
+      pollId,
+      active,
+      pollExists: !!poll,
+      pollIsActive: poll?.isActive,
+    });
+    if (!active || !poll) {
+      return NextResponse.json({
+        type: 4,
+        data: {
+          content: "❌ Ce sondage est fermé.",
+          flags: 64,
+        },
+      });
+    }
+
+    // Trouver le joueur
+    const player = await findPlayerByDiscordId(discordUserId);
+    if (!player) {
+      return NextResponse.json({
+        type: 4,
+        data: {
+          content:
+            "❌ Votre compte Discord n'est pas lié à une licence. Utilisez `/lier_licence <numéro>` pour associer votre compte.",
+          flags: 64,
+        },
+      });
+    }
+
+    // Extraire les infos du pollId
+    const parts = pollId.split("_");
+    const phase = parts[0] as "aller" | "retour";
+    const journee = parseInt(parts[1], 10);
+    const championshipType = parts[2] as ChampionshipType;
+    const idEpreuve = parts.length > 3 ? parseInt(parts[3], 10) : undefined;
+
+    // Récupérer l'état actuel
+    const availabilityService = new AvailabilityServiceAdmin();
+    const availability = await availabilityService.getAvailability(
+      journee,
+      phase,
+      championshipType,
+      idEpreuve
+    );
+    const currentResponse = availability?.players[player.playerId];
+
+    // Toggle l'état (cycle à 2 états : undefined → true → false → true → ...)
+    // L'état "non renseigné" (undefined) n'est que l'état de départ, on ne peut pas y revenir
+    let isAvailable: boolean | undefined = currentResponse?.available;
+
+    // Cycle : undefined → true → false → true → false → ...
+    if (isAvailable === true) {
+      isAvailable = false;
+    } else {
+      // undefined ou false → true
+      isAvailable = true;
+    }
+
+    // Sauvegarder la réponse
+    const availabilityData: {
+      available: boolean;
+    } = {
+      available: isAvailable,
+    };
+
+    await availabilityService.updatePlayerAvailability(
+      journee,
+      phase,
+      championshipType,
+      player.playerId,
+      availabilityData,
+      idEpreuve
+    );
+
+    const playerName = `${player.playerData.prenom || ""} ${
+      player.playerData.nom || ""
+    }`.trim();
+
+    const statusEmoji = isAvailable === true ? "✅" : "❌";
+    const statusText = isAvailable === true ? "disponible" : "indisponible";
+
+    console.log("[Discord Poll] Men toggle response saved:", {
+      playerId: player.playerId,
+      data: availabilityData,
+    });
+
+    // Déterminer le style et le label pour le bouton selon l'état
+    const getButtonStyle = (available: boolean | undefined): number => {
+      if (available === true) return 3; // SUCCESS (vert)
+      if (available === false) return 4; // DANGER (rouge)
+      return 2; // SECONDARY (gris) pour non renseigné
+    };
+
+    const getButtonLabel = (available: boolean | undefined): string => {
+      if (available === true) return "✅ Disponible";
+      if (available === false) return "❌ Indisponible";
+      return "❓ Non renseigné";
+    };
+
+    return NextResponse.json({
+      type: 4,
+      data: {
+        content: `${statusEmoji} **Votre disponibilité a été enregistrée : ${statusText}**\n📋 **Licence :** ${player.playerId}${
+          playerName ? ` (${playerName})` : ""
+        }\n\n💡 Cliquez sur le bouton pour changer l'état (Disponible ↔ Indisponible).`,
+        flags: 64,
+        components: [
+          {
+            type: 1,
+            components: [
+              {
+                type: 2,
+                style: getButtonStyle(isAvailable),
+                label: getButtonLabel(isAvailable),
+                custom_id: `availability_${pollId}_men_toggle`,
+              },
+            ],
+          },
+        ],
+      },
+    });
+  } catch (error) {
+    console.error("[Discord Poll] Erreur dans handleMenToggle:", error);
+    return NextResponse.json({
+      type: 4,
+      data: {
+        content: "❌ Erreur lors de l'enregistrement. Veuillez réessayer.",
+        flags: 64,
+      },
+    });
+  }
+}
+
+
+/**
+ * Gère les réponses des femmes (toggle vendredi ou samedi)
+ */
+export async function handleWomenToggle(
+  interaction: DiscordMessageComponentInteraction,
+  pollId: string,
+  day: "ven" | "sat"
+): Promise<NextResponse> {
+  try {
+    const discordUserId = interaction.member?.user?.id || interaction.user?.id;
+
+    if (!discordUserId) {
+      return NextResponse.json({
+        type: 4,
+        data: {
+          content: "❌ Erreur: Impossible de récupérer votre ID Discord.",
+          flags: 64,
+        },
+      });
+    }
+
+    // Vérifier que le poll est actif
+    const { active, poll } = await checkPollActive(pollId);
+    if (!active || !poll) {
+      return NextResponse.json({
+        type: 4,
+        data: {
+          content: "❌ Ce sondage est fermé.",
+          flags: 64,
+        },
+      });
+    }
+
+    // Trouver le joueur
+    const player = await findPlayerByDiscordId(discordUserId);
+    if (!player) {
+      return NextResponse.json({
+        type: 4,
+        data: {
+          content:
+            "❌ Votre compte Discord n'est pas lié à une licence. Utilisez `/lier_licence <numéro>` pour associer votre compte.",
+          flags: 64,
+        },
+      });
+    }
+
+    // Extraire les infos du pollId
+    const parts = pollId.split("_");
+    const phase = parts[0] as "aller" | "retour";
+    const journee = parseInt(parts[1], 10);
+    const championshipType = parts[2] as ChampionshipType;
+    const idEpreuve = parts.length > 3 ? parseInt(parts[3], 10) : undefined;
+
+    // Déterminer si c'est le championnat par équipes
+    const isTeamChampionship = championshipType === "masculin" && (idEpreuve === undefined || idEpreuve !== 15980);
+
+    // Récupérer l'état actuel
+    const availabilityService = new AvailabilityServiceAdmin();
+    const availability = await availabilityService.getAvailability(
+      journee,
+      phase,
+      championshipType,
+      idEpreuve
+    );
+    const currentResponse = availability?.players[player.playerId];
+
+    // Toggle l'état du jour sélectionné (cycle à 2 états : undefined → true → false → true → ...)
+    // L'état "non renseigné" (undefined) n'est que l'état de départ, on ne peut pas y revenir
+    let fridayAvailable: boolean | undefined = currentResponse?.fridayAvailable;
+    let saturdayAvailable: boolean | undefined = currentResponse?.saturdayAvailable;
+
+    if (day === "ven") {
+      // Cycle vendredi : undefined → true → false → true → false → ...
+      if (fridayAvailable === true) {
+        fridayAvailable = false;
+      } else {
+        // undefined ou false → true
+        fridayAvailable = true;
+      }
+    } else {
+      // Cycle samedi : undefined → true → false → true → false → ...
+      if (saturdayAvailable === true) {
+        saturdayAvailable = false;
+      } else {
+        // undefined ou false → true
+        saturdayAvailable = true;
+      }
+    }
+
+    // Pour le championnat par équipes, les femmes doivent sauvegarder :
+    // - Vendredi disponible → disponible pour le championnat masculin (les hommes jouent le vendredi)
+    // - Samedi disponible → disponible pour le championnat féminin (les femmes jouent le samedi)
+
+    if (isTeamChampionship) {
+      // Championnat par équipes : sauvegarder dans les deux championnats selon les jours
+      const masculineData: {
+      available?: boolean;
+      fridayAvailable?: boolean;
+      saturdayAvailable?: boolean;
+      } = {};
+      const feminineData: {
+        available?: boolean;
+        fridayAvailable?: boolean;
+        saturdayAvailable?: boolean;
+    } = {};
+
+      // Vendredi → championnat masculin
+      // fridayAvailable ne peut plus être undefined ici (cycle true/false uniquement)
+      if (fridayAvailable !== undefined) {
+        masculineData.available = fridayAvailable;
+        masculineData.fridayAvailable = fridayAvailable;
+      }
+
+      // Samedi → championnat féminin
+      // saturdayAvailable ne peut plus être undefined ici (cycle true/false uniquement)
+      if (saturdayAvailable !== undefined) {
+        feminineData.available = saturdayAvailable;
+        feminineData.saturdayAvailable = saturdayAvailable;
+      }
+
+      // Sauvegarder dans les deux championnats
+      await Promise.all([
+        availabilityService.updatePlayerAvailability(
+      journee,
+      phase,
+          "masculin",
+          player.playerId,
+          masculineData,
+      idEpreuve
+        ),
+        availabilityService.updatePlayerAvailability(
+          journee,
+          phase,
+          "feminin",
+          player.playerId,
+          feminineData,
+          idEpreuve
+        ),
+      ]);
+    } else {
+      // Championnat de Paris : sauvegarder avec fridayAvailable et saturdayAvailable
+      // Les valeurs ne peuvent plus être undefined ici (cycle true/false uniquement)
+      const availabilityData: {
+        fridayAvailable?: boolean;
+        saturdayAvailable?: boolean;
+      } = {};
+      if (fridayAvailable !== undefined) {
+        availabilityData.fridayAvailable = fridayAvailable;
+      }
+      if (saturdayAvailable !== undefined) {
+        availabilityData.saturdayAvailable = saturdayAvailable;
+      }
+
+    await availabilityService.updatePlayerAvailability(
+      journee,
+      phase,
+        championshipType,
+        player.playerId,
+        availabilityData,
+      idEpreuve
+    );
+    }
+
+    const playerName = `${player.playerData.prenom || ""} ${
+      player.playerData.nom || ""
+    }`.trim();
+
+    const dayLabel = day === "ven" ? "Vendredi" : "Samedi";
+    const newStatus = day === "ven" ? fridayAvailable : saturdayAvailable;
+    const statusEmoji = newStatus === true ? "✅" : newStatus === false ? "❌" : "❓";
+    const statusText = newStatus === true ? "disponible" : newStatus === false ? "indisponible" : "non renseigné";
+
+    const venEmoji = fridayAvailable === true ? "✅" : fridayAvailable === false ? "❌" : "❓";
+    const satEmoji = saturdayAvailable === true ? "✅" : saturdayAvailable === false ? "❌" : "❓";
+
+    // Déterminer le style et le label pour chaque bouton selon l'état
+    const getButtonStyle = (available: boolean | undefined): number => {
+      if (available === true) return 3; // SUCCESS (vert)
+      if (available === false) return 4; // DANGER (rouge)
+      return 2; // SECONDARY (gris) pour non renseigné
+    };
+
+    const getButtonLabel = (day: "ven" | "sat", available: boolean | undefined): string => {
+      const dayLabel = day === "ven" ? "Vendredi" : "Samedi";
+      if (available === true) return `✅ ${dayLabel} - Disponible`;
+      if (available === false) return `❌ ${dayLabel} - Indisponible`;
+      return `❓ ${dayLabel} - Non renseigné`;
+    };
+
+    // Retourner une réponse avec les boutons mis à jour
+    return NextResponse.json({
+      type: 4,
+      data: {
+        content: `${statusEmoji} **${dayLabel} : ${statusText}**\n\n📋 **Votre disponibilité :**\nVEN: ${venEmoji} / SAM: ${satEmoji}\n📋 **Licence :** ${player.playerId}${
+          playerName ? ` (${playerName})` : ""
+        }\n\n💡 Cliquez sur un bouton pour changer l'état (Disponible ↔ Indisponible).`,
+        flags: 64,
+        components: [
+          {
+            type: 1,
+            components: [
+              {
+                type: 2,
+                style: getButtonStyle(fridayAvailable),
+                label: getButtonLabel("ven", fridayAvailable),
+                custom_id: `availability_${pollId}_women_ven_toggle`,
+              },
+              {
+                type: 2,
+                style: getButtonStyle(saturdayAvailable),
+                label: getButtonLabel("sat", saturdayAvailable),
+                custom_id: `availability_${pollId}_women_sat_toggle`,
+              },
+            ],
+          },
+        ],
+      },
+    });
+  } catch (error) {
+    console.error("[Discord Poll] Erreur dans handleWomenToggle:", error);
+    return NextResponse.json({
+      type: 4,
+      data: {
+        content: "❌ Erreur lors de l'enregistrement. Veuillez réessayer.",
+        flags: 64,
+      },
+    });
+  }
+}
+
+
+/**
+ * Gère l'interaction du bouton "Commentaire"
+ */
+export async function handleCommentButton(
+  interaction: DiscordMessageComponentInteraction,
+  pollId: string
+): Promise<NextResponse> {
+  try {
+    const discordUserId = interaction.member?.user?.id || interaction.user?.id;
+
+    if (!discordUserId) {
+      return NextResponse.json({
+        type: 4,
+        data: {
+          content: "❌ Erreur: Impossible de récupérer votre ID Discord.",
+          flags: 64,
+        },
+      });
+    }
+
+    // Vérifier que le poll est actif
+    const { active } = await checkPollActive(pollId);
+    if (!active) {
+      return NextResponse.json({
+        type: 4,
+        data: {
+          content: "❌ Ce sondage n'est plus actif.",
+          flags: 64,
+        },
+      });
+    }
+
+    // Vérifier si l'utilisateur a une licence associée
+    const player = await findPlayerByDiscordId(discordUserId);
+
+    if (!player) {
+      return NextResponse.json({
+        type: 4,
+        data: {
+          content:
+            "❌ Votre compte Discord n'est pas lié à une licence. Utilisez `/lier_licence <numéro>` pour associer votre compte.",
           flags: 64,
         },
       });
     }
 
     // Ouvrir le modal de commentaire
+    const modalCustomId = `availability_${pollId}_comment_modal`;
+
     return NextResponse.json({
       type: 9, // MODAL
       data: {
         title: "Ajouter un commentaire",
-        custom_id: `availability_${pollId}_comment_modal`,
+        custom_id: modalCustomId,
         components: [
           {
             type: 1, // ACTION_ROW
@@ -230,70 +982,56 @@ export async function handleCommentButton(
       },
     });
   } catch (error) {
-    console.error(
-      "[Discord Poll Interactions] Erreur dans handleCommentButton:",
-      error
-    );
-    return NextResponse.json({
-      type: 4,
-      data: {
-        content: "❌ Erreur lors de l'ouverture du formulaire. Veuillez réessayer.",
-        flags: 64,
-      },
-    });
+    console.error("[Discord Poll] Erreur dans handleCommentButton:", error);
+        return NextResponse.json({
+          type: 4,
+          data: {
+            content:
+          "❌ Erreur lors de l'ouverture du formulaire. Veuillez réessayer.",
+            flags: 64,
+          },
+        });
   }
 }
 
+
+
 /**
- * Gère l'interaction du bouton "Voir/Modifier ma réponse"
+ * Gère la soumission d'un modal (commentaire uniquement)
  */
-export async function handleViewButton(
-  interaction: DiscordMessageComponentInteraction,
+export async function handleModalSubmit(
+  interaction: DiscordModalSubmitInteraction,
   pollId: string
 ): Promise<NextResponse> {
   try {
-    const discordUserId =
-      interaction.member?.user?.id || interaction.user?.id;
+    const discordUserId = interaction.member?.user?.id || interaction.user?.id;
 
     if (!discordUserId) {
-      return NextResponse.json({
-        type: 4,
-        data: {
+        return NextResponse.json({
+          type: 4,
+          data: {
           content: "❌ Erreur: Impossible de récupérer votre ID Discord.",
-          flags: 64,
-        },
-      });
-    }
+            flags: 64,
+          },
+        });
+      }
 
-    await initializeFirebaseAdmin();
+    const customId = interaction.data.custom_id;
 
-    // Extraire les informations du pollId
-    const parts = pollId.split("_");
-    if (parts.length < 3) {
-      return NextResponse.json({
-        type: 4,
-        data: {
-          content: "❌ Format de pollId invalide.",
-          flags: 64,
-        },
-      });
-    }
+    // Vérifier que c'est un modal de commentaire
+    if (!customId.endsWith("_comment_modal")) {
+        return NextResponse.json({
+          type: 4,
+          data: {
+          content: "❌ Modal non reconnu.",
+            flags: 64,
+          },
+        });
+      }
 
-    const phase = parts[0] as "aller" | "retour";
-    const journee = parseInt(parts[1], 10);
-    const championshipType = parts[2] as ChampionshipType;
-    const idEpreuve = parts.length > 3 ? parseInt(parts[3], 10) : undefined;
-
-    // Récupérer le sondage
-    const pollService = new DiscordPollServiceAdmin();
-    const poll = await pollService.getPoll(
-      journee,
-      phase,
-      championshipType,
-      idEpreuve
-    );
-
-    if (!poll || !poll.isActive) {
+    // Vérifier que le poll est actif
+    const { active } = await checkPollActive(pollId);
+    if (!active) {
       return NextResponse.json({
         type: 4,
         data: {
@@ -303,273 +1041,6 @@ export async function handleViewButton(
       });
     }
 
-    // Récupérer la réponse actuelle de l'utilisateur
-    const player = await findPlayerByDiscordId(discordUserId);
-    if (!player) {
-      return NextResponse.json({
-        type: 4,
-        data: {
-          content: "❌ Vous devez d'abord associer votre licence.",
-          flags: 64,
-        },
-      });
-    }
-
-    const availabilityService = new AvailabilityServiceAdmin();
-    const availability = await availabilityService.getAvailability(
-      journee,
-      phase,
-      championshipType,
-      idEpreuve
-    );
-
-    const currentResponse = availability?.players[player.playerId];
-    const playerName = `${player.playerData.prenom || ""} ${player.playerData.nom || ""}`.trim();
-
-    let content: string;
-    if (currentResponse && currentResponse.available !== undefined) {
-      const statusText = currentResponse.available ? "✅ **Disponible**" : "❌ **Indisponible**";
-      const commentText = currentResponse.comment ? `\n💬 **Commentaire :** ${currentResponse.comment}` : "";
-      const licenseText = `\n📋 **Licence :** ${player.playerId}${playerName ? ` (${playerName})` : ""}`;
-      content = `📋 **Votre réponse actuelle :**\n${statusText}${commentText}${licenseText}\n\n💡 Cliquez sur Disponible ou Indisponible pour modifier votre réponse.`;
-    } else {
-      content = "❌ Vous n'avez pas encore répondu à ce sondage.\n\n💡 Cliquez sur Disponible ou Indisponible pour répondre.";
-    }
-
-    return NextResponse.json({
-      type: 4,
-      data: {
-        content,
-        flags: 64,
-      },
-    });
-  } catch (error) {
-    console.error(
-      "[Discord Poll Interactions] Erreur dans handleViewButton:",
-      error
-    );
-    return NextResponse.json({
-      type: 4,
-      data: {
-        content: "❌ Erreur lors de la récupération de votre réponse. Veuillez réessayer.",
-        flags: 64,
-      },
-    });
-  }
-}
-
-/**
- * Gère l'interaction du bouton "Modifier ma réponse" (déprécié, utilisez handleViewButton)
- */
-export async function handleModifyButton(
-  interaction: DiscordMessageComponentInteraction,
-  pollId: string
-): Promise<NextResponse> {
-  return handleViewButton(interaction, pollId);
-}
-
-/**
- * Traite une réponse de disponibilité et la sauvegarde
- */
-async function processAvailabilityResponse(
-  pollId: string,
-  playerId: string,
-  available: boolean,
-  comment: string | undefined,
-  _discordUserId: string,
-  playerData: Record<string, unknown>
-): Promise<NextResponse> {
-  try {
-    await initializeFirebaseAdmin();
-    // Extraire les informations du pollId : ${phase}_${journee}_${championshipType}_${idEpreuve}
-    const parts = pollId.split("_");
-    if (parts.length < 3) {
-      throw new Error("Format de pollId invalide");
-    }
-
-    const phase = parts[0] as "aller" | "retour";
-    const journee = parseInt(parts[1], 10);
-    const championshipType = parts[2] as ChampionshipType;
-    const idEpreuve = parts.length > 3 ? parseInt(parts[3], 10) : undefined;
-
-    // Vérifier que le sondage existe et est actif
-    const pollService = new DiscordPollServiceAdmin();
-    const poll = await pollService.getPoll(
-      journee,
-      phase,
-      championshipType,
-      idEpreuve
-    );
-
-    if (!poll) {
-      return NextResponse.json({
-        type: 4,
-        data: {
-          content: "❌ Sondage introuvable.",
-          flags: 64,
-        },
-      });
-    }
-
-    if (!poll.isActive) {
-      return NextResponse.json({
-        type: 4,
-        data: {
-          content: "❌ Ce sondage est fermé.",
-          flags: 64,
-        },
-      });
-    }
-
-    // Sauvegarder la disponibilité
-    const availabilityService = new AvailabilityServiceAdmin();
-    const availabilityData: {
-      available: boolean;
-      comment?: string;
-    } = {
-      available,
-    };
-    if (comment?.trim()) {
-      availabilityData.comment = comment.trim();
-    }
-    await availabilityService.updatePlayerAvailability(
-      journee,
-      phase,
-      championshipType,
-      playerId,
-      availabilityData,
-      idEpreuve
-    );
-
-    const playerName = `${playerData.prenom || ""} ${playerData.nom || ""}`.trim();
-
-    // Ne pas mettre à jour le message Discord principal
-    // La réponse sera affichée dans un message éphémère à l'utilisateur
-
-    // Retourner une réponse qui met à jour le message (type 7 = UPDATE_MESSAGE)
-    // Mais on ne peut pas mettre à jour le message d'origine depuis une interaction de bouton
-    // On retourne donc un message éphémère de confirmation
-    const statusEmoji = available ? "✅" : "❌";
-    const statusText = available ? "disponible" : "indisponible";
-
-    return NextResponse.json({
-      type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
-      data: {
-        content: `${statusEmoji} **Votre disponibilité a été enregistrée : ${statusText}**${comment ? `\n💬 **Commentaire :** ${comment}` : ""}\n📋 **Licence :** ${playerId}${playerName ? ` (${playerName})` : ""}\n\n💡 Vous pouvez modifier votre réponse à tout moment en cliquant à nouveau sur les boutons.`,
-        flags: 64, // EPHEMERAL
-      },
-    });
-  } catch (error) {
-    console.error(
-      "[Discord Poll Interactions] Erreur dans processAvailabilityResponse:",
-      error
-    );
-    return NextResponse.json({
-      type: 4,
-      data: {
-        content: "❌ Erreur lors de l'enregistrement de votre disponibilité. Veuillez réessayer.",
-        flags: 64,
-      },
-    });
-  }
-}
-
-/**
- * Gère la soumission d'un modal (licence ou commentaire)
- */
-export async function handleModalSubmit(
-  interaction: DiscordModalSubmitInteraction,
-  pollId: string
-): Promise<NextResponse> {
-  try {
-    const discordUserId =
-      interaction.member?.user?.id || interaction.user?.id;
-
-    if (!discordUserId) {
-      return NextResponse.json({
-        type: 4,
-        data: {
-          content: "❌ Erreur: Impossible de récupérer votre ID Discord.",
-          flags: 64,
-        },
-      });
-    }
-
-    const customId = interaction.data.custom_id;
-
-    // Modal de licence
-    if (customId.startsWith(`availability_${pollId}_license_modal_`)) {
-      const responseType = customId.split("_").pop() as "available" | "unavailable";
-      const licenseInput = interaction.data.components[0]?.components[0];
-      const licenseNumber = licenseInput?.value?.trim();
-
-      if (!licenseNumber || !/^\d+$/.test(licenseNumber)) {
-        return NextResponse.json({
-          type: 4,
-          data: {
-            content: "❌ Le numéro de licence doit contenir uniquement des chiffres.",
-            flags: 64,
-          },
-        });
-      }
-
-      // Associer la licence (réutiliser la logique de handleLinkLicenseCommand)
-      await initializeFirebaseAdmin();
-      const db = getFirestoreAdmin();
-
-      // Vérifier si l'utilisateur est déjà associé à une autre licence
-      const existingPlayerQuery = await db
-        .collection("players")
-        .where("discordMentions", "array-contains", discordUserId)
-        .limit(1)
-        .get();
-
-      if (!existingPlayerQuery.empty) {
-        const existingLicense = existingPlayerQuery.docs[0].id;
-        return NextResponse.json({
-          type: 4,
-          data: {
-            content: `❌ Vous êtes déjà associé à la licence ${existingLicense}. Utilisez /modifier_licence pour changer.`,
-            flags: 64,
-          },
-        });
-      }
-
-      // Vérifier que la licence existe
-      const playerDoc = await db.collection("players").doc(licenseNumber).get();
-      if (!playerDoc.exists) {
-        return NextResponse.json({
-          type: 4,
-          data: {
-            content: `❌ Aucun joueur trouvé avec la licence ${licenseNumber}.`,
-            flags: 64,
-          },
-        });
-      }
-
-      // Associer la licence
-      const playerData = playerDoc.data();
-      const existingDiscordMentions = playerData?.discordMentions || [];
-      if (!existingDiscordMentions.includes(discordUserId)) {
-        await db.collection("players").doc(licenseNumber).update({
-          discordMentions: [...existingDiscordMentions, discordUserId],
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-      }
-
-      // Maintenant traiter la réponse de disponibilité
-      return await processAvailabilityResponse(
-        pollId,
-        licenseNumber,
-        responseType === "available",
-        undefined,
-        discordUserId,
-        (playerData || {}) as Record<string, unknown>
-      );
-    }
-
-    // Modal de commentaire
-    if (customId === `availability_${pollId}_comment_modal`) {
       const commentInput = interaction.data.components[0]?.components[0];
       const comment = commentInput?.value?.trim();
 
@@ -579,49 +1050,88 @@ export async function handleModalSubmit(
         return NextResponse.json({
           type: 4,
           data: {
-            content: "❌ Vous devez d'abord associer votre licence. Répondez au sondage pour commencer.",
+            content:
+            "❌ Votre compte Discord n'est pas lié à une licence. Utilisez `/lier_licence <numéro>` pour associer votre compte.",
             flags: 64,
           },
         });
       }
 
-      // Récupérer la dernière réponse de disponibilité (on suppose qu'elle existe)
-      // Pour simplifier, on va juste mettre à jour avec le commentaire
-      // (en pratique, on devrait récupérer la dernière réponse)
-      const parts = pollId.split("_");
-      const phase = parts[0] as "aller" | "retour";
-      const journee = parseInt(parts[1], 10);
-      const championshipType = parts[2] as ChampionshipType;
-      const idEpreuve = parts.length > 3 ? parseInt(parts[3], 10) : undefined;
+      // Récupérer les informations du pollId
+      const pollParts = pollId.split("_");
+      const phase = pollParts[0] as "aller" | "retour";
+      const journee = parseInt(pollParts[1], 10);
+      const idEpreuve =
+        pollParts.length > 3 ? parseInt(pollParts[3], 10) : undefined;
 
       const availabilityService = new AvailabilityServiceAdmin();
-      const availability = await availabilityService.getAvailability(
-        journee,
-        phase,
-        championshipType,
-        idEpreuve
-      );
 
-      const currentResponse = availability?.players[player.playerId];
-      const available = currentResponse?.available ?? true; // Par défaut disponible si pas de réponse
+      // Pour le championnat par équipes, sauvegarder le commentaire pour les deux catégories (masculin et féminin)
+        const [masculinAvailability, femininAvailability] = await Promise.all([
+          availabilityService.getAvailability(
+            journee,
+            phase,
+            "masculin",
+            idEpreuve
+          ),
+          availabilityService.getAvailability(
+            journee,
+            phase,
+            "feminin",
+            idEpreuve
+          ),
+        ]);
 
-      const availabilityData: {
-        available: boolean;
-        comment?: string;
-      } = {
-        available,
-      };
-      if (comment) {
-        availabilityData.comment = comment;
-      }
-      await availabilityService.updatePlayerAvailability(
-        journee,
-        phase,
-        championshipType,
-        player.playerId,
-        availabilityData,
-        idEpreuve
-      );
+        const masculinResponse = masculinAvailability?.players[player.playerId];
+        const femininResponse = femininAvailability?.players[player.playerId];
+
+        // Mettre à jour les deux catégories avec le même commentaire
+        const masculinData: {
+      available?: boolean;
+      fridayAvailable?: boolean;
+      saturdayAvailable?: boolean;
+          comment?: string;
+        } = {
+      ...masculinResponse,
+        };
+        if (comment) {
+          masculinData.comment = comment;
+    } else {
+      delete masculinData.comment;
+        }
+
+        const femininData: {
+      available?: boolean;
+      fridayAvailable?: boolean;
+      saturdayAvailable?: boolean;
+          comment?: string;
+        } = {
+      ...femininResponse,
+        };
+        if (comment) {
+          femininData.comment = comment;
+    } else {
+      delete femininData.comment;
+        }
+
+        await Promise.all([
+          availabilityService.updatePlayerAvailability(
+            journee,
+            phase,
+            "masculin",
+            player.playerId,
+            masculinData,
+            idEpreuve
+          ),
+          availabilityService.updatePlayerAvailability(
+            journee,
+            phase,
+            "feminin",
+            player.playerId,
+            femininData,
+            idEpreuve
+          ),
+        ]);
 
       return NextResponse.json({
         type: 4,
@@ -629,23 +1139,11 @@ export async function handleModalSubmit(
           content: comment
             ? `💬 Votre commentaire a été enregistré : "${comment}"`
             : "💬 Commentaire supprimé.",
-          flags: 64,
-        },
-      });
-    }
-
-    return NextResponse.json({
-      type: 4,
-      data: {
-        content: "❌ Modal non reconnu.",
         flags: 64,
       },
     });
   } catch (error) {
-    console.error(
-      "[Discord Poll Interactions] Erreur dans handleModalSubmit:",
-      error
-    );
+    console.error("[Discord Poll] Erreur dans handleModalSubmit:", error);
     return NextResponse.json({
       type: 4,
       data: {
@@ -655,4 +1153,3 @@ export async function handleModalSubmit(
     });
   }
 }
-

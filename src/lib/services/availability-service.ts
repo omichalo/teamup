@@ -5,6 +5,9 @@ import { ChampionshipType } from "@/types";
 export interface AvailabilityResponse {
   available?: boolean;
   comment?: string;
+  // Disponibilités par date pour les filles (vendredi/samedi)
+  fridayAvailable?: boolean;
+  saturdayAvailable?: boolean;
 }
 
 const sanitizeResponse = (
@@ -27,7 +30,20 @@ const sanitizeResponse = (
     }
   }
 
-  if (sanitized.available === undefined && sanitized.comment === undefined) {
+  if (typeof response.fridayAvailable === "boolean") {
+    sanitized.fridayAvailable = response.fridayAvailable;
+  }
+
+  if (typeof response.saturdayAvailable === "boolean") {
+    sanitized.saturdayAvailable = response.saturdayAvailable;
+  }
+
+  if (
+    sanitized.available === undefined &&
+    sanitized.comment === undefined &&
+    sanitized.fridayAvailable === undefined &&
+    sanitized.saturdayAvailable === undefined
+  ) {
     return undefined;
   }
 

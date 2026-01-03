@@ -57,6 +57,8 @@ export async function GET() {
         config: {
           parisChannelId: null,
           equipesChannelId: null,
+          parisMention: null,
+          equipesMention: null,
         },
       });
     }
@@ -67,6 +69,8 @@ export async function GET() {
       config: {
         parisChannelId: data?.parisChannelId || null,
         equipesChannelId: data?.equipesChannelId || null,
+        parisMention: data?.parisMention || null,
+        equipesMention: data?.equipesMention || null,
       },
     });
   } catch (error) {
@@ -75,7 +79,10 @@ export async function GET() {
       error
     );
     return NextResponse.json(
-      { success: false, error: "Erreur lors de la récupération de la configuration" },
+      {
+        success: false,
+        error: "Erreur lors de la récupération de la configuration",
+      },
       { status: 500 }
     );
   }
@@ -115,7 +122,8 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { parisChannelId, equipesChannelId } = body;
+    const { parisChannelId, equipesChannelId, parisMention, equipesMention } =
+      body;
 
     // Validation
     if (
@@ -124,7 +132,10 @@ export async function POST(req: Request) {
       typeof parisChannelId !== "string"
     ) {
       return NextResponse.json(
-        { success: false, error: "parisChannelId doit être une chaîne ou null" },
+        {
+          success: false,
+          error: "parisChannelId doit être une chaîne ou null",
+        },
         { status: 400 }
       );
     }
@@ -135,7 +146,35 @@ export async function POST(req: Request) {
       typeof equipesChannelId !== "string"
     ) {
       return NextResponse.json(
-        { success: false, error: "equipesChannelId doit être une chaîne ou null" },
+        {
+          success: false,
+          error: "equipesChannelId doit être une chaîne ou null",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (
+      parisMention !== null &&
+      parisMention !== undefined &&
+      typeof parisMention !== "string"
+    ) {
+      return NextResponse.json(
+        { success: false, error: "parisMention doit être une chaîne ou null" },
+        { status: 400 }
+      );
+    }
+
+    if (
+      equipesMention !== null &&
+      equipesMention !== undefined &&
+      typeof equipesMention !== "string"
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "equipesMention doit être une chaîne ou null",
+        },
         { status: 400 }
       );
     }
@@ -147,6 +186,8 @@ export async function POST(req: Request) {
     const dataToSave: Record<string, unknown> = {
       parisChannelId: parisChannelId || null,
       equipesChannelId: equipesChannelId || null,
+      parisMention: parisMention || null,
+      equipesMention: equipesMention || null,
       updatedAt: FieldValue.serverTimestamp(),
       updatedBy: decoded.uid,
     };
@@ -158,6 +199,8 @@ export async function POST(req: Request) {
       config: {
         parisChannelId: parisChannelId || null,
         equipesChannelId: equipesChannelId || null,
+        parisMention: parisMention || null,
+        equipesMention: equipesMention || null,
       },
     });
   } catch (error) {
@@ -166,9 +209,11 @@ export async function POST(req: Request) {
       error
     );
     return NextResponse.json(
-      { success: false, error: "Erreur lors de la sauvegarde de la configuration" },
+      {
+        success: false,
+        error: "Erreur lors de la sauvegarde de la configuration",
+      },
       { status: 500 }
     );
   }
 }
-

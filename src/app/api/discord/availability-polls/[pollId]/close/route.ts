@@ -11,15 +11,15 @@ import { ChampionshipType } from "@/types/championship";
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 
 /**
- * POST - Ferme un sondage Discord (désactive les boutons)
+ * POST - Ferme un sondage Discord (désactive les boutons) et envoie un message optionnel
  */
 export async function POST(
-  _req: Request,
+  req: Request,
   context: { params: Promise<{ pollId: string }> }
 ) {
   try {
     const params = await context.params;
-    
+
     // Vérifier l'authentification
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
@@ -94,6 +94,74 @@ export async function POST(
       });
     }
 
+    // Récupérer le messageTemplate optionnel depuis le body
+    let messageTemplate: string | undefined;
+    try {
+      const body = await req.json();
+      messageTemplate = body.messageTemplate;
+    } catch {
+      // Body vide ou invalide, pas de message personnalisé
+    }
+
+    // Récupérer la mention configurée pour ce type de championnat
+    const { getFirestoreAdmin } = await import("@/lib/firebase-admin");
+    const db = getFirestoreAdmin();
+    const configDoc = await db
+      .collection("discordAvailabilityConfig")
+      .doc("default")
+      .get();
+    const config = configDoc.exists ? configDoc.data() : null;
+
+    // Déterminer le type de championnat (par équipes ou Paris)
+    // idEpreuve === 15980 = Championnat de Paris IDF (Excellence)
+    // Sinon = Championnat de France par Équipes
+    const isTeamChampionship = idEpreuve === undefined || idEpreuve !== 15980;
+    const mention = isTeamChampionship
+      ? config?.equipesMention || null
+      : config?.parisMention || null;
+
+    // Construire le message final (avec mention si fournie)
+    let finalMessage =
+      messageTemplate ||
+      "Les inscriptions sont terminées pour cette journée.\n\nSi vous voulez vous ajoutez, il faut envoyer un message à Joffrey en privé.";
+
+    // Ajouter "Bonjour {mention}" au début si la mention est configurée et qu'elle n'est pas déjà présente
+    if (mention) {
+      const bonjourWithMention = `Bonjour ${mention}`;
+      const mentionAlreadyPresent =
+        finalMessage.trim().startsWith(bonjourWithMention.trim()) ||
+        finalMessage.trim().startsWith(mention.trim());
+      if (!mentionAlreadyPresent) {
+        finalMessage = `${bonjourWithMention}\n\n${finalMessage}`;
+      }
+    }
+
+    // Envoyer le message dans le même channel
+    const closeMessage = {
+      content: finalMessage,
+    };
+
+    const sendMessageResponse = await fetch(
+      `https://discord.com/api/v10/channels/${poll.channelId}/messages`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bot ${DISCORD_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(closeMessage),
+      }
+    );
+
+    if (!sendMessageResponse.ok) {
+      const errorText = await sendMessageResponse.text();
+      console.error(
+        "[Discord Poll Close] Erreur lors de l'envoi du message:",
+        errorText
+      );
+      // Continuer quand même pour fermer le sondage
+    }
+
     // Désactiver les boutons dans le message Discord
     const { buildAvailabilityPollMessage } = await import(
       "@/lib/discord/poll-builder"
@@ -131,7 +199,10 @@ export async function POST(
 
     if (!discordResponse.ok) {
       const errorText = await discordResponse.text();
-      console.error("[Discord Poll Close] Erreur lors de la mise à jour:", errorText);
+      console.error(
+        "[Discord Poll Close] Erreur lors de la mise à jour:",
+        errorText
+      );
       // Continuer quand même pour fermer dans Firestore
     }
 
@@ -150,4 +221,3 @@ export async function POST(
     );
   }
 }
-

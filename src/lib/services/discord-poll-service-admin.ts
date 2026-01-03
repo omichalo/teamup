@@ -32,7 +32,12 @@ export class DiscordPollServiceAdmin {
   ): Promise<DiscordAvailabilityPoll | null> {
     try {
       const db = getFirestoreAdmin();
-      const docId = this.getDocumentId(phase, journee, championshipType, idEpreuve);
+      const docId = this.getDocumentId(
+        phase,
+        journee,
+        championshipType,
+        idEpreuve
+      );
       const docRef = db.collection(COLLECTION_NAME).doc(docId);
       const docSnap = await docRef.get();
 
@@ -55,9 +60,10 @@ export class DiscordPollServiceAdmin {
         idEpreuve: data.idEpreuve,
         date: data.date,
         isActive: data.isActive ?? true,
-        closedAt: data.closedAt instanceof Timestamp
-          ? data.closedAt.toDate()
-          : data.closedAt?.toDate?.() || undefined,
+        closedAt:
+          data.closedAt instanceof Timestamp
+            ? data.closedAt.toDate()
+            : data.closedAt?.toDate?.() || undefined,
         createdAt:
           data.createdAt instanceof Timestamp
             ? data.createdAt.toDate()
@@ -65,7 +71,10 @@ export class DiscordPollServiceAdmin {
         createdBy: data.createdBy || "",
       };
     } catch (error) {
-      console.error("[DiscordPollServiceAdmin] Erreur lors de la récupération:", error);
+      console.error(
+        "[DiscordPollServiceAdmin] Erreur lors de la récupération:",
+        error
+      );
       throw error;
     }
   }
@@ -73,7 +82,9 @@ export class DiscordPollServiceAdmin {
   /**
    * Crée un nouveau sondage dans Firestore
    */
-  async createPoll(poll: Omit<DiscordAvailabilityPoll, "id" | "createdAt">): Promise<string> {
+  async createPoll(
+    poll: Omit<DiscordAvailabilityPoll, "id" | "createdAt">
+  ): Promise<string> {
     try {
       const db = getFirestoreAdmin();
       const docId = this.getDocumentId(
@@ -110,7 +121,56 @@ export class DiscordPollServiceAdmin {
       await docRef.set(dataToSave);
       return docId;
     } catch (error) {
-      console.error("[DiscordPollServiceAdmin] Erreur lors de la création:", error);
+      console.error(
+        "[DiscordPollServiceAdmin] Erreur lors de la création:",
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Récupère tous les sondages actifs
+   */
+  async getActivePolls(): Promise<DiscordAvailabilityPoll[]> {
+    try {
+      const db = getFirestoreAdmin();
+      const snapshot = await db
+        .collection(COLLECTION_NAME)
+        .where("isActive", "==", true)
+        .get();
+
+      const polls: DiscordAvailabilityPoll[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        polls.push({
+          id: doc.id,
+          messageId: data.messageId,
+          channelId: data.channelId,
+          journee: data.journee,
+          phase: data.phase,
+          championshipType: data.championshipType,
+          idEpreuve: data.idEpreuve,
+          date: data.date,
+          isActive: data.isActive ?? true,
+          closedAt:
+            data.closedAt instanceof Timestamp
+              ? data.closedAt.toDate()
+              : data.closedAt?.toDate?.() || undefined,
+          createdAt:
+            data.createdAt instanceof Timestamp
+              ? data.createdAt.toDate()
+              : data.createdAt?.toDate?.() || new Date(),
+          createdBy: data.createdBy || "",
+        });
+      });
+
+      return polls;
+    } catch (error) {
+      console.error(
+        "[DiscordPollServiceAdmin] Erreur lors de la récupération des sondages actifs:",
+        error
+      );
       throw error;
     }
   }
@@ -126,7 +186,12 @@ export class DiscordPollServiceAdmin {
   ): Promise<void> {
     try {
       const db = getFirestoreAdmin();
-      const docId = this.getDocumentId(phase, journee, championshipType, idEpreuve);
+      const docId = this.getDocumentId(
+        phase,
+        journee,
+        championshipType,
+        idEpreuve
+      );
       const docRef = db.collection(COLLECTION_NAME).doc(docId);
 
       await docRef.set(
@@ -137,9 +202,11 @@ export class DiscordPollServiceAdmin {
         { merge: true }
       );
     } catch (error) {
-      console.error("[DiscordPollServiceAdmin] Erreur lors de la fermeture:", error);
+      console.error(
+        "[DiscordPollServiceAdmin] Erreur lors de la fermeture:",
+        error
+      );
       throw error;
     }
   }
 }
-
