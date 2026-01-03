@@ -52,7 +52,17 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { journee, phase, championshipType, idEpreuve, date } = body;
+    const {
+      journee,
+      phase,
+      championshipType,
+      idEpreuve,
+      date,
+      epreuveType,
+      messageTemplate,
+      fridayDate,
+      saturdayDate,
+    } = body;
 
     // Validation
     if (typeof journee !== "number" || journee < 1) {
@@ -91,28 +101,43 @@ export async function POST(req: Request) {
 
     const config = configDoc.data();
 
+    // Déterminer si c'est le championnat par équipes
+    // epreuveType === "championnat_equipes" = Championnat de France par Équipes
+    // epreuveType === "championnat_paris" ou idEpreuve === 15980 = Championnat de Paris IDF (Excellence)
+    // Fallback : idEpreuve === 15954 ou 15955 = Championnat de France par Équipes
+    const isTeamChampionship =
+      epreuveType === "championnat_equipes" ||
+      (idEpreuve !== undefined && idEpreuve !== 15980);
+
     // Déterminer le channel selon le type de championnat
-    // masculin/feminin = championnat de Paris → parisChannelId
-    // Pour le championnat par équipes, on utiliserait equipesChannelId
-    // (mais actuellement ChampionshipType ne contient que masculin/feminin)
-    const targetChannelId = config?.parisChannelId || null;
+    const targetChannelId = isTeamChampionship
+      ? config?.equipesChannelId || null
+      : config?.parisChannelId || null;
 
     if (!targetChannelId) {
       return NextResponse.json(
         {
           success: false,
-          error: "Channel Discord non configuré pour le championnat de Paris. Configurez-le dans l'administration.",
+          error: isTeamChampionship
+            ? "Channel Discord non configuré pour le championnat par équipes. Configurez-le dans l'administration."
+            : "Channel Discord non configuré pour le championnat de Paris. Configurez-le dans l'administration.",
         },
         { status: 400 }
       );
     }
+
+    // Pour le championnat par équipes, créer un seul sondage (utiliser "masculin" comme type par défaut)
+    // Le sondage contiendra les boutons pour masculin ET féminin
+    const pollChampionshipTypeForCheck: ChampionshipType = isTeamChampionship
+      ? "masculin"
+      : (championshipType as ChampionshipType);
 
     // Vérifier si un sondage existe déjà
     const pollService = new DiscordPollServiceAdmin();
     const existingPoll = await pollService.getPoll(
       journee,
       phase,
-      championshipType as ChampionshipType,
+      pollChampionshipTypeForCheck,
       idEpreuve
     );
 
@@ -126,19 +151,47 @@ export async function POST(req: Request) {
       );
     }
 
+    // Pour le championnat par équipes, créer un seul sondage (utiliser "masculin" comme type par défaut)
+    // Le sondage contiendra les boutons pour masculin ET féminin
+    const pollChampionshipType: ChampionshipType = isTeamChampionship
+      ? "masculin"
+      : (championshipType as ChampionshipType);
+
     // Générer l'ID du sondage
     const pollId = existingPoll
       ? existingPoll.id
-      : `${phase}_${journee}_${championshipType}${idEpreuve ? `_${idEpreuve}` : ""}`;
+      : `${phase}_${journee}_${pollChampionshipType}${idEpreuve ? `_${idEpreuve}` : ""}`;
 
     // Construire le message Discord
+    console.log("[Discord Poll Create] Création du sondage:", {
+      pollId,
+      journee,
+      phase,
+      pollChampionshipType,
+      isTeamChampionship,
+      idEpreuve,
+      epreuveType,
+      date,
+    });
     const message = buildAvailabilityPollMessage(
       pollId,
       journee,
       phase,
-      championshipType as ChampionshipType,
-      date
+      pollChampionshipType,
+      date,
+      isTeamChampionship,
+      messageTemplate,
+      fridayDate,
+      saturdayDate
     );
+    console.log("[Discord Poll Create] Message Discord construit:", {
+      embedTitle: message.embeds[0]?.title,
+      componentsCount: message.components.length,
+      buttonsCount: message.components.reduce(
+        (acc, row) => acc + row.components.length,
+        0
+      ),
+    });
 
     // Envoyer le message Discord
     const discordResponse = await fetch(
@@ -171,7 +224,7 @@ export async function POST(req: Request) {
       channelId: targetChannelId,
       journee,
       phase,
-      championshipType: championshipType as ChampionshipType,
+      championshipType: pollChampionshipType,
       idEpreuve,
       date,
       isActive: true,
@@ -186,7 +239,7 @@ export async function POST(req: Request) {
         channelId: targetChannelId,
         journee,
         phase,
-        championshipType,
+        championshipType: pollChampionshipType,
         idEpreuve,
         date,
       },

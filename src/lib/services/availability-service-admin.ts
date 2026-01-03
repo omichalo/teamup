@@ -27,14 +27,29 @@ const sanitizeResponse = (
     }
   }
 
-  if (sanitized.available === undefined && sanitized.comment === undefined) {
+  if (typeof response.fridayAvailable === "boolean") {
+    sanitized.fridayAvailable = response.fridayAvailable;
+  }
+
+  if (typeof response.saturdayAvailable === "boolean") {
+    sanitized.saturdayAvailable = response.saturdayAvailable;
+  }
+
+  if (
+    sanitized.available === undefined &&
+    sanitized.comment === undefined &&
+    sanitized.fridayAvailable === undefined &&
+    sanitized.saturdayAvailable === undefined
+  ) {
     return undefined;
   }
 
   return sanitized;
 };
 
-const toTimestamp = (value: unknown | Date | Timestamp | undefined): Timestamp => {
+const toTimestamp = (
+  value: unknown | Date | Timestamp | undefined
+): Timestamp => {
   if (value instanceof Timestamp) {
     return value;
   }
@@ -76,7 +91,12 @@ export class AvailabilityServiceAdmin {
   ): Promise<DayAvailability | null> {
     try {
       const db = getFirestoreAdmin();
-      const docId = this.getDocumentId(journee, phase, championshipType, idEpreuve);
+      const docId = this.getDocumentId(
+        journee,
+        phase,
+        championshipType,
+        idEpreuve
+      );
       const docRef = db.collection(this.collectionName).doc(docId);
       const docSnap = await docRef.get();
 
@@ -106,7 +126,10 @@ export class AvailabilityServiceAdmin {
             : data.updatedAt?.toDate?.() || new Date(),
       };
     } catch (error) {
-      console.error("Erreur lors de la récupération de la disponibilité:", error);
+      console.error(
+        "Erreur lors de la récupération de la disponibilité:",
+        error
+      );
       throw error;
     }
   }
@@ -211,9 +234,11 @@ export class AvailabilityServiceAdmin {
 
       await this.saveAvailability(updatedAvailability);
     } catch (error) {
-      console.error("Erreur lors de la mise à jour de la disponibilité:", error);
+      console.error(
+        "Erreur lors de la mise à jour de la disponibilité:",
+        error
+      );
       throw error;
     }
   }
 }
-

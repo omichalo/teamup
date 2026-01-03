@@ -47,10 +47,7 @@ import { Player } from "@/types/team-management";
 import { ChampionshipType } from "@/types";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
-import {
-  getPlayersByType,
-  getTeamsByType,
-} from "@/lib/compositions/championship-utils";
+import { getTeamsByType } from "@/lib/compositions/championship-utils";
 import { AvailabilityResponse } from "@/lib/services/availability-service";
 import {
   AvailabilityState,
@@ -60,7 +57,6 @@ import {
 import { useAvailabilityStore } from "@/stores/availabilityStore";
 import { EpreuveSelect } from "@/components/compositions/Filters/EpreuveSelect";
 import { PhaseSelect } from "@/components/compositions/Filters/PhaseSelect";
-import { TeamPicker } from "@/components/compositions/Filters/TeamPicker";
 import { SearchInput } from "@/components/compositions/Filters/SearchInput";
 import { AvailabilityStatusChip } from "@/components/disponibilites/AvailabilityStatusChip";
 import { DiscordPollManager } from "@/components/disponibilites/DiscordPollManager";
@@ -90,7 +86,6 @@ export default function DisponibilitesPage() {
     updateAvailabilityEntry,
   } = useAvailabilityStore();
   const { players, loading: loadingPlayers } = usePlayers();
-  const [teamTabValue, setTeamTabValue] = useState(0);
   const commentSaveTimeoutRef = React.useRef<
     Record<string, { masculin?: NodeJS.Timeout; feminin?: NodeJS.Timeout }>
   >({});
@@ -261,8 +256,23 @@ export default function DisponibilitesPage() {
         }
         const phaseMap = epreuveMap.get(phase)!;
 
-        const matchDate =
-          match.date instanceof Date ? match.date : new Date(match.date);
+        // Normaliser la date du match pour éviter les problèmes de timezone
+        // En créant une nouvelle date avec uniquement année/mois/jour
+        let matchDate: Date;
+        if (match.date instanceof Date) {
+          matchDate = new Date(
+            match.date.getFullYear(),
+            match.date.getMonth(),
+            match.date.getDate()
+          );
+        } else {
+          const date = new Date(match.date);
+          matchDate = new Date(
+            date.getFullYear(),
+            date.getMonth(),
+            date.getDate()
+          );
+        }
 
         if (!phaseMap.has(match.journee)) {
           phaseMap.set(match.journee, {
@@ -475,18 +485,7 @@ export default function DisponibilitesPage() {
       }
     }
 
-    const championshipTypeForFilter: ChampionshipType =
-      selectedEpreuve?.toLowerCase().includes("femin") === true
-        ? "feminin"
-        : "masculin";
-
-    filtered = getPlayersByType(filtered, championshipTypeForFilter);
-
-    if (teamTabValue === 0) {
-      filtered = filtered.filter((p) => p.gender === "M");
-    } else if (teamTabValue === 1) {
-      filtered = filtered.filter((p) => p.gender === "F");
-    }
+    // Afficher tous les joueurs (hommes et femmes) sans distinction
 
     // Filtre de recherche
     if (searchQuery) {
@@ -500,35 +499,47 @@ export default function DisponibilitesPage() {
     }
 
     return filtered;
-  }, [players, showAllPlayers, searchQuery, selectedEpreuve, teamTabValue]);
+  }, [players, showAllPlayers, searchQuery, selectedEpreuve]);
 
   // Séparer les joueurs ayant répondu et ceux en attente
+  // Pour le championnat de Paris : un seul sondage, tous répondent une seule fois (masculin)
+  // Pour le championnat par équipes : les hommes répondent masculin, les femmes peuvent répondre masculin ET féminin
+  const isParisChampionshipForResponse =
+    selectedEpreuve === "championnat_paris";
   const { respondedPlayers, pendingPlayers } = useMemo(() => {
     const responded: Player[] = [];
     const pending: Player[] = [];
 
     filteredPlayers.forEach((player) => {
       const playerAvailabilities = availabilities[player.id];
+      const isFemale = player.gender === "F";
 
-      // Pour les hommes : vérifier uniquement masculin
-      // Pour les femmes : vérifier masculin ET féminin
-      // Un joueur a répondu seulement s'il a indiqué disponible/indisponible (available est un boolean)
-      // Un commentaire seul ne compte pas comme une réponse
-      if (player.gender === "M") {
+      if (isParisChampionshipForResponse) {
+        // Championnat de Paris : un seul sondage, tous répondent une seule fois
         if (typeof playerAvailabilities?.masculin?.available === "boolean") {
           responded.push(player);
         } else {
           pending.push(player);
         }
       } else {
-        // Femmes : doivent avoir répondu aux deux (available doit être un boolean pour les deux)
-        if (
-          typeof playerAvailabilities?.masculin?.available === "boolean" &&
-          typeof playerAvailabilities?.feminin?.available === "boolean"
-        ) {
-          responded.push(player);
+        // Championnat par équipes :
+        // - Les hommes répondent uniquement masculin
+        // - Les femmes doivent répondre masculin ET féminin
+        if (isFemale) {
+          if (
+            typeof playerAvailabilities?.masculin?.available === "boolean" &&
+            typeof playerAvailabilities?.feminin?.available === "boolean"
+          ) {
+            responded.push(player);
+          } else {
+            pending.push(player);
+          }
         } else {
-          pending.push(player);
+          if (typeof playerAvailabilities?.masculin?.available === "boolean") {
+            responded.push(player);
+          } else {
+            pending.push(player);
+          }
         }
       }
     });
@@ -537,7 +548,7 @@ export default function DisponibilitesPage() {
       respondedPlayers: responded,
       pendingPlayers: pending,
     };
-  }, [filteredPlayers, availabilities]);
+  }, [filteredPlayers, availabilities, isParisChampionshipForResponse]);
 
   // Joueurs ayant fait un commentaire (au moins un commentaire présent, même sans réponse)
   const playersWithComment = useMemo(() => {
@@ -545,64 +556,78 @@ export default function DisponibilitesPage() {
       const playerAvailabilities = availabilities[player.id];
       const masculinComment = playerAvailabilities?.masculin?.comment?.trim();
       const femininComment = playerAvailabilities?.feminin?.comment?.trim();
+      const isFemale = player.gender === "F";
 
-      if (player.gender === "M") {
+      if (isParisChampionshipForResponse) {
         return masculinComment && masculinComment.length > 0;
       } else {
-        return (
-          (masculinComment && masculinComment.length > 0) ||
-          (femininComment && femininComment.length > 0)
-        );
+        // Championnat par équipes : pour les femmes, vérifier les deux commentaires
+        if (isFemale) {
+          return (
+            (masculinComment && masculinComment.length > 0) ||
+            (femininComment && femininComment.length > 0)
+          );
+        } else {
+          return masculinComment && masculinComment.length > 0;
+        }
       }
     });
-  }, [filteredPlayers, availabilities]);
+  }, [filteredPlayers, availabilities, isParisChampionshipForResponse]);
 
-  // Joueurs ayant répondu OK (disponible) - au moins une catégorie avec available === true
-  // Pour les femmes : si elle a répondu OK dans une catégorie, elle apparaît dans OK
-  // (même si elle a répondu KO dans l'autre catégorie)
+  // Joueurs ayant répondu OK (disponible)
   const playersWithOK = useMemo(() => {
     return filteredPlayers.filter((player) => {
       const playerAvailabilities = availabilities[player.id];
+      const isFemale = player.gender === "F";
 
-      if (player.gender === "M") {
+      if (isParisChampionshipForResponse) {
         return playerAvailabilities?.masculin?.available === true;
       } else {
-        // Pour les femmes : au moins une catégorie avec available === true
-        // Une femme avec OK féminin et KO masculin apparaîtra dans OK
-        return (
-          playerAvailabilities?.masculin?.available === true ||
-          playerAvailabilities?.feminin?.available === true
-        );
+        // Championnat par équipes : pour les femmes, au moins une catégorie avec OK
+        if (isFemale) {
+          return (
+            playerAvailabilities?.masculin?.available === true ||
+            playerAvailabilities?.feminin?.available === true
+          );
+        } else {
+          return playerAvailabilities?.masculin?.available === true;
+        }
       }
     });
-  }, [filteredPlayers, availabilities]);
+  }, [filteredPlayers, availabilities, isParisChampionshipForResponse]);
 
-  // Joueurs ayant répondu KO (indisponible) - au moins une catégorie avec available === false
-  // Pour les femmes : si elle a répondu KO dans une catégorie, elle apparaît dans KO
-  // (même si elle a répondu OK dans l'autre catégorie)
+  // Joueurs ayant répondu KO (indisponible)
   const playersWithKO = useMemo(() => {
     return filteredPlayers.filter((player) => {
       const playerAvailabilities = availabilities[player.id];
+      const isFemale = player.gender === "F";
 
-      if (player.gender === "M") {
+      if (isParisChampionshipForResponse) {
         return playerAvailabilities?.masculin?.available === false;
       } else {
-        // Pour les femmes : au moins une catégorie avec available === false
-        // Une femme avec OK féminin et KO masculin apparaîtra dans KO
-        return (
-          playerAvailabilities?.masculin?.available === false ||
-          playerAvailabilities?.feminin?.available === false
-        );
+        // Championnat par équipes : pour les femmes, au moins une catégorie avec KO
+        if (isFemale) {
+          return (
+            playerAvailabilities?.masculin?.available === false ||
+            playerAvailabilities?.feminin?.available === false
+          );
+        } else {
+          return playerAvailabilities?.masculin?.available === false;
+        }
       }
     });
-  }, [filteredPlayers, availabilities]);
+  }, [filteredPlayers, availabilities, isParisChampionshipForResponse]);
 
   // Calculer l'idEpreuve pour les hooks
   const idEpreuveForHooks = useMemo(() => {
     return getIdEpreuve(selectedEpreuve);
   }, [selectedEpreuve]);
 
-  // Écouter les disponibilités en temps réel (masculin)
+  // Écouter les disponibilités en temps réel
+  // Pour le championnat de Paris : uniquement masculin (un seul sondage)
+  // Pour le championnat par équipes : masculin ET féminin (deux sondages possibles)
+  const isParisChampionship = selectedEpreuve === "championnat_paris";
+
   const {
     availability: masculineAvailability,
     error: errorMasculineAvailability,
@@ -634,10 +659,9 @@ export default function DisponibilitesPage() {
       return;
     }
 
-    // Fusionner les deux types de disponibilités
     const mergedAvailabilities: AvailabilityState = {};
 
-    // Ajouter les disponibilités masculines
+    // Ajouter les disponibilités masculines (toujours présentes)
     if (masculineAvailability) {
       Object.entries(masculineAvailability.players).forEach(
         ([playerId, response]) => {
@@ -653,8 +677,8 @@ export default function DisponibilitesPage() {
       );
     }
 
-    // Ajouter les disponibilités féminines
-    if (feminineAvailability) {
+    // Ajouter les disponibilités féminines (uniquement pour le championnat par équipes)
+    if (!isParisChampionship && feminineAvailability) {
       Object.entries(feminineAvailability.players).forEach(
         ([playerId, response]) => {
           const sanitized = sanitizeAvailabilityEntry(response);
@@ -675,6 +699,7 @@ export default function DisponibilitesPage() {
     feminineAvailability,
     selectedJournee,
     selectedPhase,
+    isParisChampionship,
     setAvailabilities,
   ]);
 
@@ -1054,11 +1079,6 @@ export default function DisponibilitesPage() {
                 }
                 label="Afficher tous les joueurs"
               />
-
-              <TeamPicker
-                value={teamTabValue}
-                onChange={(_, value) => setTeamTabValue(value)}
-              />
             </Box>
 
             {selectedJournee && (
@@ -1075,13 +1095,119 @@ export default function DisponibilitesPage() {
         {selectedJournee !== null && selectedPhase !== null && (
           <Card sx={{ mb: 2 }}>
             <CardContent>
+              {/* Un seul sondage pour tous les types de championnats */}
+              {/* Pour le championnat par équipes, le sondage contiendra les boutons masculin et féminin */}
               <DiscordPollManager
                 journee={selectedJournee}
                 phase={selectedPhase}
-                championshipType={teamTabValue === 0 ? "masculin" : "feminin"}
-                {...(selectedEpreuve && getIdEpreuve(selectedEpreuve) !== undefined
+                championshipType="masculin"
+                {...(selectedEpreuve &&
+                getIdEpreuve(selectedEpreuve) !== undefined
                   ? { idEpreuve: getIdEpreuve(selectedEpreuve) as number }
                   : {})}
+                epreuveType={selectedEpreuve}
+                {...(() => {
+                  // Extraire automatiquement les dates vendredi/samedi depuis les matchs
+                  if (
+                    selectedEpreuve === "championnat_equipes" &&
+                    selectedJournee !== null &&
+                    selectedPhase !== null &&
+                    journeesByPhase.has(selectedPhase)
+                  ) {
+                    const journeeData = journeesByPhase
+                      .get(selectedPhase)
+                      ?.get(selectedJournee);
+                    if (journeeData && journeeData.dates.length > 0) {
+                      // Trier les dates
+                      const sortedDates = [...journeeData.dates].sort(
+                        (a, b) => a.getTime() - b.getTime()
+                      );
+
+                      console.log(
+                        "[DiscordPollManager] Dates trouvées pour la journée:",
+                        {
+                          journee: selectedJournee,
+                          phase: selectedPhase,
+                          dates: sortedDates.map((d) => ({
+                            date: d.toISOString().split("T")[0],
+                            dayOfWeek: d.getDay(),
+                            dayName: d.toLocaleDateString("fr-FR", {
+                              weekday: "long",
+                            }),
+                          })),
+                        }
+                      );
+
+                      // Identifier vendredi (jour 5) et samedi (jour 6) parmi toutes les dates
+                      // Normaliser les dates pour éviter les problèmes de timezone
+                      let fridayDate: Date | null = null;
+                      let saturdayDate: Date | null = null;
+
+                      for (const date of sortedDates) {
+                        // Normaliser la date en créant une nouvelle date avec uniquement année/mois/jour
+                        // pour éviter les problèmes de timezone
+                        const normalizedDate = new Date(
+                          date.getFullYear(),
+                          date.getMonth(),
+                          date.getDate()
+                        );
+                        const dayOfWeek = normalizedDate.getDay(); // 0 = dimanche, 5 = vendredi, 6 = samedi
+                        if (dayOfWeek === 5 && !fridayDate) {
+                          fridayDate = normalizedDate;
+                        } else if (dayOfWeek === 6 && !saturdayDate) {
+                          saturdayDate = normalizedDate;
+                        }
+                      }
+
+                      console.log(
+                        "[DiscordPollManager] Dates vendredi/samedi identifiées:",
+                        {
+                          fridayDate: fridayDate
+                            ? fridayDate.toISOString().split("T")[0]
+                            : null,
+                          saturdayDate: saturdayDate
+                            ? saturdayDate.toISOString().split("T")[0]
+                            : null,
+                        }
+                      );
+
+                      // Retourner les dates trouvées
+                      const result: {
+                        fridayDate?: string;
+                        saturdayDate?: string;
+                      } = {};
+
+                      if (fridayDate) {
+                        // Formater la date en YYYY-MM-DD en évitant les problèmes de timezone
+                        const year = fridayDate.getFullYear();
+                        const month = String(
+                          fridayDate.getMonth() + 1
+                        ).padStart(2, "0");
+                        const day = String(fridayDate.getDate()).padStart(
+                          2,
+                          "0"
+                        );
+                        result.fridayDate = `${year}-${month}-${day}`;
+                      }
+                      if (saturdayDate) {
+                        const year = saturdayDate.getFullYear();
+                        const month = String(
+                          saturdayDate.getMonth() + 1
+                        ).padStart(2, "0");
+                        const day = String(saturdayDate.getDate()).padStart(
+                          2,
+                          "0"
+                        );
+                        result.saturdayDate = `${year}-${month}-${day}`;
+                      }
+
+                      if (Object.keys(result).length > 0) {
+                        return result;
+                      }
+                    }
+                  }
+                  return {};
+                })()}
               />
             </CardContent>
           </Card>
@@ -1173,7 +1299,6 @@ export default function DisponibilitesPage() {
                   availabilities={availabilities}
                   onAvailabilityChange={handleAvailabilityChange}
                   onCommentChange={handleCommentChange}
-                  selectedEpreuve={selectedEpreuve}
                 />
               </Box>
             )}
@@ -1193,7 +1318,6 @@ export default function DisponibilitesPage() {
                     availabilities={availabilities}
                     onAvailabilityChange={handleAvailabilityChange}
                     onCommentChange={handleCommentChange}
-                    selectedEpreuve={selectedEpreuve}
                   />
                 )}
               </Box>
@@ -1214,7 +1338,6 @@ export default function DisponibilitesPage() {
                     availabilities={availabilities}
                     onAvailabilityChange={handleAvailabilityChange}
                     onCommentChange={handleCommentChange}
-                    selectedEpreuve={selectedEpreuve}
                   />
                 )}
               </Box>
@@ -1235,7 +1358,6 @@ export default function DisponibilitesPage() {
                     availabilities={availabilities}
                     onAvailabilityChange={handleAvailabilityChange}
                     onCommentChange={handleCommentChange}
-                    selectedEpreuve={selectedEpreuve}
                   />
                 )}
               </Box>
@@ -1256,7 +1378,6 @@ export default function DisponibilitesPage() {
                     availabilities={availabilities}
                     onAvailabilityChange={handleAvailabilityChange}
                     onCommentChange={handleCommentChange}
-                    selectedEpreuve={selectedEpreuve}
                   />
                 )}
               </Box>
@@ -1316,7 +1437,7 @@ function PlayerList({
   const isParisChampionship = selectedEpreuve === "championnat_paris";
   const [expandedPlayer, setExpandedPlayer] = useState<{
     id: string;
-    type: ChampionshipType | "both";
+    type: ChampionshipType;
   } | null>(null);
 
   return (
@@ -1327,18 +1448,23 @@ function PlayerList({
         const femininAvailability = playerAvailabilities.feminin;
         const isFemale = player.gender === "F";
 
-        // Pour le championnat de Paris : vérifier uniquement masculin (pas de distinction)
-        // Pour le championnat par équipes :
-        //   - Pour les hommes : vérifier uniquement masculin
-        //   - Pour les femmes : vérifier masculin ET féminin
-        // Un joueur a répondu seulement s'il a indiqué disponible/indisponible (available est un boolean)
+        // Pour le championnat de Paris : un seul sondage, tous répondent une seule fois
+        // Pour le championnat par équipes : les hommes répondent masculin, les femmes peuvent répondre masculin ET féminin
         const hasRespondedMasculin =
           typeof masculinAvailability?.available === "boolean";
-        const hasRespondedFeminin = isParisChampionship
-          ? true // Pour Paris, pas de distinction
-          : isFemale
-          ? typeof femininAvailability?.available === "boolean"
-          : true; // Les hommes n'ont pas de championnat féminin
+        const hasRespondedFeminin =
+          typeof femininAvailability?.available === "boolean";
+
+        let hasResponded: boolean;
+        if (isParisChampionship) {
+          hasResponded = hasRespondedMasculin;
+        } else {
+          if (isFemale) {
+            hasResponded = hasRespondedMasculin && hasRespondedFeminin;
+          } else {
+            hasResponded = hasRespondedMasculin;
+          }
+        }
 
         const isExpanded = expandedPlayer?.id === player.id;
 
@@ -1347,14 +1473,7 @@ function PlayerList({
             key={player.id}
             sx={{
               mb: 1,
-              borderLeft: isParisChampionship
-                ? hasRespondedMasculin
-                  ? `4px solid ${
-                      masculinAvailability?.available ? "#4caf50" : "#f44336"
-                    }`
-                  : "4px solid transparent"
-                : hasRespondedMasculin &&
-                  (isFemale ? hasRespondedFeminin : true)
+              borderLeft: hasResponded
                 ? `4px solid ${
                     masculinAvailability?.available ? "#4caf50" : "#f44336"
                   }`
@@ -1414,31 +1533,69 @@ function PlayerList({
                     alignItems="center"
                     flexWrap="wrap"
                   >
-                    <AvailabilityStatusChip
-                      status={
-                        masculinAvailability?.available === true
-                          ? "available"
-                          : masculinAvailability?.available === false
-                          ? "unavailable"
-                          : masculinAvailability?.comment
-                          ? "pending"
-                          : "unknown"
-                      }
-                      label="Masculin"
-                    />
-                    {isFemale && (
+                    {isParisChampionship ? (
                       <AvailabilityStatusChip
                         status={
-                          femininAvailability?.available === true
+                          masculinAvailability?.available === true
                             ? "available"
-                            : femininAvailability?.available === false
+                            : masculinAvailability?.available === false
                             ? "unavailable"
-                            : femininAvailability?.comment
+                            : masculinAvailability?.comment
                             ? "pending"
                             : "unknown"
                         }
-                        label="Féminin"
                       />
+                    ) : (
+                      <AvailabilityStatusChip
+                        status={
+                          masculinAvailability?.available === true
+                            ? "available"
+                            : masculinAvailability?.available === false
+                            ? "unavailable"
+                            : masculinAvailability?.comment
+                            ? "pending"
+                            : "unknown"
+                        }
+                        label="Masculin"
+                      />
+                    )}
+                    {isFemale && !isParisChampionship && (
+                      <>
+                        <AvailabilityStatusChip
+                          status={
+                            femininAvailability?.available === true
+                              ? "available"
+                              : femininAvailability?.available === false
+                              ? "unavailable"
+                              : femininAvailability?.comment
+                              ? "pending"
+                              : "unknown"
+                          }
+                          label="Féminin"
+                        />
+                        {typeof femininAvailability?.fridayAvailable ===
+                          "boolean" && (
+                          <AvailabilityStatusChip
+                            status={
+                              femininAvailability.fridayAvailable === true
+                                ? "available"
+                                : "unavailable"
+                            }
+                            label="Vendredi"
+                          />
+                        )}
+                        {typeof femininAvailability?.saturdayAvailable ===
+                          "boolean" && (
+                          <AvailabilityStatusChip
+                            status={
+                              femininAvailability.saturdayAvailable === true
+                                ? "available"
+                                : "unavailable"
+                            }
+                            label="Samedi"
+                          />
+                        )}
+                      </>
                     )}
                   </Box>
                 </Box>
@@ -1449,7 +1606,8 @@ function PlayerList({
                   gap={1}
                   sx={{ minWidth: { xs: "100%", sm: 280 } }}
                 >
-                  {/* Disponibilité - Pour le championnat de Paris, pas de distinction masculin/féminin */}
+                  {/* Disponibilité - Pour le championnat de Paris : un seul sondage */}
+                  {/* Pour le championnat par équipes : les femmes ont deux champs (masculin et féminin) */}
                   {isParisChampionship ? (
                     <Box
                       display="flex"
@@ -1603,7 +1761,7 @@ function PlayerList({
                         </Button>
                       </Box>
 
-                      {/* Disponibilité Féminine (uniquement pour les femmes) */}
+                      {/* Disponibilité Féminine (uniquement pour les femmes en championnat par équipes) */}
                       {isFemale && (
                         <Box
                           display="flex"
@@ -1699,21 +1857,19 @@ function PlayerList({
                   }}
                 >
                   {isParisChampionship ? (
-                    <Box>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        placeholder="Commentaire (optionnel)"
-                        id={`comment-${player.id}-masculin`}
-                        name={`comment-${player.id}-masculin`}
-                        value={masculinAvailability?.comment || ""}
-                        onChange={(e) =>
-                          onCommentChange(player.id, "masculin", e.target.value)
-                        }
-                        multiline
-                        rows={2}
-                      />
-                    </Box>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      placeholder="Commentaire (optionnel)"
+                      id={`comment-${player.id}-masculin`}
+                      name={`comment-${player.id}-masculin`}
+                      value={masculinAvailability?.comment || ""}
+                      onChange={(e) =>
+                        onCommentChange(player.id, "masculin", e.target.value)
+                      }
+                      multiline
+                      rows={2}
+                    />
                   ) : (
                     <>
                       {/* Commentaire Masculin */}
@@ -1747,7 +1903,7 @@ function PlayerList({
                         />
                       </Box>
 
-                      {/* Commentaire Féminin (uniquement pour les femmes) */}
+                      {/* Commentaire Féminin (uniquement pour les femmes en championnat par équipes) */}
                       {isFemale && (
                         <Box>
                           <Typography
@@ -1786,7 +1942,9 @@ function PlayerList({
 
               {/* Afficher les commentaires existants s'il y en a (même si pas expanded) */}
               {(masculinAvailability?.comment ||
-                (isFemale && femininAvailability?.comment)) &&
+                (isFemale &&
+                  !isParisChampionship &&
+                  femininAvailability?.comment)) &&
                 !isExpanded && (
                   <Box
                     sx={{

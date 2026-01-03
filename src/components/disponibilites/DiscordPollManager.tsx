@@ -13,6 +13,7 @@ import {
   CircularProgress,
   Chip,
   Tooltip,
+  TextField,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -44,6 +45,9 @@ interface DiscordPollManagerProps {
   championshipType: ChampionshipType | null;
   idEpreuve?: number;
   date?: string;
+  epreuveType?: "championnat_equipes" | "championnat_paris" | null;
+  fridayDate?: string;
+  saturdayDate?: string;
 }
 
 export function DiscordPollManager({
@@ -52,6 +56,9 @@ export function DiscordPollManager({
   championshipType,
   idEpreuve,
   date,
+  epreuveType,
+  fridayDate: propFridayDate,
+  saturdayDate: propSaturdayDate,
 }: DiscordPollManagerProps) {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -59,14 +66,95 @@ export function DiscordPollManager({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [currentPoll, setCurrentPoll] = useState<DiscordPoll | null>(null);
+  const [messageTemplate, setMessageTemplate] = useState<string>("");
+  // Utiliser les dates passées en props si disponibles, sinon permettre la saisie manuelle
+  const [fridayDate, setFridayDate] = useState<string>(propFridayDate || "");
+  const [saturdayDate, setSaturdayDate] = useState<string>(
+    propSaturdayDate || ""
+  );
   const [loadingPoll, setLoadingPoll] = useState(false);
 
+  // Calculer le message par défaut
+  const getDefaultMessage = useCallback(() => {
+    if (epreuveType === "championnat_equipes") {
+      // Utiliser les dates passées en props si disponibles (déjà formatées correctement)
+      const fridayLabel = propFridayDate
+        ? (() => {
+            // Parser la date en évitant les problèmes de timezone
+            const [year, month, day] = propFridayDate.split("-").map(Number);
+            const date = new Date(year, month - 1, day);
+            return date.toLocaleDateString("fr-FR", {
+              weekday: "long",
+              day: "numeric",
+              month: "numeric",
+            });
+          })()
+        : fridayDate
+        ? (() => {
+            const [year, month, day] = fridayDate.split("-").map(Number);
+            const date = new Date(year, month - 1, day);
+            return date.toLocaleDateString("fr-FR", {
+              weekday: "long",
+              day: "numeric",
+              month: "numeric",
+            });
+          })()
+        : "{fridayDate}";
+      const saturdayLabel = propSaturdayDate
+        ? (() => {
+            const [year, month, day] = propSaturdayDate.split("-").map(Number);
+            const date = new Date(year, month - 1, day);
+            return date.toLocaleDateString("fr-FR", {
+              weekday: "long",
+              day: "numeric",
+              month: "numeric",
+            });
+          })()
+        : saturdayDate
+        ? (() => {
+            const [year, month, day] = saturdayDate.split("-").map(Number);
+            const date = new Date(year, month - 1, day);
+            return date.toLocaleDateString("fr-FR", {
+              weekday: "long",
+              day: "numeric",
+              month: "numeric",
+            });
+          })()
+        : "{saturdayDate}";
+      return `Bonjour,\n\nProchaine journée de championnat par équipes le ${fridayLabel} (${saturdayLabel} pour les rég et équipes filles).\n\nMerci de me dire si vous êtes disponibles!\n\nPour les filles, merci de préciser vendredi et/ou samedi.`;
+    } else {
+      const phaseLabel =
+        phase === "aller" ? "Aller" : phase === "retour" ? "Retour" : "{phase}";
+      const dateLabel = date
+        ? new Date(date).toLocaleDateString("fr-FR", {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })
+        : "{date}";
+      return `Bonjour,\n\nProchaine journée de championnat de Paris - Journée ${
+        journee || "{journee}"
+      }, Phase ${phaseLabel}${
+        date ? `, ${dateLabel}` : ""
+      }.\n\nMerci de me dire si vous êtes disponibles!`;
+    }
+  }, [epreuveType, propFridayDate, propSaturdayDate, fridayDate, saturdayDate, phase, journee, date]);
+
+  // Mettre à jour les dates quand les props changent
+  useEffect(() => {
+    if (propFridayDate) {
+      setFridayDate(propFridayDate);
+    }
+    if (propSaturdayDate) {
+      setSaturdayDate(propSaturdayDate);
+    }
+    // Réinitialiser le messageTemplate quand les dates changent pour utiliser le nouveau message par défaut
+    setMessageTemplate("");
+  }, [propFridayDate, propSaturdayDate]);
+
   const fetchCurrentPoll = useCallback(async () => {
-    if (
-      journee === null ||
-      phase === null ||
-      championshipType === null
-    ) {
+    if (journee === null || phase === null || championshipType === null) {
       setCurrentPoll(null);
       return;
     }
@@ -103,9 +191,7 @@ export function DiscordPollManager({
         setError(result.error || "Erreur lors de la récupération du sondage");
       }
     } catch (error) {
-      setError(
-        error instanceof Error ? error.message : "Erreur réseau"
-      );
+      setError(error instanceof Error ? error.message : "Erreur réseau");
     } finally {
       setLoadingPoll(false);
     }
@@ -116,12 +202,10 @@ export function DiscordPollManager({
   }, [fetchCurrentPoll]);
 
   const handleCreatePoll = useCallback(async () => {
-    if (
-      journee === null ||
-      phase === null ||
-      championshipType === null
-    ) {
-      setError("Veuillez sélectionner une journée, une phase et un championnat");
+    if (journee === null || phase === null || championshipType === null) {
+      setError(
+        "Veuillez sélectionner une journée, une phase et un championnat"
+      );
       return;
     }
 
@@ -130,6 +214,13 @@ export function DiscordPollManager({
     setSuccess(null);
 
     try {
+      // Envoyer le messageTemplate seulement s'il a été modifié (différent du message par défaut)
+      const defaultMsg = getDefaultMessage();
+      const finalMessageTemplate =
+        messageTemplate.trim() && messageTemplate.trim() !== defaultMsg.trim()
+          ? messageTemplate.trim()
+          : undefined;
+
       const response = await fetch("/api/discord/availability-polls/create", {
         method: "POST",
         credentials: "include",
@@ -142,6 +233,10 @@ export function DiscordPollManager({
           championshipType,
           idEpreuve,
           date,
+          epreuveType,
+          messageTemplate: finalMessageTemplate,
+          fridayDate: fridayDate.trim() || undefined,
+          saturdayDate: saturdayDate.trim() || undefined,
         }),
       });
 
@@ -155,13 +250,23 @@ export function DiscordPollManager({
         setError(result.error || "Erreur lors de la création du sondage");
       }
     } catch (error) {
-      setError(
-        error instanceof Error ? error.message : "Erreur réseau"
-      );
+      setError(error instanceof Error ? error.message : "Erreur réseau");
     } finally {
       setCreating(false);
     }
-  }, [journee, phase, championshipType, idEpreuve, date, fetchCurrentPoll]);
+  }, [
+    journee,
+    phase,
+    championshipType,
+    idEpreuve,
+    date,
+    epreuveType,
+    messageTemplate,
+    fridayDate,
+    saturdayDate,
+    getDefaultMessage,
+    fetchCurrentPoll,
+  ]);
 
   const handleClosePoll = useCallback(async () => {
     if (!currentPoll) return;
@@ -199,9 +304,7 @@ export function DiscordPollManager({
         setError(result.error || "Erreur lors de la fermeture du sondage");
       }
     } catch (error) {
-      setError(
-        error instanceof Error ? error.message : "Erreur réseau"
-      );
+      setError(error instanceof Error ? error.message : "Erreur réseau");
     } finally {
       setClosing(false);
     }
@@ -226,11 +329,7 @@ export function DiscordPollManager({
   return (
     <Box>
       {error && (
-        <Alert
-          severity="error"
-          sx={{ mb: 2 }}
-          onClose={() => setError(null)}
-        >
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
           {error}
         </Alert>
       )}
@@ -265,7 +364,9 @@ export function DiscordPollManager({
               size="small"
             />
             {discordMessageInfo && (
-              <Tooltip title={`Channel: ${discordMessageInfo.channelId}, Message: ${discordMessageInfo.messageId}`}>
+              <Tooltip
+                title={`Channel: ${discordMessageInfo.channelId}, Message: ${discordMessageInfo.messageId}`}
+              >
                 <Chip
                   label="Voir sur Discord"
                   size="small"
@@ -273,7 +374,10 @@ export function DiscordPollManager({
                   onClick={() => {
                     // Ouvrir Discord dans le navigateur
                     // L'utilisateur devra naviguer manuellement vers le channel
-                    window.open(`https://discord.com/channels/@me/${discordMessageInfo.channelId}`, "_blank");
+                    window.open(
+                      `https://discord.com/channels/@me/${discordMessageInfo.channelId}`,
+                      "_blank"
+                    );
                   }}
                   clickable
                 />
@@ -286,7 +390,9 @@ export function DiscordPollManager({
                 size="small"
                 onClick={() => void handleClosePoll()}
                 disabled={closing}
-                startIcon={closing ? <CircularProgress size={16} /> : <CloseIcon />}
+                startIcon={
+                  closing ? <CircularProgress size={16} /> : <CloseIcon />
+                }
               >
                 Fermer le sondage
               </Button>
@@ -304,9 +410,11 @@ export function DiscordPollManager({
         <DialogTitle>Créer un sondage Discord</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Un sondage sera créé dans le channel Discord configuré pour le
-            championnat de Paris. Tous les utilisateurs ayant accès à ce channel
-            pourront répondre.
+            Un sondage sera créé dans le channel Discord configuré pour{" "}
+            {epreuveType === "championnat_equipes"
+              ? "le championnat par équipes"
+              : "le championnat de Paris"}
+            . Tous les utilisateurs ayant accès à ce channel pourront répondre.
           </Typography>
           <Box>
             <Typography variant="body2">
@@ -314,10 +422,6 @@ export function DiscordPollManager({
             </Typography>
             <Typography variant="body2">
               <strong>Phase :</strong> {phase || "—"}
-            </Typography>
-            <Typography variant="body2">
-              <strong>Championnat :</strong>{" "}
-              {championshipType === "masculin" ? "Masculin" : "Féminin"}
             </Typography>
             {date && (
               <Typography variant="body2">
@@ -331,10 +435,113 @@ export function DiscordPollManager({
               </Typography>
             )}
           </Box>
+
+          {epreuveType === "championnat_equipes" && (
+            <Box sx={{ mt: 3 }}>
+              {propFridayDate || propSaturdayDate ? (
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 2 }}
+                >
+                  Dates extraites automatiquement depuis les matchs :
+                  {propFridayDate && (
+                    <Box component="span" sx={{ ml: 1 }}>
+                      Vendredi:{" "}
+                      {(() => {
+                        // Parser la date en évitant les problèmes de timezone
+                        const [year, month, day] = propFridayDate
+                          .split("-")
+                          .map(Number);
+                        const date = new Date(year, month - 1, day);
+                        const dayOfWeek = date.getDay();
+                        const dayName = date.toLocaleDateString("fr-FR", {
+                          weekday: "long",
+                        });
+                        // Vérifier que c'est bien un vendredi (jour 5)
+                        if (dayOfWeek !== 5) {
+                          console.warn(
+                            `[DiscordPollManager] Date identifiée comme vendredi mais jour de la semaine réel: ${dayName} (${dayOfWeek})`,
+                            { date: propFridayDate }
+                          );
+                        }
+                        return `${dayName} ${day}/${month}/${year}`;
+                      })()}
+                    </Box>
+                  )}
+                  {propSaturdayDate && (
+                    <Box component="span" sx={{ ml: 1 }}>
+                      Samedi:{" "}
+                      {(() => {
+                        const [year, month, day] = propSaturdayDate
+                          .split("-")
+                          .map(Number);
+                        const date = new Date(year, month - 1, day);
+                        const dayOfWeek = date.getDay();
+                        const dayName = date.toLocaleDateString("fr-FR", {
+                          weekday: "long",
+                        });
+                        // Vérifier que c'est bien un samedi (jour 6)
+                        if (dayOfWeek !== 6) {
+                          console.warn(
+                            `[DiscordPollManager] Date identifiée comme samedi mais jour de la semaine réel: ${dayName} (${dayOfWeek})`,
+                            { date: propSaturdayDate }
+                          );
+                        }
+                        return `${dayName} ${day}/${month}/${year}`;
+                      })()}
+                    </Box>
+                  )}
+                </Typography>
+              ) : (
+                <>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                    Dates spécifiques (optionnel)
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    label="Date vendredi"
+                    type="date"
+                    value={fridayDate}
+                    onChange={(e) => setFridayDate(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ mb: 2 }}
+                    helperText="Date du vendredi pour le championnat par équipes"
+                  />
+                  <TextField
+                    fullWidth
+                    label="Date samedi"
+                    type="date"
+                    value={saturdayDate}
+                    onChange={(e) => setSaturdayDate(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    helperText="Date du samedi pour les rég et équipes filles"
+                  />
+                </>
+              )}
+            </Box>
+          )}
+
+          <Box sx={{ mt: 3 }}>
+            <TextField
+              fullWidth
+              multiline
+              rows={6}
+              label="Message qui sera envoyé"
+              value={messageTemplate || getDefaultMessage()}
+              onChange={(e) => setMessageTemplate(e.target.value)}
+              helperText="Vous pouvez modifier ce message. Variables disponibles: {journee}, {phase}, {championshipType}, {date}, {fridayDate}, {saturdayDate}"
+            />
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button
-            onClick={() => setCreateDialogOpen(false)}
+            onClick={() => {
+              setCreateDialogOpen(false);
+              setMessageTemplate("");
+              setFridayDate("");
+              setSaturdayDate("");
+            }}
             disabled={creating}
           >
             Annuler
@@ -352,4 +559,3 @@ export function DiscordPollManager({
     </Box>
   );
 }
-

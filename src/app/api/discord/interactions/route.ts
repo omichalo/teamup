@@ -139,7 +139,8 @@ export async function POST(req: Request) {
       }
 
       // Vérifier si c'est une interaction de sondage de disponibilité
-      // Format: availability_${pollId}_available|unavailable|comment
+      // Format ancien (championnat de Paris): availability_${pollId}_available|unavailable|comment
+      // Format nouveau (championnat par équipes): availability_${pollId}_masculin|feminin_available|unavailable|comment
       if (customId.startsWith("availability_")) {
         const parts = customId.split("_");
         if (parts.length < 3) {
@@ -152,23 +153,112 @@ export async function POST(req: Request) {
           });
         }
 
-        // Le pollId est tout ce qui est entre "availability" et le dernier élément (available/unavailable/comment)
-        const action = parts[parts.length - 1]; // Dernier élément
-        const pollId = parts.slice(1, -1).join("_"); // Tout sauf le premier (availability) et dernier (action)
+        // Détecter le format :
+        // - Format avec vendredi/samedi : availability_${pollId}_feminin_friday|saturday_available|unavailable
+        // - Format avec masculin/féminin : availability_${pollId}_masculin|feminin_available|unavailable|comment
+        // - Format ancien : availability_${pollId}_available|unavailable|comment
+        const lastPart = parts[parts.length - 1];
+        const secondLastPart = parts[parts.length - 2];
+        const thirdLastPart =
+          parts.length >= 3 ? parts[parts.length - 3] : undefined;
+
+        let championshipType: "masculin" | "feminin" | undefined;
+        let action: string;
+        let pollId: string;
+        let buttonType:
+          | "masculin"
+          | "feminin"
+          | "friday"
+          | "saturday"
+          | undefined;
+
+        // Vérifier si c'est le format avec vendredi/samedi
+        if (
+          thirdLastPart === "feminin" &&
+          (secondLastPart === "friday" || secondLastPart === "saturday")
+        ) {
+          // Format : availability_${pollId}_feminin_friday|saturday_available|unavailable
+          championshipType = "feminin";
+          buttonType = secondLastPart as "friday" | "saturday";
+          action = lastPart;
+          pollId = parts.slice(1, -3).join("_"); // Tout sauf le premier (availability), les deux derniers (feminin, friday/saturday) et le dernier (action)
+          console.log(
+            "[Discord Interactions] Format vendredi/samedi détecté:",
+            {
+              customId,
+              parts,
+              championshipType,
+              buttonType,
+              action,
+              pollId,
+            }
+          );
+        } else if (
+          secondLastPart === "masculin" ||
+          secondLastPart === "feminin"
+        ) {
+          // Format : availability_${pollId}_masculin|feminin_available|unavailable|comment
+          championshipType = secondLastPart as "masculin" | "feminin";
+          buttonType = championshipType;
+          action = lastPart;
+          pollId = parts.slice(1, -2).join("_"); // Tout sauf le premier (availability), l'avant-dernier (masculin/feminin) et le dernier (action)
+          console.log(
+            "[Discord Interactions] Format masculin/féminin détecté:",
+            {
+              customId,
+              parts,
+              championshipType,
+              action,
+              pollId,
+            }
+          );
+        } else {
+          // Ancien format : availability_${pollId}_available|unavailable|comment
+          action = lastPart;
+          pollId = parts.slice(1, -1).join("_"); // Tout sauf le premier (availability) et dernier (action)
+          console.log("[Discord Interactions] Ancien format détecté:", {
+            customId,
+            parts,
+            action,
+            pollId,
+          });
+        }
+
+        if (!pollId || pollId.length === 0) {
+          console.error("[Discord Interactions] pollId vide après parsing:", {
+            customId,
+            parts,
+            secondLastPart,
+            lastPart,
+          });
+          return NextResponse.json({
+            type: 4,
+            data: {
+              content: "❌ Format d'interaction invalide (pollId vide).",
+              flags: 64,
+            },
+          });
+        }
 
         if (action === "available" || action === "unavailable") {
           try {
             return await handleAvailabilityButton(
               interaction,
               pollId,
-              action as "available" | "unavailable"
+              action as "available" | "unavailable",
+              championshipType,
+              buttonType
             );
           } catch (error) {
-            console.error("[Discord Interactions] Erreur dans handleAvailabilityButton:", error);
+            console.error(
+              "[Discord Interactions] Erreur dans handleAvailabilityButton:",
+              error
+            );
             return NextResponse.json({
               type: 4,
               data: {
-                content: "❌ Erreur lors du traitement de votre réponse. Veuillez réessayer.",
+                content:
+                  "❌ Erreur lors du traitement de votre réponse. Veuillez réessayer.",
                 flags: 64,
               },
             });
@@ -179,11 +269,15 @@ export async function POST(req: Request) {
           try {
             return await handleCommentButton(interaction, pollId);
           } catch (error) {
-            console.error("[Discord Interactions] Erreur dans handleCommentButton:", error);
+            console.error(
+              "[Discord Interactions] Erreur dans handleCommentButton:",
+              error
+            );
             return NextResponse.json({
               type: 4,
               data: {
-                content: "❌ Erreur lors de l'ouverture du formulaire. Veuillez réessayer.",
+                content:
+                  "❌ Erreur lors de l'ouverture du formulaire. Veuillez réessayer.",
                 flags: 64,
               },
             });
@@ -195,11 +289,15 @@ export async function POST(req: Request) {
           try {
             return await handleViewButton(interaction, pollId);
           } catch (error) {
-            console.error("[Discord Interactions] Erreur dans handleViewButton:", error);
+            console.error(
+              "[Discord Interactions] Erreur dans handleViewButton:",
+              error
+            );
             return NextResponse.json({
               type: 4,
               data: {
-                content: "❌ Erreur lors de la récupération de votre réponse. Veuillez réessayer.",
+                content:
+                  "❌ Erreur lors de la récupération de votre réponse. Veuillez réessayer.",
                 flags: 64,
               },
             });
@@ -210,11 +308,15 @@ export async function POST(req: Request) {
           try {
             return await handleViewButton(interaction, pollId);
           } catch (error) {
-            console.error("[Discord Interactions] Erreur dans handleViewButton:", error);
+            console.error(
+              "[Discord Interactions] Erreur dans handleViewButton:",
+              error
+            );
             return NextResponse.json({
               type: 4,
               data: {
-                content: "❌ Erreur lors de la récupération de votre réponse. Veuillez réessayer.",
+                content:
+                  "❌ Erreur lors de la récupération de votre réponse. Veuillez réessayer.",
                 flags: 64,
               },
             });
@@ -249,7 +351,8 @@ export async function POST(req: Request) {
       }
 
       // Vérifier si c'est un modal de sondage de disponibilité
-      // Format: availability_${pollId}_license_modal_${responseType} ou availability_${pollId}_comment_modal
+      // Format ancien: availability_${pollId}_license_modal_${responseType} ou availability_${pollId}_comment_modal
+      // Format nouveau: availability_${pollId}_masculin|feminin_license_modal_${responseType} ou availability_${pollId}_masculin|feminin_comment_modal
       if (customId.startsWith("availability_")) {
         const parts = customId.split("_");
         if (parts.length < 4) {
@@ -263,12 +366,19 @@ export async function POST(req: Request) {
         }
 
         // Extraire le pollId
-        // Format: availability_${pollId}_license_modal_${responseType}
-        // ou: availability_${pollId}_comment_modal
+        // Format ancien: availability_${pollId}_license_modal_${responseType}
+        // Format nouveau: availability_${pollId}_masculin|feminin_license_modal_${responseType}
+        // ou: availability_${pollId}_masculin|feminin_comment_modal
         const pollIdParts: string[] = [];
         let i = 1; // Commencer après "availability"
         while (i < parts.length) {
-          if (parts[i] === "license" || parts[i] === "comment") {
+          // Arrêter si on rencontre "license", "comment", "masculin" ou "feminin"
+          if (
+            parts[i] === "license" ||
+            parts[i] === "comment" ||
+            parts[i] === "masculin" ||
+            parts[i] === "feminin"
+          ) {
             break;
           }
           pollIdParts.push(parts[i]);
@@ -289,7 +399,10 @@ export async function POST(req: Request) {
         try {
           return await handleModalSubmit(interaction, pollId);
         } catch (error) {
-          console.error("[Discord Interactions] Erreur dans handleModalSubmit:", error);
+          console.error(
+            "[Discord Interactions] Erreur dans handleModalSubmit:",
+            error
+          );
           return NextResponse.json({
             type: 4,
             data: {
