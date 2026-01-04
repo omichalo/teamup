@@ -77,10 +77,18 @@ export async function GET() {
     
     console.log("[Discord Roles] Total rôles récupérés:", roles.length);
     console.log("[Discord Roles] Rôles avec mentionable=true:", roles.filter(r => r.mentionable).length);
+    console.log("[Discord Roles] Détail de tous les rôles:", roles.map(r => ({ 
+      name: r.name, 
+      id: r.id, 
+      mentionable: r.mentionable,
+      position: r.position 
+    })));
     
-    // Filtrer les rôles mentionnables et trier par position (décroissant)
-    const mentionableRoles = roles
-      .filter((role) => role.mentionable && role.name !== "@everyone")
+    // Le bot a la permission "Mention Everyone", donc il peut mentionner TOUS les rôles,
+    // même ceux qui ne sont pas "mentionnables" (propriété mentionable=false)
+    // On inclut donc tous les rôles sauf @everyone, indépendamment de la propriété mentionable
+    const allRoles = roles
+      .filter((role) => role.name !== "@everyone")
       .sort((a, b) => b.position - a.position)
       .map((role) => ({
         id: role.id,
@@ -88,11 +96,11 @@ export async function GET() {
         color: role.color,
       }));
 
-    console.log("[Discord Roles] Rôles retournés:", mentionableRoles.length, mentionableRoles.map(r => r.name));
+    console.log("[Discord Roles] Rôles retournés:", allRoles.length, allRoles.map(r => r.name));
 
     return NextResponse.json({ 
       success: true, 
-      roles: mentionableRoles,
+      roles: allRoles,
     });
   } catch (error) {
     console.error("[Discord Roles] Erreur:", error);

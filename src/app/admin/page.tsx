@@ -1667,6 +1667,9 @@ function DiscordAvailabilityConfig() {
 
       if (response.ok && result.success) {
         setDiscordRoles(result.roles || []);
+        if (result.roles && result.roles.length === 0) {
+          console.warn("[Discord Roles] Aucun rôle mentionnable trouvé. Vérifiez que les rôles sont configurés comme 'mentionnables' dans Discord.");
+        }
       } else {
         console.error("Erreur lors de la récupération des rôles Discord:", result.error);
       }
@@ -1960,7 +1963,7 @@ function DiscordAvailabilityConfig() {
                       InputLabelProps={InputLabelProps}
                       label="Mention Discord"
                       placeholder="Rechercher un utilisateur ou un rôle..."
-                      helperText="Sélectionnez un utilisateur ou un rôle à mentionner lors de la création d'un sondage. Note: seuls les rôles configurés comme 'mentionnables' dans Discord apparaissent ici."
+                      helperText="Sélectionnez un utilisateur ou un rôle à mentionner lors de la création d'un sondage."
                     />
                   );
                 }}
@@ -2118,7 +2121,7 @@ function DiscordAvailabilityConfig() {
                       InputLabelProps={InputLabelProps}
                       label="Mention Discord"
                       placeholder="Rechercher un utilisateur ou un rôle..."
-                      helperText="Sélectionnez un utilisateur ou un rôle à mentionner lors de la création d'un sondage. Note: seuls les rôles configurés comme 'mentionnables' dans Discord apparaissent ici."
+                      helperText="Sélectionnez un utilisateur ou un rôle à mentionner lors de la création d'un sondage."
                     />
                   );
                 }}
