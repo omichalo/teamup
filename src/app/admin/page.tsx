@@ -13,6 +13,7 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  FormControl,
   InputAdornment,
   MenuItem,
   Select,
@@ -28,6 +29,8 @@ import {
   Typography,
   TableContainer,
   Paper,
+  Autocomplete,
+  InputLabel,
 } from "@mui/material";
 import {
   Check as CheckIcon,
@@ -41,11 +44,13 @@ import {
   Sports as SportsIcon,
   Add as AddIcon,
   Delete as DeleteIcon,
+  Settings as SettingsIcon,
 } from "@mui/icons-material";
 import { AuthGuard } from "@/components/AuthGuard";
 import { useAuth } from "@/hooks/useAuth";
 import { COACH_REQUEST_STATUS, USER_ROLES } from "@/lib/auth/roles";
 import { User, UserRole } from "@/types";
+import { useDiscordMembers } from "@/hooks/useDiscordMembers";
 
 interface TabPanelProps {
   children: React.ReactNode;
@@ -668,6 +673,11 @@ export default function AdminPage() {
               label="Lieux"
               id="admin-tab-2"
               aria-controls="admin-tabpanel-2"
+            />
+            <Tab
+              label="Configuration Discord"
+              id="admin-tab-3"
+              aria-controls="admin-tabpanel-3"
             />
           </Tabs>
 
@@ -1317,6 +1327,10 @@ export default function AdminPage() {
           <TabPanel value={tabValue} index={2}>
             <LocationsManagement />
           </TabPanel>
+
+          <TabPanel value={tabValue} index={3}>
+            <DiscordAvailabilityConfig />
+          </TabPanel>
         </Box>
     </AuthGuard>
   );
@@ -1537,6 +1551,605 @@ function LocationsManagement() {
           )}
         </CardContent>
       </Card>
+    </Box>
+  );
+}
+
+// Types pour les mentions Discord
+interface DiscordMentionOption {
+  id: string;
+  name: string;
+  type: "user" | "role";
+  displayName: string;
+}
+
+// Composant de configuration Discord pour les sondages de disponibilité
+function DiscordAvailabilityConfig() {
+  const [config, setConfig] = useState<{
+    parisChannelId: string | null;
+    equipesChannelId: string | null;
+    parisMention: string | null;
+    equipesMention: string | null;
+  }>({
+    parisChannelId: null,
+    equipesChannelId: null,
+    parisMention: null,
+    equipesMention: null,
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [discordChannels, setDiscordChannels] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [discordChannelsHierarchy, setDiscordChannelsHierarchy] = useState<
+    Array<{
+      category: { id: string; name: string; position: number } | null;
+      channels: Array<{ id: string; name: string; position: number }>;
+    }>
+  >([]);
+  const [discordRoles, setDiscordRoles] = useState<
+    Array<{ id: string; name: string; color: number }>
+  >([]);
+  const [loadingChannels, setLoadingChannels] = useState(false);
+  const [loadingRoles, setLoadingRoles] = useState(false);
+  const { members: discordMembers } = useDiscordMembers();
+
+  const fetchConfig = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/admin/discord-availability-config", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        setConfig({
+          parisChannelId: result.config?.parisChannelId || null,
+          equipesChannelId: result.config?.equipesChannelId || null,
+          parisMention: result.config?.parisMention || null,
+          equipesMention: result.config?.equipesMention || null,
+        });
+      } else {
+        setError(result.error || "Erreur lors de la récupération de la configuration");
+      }
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : "Erreur réseau"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const fetchDiscordChannels = useCallback(async () => {
+    setLoadingChannels(true);
+    try {
+      const response = await fetch("/api/discord/channels", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        setDiscordChannels(result.channels || []);
+        setDiscordChannelsHierarchy(result.hierarchy || []);
+      } else {
+        console.error("Erreur lors de la récupération des channels Discord:", result.error);
+      }
+    } catch (error) {
+      console.error("Erreur réseau lors de la récupération des channels:", error);
+    } finally {
+      setLoadingChannels(false);
+    }
+  }, []);
+
+  const fetchDiscordRoles = useCallback(async () => {
+    setLoadingRoles(true);
+    try {
+      const response = await fetch("/api/discord/roles", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        setDiscordRoles(result.roles || []);
+      } else {
+        console.error("Erreur lors de la récupération des rôles Discord:", result.error);
+      }
+    } catch (error) {
+      console.error("Erreur réseau lors de la récupération des rôles:", error);
+    } finally {
+      setLoadingRoles(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchConfig();
+    void fetchDiscordChannels();
+    void fetchDiscordRoles();
+  }, [fetchConfig, fetchDiscordChannels, fetchDiscordRoles]);
+
+  // Combiner utilisateurs et rôles pour l'autocomplete
+  const mentionOptions: DiscordMentionOption[] = useMemo(() => {
+    const users: DiscordMentionOption[] = (discordMembers || []).map((member) => ({
+      id: member.id,
+      name: member.username,
+      type: "user" as const,
+      displayName: member.displayName,
+    }));
+    const roles: DiscordMentionOption[] = (discordRoles || []).map((role) => ({
+      id: role.id,
+      name: role.name,
+      type: "role" as const,
+      displayName: role.name,
+    }));
+    return [...users, ...roles];
+  }, [discordMembers, discordRoles]);
+
+  // Convertir une mention (format Discord) en option pour l'autocomplete
+  const parseMentionToOption = (mention: string | null): DiscordMentionOption | null => {
+    if (!mention) return null;
+    // Format: <@userId> ou <@&roleId>
+    const userMatch = mention.match(/^<@(\d+)>$/);
+    const roleMatch = mention.match(/^<@&(\d+)>$/);
+    
+    if (userMatch) {
+      const userId = userMatch[1];
+      const member = discordMembers.find((m) => m.id === userId);
+      if (member) {
+        return {
+          id: member.id,
+          name: member.username,
+          type: "user",
+          displayName: member.displayName,
+        };
+      }
+    } else if (roleMatch) {
+      const roleId = roleMatch[1];
+      const role = discordRoles.find((r) => r.id === roleId);
+      if (role) {
+        return {
+          id: role.id,
+          name: role.name,
+          type: "role",
+          displayName: role.name,
+        };
+      }
+    }
+    return null;
+  };
+
+  // Convertir une option en mention Discord
+  const optionToMention = (option: DiscordMentionOption | null): string | null => {
+    if (!option) return null;
+    if (option.type === "user") {
+      return `<@${option.id}>`;
+    } else {
+      return `<@&${option.id}>`;
+    }
+  };
+
+  const handleSave = useCallback(async () => {
+    setSaving(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const response = await fetch("/api/admin/discord-availability-config", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          parisChannelId: config.parisChannelId || null,
+          equipesChannelId: config.equipesChannelId || null,
+          parisMention: config.parisMention || null,
+          equipesMention: config.equipesMention || null,
+        }),
+      });
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        setSuccess("Configuration sauvegardée avec succès");
+        setConfig({
+          parisChannelId: result.config?.parisChannelId || null,
+          equipesChannelId: result.config?.equipesChannelId || null,
+          parisMention: result.config?.parisMention || null,
+          equipesMention: result.config?.equipesMention || null,
+        });
+      } else {
+        setError(result.error || "Erreur lors de la sauvegarde de la configuration");
+      }
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : "Erreur réseau"
+      );
+    } finally {
+      setSaving(false);
+    }
+  }, [config]);
+
+  if (loading) {
+    return (
+      <Box display="flex" alignItems="center" gap={2}>
+        <CircularProgress size={24} />
+        <Typography variant="body2">Chargement de la configuration…</Typography>
+      </Box>
+    );
+  }
+
+  return (
+    <Box>
+      {error && (
+        <Alert
+          severity="error"
+          sx={{ mb: 3 }}
+          onClose={() => setError(null)}
+        >
+          {error}
+        </Alert>
+      )}
+      {success && (
+        <Alert
+          severity="success"
+          sx={{ mb: 3 }}
+          onClose={() => setSuccess(null)}
+        >
+          {success}
+        </Alert>
+      )}
+
+      <Stack spacing={3}>
+        {/* Configuration Championnat de Paris */}
+        <Card>
+          <CardContent>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }}>
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              <SettingsIcon sx={{ mr: 1, color: "primary.main" }} />
+              <Typography variant="h6">
+                Championnat de Paris
+              </Typography>
+            </Box>
+            <Button
+              size="small"
+              startIcon={<RefreshIcon />}
+              onClick={() => {
+                void fetchDiscordChannels();
+                void fetchDiscordRoles();
+              }}
+              disabled={loadingChannels || loadingRoles}
+            >
+              Actualiser
+            </Button>
+          </Box>
+
+            <Stack spacing={3}>
+              <FormControl fullWidth>
+                <InputLabel>Channel Discord</InputLabel>
+                <Select
+                  value={config.parisChannelId || ""}
+                  label="Channel Discord"
+                  onChange={(e) =>
+                    setConfig((prev) => ({
+                      ...prev,
+                      parisChannelId: e.target.value || null,
+                    }))
+                  }
+                  disabled={loadingChannels || saving}
+                >
+                  <MenuItem value="">
+                    <em>Aucun channel</em>
+                  </MenuItem>
+                  {discordChannelsHierarchy.length > 0
+                    ? discordChannelsHierarchy.flatMap((group) => [
+                        ...(group.category
+                          ? [
+                              <MenuItem
+                                key={`category-${group.category.id}`}
+                                disabled
+                                sx={{ fontWeight: "bold", opacity: 1 }}
+                              >
+                                📁 {group.category.name}
+                              </MenuItem>,
+                            ]
+                          : []),
+                        ...group.channels.map((channel) => (
+                          <MenuItem
+                            key={channel.id}
+                            value={channel.id}
+                            sx={{ pl: group.category ? 4 : 2 }}
+                          >
+                            {group.category ? "  " : ""}#{channel.name}
+                          </MenuItem>
+                        )),
+                      ])
+                    : discordChannels.map((channel) => (
+                        <MenuItem key={channel.id} value={channel.id}>
+                          #{channel.name}
+                        </MenuItem>
+                      ))}
+                </Select>
+                {loadingChannels && (
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                    Chargement des channels...
+                  </Typography>
+                )}
+              </FormControl>
+
+              <Autocomplete
+                options={mentionOptions}
+                getOptionKey={(option) => `${option.type}-${option.id}`}
+                getOptionLabel={(option) => 
+                  option.type === "user" 
+                    ? `${option.displayName} (@${option.name})` 
+                    : `@${option.displayName}`
+                }
+                value={parseMentionToOption(config.parisMention)}
+                onChange={(_, newValue) => {
+                  setConfig((prev) => ({
+                    ...prev,
+                    parisMention: optionToMention(newValue),
+                  }));
+                }}
+                filterOptions={(options, { inputValue }) => {
+                  const query = inputValue.toLowerCase();
+                  return options.filter((option) => {
+                    return (
+                      option.displayName.toLowerCase().includes(query) ||
+                      option.name.toLowerCase().includes(query)
+                    );
+                  });
+                }}
+                renderOption={(props, option) => {
+                  const { key, ...otherProps } = props;
+                  return (
+                    <Box component="li" key={key} {...otherProps}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          width: 32,
+                          height: 32,
+                          borderRadius: "50%",
+                          backgroundColor: option.type === "user" ? "primary.main" : "secondary.main",
+                          color: "primary.contrastText",
+                          mr: 1.5,
+                          fontSize: "0.875rem",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {option.type === "user" 
+                          ? option.displayName.charAt(0).toUpperCase()
+                          : "@"
+                        }
+                      </Box>
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="body2" fontWeight={500}>
+                          {option.type === "user" ? option.displayName : `@${option.displayName}`}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {option.type === "user" ? `@${option.name}` : "Rôle"}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  );
+                }}
+                renderInput={(params) => {
+                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                  const { size, InputLabelProps, ...restParams } = params;
+                  return (
+                    <TextField
+                      {...restParams}
+                      // @ts-expect-error - InputLabelProps from Autocomplete has incompatible types with TextField
+                      InputLabelProps={InputLabelProps}
+                      label="Mention Discord"
+                      placeholder="Rechercher un utilisateur ou un rôle..."
+                      helperText="Sélectionnez un utilisateur ou un rôle à mentionner lors de la création d'un sondage. Note: seuls les rôles configurés comme 'mentionnables' dans Discord apparaissent ici."
+                    />
+                  );
+                }}
+                noOptionsText="Aucun utilisateur ou rôle trouvé"
+                loading={discordMembers.length === 0 || loadingRoles}
+                loadingText="Chargement des utilisateurs et rôles..."
+                disabled={saving}
+              />
+            </Stack>
+          </CardContent>
+        </Card>
+
+        {/* Configuration Championnat par équipes */}
+        <Card>
+          <CardContent>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }}>
+            <Box sx={{ display: "flex", alignItems: "center" }}>
+              <SettingsIcon sx={{ mr: 1, color: "primary.main" }} />
+              <Typography variant="h6">
+                Championnat par équipes
+              </Typography>
+            </Box>
+            <Button
+              size="small"
+              startIcon={<RefreshIcon />}
+              onClick={() => {
+                void fetchDiscordChannels();
+                void fetchDiscordRoles();
+              }}
+              disabled={loadingChannels || loadingRoles}
+            >
+              Actualiser
+            </Button>
+          </Box>
+
+            <Stack spacing={3}>
+              <FormControl fullWidth>
+                <InputLabel>Channel Discord</InputLabel>
+                <Select
+                  value={config.equipesChannelId || ""}
+                  label="Channel Discord"
+                  onChange={(e) =>
+                    setConfig((prev) => ({
+                      ...prev,
+                      equipesChannelId: e.target.value || null,
+                    }))
+                  }
+                  disabled={loadingChannels || saving}
+                >
+                  <MenuItem value="">
+                    <em>Aucun channel</em>
+                  </MenuItem>
+                  {discordChannelsHierarchy.length > 0
+                    ? discordChannelsHierarchy.flatMap((group) => [
+                        ...(group.category
+                          ? [
+                              <MenuItem
+                                key={`category-${group.category.id}`}
+                                disabled
+                                sx={{ fontWeight: "bold", opacity: 1 }}
+                              >
+                                📁 {group.category.name}
+                              </MenuItem>,
+                            ]
+                          : []),
+                        ...group.channels.map((channel) => (
+                          <MenuItem
+                            key={channel.id}
+                            value={channel.id}
+                            sx={{ pl: group.category ? 4 : 2 }}
+                          >
+                            {group.category ? "  " : ""}#{channel.name}
+                          </MenuItem>
+                        )),
+                      ])
+                    : discordChannels.map((channel) => (
+                        <MenuItem key={channel.id} value={channel.id}>
+                          #{channel.name}
+                        </MenuItem>
+                      ))}
+                </Select>
+                {loadingChannels && (
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                    Chargement des channels...
+                  </Typography>
+                )}
+              </FormControl>
+
+              <Autocomplete
+                options={mentionOptions}
+                getOptionKey={(option) => `${option.type}-${option.id}`}
+                getOptionLabel={(option) => 
+                  option.type === "user" 
+                    ? `${option.displayName} (@${option.name})` 
+                    : `@${option.displayName}`
+                }
+                value={parseMentionToOption(config.equipesMention)}
+                onChange={(_, newValue) => {
+                  setConfig((prev) => ({
+                    ...prev,
+                    equipesMention: optionToMention(newValue),
+                  }));
+                }}
+                filterOptions={(options, { inputValue }) => {
+                  const query = inputValue.toLowerCase();
+                  return options.filter((option) => {
+                    return (
+                      option.displayName.toLowerCase().includes(query) ||
+                      option.name.toLowerCase().includes(query)
+                    );
+                  });
+                }}
+                renderOption={(props, option) => {
+                  const { key, ...otherProps } = props;
+                  return (
+                    <Box component="li" key={key} {...otherProps}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          width: 32,
+                          height: 32,
+                          borderRadius: "50%",
+                          backgroundColor: option.type === "user" ? "primary.main" : "secondary.main",
+                          color: "primary.contrastText",
+                          mr: 1.5,
+                          fontSize: "0.875rem",
+                          fontWeight: 600,
+                        }}
+                      >
+                        {option.type === "user" 
+                          ? option.displayName.charAt(0).toUpperCase()
+                          : "@"
+                        }
+                      </Box>
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="body2" fontWeight={500}>
+                          {option.type === "user" ? option.displayName : `@${option.displayName}`}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {option.type === "user" ? `@${option.name}` : "Rôle"}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  );
+                }}
+                renderInput={(params) => {
+                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                  const { size, InputLabelProps, ...restParams } = params;
+                  return (
+                    <TextField
+                      {...restParams}
+                      // @ts-expect-error - InputLabelProps from Autocomplete has incompatible types with TextField
+                      InputLabelProps={InputLabelProps}
+                      label="Mention Discord"
+                      placeholder="Rechercher un utilisateur ou un rôle..."
+                      helperText="Sélectionnez un utilisateur ou un rôle à mentionner lors de la création d'un sondage. Note: seuls les rôles configurés comme 'mentionnables' dans Discord apparaissent ici."
+                    />
+                  );
+                }}
+                noOptionsText="Aucun utilisateur ou rôle trouvé"
+                loading={discordMembers.length === 0 || loadingRoles}
+                loadingText="Chargement des utilisateurs et rôles..."
+                disabled={saving}
+              />
+            </Stack>
+          </CardContent>
+        </Card>
+
+        {/* Boutons d'action */}
+        <Box sx={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
+          <Button
+            variant="outlined"
+            onClick={() => void fetchConfig()}
+            disabled={saving || loading}
+          >
+            Annuler
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => void handleSave()}
+            disabled={saving || loadingChannels || loadingRoles}
+            startIcon={saving ? <CircularProgress size={20} /> : <CheckIcon />}
+          >
+            {saving ? "Sauvegarde..." : "Sauvegarder"}
+          </Button>
+        </Box>
+      </Stack>
     </Box>
   );
 }

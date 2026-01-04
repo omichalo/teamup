@@ -8,6 +8,14 @@ import {
 } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import nacl from "tweetnacl";
+import {
+  handleRespondButton,
+  handleModifyButton,
+  handleCommentButton,
+  handleModalSubmit,
+  DiscordMessageComponentInteraction,
+  DiscordModalSubmitInteraction,
+} from "@/lib/discord/poll-interactions";
 
 const DISCORD_PUBLIC_KEY = process.env.DISCORD_PUBLIC_KEY; // Clé publique du bot Discord
 
@@ -110,6 +118,240 @@ export async function POST(req: Request) {
         data: {
           content: `❌ Commande inconnue : ${commandName || "N/A"}`,
           flags: 64, // EPHEMERAL
+        },
+      });
+    }
+
+    // Gérer les interactions de composants (boutons, select menus, etc.) - type 3
+    if (data.type === InteractionType.MESSAGE_COMPONENT) {
+      await initializeFirebaseAdmin();
+      const interaction = data as unknown as DiscordMessageComponentInteraction;
+      const customId = interaction.data?.custom_id;
+      const componentType = (interaction.data as { component_type?: number })?.component_type;
+
+      const interactionData = interaction.data as {
+        values?: string[];
+        component_type?: number;
+        custom_id?: string;
+      };
+      
+      console.log("[Discord Interactions] MESSAGE_COMPONENT received:", {
+        customId,
+        componentType,
+        hasValues: !!interactionData.values,
+        values: interactionData.values,
+        fullInteractionData: JSON.stringify(interactionData),
+        fullInteraction: JSON.stringify(interaction).substring(0, 500), // Limiter la taille du log
+      });
+
+      if (!customId || !customId.startsWith("availability_")) {
+        return NextResponse.json({
+          type: 4,
+          data: {
+            content: "❌ Interaction non reconnue.",
+            flags: 64,
+          },
+        });
+      }
+
+      // Extraire le pollId et l'action
+      // Formats possibles:
+      // - availability_${pollId}_respond
+      // - availability_${pollId}_modify
+      // - availability_${pollId}_comment
+      // - availability_${pollId}_men_${responseType}
+      // - availability_${pollId}_women_submit
+      // - availability_${pollId}_women_ven
+      // - availability_${pollId}_women_sat
+      const parts = customId.split("_");
+      if (parts.length < 3) {
+        return NextResponse.json({
+          type: 4,
+          data: {
+            content: "❌ Format d'interaction invalide.",
+            flags: 64,
+          },
+        });
+      }
+
+      const lastPart = parts[parts.length - 1];
+      const secondLastPart = parts[parts.length - 2];
+      const thirdLastPart = parts.length >= 3 ? parts[parts.length - 3] : undefined;
+
+      let pollId: string;
+      let action: string;
+      let day: "ven" | "sat" | undefined = undefined;
+
+      // Cas spéciaux :
+      // - availability_${pollId}_men_${responseType}
+      // - availability_${pollId}_women_${action}
+      // - availability_${pollId}_women_${day}_toggle (nouveau format toggle)
+      if (secondLastPart === "men") {
+        // Pour les hommes : availability_${pollId}_men_${responseType}
+        pollId = parts.slice(1, -2).join("_");
+        action = lastPart;
+      } else if (thirdLastPart === "women" && lastPart === "toggle") {
+        // Format toggle : availability_${pollId}_women_${day}_toggle
+        day = secondLastPart as "ven" | "sat";
+        pollId = parts.slice(1, -3).join("_");
+        action = "toggle";
+      } else if (secondLastPart === "women") {
+        // Format classique : availability_${pollId}_women_${action}
+        pollId = parts.slice(1, -2).join("_");
+        action = lastPart;
+      } else {
+        // Cas normaux : availability_${pollId}_${action}
+        pollId = parts.slice(1, -1).join("_");
+        action = lastPart;
+      }
+
+      console.log("[Discord Interactions] Parsing custom_id:", {
+        customId,
+        parts,
+        pollId,
+        action,
+        secondLastPart,
+        thirdLastPart,
+        day,
+      });
+
+      if (!pollId || !action) {
+        return NextResponse.json({
+          type: 4,
+          data: {
+            content: "❌ Format d'interaction invalide (pollId ou action manquant).",
+            flags: 64,
+          },
+        });
+      }
+
+      try {
+        // Bouton "Répondre"
+        if (action === "respond") {
+          return await handleRespondButton(interaction, pollId);
+        }
+
+        // Bouton "Modifier"
+        if (action === "modify") {
+          return await handleModifyButton(interaction, pollId);
+        }
+
+        // Bouton "Commentaire"
+        if (action === "comment") {
+          return await handleCommentButton(interaction, pollId);
+        }
+
+        // Réponses hommes toggle : availability_${pollId}_men_toggle
+        if (action === "toggle" && secondLastPart === "men") {
+          console.log("[Discord Interactions] Men toggle detected:", {
+            pollId,
+            action,
+            secondLastPart,
+          });
+          const { handleMenToggle } = await import("@/lib/discord/poll-interactions");
+          return await handleMenToggle(interaction, pollId);
+        }
+
+        // Réponses femmes toggle : availability_${pollId}_women_ven_toggle ou availability_${pollId}_women_sat_toggle
+        if (action === "toggle" && day) {
+          console.log("[Discord Interactions] Women toggle detected:", {
+            pollId,
+            action,
+            day,
+          });
+          const { handleWomenToggle } = await import("@/lib/discord/poll-interactions");
+          return await handleWomenToggle(interaction, pollId, day);
+        }
+
+        return NextResponse.json({
+          type: 4,
+          data: {
+            content: "❌ Action non reconnue.",
+            flags: 64,
+          },
+        });
+      } catch (error) {
+        console.error("[Discord Interactions] Erreur dans le handler:", error);
+        return NextResponse.json({
+          type: 4,
+          data: {
+            content: "❌ Erreur lors du traitement. Veuillez réessayer.",
+            flags: 64,
+          },
+        });
+      }
+    }
+
+    // Gérer les soumissions de modals - type 5
+    if (data.type === InteractionType.MODAL_SUBMIT) {
+      await initializeFirebaseAdmin();
+      const interaction = data as unknown as DiscordModalSubmitInteraction;
+      const customId = interaction.data?.custom_id;
+
+      if (!customId) {
+        return NextResponse.json({
+          type: 4,
+          data: {
+            content: "❌ Modal non reconnu.",
+            flags: 64,
+          },
+        });
+      }
+
+      // Vérifier si c'est un modal de sondage de disponibilité
+      // Format: availability_${pollId}_comment_modal
+      if (customId.startsWith("availability_") && customId.endsWith("_comment_modal")) {
+        const parts = customId.split("_");
+        if (parts.length < 4) {
+          return NextResponse.json({
+            type: 4,
+            data: {
+              content: "❌ Format de modal invalide.",
+              flags: 64,
+            },
+          });
+        }
+
+        // Extraire le pollId : tout sauf "availability", "comment", "modal"
+        const pollIdParts: string[] = [];
+        for (let i = 1; i < parts.length - 2; i++) {
+          pollIdParts.push(parts[i]);
+        }
+        const pollId = pollIdParts.join("_");
+
+        if (!pollId) {
+          return NextResponse.json({
+            type: 4,
+            data: {
+              content: "❌ Impossible d'extraire l'ID du sondage.",
+              flags: 64,
+            },
+          });
+        }
+
+        try {
+          return await handleModalSubmit(interaction, pollId);
+        } catch (error) {
+          console.error(
+            "[Discord Interactions] Erreur dans handleModalSubmit:",
+            error
+          );
+          return NextResponse.json({
+            type: 4,
+            data: {
+              content: "❌ Erreur lors du traitement. Veuillez réessayer.",
+              flags: 64,
+            },
+          });
+        }
+      }
+
+      // Modal non reconnu
+      return NextResponse.json({
+        type: 4,
+        data: {
+          content: "❌ Modal non reconnu.",
+          flags: 64,
         },
       });
     }
