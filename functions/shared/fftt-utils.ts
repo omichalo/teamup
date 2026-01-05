@@ -8,11 +8,23 @@ import {
 } from "./fftt-types";
 
 // Configuration FFTT partagée pour Cloud Functions
-export const getFFTTConfig = () => ({
-  id: functions.config().fftt?.id || "SW251",
-  pwd: functions.config().fftt?.pwd || "XpZ31v56Jr",
-  clubCode: functions.config().fftt?.club_code || "08781477",
-});
+export const getFFTTConfig = () => {
+  const id = functions.config().fftt?.id;
+  const pwd = functions.config().fftt?.pwd;
+  const clubCode = functions.config().fftt?.club_code;
+
+  if (!id || !pwd) {
+    throw new Error(
+      "FFTT credentials are required. Please configure fftt.id and fftt.pwd using Firebase Functions config."
+    );
+  }
+
+  return {
+    id,
+    pwd,
+    clubCode: clubCode || "08781477", // clubCode peut avoir une valeur par défaut si nécessaire
+  };
+};
 
 // Instance FFTT API partagée
 export const createFFTTAPI = () => {
