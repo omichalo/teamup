@@ -5,8 +5,15 @@ import { cookies } from "next/headers";
  * Le token est stocké dans un cookie HTTP-only pour éviter les attaques XSS.
  */
 export async function generateCSRFToken(uid: string): Promise<string> {
-  // Utiliser un secret basé sur l'environnement (ou générer un secret aléatoire)
-  const secret = process.env.CSRF_SECRET || "default-secret-change-in-production";
+  // Le secret CSRF doit être défini via la variable d'environnement CSRF_SECRET
+  const secret = process.env.CSRF_SECRET;
+  
+  if (!secret) {
+    throw new Error(
+      "CSRF_SECRET environment variable is required. " +
+      "Please configure it in your environment variables or Firebase App Hosting secrets."
+    );
+  }
   
   // Créer un token simple basé sur l'UID et un timestamp
   // En production, utilisez une bibliothèque comme `crypto` pour un hash plus sécurisé
@@ -19,17 +26,17 @@ export async function generateCSRFToken(uid: string): Promise<string> {
 /**
  * Valide un token CSRF en le comparant avec celui stocké dans le cookie.
  * @param providedToken - Le token fourni par le client
+ * @param uid - L'UID de l'utilisateur (optionnel, extrait du cookie si non fourni)
  */
 export async function validateCSRFToken(
-  providedToken: string | null | undefined
+  providedToken: string | null | undefined,
+  uid?: string
 ): Promise<boolean> {
   if (!providedToken) {
     return false;
   }
 
   try {
-    // Re-générer le token attendu et comparer
-    // En production, utilisez une validation plus robuste avec expiration
     const cookieStore = await cookies();
     const csrfCookie = cookieStore.get("__csrf")?.value;
 
@@ -37,8 +44,36 @@ export async function validateCSRFToken(
       return false;
     }
 
-    // Comparer les tokens
-    return providedToken === csrfCookie;
+    // Le secret CSRF doit être défini via la variable d'environnement CSRF_SECRET
+    const secret = process.env.CSRF_SECRET;
+    
+    if (!secret) {
+      console.error(
+        "[CSRF] CSRF_SECRET environment variable is required for token validation. " +
+        "Please configure it in your environment variables or Firebase App Hosting secrets."
+      );
+      return false;
+    }
+
+    // Décoder le token fourni pour extraire l'UID et le timestamp
+    try {
+      const decoded = Buffer.from(providedToken, "base64").toString("utf-8");
+      const [tokenUid, timestamp] = decoded.split(":");
+      
+      // Si un UID est fourni, vérifier qu'il correspond
+      if (uid && tokenUid !== uid) {
+        return false;
+      }
+
+      // Re-générer le token attendu avec le secret
+      const expectedToken = Buffer.from(`${tokenUid}:${timestamp}:${secret}`).toString("base64");
+      
+      // Comparer les tokens
+      return providedToken === expectedToken && providedToken === csrfCookie;
+    } catch {
+      // Si le décodage échoue, le token est invalide
+      return false;
+    }
   } catch {
     return false;
   }

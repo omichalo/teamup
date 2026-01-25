@@ -86,6 +86,11 @@ Thumbs.db
 .history/
 **/.history/
 
+# Security scan reports
+gitleaks-report.json
+trufflehog-report.json
+*.sarif
+
 # Build outputs
 dist/
 **/dist/
