@@ -38,13 +38,20 @@ export function buildAvailabilityPollMessage(
   }>;
 } {
   const phaseLabel = phase === "aller" ? "Aller" : "Retour";
-  const dateLabel = date
-    ? new Date(date).toLocaleDateString("fr-FR", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
+
+  // Formater la date pour le championnat de Paris : "ce vendredi 24 mai"
+  const parisDateLabel = date
+    ? (() => {
+        const dateObj = new Date(date);
+        const weekday = dateObj.toLocaleDateString("fr-FR", {
+          weekday: "long",
+        });
+        const day = dateObj.getDate();
+        const month = dateObj.toLocaleDateString("fr-FR", {
+          month: "long",
+        });
+        return `ce ${weekday} ${day} ${month}`;
+      })()
     : null;
 
   // Formater les dates vendredi et samedi si fournies
@@ -90,9 +97,9 @@ export function buildAvailabilityPollMessage(
       description = `${mention}\n\n${description}`;
     }
   } else {
-    // Template par défaut pour le championnat de Paris
-    description = `Bonjour,\n\nProchaine journée de championnat de Paris - Journée ${journee}, Phase ${phaseLabel}${
-      dateLabel ? `, ${dateLabel}` : ""
+    // Template par défaut pour le championnat de Paris (sans phase, avec date formatée)
+    description = `Bonjour,\n\nProchaine journée de championnat de Paris - Journée ${journee}${
+      parisDateLabel ? ` ${parisDateLabel}` : ""
     }.\n\nMerci de me dire si vous êtes disponibles!`;
     // Ajouter la mention au début si fournie
     if (mention) {

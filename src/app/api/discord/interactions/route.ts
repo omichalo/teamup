@@ -129,6 +129,14 @@ export async function POST(req: Request) {
       const customId = interaction.data?.custom_id;
       const componentType = (interaction.data as { component_type?: number })?.component_type;
 
+      // Ajouter application_id et token depuis l'interaction Discord
+      // Type assertion nécessaire car application_id et token sont optionnels dans DiscordInteraction
+      const interactionWithMetadata: DiscordMessageComponentInteraction = {
+        ...interaction,
+        application_id: data.application_id,
+        token: data.token,
+      } as DiscordMessageComponentInteraction;
+
       const interactionData = interaction.data as {
         values?: string[];
         component_type?: number;
@@ -154,15 +162,107 @@ export async function POST(req: Request) {
         });
       }
 
+      // Détecter si c'est un select menu (component_type === 3)
+      if (componentType === 3) {
+        // Select menu
+        const parts = customId.split("_");
+        if (parts.length < 3) {
+          return NextResponse.json({
+            type: 4,
+            data: {
+              content: "❌ Format d'interaction invalide.",
+              flags: 64,
+            },
+          });
+        }
+
+        const lastPart = parts[parts.length - 1];
+        const secondLastPart = parts[parts.length - 2];
+
+        // Extraire le pollId
+        let pollId: string;
+        let selectType: "paris" | "men" | "women_ven" | "women_sat" | null = null;
+
+        // Formats possibles:
+        // - availability_${pollId}_select (championnat de Paris)
+        // - availability_${pollId}_men_select (championnat par équipes - hommes)
+        // - availability_${pollId}_women_ven_select (championnat par équipes - femmes vendredi)
+        // - availability_${pollId}_women_sat_select (championnat par équipes - femmes samedi)
+
+        if (lastPart === "select" && secondLastPart !== "men" && secondLastPart !== "ven" && secondLastPart !== "sat") {
+          // Championnat de Paris : availability_${pollId}_select
+          pollId = parts.slice(1, -1).join("_");
+          selectType = "paris";
+        } else if (lastPart === "select" && secondLastPart === "men") {
+          // Championnat par équipes - hommes : availability_${pollId}_men_select
+          pollId = parts.slice(1, -2).join("_");
+          selectType = "men";
+        } else if (lastPart === "select" && secondLastPart === "ven") {
+          // Championnat par équipes - femmes vendredi : availability_${pollId}_women_ven_select
+          pollId = parts.slice(1, -3).join("_");
+          selectType = "women_ven";
+        } else if (lastPart === "select" && secondLastPart === "sat") {
+          // Championnat par équipes - femmes samedi : availability_${pollId}_women_sat_select
+          pollId = parts.slice(1, -3).join("_");
+          selectType = "women_sat";
+        } else {
+          return NextResponse.json({
+            type: 4,
+            data: {
+              content: "❌ Format de select menu invalide.",
+              flags: 64,
+            },
+          });
+        }
+
+        console.log("[Discord Interactions] Select menu detected:", {
+          customId,
+          pollId,
+          selectType,
+        });
+
+        try {
+          const {
+            handleParisSelect,
+            handleMenSelect,
+            handleWomenSelect,
+          } = await import("@/lib/discord/poll-interactions");
+
+          if (selectType === "paris") {
+            return await handleParisSelect(interactionWithMetadata, pollId);
+          } else if (selectType === "men") {
+            return await handleMenSelect(interactionWithMetadata, pollId);
+          } else if (selectType === "women_ven") {
+            return await handleWomenSelect(interactionWithMetadata, pollId, "ven");
+          } else if (selectType === "women_sat") {
+            return await handleWomenSelect(interactionWithMetadata, pollId, "sat");
+          }
+
+          return NextResponse.json({
+            type: 4,
+            data: {
+              content: "❌ Type de select menu non reconnu.",
+              flags: 64,
+            },
+          });
+        } catch (error) {
+          console.error("[Discord Interactions] Erreur dans le handler select menu:", error);
+          return NextResponse.json({
+            type: 4,
+            data: {
+              content: "❌ Erreur lors du traitement. Veuillez réessayer.",
+              flags: 64,
+            },
+          });
+        }
+      }
+
+      // Boutons (component_type === 2)
       // Extraire le pollId et l'action
       // Formats possibles:
       // - availability_${pollId}_respond
       // - availability_${pollId}_modify
       // - availability_${pollId}_comment
-      // - availability_${pollId}_men_${responseType}
-      // - availability_${pollId}_women_submit
-      // - availability_${pollId}_women_ven
-      // - availability_${pollId}_women_sat
       const parts = customId.split("_");
       if (parts.length < 3) {
         return NextResponse.json({
@@ -175,44 +275,14 @@ export async function POST(req: Request) {
       }
 
       const lastPart = parts[parts.length - 1];
-      const secondLastPart = parts[parts.length - 2];
-      const thirdLastPart = parts.length >= 3 ? parts[parts.length - 3] : undefined;
-
-      let pollId: string;
-      let action: string;
-      let day: "ven" | "sat" | undefined = undefined;
-
-      // Cas spéciaux :
-      // - availability_${pollId}_men_${responseType}
-      // - availability_${pollId}_women_${action}
-      // - availability_${pollId}_women_${day}_toggle (nouveau format toggle)
-      if (secondLastPart === "men") {
-        // Pour les hommes : availability_${pollId}_men_${responseType}
-        pollId = parts.slice(1, -2).join("_");
-        action = lastPart;
-      } else if (thirdLastPart === "women" && lastPart === "toggle") {
-        // Format toggle : availability_${pollId}_women_${day}_toggle
-        day = secondLastPart as "ven" | "sat";
-        pollId = parts.slice(1, -3).join("_");
-        action = "toggle";
-      } else if (secondLastPart === "women") {
-        // Format classique : availability_${pollId}_women_${action}
-        pollId = parts.slice(1, -2).join("_");
-        action = lastPart;
-      } else {
-        // Cas normaux : availability_${pollId}_${action}
-        pollId = parts.slice(1, -1).join("_");
-        action = lastPart;
-      }
+      const pollId = parts.slice(1, -1).join("_");
+      const action = lastPart;
 
       console.log("[Discord Interactions] Parsing custom_id:", {
         customId,
         parts,
         pollId,
         action,
-        secondLastPart,
-        thirdLastPart,
-        day,
       });
 
       if (!pollId || !action) {
@@ -228,39 +298,17 @@ export async function POST(req: Request) {
       try {
         // Bouton "Répondre"
         if (action === "respond") {
-          return await handleRespondButton(interaction, pollId);
+          return await handleRespondButton(interactionWithMetadata, pollId);
         }
 
         // Bouton "Modifier"
         if (action === "modify") {
-          return await handleModifyButton(interaction, pollId);
+          return await handleModifyButton(interactionWithMetadata, pollId);
         }
 
         // Bouton "Commentaire"
         if (action === "comment") {
-          return await handleCommentButton(interaction, pollId);
-        }
-
-        // Réponses hommes toggle : availability_${pollId}_men_toggle
-        if (action === "toggle" && secondLastPart === "men") {
-          console.log("[Discord Interactions] Men toggle detected:", {
-            pollId,
-            action,
-            secondLastPart,
-          });
-          const { handleMenToggle } = await import("@/lib/discord/poll-interactions");
-          return await handleMenToggle(interaction, pollId);
-        }
-
-        // Réponses femmes toggle : availability_${pollId}_women_ven_toggle ou availability_${pollId}_women_sat_toggle
-        if (action === "toggle" && day) {
-          console.log("[Discord Interactions] Women toggle detected:", {
-            pollId,
-            action,
-            day,
-          });
-          const { handleWomenToggle } = await import("@/lib/discord/poll-interactions");
-          return await handleWomenToggle(interaction, pollId, day);
+          return await handleCommentButton(interactionWithMetadata, pollId);
         }
 
         return NextResponse.json({
@@ -454,6 +502,8 @@ interface DiscordInteraction {
   data?: DiscordApplicationCommandData;
   member?: DiscordMember;
   user?: DiscordUser;
+  application_id?: string;
+  token?: string;
 }
 
 /**
