@@ -66,12 +66,6 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          # Scanner uniquement les fichiers modifiés pour les PRs
-          # Scanner tout l'historique pour les pushes sur main
-          no-git: false
-          exit-code: 1
-          severity-threshold: high
 
       - name: Comment PR if secrets found
         if: github.event_name == 'pull_request' && failure()
