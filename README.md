@@ -89,6 +89,16 @@ teamup/
 
 Voir `.env.example` pour la liste complète des variables d'environnement requises.
 
+### ⚠️ Note importante sur la sécurité
+
+Les variables préfixées par `NEXT_PUBLIC_*` (comme `NEXT_PUBLIC_FIREBASE_API_KEY`) sont **intentionnellement publiques** et incluses dans le bundle JavaScript côté client. C'est le comportement normal pour la configuration Firebase, car ces valeurs sont sécurisées par des restrictions de domaine configurées dans Firebase Console. **Ne jamais y mettre de secrets.**
+
+Les secrets (tokens, mots de passe, clés privées) sont gérés via :
+- **Développement local** : fichier `.env.local` (non commité)
+- **Production** : Firebase App Hosting Secrets Manager
+
+**Audit de sécurité automatisé** : Chaque commit et pull request est automatiquement scanné pour détecter les secrets (TruffleHog, Gitleaks). Voir [docs/SECURITY.md](./docs/SECURITY.md) pour plus d'informations.
+
 ## 🚢 Déploiement
 
 Le déploiement se fait automatiquement via GitHub Actions lors d'un merge sur `main`.

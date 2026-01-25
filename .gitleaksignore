@@ -1,0 +1,6 @@
+# Gitleaks ignore patterns
+# Format: <commit-sha>:<file-path>:<rule-id>:<line-number>
+
+# Ignore la clé privée fictive dans .env.example (ligne 37)
+# C'est une valeur d'exemple pour la documentation, pas un vrai secret
+eb060e5f5844f3ccd9789aa132ae5c6bd66dc6b6:.env.example:private-key:37

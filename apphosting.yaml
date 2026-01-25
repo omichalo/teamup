@@ -119,3 +119,9 @@ env:
     secret: DISCORD_SERVER_ID
     availability:
       - RUNTIME
+
+  # CSRF Protection (privé, côté serveur uniquement)
+  - variable: CSRF_SECRET
+    secret: CSRF_SECRET
+    availability:
+      - RUNTIME
