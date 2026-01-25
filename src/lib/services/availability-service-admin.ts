@@ -148,11 +148,6 @@ export class AvailabilityServiceAdmin {
       const existingSnap = await docRef.get();
       const existingData = existingSnap.exists ? existingSnap.data() : null;
 
-      console.log("[AvailabilityServiceAdmin] saveAvailability input", {
-        docId,
-        incomingPlayers: availability.players,
-      });
-
       const sanitizedPlayers: PlayerAvailability = {};
 
       Object.entries(availability.players).forEach(([playerId, response]) => {
@@ -187,17 +182,7 @@ export class AvailabilityServiceAdmin {
         dataToSave.idEpreuve = availability.idEpreuve;
       }
 
-      console.log("[AvailabilityServiceAdmin] sanitized players", {
-        docId,
-        players: sanitizedPlayers,
-      });
-
       await docRef.set(dataToSave);
-      console.log("[AvailabilityServiceAdmin] Saved availability document", {
-        docId,
-        dataToSave,
-        playersKeys: Object.keys(sanitizedPlayers),
-      });
     } catch (error) {
       console.error("Erreur lors de la sauvegarde de la disponibilité:", error);
       throw error;

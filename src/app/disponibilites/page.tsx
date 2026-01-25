@@ -1107,6 +1107,32 @@ export default function DisponibilitesPage() {
                   : {})}
                 epreuveType={selectedEpreuve}
                 {...(() => {
+                  // Extraire automatiquement la date pour le championnat de Paris
+                  if (
+                    selectedEpreuve === "championnat_paris" &&
+                    selectedJournee !== null &&
+                    selectedPhase !== null &&
+                    journeesByEpreuveAndPhase.has("championnat_paris")
+                  ) {
+                    const parisEpreuveMap = journeesByEpreuveAndPhase.get("championnat_paris");
+                    const parisPhaseMap = parisEpreuveMap?.get(selectedPhase);
+                    const parisJourneeData = parisPhaseMap?.get(selectedJournee);
+                    
+                    if (parisJourneeData && parisJourneeData.dates.length > 0) {
+                      // Prendre la première date (ou la date la plus proche)
+                      const sortedDates = [...parisJourneeData.dates].sort(
+                        (a, b) => a.getTime() - b.getTime()
+                      );
+                      const firstDate = sortedDates[0];
+                      // Formater la date en YYYY-MM-DD en évitant les problèmes de timezone
+                      const year = firstDate.getFullYear();
+                      const month = String(firstDate.getMonth() + 1).padStart(2, "0");
+                      const day = String(firstDate.getDate()).padStart(2, "0");
+                      const dateStr = `${year}-${month}-${day}`;
+                      return { date: dateStr };
+                    }
+                  }
+                  
                   // Extraire automatiquement les dates vendredi/samedi depuis les matchs
                   if (
                     selectedEpreuve === "championnat_equipes" &&

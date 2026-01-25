@@ -280,21 +280,23 @@ export function DiscordPollManager({
         : "{saturdayDate}";
       return `Bonjour,\n\nProchaine journée de championnat par équipes le ${fridayLabel} (${saturdayLabel} pour les rég et équipes filles).\n\nMerci de me dire si vous êtes disponibles!\n\nPour les filles, merci de préciser vendredi et/ou samedi.`;
     } else {
-      const phaseLabel =
-        phase === "aller" ? "Aller" : phase === "retour" ? "Retour" : "{phase}";
-      const dateLabel = date
-        ? new Date(date).toLocaleDateString("fr-FR", {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })
+      // Formater la date pour le championnat de Paris : "ce vendredi 24 mai"
+      const parisDateLabel = date
+        ? (() => {
+            const dateObj = new Date(date);
+            const weekday = dateObj.toLocaleDateString("fr-FR", {
+              weekday: "long",
+            });
+            const day = dateObj.getDate();
+            const month = dateObj.toLocaleDateString("fr-FR", {
+              month: "long",
+            });
+            return `ce ${weekday} ${day} ${month}`;
+          })()
         : "{date}";
       return `Bonjour,\n\nProchaine journée de championnat de Paris - Journée ${
         journee || "{journee}"
-      }, Phase ${phaseLabel}${
-        date ? `, ${dateLabel}` : ""
-      }.\n\nMerci de me dire si vous êtes disponibles!`;
+      }${date ? ` ${parisDateLabel}` : ""}.\n\nMerci de me dire si vous êtes disponibles!`;
     }
   }, [
     epreuveType,
@@ -302,7 +304,6 @@ export function DiscordPollManager({
     propSaturdayDate,
     fridayDate,
     saturdayDate,
-    phase,
     journee,
     date,
   ]);
