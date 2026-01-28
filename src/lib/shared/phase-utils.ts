@@ -1,4 +1,5 @@
 import { Match, Team } from "@/types";
+import { getMatchEpreuve } from "@/lib/shared/epreuve-utils";
 
 interface EquipeWithMatches {
   team: Team;
@@ -74,4 +75,37 @@ export function getCurrentPhase(
   } else {
     return "retour";
   }
+}
+
+/**
+ * Retourne la phase (aller/retour) du prochain match de championnat par équipes à jouer.
+ * Utilisé pour pré-sélectionner la phase sur les pages compositions et compositions par défaut.
+ *
+ * @param equipesWithMatches - Liste des équipes avec leurs matchs
+ * @returns "aller" | "retour" si un prochain match existe, null sinon
+ */
+export function getPhaseOfNextChampionnatEquipesMatch(
+  equipesWithMatches: EquipeWithMatches[]
+): "aller" | "retour" | null {
+  if (!equipesWithMatches?.length) return null;
+
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const upcoming: { date: Date; phase: "aller" | "retour" }[] = [];
+
+  for (const eq of equipesWithMatches) {
+    for (const m of eq.matches) {
+      if (getMatchEpreuve(m, eq.team) !== "championnat_equipes") continue;
+      const d = new Date(m.date);
+      if (d < startOfToday) continue;
+      const ph = (m.phase || "").toLowerCase();
+      if (ph !== "aller" && ph !== "retour") continue;
+      upcoming.push({ date: d, phase: ph as "aller" | "retour" });
+    }
+  }
+
+  if (upcoming.length === 0) return null;
+  upcoming.sort((a, b) => a.date.getTime() - b.date.getTime());
+  return upcoming[0].phase;
 }

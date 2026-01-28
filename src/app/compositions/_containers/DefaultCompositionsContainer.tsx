@@ -51,6 +51,7 @@ import { AvailablePlayersPanel } from "@/components/compositions/AvailablePlayer
 import { TeamCompositionCard } from "@/components/compositions/TeamCompositionCard";
 import { CompositionsSummary } from "@/components/compositions/CompositionsSummary";
 import { CompositionRulesHelp, type CompositionRuleItem } from "@/components/compositions/CompositionRulesHelp";
+import { usePhasePreselect } from "@/hooks/usePhasePreselect";
 import { usePlayerDrag } from "@/hooks/usePlayerDrag";
 import { EpreuveSelect } from "@/components/compositions/Filters/EpreuveSelect";
 import { PhaseSelect } from "@/components/compositions/Filters/PhaseSelect";
@@ -99,16 +100,14 @@ export function DefaultCompositionsContainer() {
     []
   );
 
-  useEffect(() => {
-    // Pour le championnat de Paris, définir automatiquement la phase à "aller"
-    if (selectedEpreuve === "championnat_paris") {
-      if (selectedPhase !== "aller") {
-        setSelectedPhase("aller");
-      }
-    } else if (selectedPhase === null && currentPhase) {
-      setSelectedPhase(currentPhase);
-    }
-  }, [currentPhase, selectedPhase, selectedEpreuve]);
+  usePhasePreselect({
+    equipes,
+    loadingEquipes,
+    currentPhase,
+    selectedEpreuve,
+    selectedPhase,
+    setSelectedPhase,
+  });
 
   // Fonction helper pour vérifier le statut Discord d'un joueur
   const getDiscordStatus = useCallback((player: Player): "none" | "invalid" | "valid" => {

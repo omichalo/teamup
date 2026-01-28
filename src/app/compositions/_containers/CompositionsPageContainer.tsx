@@ -76,6 +76,7 @@ import {
   type CompositionRuleItem,
 } from "@/components/compositions/CompositionRulesHelp";
 import { CompositionsView } from "@/components/compositions/views/CompositionsView";
+import { usePhasePreselect } from "@/hooks/usePhasePreselect";
 import { usePlayerDrag } from "@/hooks/usePlayerDrag";
 import { EpreuveSelect } from "@/components/compositions/Filters/EpreuveSelect";
 import { PhaseSelect } from "@/components/compositions/Filters/PhaseSelect";
@@ -635,12 +636,14 @@ export function CompositionsPageContainer() {
     }
   }, [defaultEpreuve, selectedEpreuve, journeesByEpreuveAndPhase]);
 
-  // Initialiser selectedPhase avec la phase en cours
-  useEffect(() => {
-    if (selectedPhase === null && currentPhase) {
-      setSelectedPhase(currentPhase);
-    }
-  }, [currentPhase, selectedPhase]);
+  usePhasePreselect({
+    equipes,
+    loadingEquipes,
+    currentPhase,
+    selectedEpreuve,
+    selectedPhase,
+    setSelectedPhase,
+  });
 
   // Initialiser selectedJournee avec la première journée dont la date de début est après aujourd'hui
   useEffect(() => {

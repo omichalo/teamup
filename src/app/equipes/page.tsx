@@ -596,7 +596,26 @@ export default function EquipesPage() {
                           
                           return numA - numB;
                         })
-                        .map((equipeWithMatches) => (
+                        .map((equipeWithMatches) => {
+                          const name = equipeWithMatches.team.name;
+                          const div = equipeWithMatches.team.division || "";
+                          const isPhase2 =
+                            /Phase 2/i.test(name) || /Phase 2/i.test(div);
+                          const isPhase1 =
+                            /Phase 1/i.test(name) || /Phase 1/i.test(div);
+                          const displayMatches = isPhase2
+                            ? equipeWithMatches.matches.filter(
+                                (m) =>
+                                  (m.phase || "").toLowerCase() === "retour"
+                              )
+                            : isPhase1
+                              ? equipeWithMatches.matches.filter(
+                                  (m) =>
+                                    (m.phase || "").toLowerCase() === "aller"
+                                )
+                              : equipeWithMatches.matches;
+
+                          return (
                           <Accordion
                             key={equipeWithMatches.team.id}
                             sx={{
@@ -746,7 +765,7 @@ export default function EquipesPage() {
                                       </>
                                     )}
                                   <Chip
-                                    label={`${equipeWithMatches.matches.length} matchs`}
+                                    label={`${displayMatches.length} matchs`}
                                     color={
                                       epreuve
                                         .toLowerCase()
@@ -766,10 +785,10 @@ export default function EquipesPage() {
                             </AccordionSummary>
                             <AccordionDetails>
                               <Box sx={{ mt: 2 }}>
-                                {equipeWithMatches.matches.length === 0 ? (
-                                  <Alert severity="info">
-                                    Aucun match trouvé pour cette équipe.
-                                  </Alert>
+                                {displayMatches.length === 0 ? (
+                                    <Alert severity="info">
+                                      Aucun match trouvé pour cette équipe.
+                                    </Alert>
                                 ) : (
                                   <>
                                     {/* Section : Joueurs par journée */}
@@ -785,7 +804,7 @@ export default function EquipesPage() {
                                       {(() => {
                                         // Grouper les matchs par journée
                                         const matchesByJournee =
-                                          equipeWithMatches.matches.reduce(
+                                          displayMatches.reduce(
                                             (acc, match) => {
                                               const journee =
                                                 match.journee || 0;
@@ -797,7 +816,7 @@ export default function EquipesPage() {
                                             },
                                             {} as Record<
                                               number,
-                                              typeof equipeWithMatches.matches
+                                              Match[]
                                             >
                                           );
 
@@ -1153,7 +1172,7 @@ export default function EquipesPage() {
                                         gap: 2,
                                       }}
                                     >
-                                      {equipeWithMatches.matches
+                                      {displayMatches
                                         .sort(
                                           (a, b) =>
                                             new Date(a.date).getTime() -
@@ -1366,7 +1385,8 @@ export default function EquipesPage() {
                               </Box>
                             </AccordionDetails>
                           </Accordion>
-                        ))
+                          );
+                        })
                     )}
                   </Box>
                 )
