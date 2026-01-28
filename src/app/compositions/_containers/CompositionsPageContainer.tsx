@@ -1711,7 +1711,9 @@ export function CompositionsPageContainer() {
           return prev;
         }
 
-        if (player.nationality === "ETR") {
+        // Pour le championnat de Paris : pas de limite sur les joueurs étrangers
+        const isParis = isParisChampionship(equipe);
+        if (!isParis && player.nationality === "ETR") {
           const targetTeamPlayersData = targetTeamPlayers
             .map((pid) => players.find((p) => p.id === pid))
             .filter((p): p is Player => p !== undefined);
