@@ -308,6 +308,50 @@ export function DiscordPollManager({
     date,
   ]);
 
+  // Trace des paramètres qui seraient envoyés à l'API à l'ouverture de la popup
+  useEffect(() => {
+    if (!createDialogOpen) return;
+
+    const displayedMessage = messageTemplate || getDefaultMessage();
+    const finalMessageTemplate =
+      displayedMessage.trim().length > 0 ? displayedMessage.trim() : undefined;
+
+    const paramsToSend = {
+      journee,
+      phase,
+      championshipType,
+      idEpreuve,
+      date,
+      epreuveType,
+      messageTemplate: finalMessageTemplate
+        ? `${finalMessageTemplate.length} car.`
+        : undefined,
+      messageTemplatePreview: finalMessageTemplate
+        ? finalMessageTemplate.substring(0, 100) +
+          (finalMessageTemplate.length > 100 ? "..." : "")
+        : "(vide)",
+      fridayDate: fridayDate.trim() || undefined,
+      saturdayDate: saturdayDate.trim() || undefined,
+    };
+
+    console.log(
+      "[DiscordPollManager] Ouverture popup - paramètres qui seraient envoyés à l'API:",
+      paramsToSend
+    );
+  }, [
+    createDialogOpen,
+    journee,
+    phase,
+    championshipType,
+    idEpreuve,
+    date,
+    epreuveType,
+    messageTemplate,
+    fridayDate,
+    saturdayDate,
+    getDefaultMessage,
+  ]);
+
   // Fonction pour insérer une mention dans le message
   const insertMention = useCallback(
     (
