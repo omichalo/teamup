@@ -47,7 +47,6 @@ import { Player } from "@/types/team-management";
 import { ChampionshipType } from "@/types";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
-import { getTeamsByType } from "@/lib/compositions/championship-utils";
 import { AvailabilityResponse } from "@/lib/services/availability-service";
 import {
   AvailabilityState,
@@ -62,15 +61,11 @@ import { SearchInput } from "@/components/compositions/Filters/SearchInput";
 import { AvailabilityStatusChip } from "@/components/disponibilites/AvailabilityStatusChip";
 import { DiscordPollManager } from "@/components/disponibilites/DiscordPollManager";
 
-import {
-  EpreuveType,
-  getIdEpreuve,
-  getMatchEpreuve,
-} from "@/lib/shared/epreuve-utils";
+import { EpreuveType, getIdEpreuve } from "@/lib/shared/epreuve-utils";
+import { useJourneesData } from "@/hooks/useJourneesData";
 
 export default function DisponibilitesPage() {
   const { equipes, loading: loadingEquipes, currentPhase } = useTeamData();
-  const equipesByType = useMemo(() => getTeamsByType(equipes), [equipes]);
   const {
     selectedEpreuve,
     selectedJournee,
@@ -162,260 +157,21 @@ export default function DisponibilitesPage() {
     availabilitiesRef.current = availabilities;
   }, [availabilities]);
 
-  // Extraire les journées depuis les matchs, groupées par épreuve et phase avec leurs dates
-  const journeesByEpreuveAndPhase = useMemo(() => {
-    const journeesMap = new Map<
-      EpreuveType,
-      Map<
-        "aller" | "retour",
-        Map<
-          number,
-          { journee: number; phase: "aller" | "retour"; dates: Date[] }
-        >
-      >
-    >();
-
-    // Debug: log pour voir toutes les équipes et leurs matchs
-    const parisEquipes = equipes.filter(
-      (equipe) =>
-        equipe.team?.idEpreuve === 15980 ||
-        equipe.team?.epreuve?.toLowerCase().includes("paris idf") ||
-        equipe.team?.epreuve?.toLowerCase().includes("excellence")
-    );
-    console.log("[Disponibilites] Équipes Paris trouvées:", {
-      count: parisEquipes.length,
-      equipes: parisEquipes.map((equipe) => ({
-        teamId: equipe.team?.id,
-        teamName: equipe.team?.name,
-        teamIdEpreuve: equipe.team?.idEpreuve,
-        teamEpreuve: equipe.team?.epreuve,
-        matchesCount: equipe.matches.length,
-        matches: equipe.matches.map((match) => ({
-          id: match.id,
-          idEpreuve: match.idEpreuve,
-          journee: match.journee,
-          phase: match.phase,
-        })),
-      })),
-    });
-
-    const equipesForJournees = [
-      ...equipesByType.masculin,
-      ...equipesByType.feminin,
-    ];
-
-    equipesForJournees.forEach((equipe) => {
-      equipe.matches.forEach((match) => {
-        const epreuve = getMatchEpreuve(match, equipe.team);
-
-        // Debug: log pour comprendre pourquoi les matchs de Paris ne sont pas détectés
-        if (match.idEpreuve === 15980 || equipe.team?.idEpreuve === 15980) {
-          console.log("[Disponibilites] Match Paris détecté:", {
-            matchIdEpreuve: match.idEpreuve,
-            teamIdEpreuve: equipe.team?.idEpreuve,
-            teamEpreuve: equipe.team?.epreuve,
-            epreuveDetected: epreuve,
-            journee: match.journee,
-            phase: match.phase,
-            matchId: match.id,
-          });
-        }
-
-        if (!epreuve || !match.journee || !match.phase) {
-          if (match.idEpreuve === 15980 || equipe.team?.idEpreuve === 15980) {
-            console.log("[Disponibilites] Match Paris rejeté:", {
-              epreuve,
-              journee: match.journee,
-              phase: match.phase,
-            });
-          }
-          return;
-        }
-
-        // Pour le championnat de Paris, accepter toutes les phases (il n'y en a qu'une)
-        // Pour le championnat par équipes, accepter uniquement "aller" et "retour"
-        const phaseLower = match.phase.toLowerCase();
-        let phase: "aller" | "retour";
-
-        if (epreuve === "championnat_paris") {
-          // Pour Paris, normaliser toutes les phases en "aller" (car il n'y a qu'une phase)
-          phase = "aller";
-        } else if (phaseLower === "aller" || phaseLower === "retour") {
-          phase = phaseLower as "aller" | "retour";
-        } else {
-          // Phase non reconnue pour le championnat par équipes
-          return;
-        }
-
-        if (!journeesMap.has(epreuve)) {
-          journeesMap.set(epreuve, new Map());
-        }
-        const epreuveMap = journeesMap.get(epreuve)!;
-
-        if (!epreuveMap.has(phase)) {
-          epreuveMap.set(phase, new Map());
-        }
-        const phaseMap = epreuveMap.get(phase)!;
-
-        // Normaliser la date du match pour éviter les problèmes de timezone
-        // En créant une nouvelle date avec uniquement année/mois/jour
-        let matchDate: Date;
-        if (match.date instanceof Date) {
-          matchDate = new Date(
-            match.date.getFullYear(),
-            match.date.getMonth(),
-            match.date.getDate()
-          );
-        } else {
-          const date = new Date(match.date);
-          matchDate = new Date(
-            date.getFullYear(),
-            date.getMonth(),
-            date.getDate()
-          );
-        }
-
-        if (!phaseMap.has(match.journee)) {
-          phaseMap.set(match.journee, {
-            journee: match.journee,
-            phase,
-            dates: [matchDate],
-          });
-        } else {
-          const journeeData = phaseMap.get(match.journee)!;
-          // Ajouter la date si elle n'existe pas déjà (même jour)
-          const dateStr = matchDate.toDateString();
-          const exists = journeeData.dates.some(
-            (d) => d.toDateString() === dateStr
-          );
-          if (!exists) {
-            journeeData.dates.push(matchDate);
-          }
-        }
-      });
-    });
-
-    // Trier les dates pour chaque journée
-    journeesMap.forEach((epreuveMap) => {
-      epreuveMap.forEach((phaseMap) => {
-        phaseMap.forEach((journeeData) => {
-          journeeData.dates.sort((a, b) => a.getTime() - b.getTime());
-        });
-      });
-    });
-
-    // Debug: log pour voir ce qui a été extrait
-    const parisPhases = journeesMap.get("championnat_paris");
-    const equipesPhases = journeesMap.get("championnat_equipes");
-    console.log("[Disponibilites] Journées extraites par épreuve:", {
-      championnat_equipes: equipesPhases?.size || 0,
-      championnat_paris: parisPhases?.size || 0,
-      details: {
-        championnat_equipes: equipesPhases
-          ? Array.from(equipesPhases.entries()).map(([phase, phaseMap]) => ({
-              phase,
-              journees: Array.from(phaseMap.keys()),
-            }))
-          : [],
-        championnat_paris: parisPhases
-          ? Array.from(parisPhases.entries()).map(([phase, phaseMap]) => ({
-              phase,
-              journees: Array.from(phaseMap.keys()),
-            }))
-          : [],
-      },
-    });
-
-    return journeesMap;
-  }, [equipes, equipesByType.feminin, equipesByType.masculin]);
-
-  // Extraire les journées pour l'épreuve sélectionnée
-  const journeesByPhase = useMemo(() => {
-    if (!selectedEpreuve) {
-      return new Map<
-        "aller" | "retour",
-        Map<
-          number,
-          { journee: number; phase: "aller" | "retour"; dates: Date[] }
-        >
-      >();
-    }
-    return journeesByEpreuveAndPhase.get(selectedEpreuve) || new Map();
-  }, [selectedEpreuve, journeesByEpreuveAndPhase]);
-
-  // Calculer l'épreuve avec la prochaine journée la plus proche (basée sur la date de début)
-  const defaultEpreuve = useMemo(() => {
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-
-    let closestEpreuve: EpreuveType | null = null;
-    let closestDate: Date | null = null;
-
-    for (const [epreuve, epreuveMap] of journeesByEpreuveAndPhase) {
-      for (const [phase, phaseMap] of epreuveMap) {
-        for (const [journee, journeeData] of phaseMap) {
-          if (journeeData.dates.length > 0) {
-            // Utiliser la date de début (minimum) plutôt que la fin
-            const debutJournee = new Date(
-              Math.min(...journeeData.dates.map((d) => d.getTime()))
-            );
-            debutJournee.setHours(0, 0, 0, 0);
-
-            if (debutJournee >= now) {
-              if (!closestDate || debutJournee < closestDate) {
-                closestDate = new Date(debutJournee);
-                closestEpreuve = epreuve;
-                console.log(
-                  `[Disponibilites] Nouvelle épreuve la plus proche: ${epreuve}, journée ${journee}, phase ${phase}, date: ${
-                    debutJournee.toISOString().split("T")[0]
-                  }`
-                );
-              }
-            }
-          }
-        }
-      }
-    }
-
-    const formattedDate: string =
-      closestDate !== null
-        ? (closestDate as Date).toISOString().split("T")[0]
-        : "aucune";
-    console.log(
-      `[Disponibilites] Épreuve par défaut sélectionnée: ${
-        closestEpreuve || "championnat_equipes"
-      }, date la plus proche: ${formattedDate}`
-    );
-    return (closestEpreuve ||
-      ("championnat_equipes" as EpreuveType)) as EpreuveType; // Fallback sur championnat_equipes
-  }, [journeesByEpreuveAndPhase]);
+  const {
+    journeesByPhase,
+    defaultEpreuve,
+    hasDataForEpreuve,
+  } = useJourneesData(equipes, selectedEpreuve, selectedPhase);
 
   // Initialiser selectedEpreuve avec l'épreuve par défaut
-  // Utiliser une ref pour suivre si on a déjà initialisé une fois
   const hasInitializedEpreuve = React.useRef(false);
 
   useEffect(() => {
-    // Initialiser seulement si :
-    // 1. On n'a pas encore initialisé ET selectedEpreuve est null
-    // 2. OU on n'a pas encore initialisé ET defaultEpreuve est disponible
-    if (!hasInitializedEpreuve.current) {
-      if (defaultEpreuve && journeesByEpreuveAndPhase.has(defaultEpreuve)) {
-        // Vérifier que defaultEpreuve a des données réelles (pas juste le fallback)
-        const hasRealData = Array.from(
-          journeesByEpreuveAndPhase.get(defaultEpreuve)?.values() || []
-        ).some((phaseMap) => phaseMap.size > 0);
-        if (hasRealData) {
-          setSelectedEpreuve(defaultEpreuve);
-          hasInitializedEpreuve.current = true;
-        }
-      }
+    if (!hasInitializedEpreuve.current && hasDataForEpreuve(defaultEpreuve)) {
+      setSelectedEpreuve(defaultEpreuve);
+      hasInitializedEpreuve.current = true;
     }
-  }, [
-    defaultEpreuve,
-    journeesByEpreuveAndPhase,
-    selectedEpreuve,
-    setSelectedEpreuve,
-  ]);
+  }, [defaultEpreuve, hasDataForEpreuve, selectedEpreuve, setSelectedEpreuve]);
 
   usePhasePreselect({
     equipes,
@@ -1110,129 +866,79 @@ export default function DisponibilitesPage() {
                   : {})}
                 epreuveType={selectedEpreuve}
                 {...(() => {
-                  // Extraire automatiquement la date pour le championnat de Paris
+                  const phaseToUse =
+                    selectedEpreuve === "championnat_paris"
+                      ? "aller"
+                      : selectedPhase;
+                  const journeeData =
+                    phaseToUse && selectedJournee !== null
+                      ? journeesByPhase.get(phaseToUse)?.get(selectedJournee)
+                      : undefined;
+
                   if (
-                    selectedEpreuve === "championnat_paris" &&
                     selectedJournee !== null &&
-                    selectedPhase !== null &&
-                    journeesByEpreuveAndPhase.has("championnat_paris")
+                    journeeData &&
+                    journeeData.dates.length > 0
                   ) {
-                    const parisEpreuveMap = journeesByEpreuveAndPhase.get("championnat_paris");
-                    const parisPhaseMap = parisEpreuveMap?.get(selectedPhase);
-                    const parisJourneeData = parisPhaseMap?.get(selectedJournee);
-                    
-                    if (parisJourneeData && parisJourneeData.dates.length > 0) {
-                      // Prendre la première date (ou la date la plus proche)
-                      const sortedDates = [...parisJourneeData.dates].sort(
-                        (a, b) => a.getTime() - b.getTime()
-                      );
+                    const sortedDates = [...journeeData.dates].sort(
+                      (a, b) => a.getTime() - b.getTime()
+                    );
+
+                    if (selectedEpreuve === "championnat_paris") {
                       const firstDate = sortedDates[0];
-                      // Formater la date en YYYY-MM-DD en évitant les problèmes de timezone
                       const year = firstDate.getFullYear();
-                      const month = String(firstDate.getMonth() + 1).padStart(2, "0");
+                      const month = String(
+                        firstDate.getMonth() + 1
+                      ).padStart(2, "0");
                       const day = String(firstDate.getDate()).padStart(2, "0");
-                      const dateStr = `${year}-${month}-${day}`;
-                      return { date: dateStr };
+                      return { date: `${year}-${month}-${day}` };
                     }
-                  }
-                  
-                  // Extraire automatiquement les dates vendredi/samedi depuis les matchs
-                  if (
-                    selectedEpreuve === "championnat_equipes" &&
-                    selectedJournee !== null &&
-                    selectedPhase !== null &&
-                    journeesByPhase.has(selectedPhase)
-                  ) {
-                    const journeeData = journeesByPhase
-                      .get(selectedPhase)
-                      ?.get(selectedJournee);
-                    if (journeeData && journeeData.dates.length > 0) {
-                      // Trier les dates
-                      const sortedDates = [...journeeData.dates].sort(
-                        (a, b) => a.getTime() - b.getTime()
+
+                    // Championnat par équipes : vendredi/samedi
+                    let fridayDate: Date | null = null;
+                    let saturdayDate: Date | null = null;
+
+                    for (const date of sortedDates) {
+                      const normalizedDate = new Date(
+                        date.getFullYear(),
+                        date.getMonth(),
+                        date.getDate()
                       );
+                      const dayOfWeek = normalizedDate.getDay();
+                      if (dayOfWeek === 5 && !fridayDate) {
+                        fridayDate = normalizedDate;
+                      } else if (dayOfWeek === 6 && !saturdayDate) {
+                        saturdayDate = normalizedDate;
+                      }
+                    }
 
-                      console.log(
-                        "[DiscordPollManager] Dates trouvées pour la journée:",
-                        {
-                          journee: selectedJournee,
-                          phase: selectedPhase,
-                          dates: sortedDates.map((d) => ({
-                            date: d.toISOString().split("T")[0],
-                            dayOfWeek: d.getDay(),
-                            dayName: d.toLocaleDateString("fr-FR", {
-                              weekday: "long",
-                            }),
-                          })),
-                        }
+                    const result: {
+                      fridayDate?: string;
+                      saturdayDate?: string;
+                    } = {};
+
+                    if (fridayDate) {
+                      const year = fridayDate.getFullYear();
+                      const month = String(
+                        fridayDate.getMonth() + 1
+                      ).padStart(2, "0");
+                      const day = String(fridayDate.getDate()).padStart(2, "0");
+                      result.fridayDate = `${year}-${month}-${day}`;
+                    }
+                    if (saturdayDate) {
+                      const year = saturdayDate.getFullYear();
+                      const month = String(
+                        saturdayDate.getMonth() + 1
+                      ).padStart(2, "0");
+                      const day = String(saturdayDate.getDate()).padStart(
+                        2,
+                        "0"
                       );
+                      result.saturdayDate = `${year}-${month}-${day}`;
+                    }
 
-                      // Identifier vendredi (jour 5) et samedi (jour 6) parmi toutes les dates
-                      // Normaliser les dates pour éviter les problèmes de timezone
-                      let fridayDate: Date | null = null;
-                      let saturdayDate: Date | null = null;
-
-                      for (const date of sortedDates) {
-                        // Normaliser la date en créant une nouvelle date avec uniquement année/mois/jour
-                        // pour éviter les problèmes de timezone
-                        const normalizedDate = new Date(
-                          date.getFullYear(),
-                          date.getMonth(),
-                          date.getDate()
-                        );
-                        const dayOfWeek = normalizedDate.getDay(); // 0 = dimanche, 5 = vendredi, 6 = samedi
-                        if (dayOfWeek === 5 && !fridayDate) {
-                          fridayDate = normalizedDate;
-                        } else if (dayOfWeek === 6 && !saturdayDate) {
-                          saturdayDate = normalizedDate;
-                        }
-                      }
-
-                      console.log(
-                        "[DiscordPollManager] Dates vendredi/samedi identifiées:",
-                        {
-                          fridayDate: fridayDate
-                            ? fridayDate.toISOString().split("T")[0]
-                            : null,
-                          saturdayDate: saturdayDate
-                            ? saturdayDate.toISOString().split("T")[0]
-                            : null,
-                        }
-                      );
-
-                      // Retourner les dates trouvées
-                      const result: {
-                        fridayDate?: string;
-                        saturdayDate?: string;
-                      } = {};
-
-                      if (fridayDate) {
-                        // Formater la date en YYYY-MM-DD en évitant les problèmes de timezone
-                        const year = fridayDate.getFullYear();
-                        const month = String(
-                          fridayDate.getMonth() + 1
-                        ).padStart(2, "0");
-                        const day = String(fridayDate.getDate()).padStart(
-                          2,
-                          "0"
-                        );
-                        result.fridayDate = `${year}-${month}-${day}`;
-                      }
-                      if (saturdayDate) {
-                        const year = saturdayDate.getFullYear();
-                        const month = String(
-                          saturdayDate.getMonth() + 1
-                        ).padStart(2, "0");
-                        const day = String(saturdayDate.getDate()).padStart(
-                          2,
-                          "0"
-                        );
-                        result.saturdayDate = `${year}-${month}-${day}`;
-                      }
-
-                      if (Object.keys(result).length > 0) {
-                        return result;
-                      }
+                    if (Object.keys(result).length > 0) {
+                      return result;
                     }
                   }
                   return {};
