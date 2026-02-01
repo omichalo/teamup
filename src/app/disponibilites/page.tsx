@@ -55,6 +55,7 @@ import {
   buildPlayersPayload,
 } from "@/lib/availability/utils";
 import { useAvailabilityStore } from "@/stores/availabilityStore";
+import { usePhasePreselect } from "@/hooks/usePhasePreselect";
 import { EpreuveSelect } from "@/components/compositions/Filters/EpreuveSelect";
 import { PhaseSelect } from "@/components/compositions/Filters/PhaseSelect";
 import { SearchInput } from "@/components/compositions/Filters/SearchInput";
@@ -416,12 +417,14 @@ export default function DisponibilitesPage() {
     setSelectedEpreuve,
   ]);
 
-  // Initialiser selectedPhase avec la phase en cours
-  useEffect(() => {
-    if (selectedPhase === null && currentPhase) {
-      setSelectedPhase(currentPhase);
-    }
-  }, [currentPhase, selectedPhase, setSelectedPhase]);
+  usePhasePreselect({
+    equipes,
+    loadingEquipes,
+    currentPhase,
+    selectedEpreuve,
+    selectedPhase,
+    setSelectedPhase,
+  });
 
   // Initialiser selectedJournee avec la prochaine journée dans le futur (basée sur la date de début)
   useEffect(() => {
