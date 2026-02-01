@@ -641,12 +641,11 @@ export function DiscordPollManager({
     setSuccess(null);
 
     try {
-      // Envoyer le messageTemplate seulement s'il a été modifié (différent du message par défaut)
-      const defaultMsg = getDefaultMessage();
+      // Envoyer le message affiché dans la popup (ce que l'utilisateur voit = ce qu'on envoie)
+      // Ainsi on évite que l'API reconstruise un message vide si fridayDate/saturdayDate manquent
+      const displayedMessage = messageTemplate || getDefaultMessage();
       const finalMessageTemplate =
-        messageTemplate.trim() && messageTemplate.trim() !== defaultMsg.trim()
-          ? messageTemplate.trim()
-          : undefined;
+        displayedMessage.trim().length > 0 ? displayedMessage.trim() : undefined;
 
       const response = await fetch("/api/discord/availability-polls/create", {
         method: "POST",
