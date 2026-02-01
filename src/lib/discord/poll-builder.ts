@@ -181,14 +181,10 @@ export function buildAvailabilityPollMessage(
       }>;
     }>;
   } = {
+    content: description,
     embeds: [embed],
     components,
   };
-
-  // Ajouter la mention au début du message si fournie
-  if (mention) {
-    result.content = mention;
-  }
 
   return result;
 }
