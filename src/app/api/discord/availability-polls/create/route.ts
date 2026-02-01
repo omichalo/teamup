@@ -168,16 +168,6 @@ export async function POST(req: Request) {
       : `${phase}_${journee}_${pollChampionshipType}${idEpreuve ? `_${idEpreuve}` : ""}`;
 
     // Construire le message Discord
-    console.log("[Discord Poll Create] Création du sondage:", {
-      pollId,
-      journee,
-      phase,
-      pollChampionshipType,
-      isTeamChampionship,
-      idEpreuve,
-      epreuveType,
-      date,
-    });
     const message = buildAvailabilityPollMessage(
       pollId,
       journee,
@@ -190,14 +180,6 @@ export async function POST(req: Request) {
       saturdayDate,
       mention
     );
-    console.log("[Discord Poll Create] Message Discord construit:", {
-      embedTitle: message.embeds[0]?.title,
-      componentsCount: message.components.length,
-      buttonsCount: message.components.reduce(
-        (acc, row) => acc + row.components.length,
-        0
-      ),
-    });
 
     // Envoyer le message Discord
     const discordResponse = await fetch(

@@ -121,9 +121,12 @@ export async function POST(
       : config?.parisMention || null;
 
     // Construire le message final (avec mention si fournie)
-    let finalMessage =
-      messageTemplate ||
+    const defaultCloseMessage =
       "Les inscriptions sont terminées pour cette journée.\n\nSi vous voulez vous ajoutez, il faut envoyer un message à Joffrey en privé.";
+    let finalMessage =
+      typeof messageTemplate === "string" && messageTemplate.trim().length > 0
+        ? messageTemplate.trim()
+        : defaultCloseMessage;
 
     // Ajouter "Bonjour {mention}" au début si la mention est configurée et qu'elle n'est pas déjà présente
     if (mention) {

@@ -71,14 +71,17 @@ export function buildAvailabilityPollMessage(
     : null;
 
   // Construire la description du message
+  // Ne pas utiliser un messageTemplate vide ou uniquement des espaces
+  const hasValidTemplate =
+    typeof messageTemplate === "string" && messageTemplate.trim().length > 0;
+
   let description: string;
-  if (messageTemplate) {
-    // Utiliser le template personnalisé tel quel
-    description = messageTemplate;
-    
+  if (hasValidTemplate) {
+    description = messageTemplate!.trim();
+
     // Vérifier si la mention est déjà présente dans le messageTemplate
-    // Si oui, ne pas l'ajouter à nouveau
-    const mentionAlreadyPresent = mention && description.trim().startsWith(mention.trim());
+    const mentionAlreadyPresent =
+      mention && description.startsWith(mention.trim());
     if (mention && !mentionAlreadyPresent) {
       description = `${mention}\n\n${description}`;
     }
@@ -90,9 +93,8 @@ export function buildAvailabilityPollMessage(
       description = `${mention}\n\n${description}`;
     }
   } else if (isTeamChampionship) {
-    // Template par défaut pour le championnat par équipes sans dates spécifiques
+    // Template par défaut pour le championnat par équipes sans dates
     description = `Bonjour,\n\nProchaine journée de championnat par équipes - Journée ${journee}, Phase ${phaseLabel}.\n\nMerci de me dire si vous êtes disponibles!\n\nPour les filles, merci de préciser vendredi et/ou samedi.`;
-    // Ajouter la mention au début si fournie
     if (mention) {
       description = `${mention}\n\n${description}`;
     }
@@ -105,6 +107,14 @@ export function buildAvailabilityPollMessage(
     if (mention) {
       description = `${mention}\n\n${description}`;
     }
+  }
+
+  // Garantir qu'il y a toujours du contenu (évite un message vide hormis mention et boutons)
+  const fallbackDescription = isTeamChampionship
+    ? `Bonjour,\n\nProchaine journée de championnat par équipes - Journée ${journee}, Phase ${phaseLabel}.\n\nMerci de me dire si vous êtes disponibles!`
+    : `Bonjour,\n\nProchaine journée de championnat de Paris - Journée ${journee}.\n\nMerci de me dire si vous êtes disponibles!`;
+  if (!description || !description.trim()) {
+    description = mention ? `${mention}\n\n${fallbackDescription}` : fallbackDescription;
   }
 
   const embed = {
