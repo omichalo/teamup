@@ -51,6 +51,7 @@ import {
   getIdEpreuve,
   getMatchEpreuve,
 } from "@/lib/shared/epreuve-utils";
+import { useJourneesData } from "@/hooks/useJourneesData";
 import {
   JOURNEE_CONCERNEE_PAR_REGLE,
   AssignmentValidationResult,
@@ -471,170 +472,22 @@ export function CompositionsPageContainer() {
     });
   }, [equipes, selectedEpreuve]);
 
-  // Extraire les journées depuis les matchs, groupées par épreuve et phase avec leurs dates
-  // Utiliser toutes les équipes (pas filteredEquipes) pour calculer defaultEpreuve correctement
-  const journeesByEpreuveAndPhase = useMemo(() => {
-    const journeesMap = new Map<
-      EpreuveType,
-      Map<
-        "aller" | "retour",
-        Map<
-          number,
-          { journee: number; phase: "aller" | "retour"; dates: Date[] }
-        >
-      >
-    >();
-
-    equipes.forEach((equipe) => {
-      equipe.matches.forEach((match) => {
-        const epreuve = getMatchEpreuve(match, equipe.team);
-
-        if (!epreuve || !match.journee || !match.phase) {
-          return;
-        }
-
-        // Pour le championnat de Paris, accepter toutes les phases (il n'y en a qu'une)
-        // Pour le championnat par équipes, accepter uniquement "aller" et "retour"
-        const phaseLower = match.phase.toLowerCase();
-        let phase: "aller" | "retour";
-
-        if (epreuve === "championnat_paris") {
-          // Pour Paris, normaliser toutes les phases en "aller" (car il n'y a qu'une phase)
-          phase = "aller";
-        } else if (phaseLower === "aller" || phaseLower === "retour") {
-          phase = phaseLower as "aller" | "retour";
-        } else {
-          // Phase non reconnue pour le championnat par équipes
-          return;
-        }
-
-        if (!journeesMap.has(epreuve)) {
-          journeesMap.set(epreuve, new Map());
-        }
-        const epreuveMap = journeesMap.get(epreuve)!;
-
-        if (!epreuveMap.has(phase)) {
-          epreuveMap.set(phase, new Map());
-        }
-        const phaseMap = epreuveMap.get(phase)!;
-
-        const matchDate =
-          match.date instanceof Date ? match.date : new Date(match.date);
-
-        if (!phaseMap.has(match.journee)) {
-          phaseMap.set(match.journee, {
-            journee: match.journee,
-            phase,
-            dates: [matchDate],
-          });
-        } else {
-          const journeeData = phaseMap.get(match.journee)!;
-          // Ajouter la date si elle n'existe pas déjà (même jour)
-          const dateStr = matchDate.toDateString();
-          const exists = journeeData.dates.some(
-            (d) => d.toDateString() === dateStr
-          );
-          if (!exists) {
-            journeeData.dates.push(matchDate);
-          }
-        }
-      });
-    });
-
-    // Trier les dates pour chaque journée
-    journeesMap.forEach((epreuveMap) => {
-      epreuveMap.forEach((phaseMap) => {
-        phaseMap.forEach((journeeData) => {
-          journeeData.dates.sort((a, b) => a.getTime() - b.getTime());
-        });
-      });
-    });
-
-    return journeesMap;
-  }, [equipes]);
-
-  // Extraire les journées pour l'épreuve sélectionnée
-  const journeesByPhase = useMemo(() => {
-    if (!selectedEpreuve) {
-      return new Map<
-        "aller" | "retour",
-        Map<
-          number,
-          { journee: number; phase: "aller" | "retour"; dates: Date[] }
-        >
-      >();
-    }
-    return journeesByEpreuveAndPhase.get(selectedEpreuve) || new Map();
-  }, [selectedEpreuve, journeesByEpreuveAndPhase]);
-
-  // Calculer l'épreuve avec la prochaine journée la plus proche (basée sur la date de début)
-  const defaultEpreuve = useMemo(() => {
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-
-    let closestEpreuve: EpreuveType | null = null;
-    let closestDate: Date | null = null;
-
-    for (const [epreuve, epreuveMap] of journeesByEpreuveAndPhase) {
-      for (const [phase, phaseMap] of epreuveMap) {
-        for (const [journee, journeeData] of phaseMap) {
-          if (journeeData.dates.length > 0) {
-            // Utiliser la date de début (minimum) plutôt que la fin
-            const debutJournee = new Date(
-              Math.min(...journeeData.dates.map((d) => d.getTime()))
-            );
-            debutJournee.setHours(0, 0, 0, 0);
-
-            if (debutJournee >= now) {
-              if (!closestDate || debutJournee < closestDate) {
-                closestDate = new Date(debutJournee);
-                closestEpreuve = epreuve;
-                console.log(
-                  `[Compositions] Nouvelle épreuve la plus proche: ${epreuve}, journée ${journee}, phase ${phase}, date: ${
-                    debutJournee.toISOString().split("T")[0]
-                  }`
-                );
-              }
-            }
-          }
-        }
-      }
-    }
-
-    const formattedDate: string =
-      closestDate !== null
-        ? (closestDate as Date).toISOString().split("T")[0]
-        : "aucune";
-    console.log(
-      `[Compositions] Épreuve par défaut sélectionnée: ${
-        closestEpreuve || "championnat_equipes"
-      }, date la plus proche: ${formattedDate}`
-    );
-    return (closestEpreuve ||
-      ("championnat_equipes" as EpreuveType)) as EpreuveType; // Fallback sur championnat_equipes
-  }, [journeesByEpreuveAndPhase]);
+  const {
+    journeesByPhase,
+    defaultEpreuve,
+    hasDataForEpreuve,
+  } = useJourneesData(equipes, selectedEpreuve, selectedPhase);
 
   // Initialiser selectedEpreuve avec l'épreuve par défaut
   // Utiliser une ref pour suivre si on a déjà initialisé une fois
   const hasInitializedEpreuve = React.useRef(false);
 
   useEffect(() => {
-    // Initialiser seulement si :
-    // 1. On n'a pas encore initialisé ET selectedEpreuve est null
-    // 2. OU on n'a pas encore initialisé ET defaultEpreuve est disponible
-    if (!hasInitializedEpreuve.current) {
-      if (defaultEpreuve && journeesByEpreuveAndPhase.has(defaultEpreuve)) {
-        // Vérifier que defaultEpreuve a des données réelles (pas juste le fallback)
-        const hasRealData = Array.from(
-          journeesByEpreuveAndPhase.get(defaultEpreuve)?.values() || []
-        ).some((phaseMap) => phaseMap.size > 0);
-        if (hasRealData) {
-          setSelectedEpreuve(defaultEpreuve);
-          hasInitializedEpreuve.current = true;
-        }
-      }
+    if (!hasInitializedEpreuve.current && hasDataForEpreuve(defaultEpreuve)) {
+      setSelectedEpreuve(defaultEpreuve);
+      hasInitializedEpreuve.current = true;
     }
-  }, [defaultEpreuve, selectedEpreuve, journeesByEpreuveAndPhase]);
+  }, [defaultEpreuve, hasDataForEpreuve, selectedEpreuve, setSelectedEpreuve]);
 
   usePhasePreselect({
     equipes,

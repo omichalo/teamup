@@ -352,11 +352,14 @@ export class TeamMatchesSyncService {
         }
       }
 
+      const matchesWithJournees =
+        this.recalculateJourneesByDate(processedMatches);
+
       return {
         success: true,
-        matchesCount: processedMatches.length,
-        message: `Synchronisation réussie: ${processedMatches.length} matchs pour ${equipe.libelle}`,
-        processedMatches,
+        matchesCount: matchesWithJournees.length,
+        message: `Synchronisation réussie: ${matchesWithJournees.length} matchs pour ${equipe.libelle}`,
+        processedMatches: matchesWithJournees,
       };
     } catch (error) {
       console.error(
@@ -1804,57 +1807,37 @@ export class TeamMatchesSyncService {
   }
 
   /**
-   * Recalcule les numéros de journée en fonction de la date des matchs
-   * Si un match a déjà une journée > 1 extraite depuis le libellé, on la garde
-   * Sinon, on calcule en fonction de la position dans la liste triée par date
+   * Assigne le numéro de journée d'après la position du match (1er, 2e, 3e...)
+   * dans l'ordre chronologique, par équipe ET par phase.
+   * Grouper par (teamId, phase) évite de mélanger Phase 1 (aller) et Phase 2 (retour)
+   * pour une même équipe (ex. team_1 fallback ou équipes partageant un identifiant).
    */
   private recalculateJourneesByDate(matches: MatchData[]): MatchData[] {
-    // Grouper les matchs par équipe
-    const matchesByTeam = new Map<string, MatchData[]>();
+    const matchesByTeamAndPhase = new Map<string, MatchData[]>();
 
     matches.forEach((match) => {
-      const teamKey = match.teamId || `team_${match.teamNumber}`;
-      if (!matchesByTeam.has(teamKey)) {
-        matchesByTeam.set(teamKey, []);
+      const teamId =
+        match.teamId?.trim() ||
+        `team_${match.teamNumber}_${match.isFemale ? "F" : "M"}`;
+      const phase = (match.phase || "aller").toLowerCase();
+      const teamPhaseKey = `${teamId}|${phase}`;
+      if (!matchesByTeamAndPhase.has(teamPhaseKey)) {
+        matchesByTeamAndPhase.set(teamPhaseKey, []);
       }
-      matchesByTeam.get(teamKey)!.push(match);
+      matchesByTeamAndPhase.get(teamPhaseKey)!.push(match);
     });
 
-    // Pour chaque équipe, recalculer les journées
     const recalculatedMatches: MatchData[] = [];
 
-    matchesByTeam.forEach((teamMatches) => {
-      // Trier par date
+    matchesByTeamAndPhase.forEach((teamMatches) => {
       const sortedMatches = [...teamMatches].sort((a, b) => {
         const dateA = new Date(a.date).getTime();
         const dateB = new Date(b.date).getTime();
         return dateA - dateB;
       });
 
-      // Groupement par date (matchs le même jour = même journée)
-      const matchesByDate = new Map<string, MatchData[]>();
-      sortedMatches.forEach((match) => {
-        const dateKey = new Date(match.date).toDateString();
-        if (!matchesByDate.has(dateKey)) {
-          matchesByDate.set(dateKey, []);
-        }
-        matchesByDate.get(dateKey)!.push(match);
-      });
-
-      // Assigner le numéro de journée basé sur l'ordre des dates uniques
-      const uniqueDates = Array.from(matchesByDate.keys()).sort((a, b) => {
-        return new Date(a).getTime() - new Date(b).getTime();
-      });
-
-      uniqueDates.forEach((dateKey, index) => {
-        const journee = index + 1;
-        matchesByDate.get(dateKey)!.forEach((match) => {
-          // Ne remplacer la journée que si elle vaut 1 (non extraite ou extraction échouée)
-          // Sinon, on garde la journée extraite depuis le libellé
-          if (match.journee === 1) {
-            match.journee = journee;
-          }
-        });
+      sortedMatches.forEach((match, index) => {
+        match.journee = index + 1;
       });
 
       recalculatedMatches.push(...sortedMatches);
