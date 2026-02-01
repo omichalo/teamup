@@ -181,6 +181,34 @@ export async function POST(req: Request) {
       mention
     );
 
+    const embedDescription = message.embeds[0]?.description ?? "";
+    if (!embedDescription.trim()) {
+      console.error("[Discord Poll Create] Message vide refusé - contenu reçu:", {
+        journee,
+        phase,
+        pollChampionshipType,
+        isTeamChampionship,
+        idEpreuve,
+        epreuveType,
+        date,
+        fridayDate,
+        saturdayDate,
+        messageTemplate:
+          typeof messageTemplate === "string"
+            ? `${messageTemplate.length} car. : "${messageTemplate.substring(0, 200)}${messageTemplate.length > 200 ? "..." : ""}"`
+            : messageTemplate,
+        embedDescriptionLength: embedDescription.length,
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "Le message ne peut pas être vide. Veuillez saisir un contenu pour le sondage.",
+        },
+        { status: 400 }
+      );
+    }
+
     // Envoyer le message Discord
     const discordResponse = await fetch(
       `https://discord.com/api/v10/channels/${targetChannelId}/messages`,
