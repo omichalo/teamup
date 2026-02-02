@@ -6,6 +6,7 @@ import {
   getDefaultDivision,
   getDefaultEpreuve,
   getJourneesByPhaseForDivision,
+  getJourneesByPhaseMerged,
   type JourneeData,
   type JourneesByEpreuvePhaseDivision,
 } from "@/lib/shared/journee-dates-utils";
@@ -46,7 +47,13 @@ export function useJourneesData(
   const phaseToUse =
     selectedEpreuve === "championnat_paris" ? "aller" : selectedPhase;
 
-  const journeesByPhase = useMemo(() => {
+  const journeesByPhase = useMemo((): Map<"aller" | "retour", Map<number, JourneeData>> => {
+    if (!selectedEpreuve) return new Map();
+    // Championnat par équipes : fusionner les dates de toutes les divisions de la phase
+    // (samedi + dimanche pour une même journée, ex. 09/01 et 10/01 pour J7).
+    if (selectedEpreuve === "championnat_equipes") {
+      return getJourneesByPhaseMerged(journeesData, selectedEpreuve);
+    }
     const division = getDefaultDivision(
       journeesData,
       selectedEpreuve,

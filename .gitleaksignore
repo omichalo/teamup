@@ -4,3 +4,7 @@
 # Ignore la clé privée fictive dans .env.example (ligne 37)
 # C'est une valeur d'exemple pour la documentation, pas un vrai secret
 eb060e5f5844f3ccd9789aa132ae5c6bd66dc6b6:.env.example:private-key:37
+
+# Ignore l'exemple DISCORD_APPLICATION_ID dans scripts/register-discord-command.ts
+# C'est un placeholder de documentation, pas un vrai secret
+ebdea02acda725d0eaaf2806c298bc3fa3fa44d9:scripts/register-discord-command.ts:discord-client-id:79

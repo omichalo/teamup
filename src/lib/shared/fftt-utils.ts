@@ -103,10 +103,21 @@ export const extractClubName = (libelle: string): string => {
 };
 
 // Utilitaires pour déterminer la phase et le résultat
+// Regex pour couvrir "Phase 2", "Phase2", "Phase  2", etc.
+const PHASE_2_PATTERN = /phase\s*2/i;
+const PHASE_1_PATTERN = /phase\s*1/i;
+
+/** Indique si le libellé de division correspond à la phase 2 (retour). */
+export const divisionIndicatesPhase2 = (division: string): boolean =>
+  PHASE_2_PATTERN.test(division);
+
+/** Indique si le libellé de division correspond à la phase 1 (aller). */
+export const divisionIndicatesPhase1 = (division: string): boolean =>
+  PHASE_1_PATTERN.test(division);
+
 export const determinePhaseFromDivision = (division: string): string => {
-  const d = division.toLowerCase();
-  if (d.includes("phase 1")) return "aller";
-  if (d.includes("phase 2")) return "retour";
+  if (divisionIndicatesPhase2(division)) return "retour";
+  if (divisionIndicatesPhase1(division)) return "aller";
   return "aller";
 };
 
@@ -426,7 +437,7 @@ export const createBaseMatch = (
   return {
     id: extractRencontreId(rencontre.lien), // Utiliser uniquement le renc_id comme ID stable
     ffttId: rencontre.lien,
-    teamId: equipe.idEquipe.toString(), // Ajouter l&apos;ID de l&apos;équipe pour le mapping
+    teamId: `${equipe.idEquipe}_${determinePhaseFromDivision(equipe.division)}`,
     teamNumber,
     opponent: opponentClub,
     opponentClub,
@@ -452,7 +463,75 @@ export const createBaseMatch = (
     rencontreId: extractRencontreId(rencontre.lien),
     equipeIds: extractEquipeIds(rencontre.lien),
     lienDetails: rencontre.lien,
-    resultatsIndividuels: undefined,
+    ...(detailsRencontre
+      ? {
+          resultatsIndividuels: (() => {
+            const joueursAToRecord = (
+              arr: Array<{ nom: string; prenom: string; points?: number | null }>
+            ): Record<string, { nom: string; prenom: string; points?: number }> =>
+              Object.fromEntries(
+                arr.map((j) => {
+                  const key = `${(j.prenom || "").trim()} ${(j.nom || "").trim()}`.trim();
+                  return [
+                    key,
+                    {
+                      nom: j.nom || "",
+                      prenom: j.prenom || "",
+                      ...(typeof j.points === "number" ? { points: j.points } : {}),
+                    },
+                  ];
+                })
+              );
+            const joueursA =
+              Array.isArray(detailsRencontre.joueursA) &&
+              detailsRencontre.joueursA.length > 0
+                ? joueursAToRecord(
+                    detailsRencontre.joueursA as Array<{
+                      nom: string;
+                      prenom: string;
+                      points?: number | null;
+                    }>
+                  )
+                : undefined;
+            const joueursB =
+              Array.isArray(detailsRencontre.joueursB) &&
+              detailsRencontre.joueursB.length > 0
+                ? joueursAToRecord(
+                    detailsRencontre.joueursB as Array<{
+                      nom: string;
+                      prenom: string;
+                      points?: number | null;
+                    }>
+                  )
+                : undefined;
+            const parties = Array.isArray(detailsRencontre.parties)
+              ? detailsRencontre.parties.map((p) => ({
+                  joueurA: p.adversaireA ?? "",
+                  joueurB: p.adversaireB ?? "",
+                  scoreA: p.scoreA,
+                  scoreB: p.scoreB,
+                  adversaireA: p.adversaireA,
+                  adversaireB: p.adversaireB,
+                  ...(p.setDetails
+                    ? {
+                        setDetails:
+                          typeof p.setDetails === "string"
+                            ? p.setDetails.split(/\s*-\s*/).filter(Boolean)
+                            : [],
+                      }
+                    : {}),
+                }))
+              : undefined;
+            return {
+              nomEquipeA: detailsRencontre.nomEquipeA,
+              nomEquipeB: detailsRencontre.nomEquipeB,
+              ...(joueursA ? { joueursA } : {}),
+              ...(joueursB ? { joueursB } : {}),
+              ...(parties && parties.length > 0 ? { parties } : {}),
+            };
+          })(),
+        }
+      : { resultatsIndividuels: undefined }),
     createdAt: new Date(),
     updatedAt: new Date(),
     // Informations des joueurs pour les conditions de brûlage
