@@ -7,6 +7,7 @@ import { getFirebaseErrorMessage } from "@/lib/firebase-error-utils";
 import { checkRateLimit } from "@/lib/auth/rate-limit";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   try {
