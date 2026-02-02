@@ -46,12 +46,14 @@ import {
   getPlayersByType,
   getTeamsByType,
 } from "@/lib/compositions/championship-utils";
+import { divisionIndicatesPhase2 } from "@/lib/shared/fftt-utils";
 import type { Player } from "@/types/team-management";
 import { AvailablePlayersPanel } from "@/components/compositions/AvailablePlayersPanel";
 import { TeamCompositionCard } from "@/components/compositions/TeamCompositionCard";
 import { CompositionsSummary } from "@/components/compositions/CompositionsSummary";
 import { CompositionRulesHelp, type CompositionRuleItem } from "@/components/compositions/CompositionRulesHelp";
 import { usePhasePreselect } from "@/hooks/usePhasePreselect";
+import { useJourneesData } from "@/hooks/useJourneesData";
 import { usePlayerDrag } from "@/hooks/usePlayerDrag";
 import { EpreuveSelect } from "@/components/compositions/Filters/EpreuveSelect";
 import { PhaseSelect } from "@/components/compositions/Filters/PhaseSelect";
@@ -70,7 +72,7 @@ const MIN_PLAYERS_FOR_DEFAULT_COMPLETION = 4;
 export function DefaultCompositionsContainer() {
   const { equipes, loading: loadingEquipes, currentPhase } = useTeamData();
   const { players, loading: loadingPlayers } = usePlayers();
-  const [selectedEpreuve, setSelectedEpreuve] = useState<EpreuveType>("championnat_equipes");
+  const [selectedEpreuve, setSelectedEpreuve] = useState<EpreuveType | null>(null);
   const [selectedPhase, setSelectedPhase] = useState<"aller" | "retour" | null>(
     null
   );
@@ -99,6 +101,19 @@ export function DefaultCompositionsContainer() {
     () => new CompositionDefaultsService(),
     []
   );
+
+  const {
+    defaultEpreuve,
+    hasDataForEpreuve,
+  } = useJourneesData(equipes, selectedEpreuve, selectedPhase);
+
+  const hasInitializedEpreuve = React.useRef(false);
+  useEffect(() => {
+    if (!hasInitializedEpreuve.current && hasDataForEpreuve(defaultEpreuve)) {
+      setSelectedEpreuve(defaultEpreuve);
+      hasInitializedEpreuve.current = true;
+    }
+  }, [defaultEpreuve, hasDataForEpreuve, selectedEpreuve]);
 
   usePhasePreselect({
     equipes,
@@ -170,7 +185,9 @@ export function DefaultCompositionsContainer() {
     loadDefaults();
   }, [selectedPhase, compositionDefaultsService]);
 
-  // Filtrer les équipes selon l'épreuve sélectionnée
+  // Filtrer les équipes selon l'épreuve et la phase (même logique que CompositionsPageContainer)
+  // Championnat Paris : pas de filtre par phase (une seule phase)
+  // Championnat par équipes : Phase aller = équipes Phase 1, Phase retour = équipes Phase 2
   const filteredEquipes = useMemo(() => {
     if (!selectedEpreuve) {
       return equipes;
@@ -180,9 +197,14 @@ export function DefaultCompositionsContainer() {
         equipe.matches[0] || {},
         equipe.team
       );
-      return epreuve === selectedEpreuve;
+      if (epreuve !== selectedEpreuve) return false;
+      if (isParisEpreuve(selectedEpreuve)) return true;
+      const division = equipe.team.division ?? "";
+      if (selectedPhase === "aller") return !divisionIndicatesPhase2(division);
+      if (selectedPhase === "retour") return divisionIndicatesPhase2(division);
+      return true;
     });
-  }, [equipes, selectedEpreuve]);
+  }, [equipes, selectedEpreuve, selectedPhase]);
 
   const equipesByType = useMemo(
     () => getTeamsByType(filteredEquipes),
