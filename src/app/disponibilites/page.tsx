@@ -34,6 +34,7 @@ import {
   Comment as CommentIcon,
   DoneAll,
   Accessible as AccessibleIcon,
+  LinkOff as LinkOffIcon,
 } from "@mui/icons-material";
 import { useTeamData } from "@/hooks/useTeamData";
 import { useAvailabilities } from "@/hooks/useAvailabilities";
@@ -61,7 +62,7 @@ import { SearchInput } from "@/components/compositions/Filters/SearchInput";
 import { AvailabilityStatusChip } from "@/components/disponibilites/AvailabilityStatusChip";
 import { DiscordPollManager } from "@/components/disponibilites/DiscordPollManager";
 
-import { EpreuveType, getIdEpreuve } from "@/lib/shared/epreuve-utils";
+import { EpreuveType, getIdEpreuve, isParisEpreuve } from "@/lib/shared/epreuve-utils";
 import { useJourneesData } from "@/hooks/useJourneesData";
 
 export default function DisponibilitesPage() {
@@ -100,6 +101,9 @@ export default function DisponibilitesPage() {
   const [availabilityWarning, setAvailabilityWarning] = useState<string | null>(
     null
   );
+  type PendingDiscordFilter = "all" | "with_discord" | "without_discord";
+  const [pendingDiscordFilter, setPendingDiscordFilter] =
+    useState<PendingDiscordFilter>("all");
 
   const handleWarningClose = useCallback(() => {
     setAvailabilityWarning(null);
@@ -230,17 +234,25 @@ export default function DisponibilitesPage() {
     let filtered = players;
 
     // Par défaut, seuls les joueurs participant au championnat sélectionné
+    // MAIS on inclut aussi les joueurs non inscrits qui ont répondu au sondage
     if (!showAllPlayers) {
       if (selectedEpreuve === "championnat_paris") {
         // Pour le championnat de Paris, filtrer par participation.championnatParis
-        filtered = filtered.filter(
-          (p) => p.participation?.championnatParis === true
-        );
+        // OU joueurs ayant répondu au sondage (availabilities.masculin.available défini)
+        filtered = filtered.filter((p) => {
+          const isRegistered = p.participation?.championnatParis === true;
+          const hasResponded = typeof availabilities[p.id]?.masculin?.available === "boolean";
+          return isRegistered || hasResponded;
+        });
       } else {
         // Pour le championnat par équipes, filtrer par participation.championnat
-        filtered = filtered.filter(
-          (p) => p.participation?.championnat === true
-        );
+        // OU joueurs ayant répondu au sondage (masculin ou féminin)
+        filtered = filtered.filter((p) => {
+          const isRegistered = p.participation?.championnat === true;
+          const hasRespondedMasculin = typeof availabilities[p.id]?.masculin?.available === "boolean";
+          const hasRespondedFeminin = typeof availabilities[p.id]?.feminin?.available === "boolean";
+          return isRegistered || hasRespondedMasculin || hasRespondedFeminin;
+        });
       }
     }
 
@@ -258,7 +270,7 @@ export default function DisponibilitesPage() {
     }
 
     return filtered;
-  }, [players, showAllPlayers, searchQuery, selectedEpreuve]);
+  }, [players, showAllPlayers, searchQuery, selectedEpreuve, availabilities]);
 
   // Séparer les joueurs ayant répondu et ceux en attente
   // Pour le championnat de Paris : un seul sondage, tous répondent une seule fois (masculin)
@@ -332,6 +344,19 @@ export default function DisponibilitesPage() {
       }
     });
   }, [filteredPlayers, availabilities, isParisChampionshipForResponse]);
+
+  // En attente : distinguer ceux avec / sans compte Discord
+  const pendingWithDiscord = useMemo(() => {
+    return pendingPlayers.filter((p) => !!p.discordMentions?.length);
+  }, [pendingPlayers]);
+  const pendingWithoutDiscord = useMemo(() => {
+    return pendingPlayers.filter((p) => !p.discordMentions?.length);
+  }, [pendingPlayers]);
+
+  // Tous les joueurs non associés à un compte Discord (filtre global)
+  const playersWithoutDiscord = useMemo(() => {
+    return filteredPlayers.filter((p) => !p.discordMentions?.length);
+  }, [filteredPlayers]);
 
   // Joueurs ayant répondu OK (disponible)
   const playersWithOK = useMemo(() => {
@@ -764,7 +789,7 @@ export default function DisponibilitesPage() {
                   setSelectedJournee(null);
                 }}
               />
-              {selectedEpreuve !== "championnat_paris" && (
+              {!isParisEpreuve(selectedEpreuve) && (
                 <PhaseSelect
                   value={selectedPhase}
                   onChange={(phase) => {
@@ -1009,6 +1034,11 @@ export default function DisponibilitesPage() {
                   icon={<Cancel fontSize="small" color="error" />}
                   iconPosition="start"
                 />
+                <Tab
+                  label={`Sans Discord (${playersWithoutDiscord.length})`}
+                  icon={<LinkOffIcon fontSize="small" color="action" />}
+                  iconPosition="start"
+                />
               </Tabs>
             </Box>
 
@@ -1034,6 +1064,7 @@ export default function DisponibilitesPage() {
                   availabilities={availabilities}
                   onAvailabilityChange={handleAvailabilityChange}
                   onCommentChange={handleCommentChange}
+                  selectedEpreuve={selectedEpreuve}
                 />
               </Box>
             )}
@@ -1048,12 +1079,45 @@ export default function DisponibilitesPage() {
                     Tous les joueurs ont répondu !
                   </Alert>
                 ) : (
-                  <PlayerList
-                    players={pendingPlayers}
-                    availabilities={availabilities}
-                    onAvailabilityChange={handleAvailabilityChange}
-                    onCommentChange={handleCommentChange}
-                  />
+                  <>
+                    <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 2 }}>
+                      <Chip
+                        label={`Tous (${pendingPlayers.length})`}
+                        onClick={() => setPendingDiscordFilter("all")}
+                        color={pendingDiscordFilter === "all" ? "primary" : "default"}
+                        variant={pendingDiscordFilter === "all" ? "filled" : "outlined"}
+                        size="small"
+                      />
+                      <Chip
+                        label={`Avec Discord (${pendingWithDiscord.length})`}
+                        onClick={() => setPendingDiscordFilter("with_discord")}
+                        color={pendingDiscordFilter === "with_discord" ? "primary" : "default"}
+                        variant={pendingDiscordFilter === "with_discord" ? "filled" : "outlined"}
+                        size="small"
+                      />
+                      <Chip
+                        icon={<LinkOffIcon sx={{ fontSize: 16 }} />}
+                        label={`Sans Discord (${pendingWithoutDiscord.length})`}
+                        onClick={() => setPendingDiscordFilter("without_discord")}
+                        color={pendingDiscordFilter === "without_discord" ? "primary" : "default"}
+                        variant={pendingDiscordFilter === "without_discord" ? "filled" : "outlined"}
+                        size="small"
+                      />
+                    </Box>
+                    <PlayerList
+                      players={
+                        pendingDiscordFilter === "with_discord"
+                          ? pendingWithDiscord
+                          : pendingDiscordFilter === "without_discord"
+                            ? pendingWithoutDiscord
+                            : pendingPlayers
+                      }
+                      availabilities={availabilities}
+                      onAvailabilityChange={handleAvailabilityChange}
+                      onCommentChange={handleCommentChange}
+                      selectedEpreuve={selectedEpreuve}
+                    />
+                  </>
                 )}
               </Box>
             )}
@@ -1073,6 +1137,7 @@ export default function DisponibilitesPage() {
                     availabilities={availabilities}
                     onAvailabilityChange={handleAvailabilityChange}
                     onCommentChange={handleCommentChange}
+                    selectedEpreuve={selectedEpreuve}
                   />
                 )}
               </Box>
@@ -1093,6 +1158,7 @@ export default function DisponibilitesPage() {
                     availabilities={availabilities}
                     onAvailabilityChange={handleAvailabilityChange}
                     onCommentChange={handleCommentChange}
+                    selectedEpreuve={selectedEpreuve}
                   />
                 )}
               </Box>
@@ -1113,6 +1179,28 @@ export default function DisponibilitesPage() {
                     availabilities={availabilities}
                     onAvailabilityChange={handleAvailabilityChange}
                     onCommentChange={handleCommentChange}
+                    selectedEpreuve={selectedEpreuve}
+                  />
+                )}
+              </Box>
+            )}
+
+            {tabValue === 6 && (
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Joueurs non associés à un compte Discord
+                </Typography>
+                {playersWithoutDiscord.length === 0 ? (
+                  <Alert severity="success">
+                    Tous les joueurs sont associés à un compte Discord.
+                  </Alert>
+                ) : (
+                  <PlayerList
+                    players={playersWithoutDiscord}
+                    availabilities={availabilities}
+                    onAvailabilityChange={handleAvailabilityChange}
+                    onCommentChange={handleCommentChange}
+                    selectedEpreuve={selectedEpreuve}
                   />
                 )}
               </Box>
@@ -1138,6 +1226,15 @@ export default function DisponibilitesPage() {
       </Box>
     </AuthGuard>
   );
+}
+
+/** Vérifie si un joueur est inscrit au championnat sélectionné */
+function isPlayerRegistered(player: Player, selectedEpreuve: EpreuveType | null | undefined): boolean {
+  if (!selectedEpreuve) return false;
+  if (selectedEpreuve === "championnat_paris") {
+    return player.participation?.championnatParis === true;
+  }
+  return player.participation?.championnat === true;
 }
 
 interface PlayerListProps {
@@ -1244,6 +1341,29 @@ function PlayerList({
                       <AccessibleIcon
                         fontSize="small"
                         sx={{ color: "primary.main", ml: 0.5 }}
+                      />
+                    </Tooltip>
+                  )}
+                  {!isPlayerRegistered(player, selectedEpreuve) && (
+                    <Tooltip title="Joueur non inscrit au championnat">
+                      <Chip
+                        label="Non inscrit"
+                        size="small"
+                        variant="outlined"
+                        color="warning"
+                        sx={{ height: 22, fontSize: "0.7rem", fontWeight: 600 }}
+                      />
+                    </Tooltip>
+                  )}
+                  {!player.discordMentions?.length && (
+                    <Tooltip title="Non associé à un compte Discord">
+                      <Chip
+                        icon={<LinkOffIcon sx={{ fontSize: 14 }} />}
+                        label="Sans Discord"
+                        size="small"
+                        variant="outlined"
+                        color="default"
+                        sx={{ height: 22, fontSize: "0.7rem" }}
                       />
                     </Tooltip>
                   )}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
 import type { EquipeWithMatches } from "@/hooks/useTeamData";
 import type { EpreuveType } from "@/lib/shared/epreuve-utils";
+import { isParisEpreuve } from "@/lib/shared/epreuve-utils";
 import { getPhaseOfNextChampionnatEquipesMatch } from "@/lib/shared/phase-utils";
 
 export interface UsePhasePreselectParams {
@@ -35,7 +36,7 @@ export function usePhasePreselect({
   useEffect(() => {
     if (selectedEpreuve === null) return;
 
-    if (selectedEpreuve === "championnat_paris") {
+    if (isParisEpreuve(selectedEpreuve)) {
       if (selectedPhase !== "aller") {
         setSelectedPhase("aller");
       }

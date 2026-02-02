@@ -32,7 +32,7 @@ import { useTeamData, type EquipeWithMatches } from "@/hooks/useTeamData";
 import { usePlayers } from "@/hooks/usePlayers";
 import { useDiscordMembers } from "@/hooks/useDiscordMembers";
 import { CompositionDefaultsService } from "@/lib/services/composition-defaults-service";
-import { EpreuveType, getMatchEpreuve } from "@/lib/shared/epreuve-utils";
+import { EpreuveType, getMatchEpreuve, isParisEpreuve } from "@/lib/shared/epreuve-utils";
 import { ChampionshipType } from "@/types";
 import {
   JOURNEE_CONCERNEE_PAR_REGLE,
@@ -241,13 +241,13 @@ export function DefaultCompositionsContainer() {
   } = useMemo(() => {
     const currentTeams =
       // Pour le championnat de Paris, utiliser toutes les équipes (masculin + féminin)
-      selectedEpreuve === "championnat_paris"
+      isParisEpreuve(selectedEpreuve)
         ? [...equipesByType.masculin, ...equipesByType.feminin]
         : defaultCompositionTab === "masculin"
           ? equipesByType.masculin
           : equipesByType.feminin;
     const championshipTypeForAssignments =
-      selectedEpreuve === "championnat_paris"
+      isParisEpreuve(selectedEpreuve)
         ? "masculin"
         : defaultCompositionTab;
     const assignments = defaultCompositions[championshipTypeForAssignments];
@@ -424,7 +424,7 @@ export function DefaultCompositionsContainer() {
 
       // Pour le championnat de Paris, utiliser "masculin" comme type par défaut (mixte)
       const championshipType =
-        selectedEpreuve === "championnat_paris"
+        isParisEpreuve(selectedEpreuve)
           ? "masculin"
           : equipe.matches.some((match) => match.isFemale === true)
             ? "feminin"
@@ -618,7 +618,7 @@ export function DefaultCompositionsContainer() {
 
       // Pour le championnat de Paris, utiliser "masculin" comme type par défaut (mixte)
       const championshipType =
-        selectedEpreuve === "championnat_paris"
+        isParisEpreuve(selectedEpreuve)
           ? "masculin"
           : equipe.matches.some((match) => match.isFemale === true)
             ? "feminin"
@@ -742,13 +742,13 @@ export function DefaultCompositionsContainer() {
   const compositionSummary = useMemo(() => {
     const currentTeams =
       // Pour le championnat de Paris, utiliser toutes les équipes (masculin + féminin)
-      selectedEpreuve === "championnat_paris"
+      isParisEpreuve(selectedEpreuve)
         ? [...equipesByType.masculin, ...equipesByType.feminin]
         : defaultCompositionTab === "masculin"
           ? equipesByType.masculin
           : equipesByType.feminin;
     const championshipTypeForAssignments =
-      selectedEpreuve === "championnat_paris"
+      isParisEpreuve(selectedEpreuve)
         ? "masculin"
         : defaultCompositionTab;
     const assignments = defaultCompositions[championshipTypeForAssignments];
@@ -805,7 +805,7 @@ export function DefaultCompositionsContainer() {
 
   const rulesForDefaults: CompositionRuleItem[] = useMemo(
     () => {
-      if (selectedEpreuve === "championnat_paris") {
+      if (isParisEpreuve(selectedEpreuve)) {
         // Règles spécifiques au championnat de Paris
         return [
           {
@@ -924,7 +924,7 @@ export function DefaultCompositionsContainer() {
                     setSelectedPhase(null);
                   }}
                 />
-                {selectedEpreuve !== "championnat_paris" && (
+                {!isParisEpreuve(selectedEpreuve) && (
                   <PhaseSelect
                     value={selectedPhase}
                     onChange={(phase) => setSelectedPhase(phase)}
@@ -965,7 +965,7 @@ export function DefaultCompositionsContainer() {
               <TeamPicker
                 value={currentTabIndex}
                 onChange={handleTabChange}
-                showFemale={selectedEpreuve !== "championnat_paris"}
+                showFemale={!isParisEpreuve(selectedEpreuve)}
               />
 
               <Box sx={{ display: "flex", gap: 2, position: "relative" }}>
@@ -1181,14 +1181,14 @@ export function DefaultCompositionsContainer() {
                     {(() => {
                       // Pour le championnat de Paris, afficher toutes les équipes (masculin + féminin)
                       const equipesToDisplay =
-                        selectedEpreuve === "championnat_paris"
+                        isParisEpreuve(selectedEpreuve)
                           ? [...equipesByType.masculin, ...equipesByType.feminin]
                           : equipesByType.masculin;
 
                       if (equipesToDisplay.length === 0) {
                         return (
                           <Typography variant="body2" color="text.secondary">
-                            {selectedEpreuve === "championnat_paris"
+                            {isParisEpreuve(selectedEpreuve)
                               ? "Aucune équipe"
                               : "Aucune équipe masculine"}
                           </Typography>
@@ -1206,7 +1206,7 @@ export function DefaultCompositionsContainer() {
                           {equipesToDisplay.map((equipe) => {
                           // Pour le championnat de Paris, utiliser "masculin" comme type par défaut (mixte)
                           const championshipTypeForTeam =
-                            selectedEpreuve === "championnat_paris"
+                            isParisEpreuve(selectedEpreuve)
                               ? "masculin"
                               : equipe.matches.some((match) => match.isFemale === true)
                                 ? "feminin"

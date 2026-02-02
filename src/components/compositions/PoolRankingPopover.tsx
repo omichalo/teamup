@@ -41,6 +41,10 @@ interface PoolRankingPopoverProps {
   phase?: "aller" | "retour" | null;
   /** Nom de l'adversaire du match de la journée sélectionnée (pour mise en évidence) */
   opponentTeamName?: string | null;
+  /** Taille du bouton icône */
+  iconSize?: "small" | "medium" | "large";
+  /** Couleur du bouton icône (couleurs MUI) */
+  iconColor?: "primary" | "secondary" | "error" | "info" | "success" | "warning" | "default";
 }
 
 /** Normalise le nom d'équipe (retire " - Phase 1/2" pour comparaison avec le classement FFTT). */
@@ -61,12 +65,10 @@ function isOurTeam(nomEquipe: string, teamName: string): boolean {
   return n.includes(t) || t.includes(n);
 }
 
-/** Vérifie si le nom d'équipe du classement correspond à l'adversaire (match partiel). */
+/** Vérifie si le nom d'équipe du classement correspond exactement à l'adversaire (même règle que l'API FFTT). */
 function isOpponentRow(nomEquipe: string, opponentTeamName: string | null | undefined): boolean {
   if (!opponentTeamName || !opponentTeamName.trim()) return false;
-  const a = nomEquipe.toLowerCase();
-  const b = opponentTeamName.toLowerCase().trim();
-  return a.includes(b) || b.split(/\s+/).some((part) => part.length > 2 && a.includes(part));
+  return normalizeTeamName(nomEquipe) === normalizeTeamName(opponentTeamName);
 }
 
 export function PoolRankingPopover({
@@ -74,9 +76,12 @@ export function PoolRankingPopover({
   teamName,
   phase,
   opponentTeamName,
+  iconSize = "small",
+  iconColor = "default",
 }: PoolRankingPopoverProps) {
   const theme = useTheme();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const [tooltipOpen, setTooltipOpen] = useState(false);
   const [ranking, setRanking] = useState<PoolRankingEntry[] | null>(null);
   const [division, setDivision] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -115,6 +120,7 @@ export function PoolRankingPopover({
   }, [teamId, phase]);
 
   const handleOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setTooltipOpen(false);
     setAnchorEl(event.currentTarget);
     if (ranking === null && !loading) {
       void fetchRanking();
@@ -145,15 +151,26 @@ export function PoolRankingPopover({
 
   return (
     <>
-      <IconButton
-        size="small"
-        onClick={handleOpen}
-        aria-label="Voir le classement de la poule"
-        color="default"
-        sx={{ ml: 0.25 }}
+      <Tooltip
+        title="Voir le classement de la poule"
+        open={open ? false : tooltipOpen}
+        onOpen={() => {
+          if (!open) setTooltipOpen(true);
+        }}
+        onClose={() => setTooltipOpen(false)}
       >
-        <LeaderboardIcon fontSize="small" />
-      </IconButton>
+        <span>
+          <IconButton
+            size={iconSize}
+            onClick={handleOpen}
+            aria-label="Voir le classement de la poule"
+            color={iconColor}
+            sx={{ ml: 0.25 }}
+          >
+            <LeaderboardIcon fontSize={iconSize} />
+          </IconButton>
+        </span>
+      </Tooltip>
       <Popover
         open={open}
         anchorEl={anchorEl}
