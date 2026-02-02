@@ -1,3 +1,7 @@
+import {
+  divisionIndicatesPhase1,
+  divisionIndicatesPhase2,
+} from "./fftt-utils";
 import type { EpreuveType } from "./epreuve-utils";
 import { getMatchEpreuve } from "./epreuve-utils";
 
@@ -170,6 +174,8 @@ export function buildJourneesByEpreuvePhaseDivision(
   });
 
   // Calculer la division par défaut (celle avec la prochaine journée la plus proche)
+  // Pour "aller" on n'accepte que les divisions dont le libellé correspond (phase 1),
+  // pour "retour" idem (phase 2), afin d'éviter d'afficher les dates de l'autre phase.
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   const defaultDivisionByEpreuvePhase = new Map<string, string>();
@@ -179,12 +185,21 @@ export function buildJourneesByEpreuvePhaseDivision(
     { division: string; debut: Date }
   >();
 
+  const divisionMatchesPhase = (division: string, phase: "aller" | "retour"): boolean => {
+    if (phase === "aller") return !divisionIndicatesPhase2(division);
+    return !divisionIndicatesPhase1(division);
+  };
+
   for (const [key, entry] of journeeDatesByKey) {
     const debutNorm = new Date(entry.debut);
     debutNorm.setHours(0, 0, 0, 0);
     if (debutNorm < now) continue;
 
-    const epreuvePhaseKey = key.split("|").slice(0, 2).join("|");
+    const parts = key.split("|");
+    const epreuvePhaseKey = parts.slice(0, 2).join("|");
+    const phase = parts[1] as "aller" | "retour";
+    if (!divisionMatchesPhase(entry.division, phase)) continue;
+
     const current = epreuvePhaseToClosest.get(epreuvePhaseKey);
     if (!current || debutNorm < current.debut) {
       epreuvePhaseToClosest.set(epreuvePhaseKey, {
@@ -198,15 +213,18 @@ export function buildJourneesByEpreuvePhaseDivision(
     defaultDivisionByEpreuvePhase.set(key, val.division);
   });
 
-  // Fallback : si aucune division n'a de match futur, prendre la première division
+  // Fallback : si aucune division n'a de match futur (ou aucune ne matche la phase),
+  // prendre une division qui a des données pour cette phase et dont le libellé correspond.
   data.forEach((epreuveMap, epreuve) => {
     for (const phase of ["aller", "retour"] as const) {
       const key = `${epreuve}|${phase}`;
       if (!defaultDivisionByEpreuvePhase.has(key)) {
         const phaseMap = epreuveMap.get(phase);
         const divisions = phaseMap ? Array.from(phaseMap.keys()) : [];
-        if (divisions.length > 0) {
-          defaultDivisionByEpreuvePhase.set(key, divisions[0]);
+        const matching = divisions.filter((div) => divisionMatchesPhase(div, phase));
+        const toUse = matching.length > 0 ? matching : divisions;
+        if (toUse.length > 0) {
+          defaultDivisionByEpreuvePhase.set(key, toUse[0]!);
         }
       }
     }
@@ -251,8 +269,65 @@ export function getJourneesByPhaseForDivision(
 }
 
 /**
+ * Retourne les journées par phase en fusionnant les dates de toutes les divisions
+ * qui correspondent à la phase (Phase 1 pour aller, Phase 2 pour retour).
+ * Permet d'afficher 09/01 et 10/01 pour une même journée quand les matchs sont
+ * répartis sur samedi/dimanche dans différentes poules.
+ */
+export function getJourneesByPhaseMerged(
+  journeesData: JourneesByEpreuvePhaseDivision,
+  epreuve: EpreuveType | null
+): Map<"aller" | "retour", Map<number, JourneeData>> {
+  const empty = new Map<
+    "aller" | "retour",
+    Map<number, JourneeData>
+  >() as Map<"aller" | "retour", Map<number, JourneeData>>;
+  if (!epreuve) return empty;
+
+  const epreuveMap = journeesData.data.get(epreuve);
+  if (!epreuveMap) return empty;
+
+  const result = new Map<"aller" | "retour", Map<number, JourneeData>>();
+  for (const phase of ["aller", "retour"] as const) {
+    const phaseMap = epreuveMap.get(phase);
+    if (!phaseMap) {
+      result.set(phase, new Map());
+      continue;
+    }
+    const mergedByJournee = new Map<number, JourneeData>();
+    phaseMap.forEach((divisionMap, division) => {
+      const matchesPhase =
+        phase === "aller"
+          ? !divisionIndicatesPhase2(division)
+          : !divisionIndicatesPhase1(division);
+      if (!matchesPhase) return;
+      divisionMap.forEach((journeeData, journeeNum) => {
+        const existing = mergedByJournee.get(journeeNum);
+        const datesSet = new Set(
+          (existing?.dates ?? []).concat(journeeData.dates).map((d) => d.toDateString())
+        );
+        const dates = Array.from(datesSet)
+          .map((s) => new Date(s))
+          .sort((a, b) => a.getTime() - b.getTime());
+        mergedByJournee.set(journeeNum, {
+          journee: journeeNum,
+          phase,
+          dates,
+        });
+      });
+    });
+    result.set(phase, mergedByJournee);
+  }
+  return result;
+}
+
+/**
  * Retourne la division par défaut pour une épreuve et une phase.
  * C'est la division dont la prochaine journée est la plus proche.
+ * Si aucune n'a de match futur pour cette phase, on prend une division qui a
+ * des journées dans cette phase, en privilégiant celles dont le libellé
+ * correspond (Phase 1 pour aller, Phase 2 pour retour) pour éviter d'afficher
+ * les samedis de l'autre phase.
  */
 export function getDefaultDivision(
   journeesData: JourneesByEpreuvePhaseDivision,
@@ -263,8 +338,28 @@ export function getDefaultDivision(
   const key = `${epreuve}|${phase}`;
   const div = journeesData.defaultDivisionByEpreuvePhase.get(key);
   if (div) return div;
-  const divisions = journeesData.divisionsByEpreuve.get(epreuve);
-  return divisions && divisions.length > 0 ? divisions[0] : null;
+  const phaseMap = journeesData.data.get(epreuve)?.get(phase);
+  if (!phaseMap) return null;
+  const withData = Array.from(phaseMap.keys()).filter(
+    (divisionKey) => (phaseMap.get(divisionKey)?.size ?? 0) > 0
+  );
+  if (withData.length === 0) return null;
+  // Pour la phase aller : exclure les divisions Phase 2 (évite d'afficher les dates retour).
+  // Pour la phase retour : exclure les divisions Phase 1.
+  const forAller =
+    phase === "aller"
+      ? withData.filter((d) => !divisionIndicatesPhase2(d))
+      : withData;
+  const forRetour =
+    phase === "retour"
+      ? withData.filter((d) => !divisionIndicatesPhase1(d))
+      : withData;
+  const candidates = phase === "aller" ? (forAller.length > 0 ? forAller : withData) : (forRetour.length > 0 ? forRetour : withData);
+  const preferred =
+    phase === "aller"
+      ? candidates.find((d) => divisionIndicatesPhase1(d))
+      : candidates.find((d) => divisionIndicatesPhase2(d));
+  return preferred ?? candidates[0] ?? null;
 }
 
 /**

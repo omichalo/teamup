@@ -6,7 +6,7 @@ import {
   FFTTDetailsRencontre,
   FFTTJoueur,
 } from "./fftt-types";
-import { createBaseMatch, isFemaleTeam } from "./fftt-utils";
+import { createBaseMatch, isFemaleTeam, determinePhaseFromDivision } from "./fftt-utils";
 import type { Firestore, DocumentReference } from "firebase-admin/firestore";
 import { Timestamp, FieldValue } from "firebase-admin/firestore";
 
@@ -142,12 +142,21 @@ export interface MatchData {
   equipeIds: { equipe1: string; equipe2: string };
   lienDetails: string;
   resultatsIndividuels?:
-    | Array<{
-        joueurA: string;
-        joueurB: string;
-        scoreA: number;
-        scoreB: number;
-      }>
+    | {
+        parties?: Array<{
+          joueurA: string;
+          joueurB: string;
+          scoreA: number;
+          scoreB: number;
+          adversaireA?: string;
+          adversaireB?: string;
+          setDetails?: string[];
+        }>;
+        nomEquipeA?: string;
+        nomEquipeB?: string;
+        joueursA?: Record<string, { nom: string; prenom: string; points?: number }>;
+        joueursB?: Record<string, { nom: string; prenom: string; points?: number }>;
+      }
     | undefined;
   joueursSQY?:
     | Array<{
@@ -199,11 +208,24 @@ export class TeamMatchesSyncService {
       // Récupérer les équipes du club
       const equipes = await this.ffttApi.getEquipesByClub(this.clubCode);
 
-      // Trouver l&apos;équipe spécifique
-      const equipeFound = equipes.find(
-        (eq: FFTTEquipe) =>
-          eq.idEquipe.toString() === teamId.replace("sqyping_team_", "")
-      );
+      // Résoudre teamId : format "idEquipe_aller" / "idEquipe_retour" ou ancien "idEquipe"
+      const cleanId = teamId.replace("sqyping_team_", "");
+      const phaseSuffix = cleanId.includes("_aller")
+        ? "aller"
+        : cleanId.includes("_retour")
+          ? "retour"
+          : null;
+      const idEquipeStr = phaseSuffix
+        ? cleanId.replace(/_(aller|retour)$/, "")
+        : cleanId;
+
+      const equipeFound = equipes.find((eq: FFTTEquipe) => {
+        if (eq.idEquipe.toString() !== idEquipeStr) return false;
+        if (phaseSuffix) {
+          return determinePhaseFromDivision(eq.division) === phaseSuffix;
+        }
+        return true;
+      });
 
       if (!equipeFound) {
         throw new Error(`Équipe ${teamId} non trouvée`);
@@ -817,9 +839,9 @@ export class TeamMatchesSyncService {
           Array.isArray(match.joueursSQY) &&
           match.joueursSQY.length > 0;
         const hasResults =
-          match.resultatsIndividuels &&
-          Array.isArray(match.resultatsIndividuels) &&
-          match.resultatsIndividuels.length > 0;
+          match.resultatsIndividuels?.parties &&
+          Array.isArray(match.resultatsIndividuels.parties) &&
+          match.resultatsIndividuels.parties.length > 0;
         // Parser le score depuis le champ score (format "24-18")
         let hasScore = false;
         if (match.score) {
@@ -853,9 +875,9 @@ export class TeamMatchesSyncService {
           Array.isArray(match.joueursSQY) &&
           match.joueursSQY.length > 0;
         const hasResults =
-          match.resultatsIndividuels &&
-          Array.isArray(match.resultatsIndividuels) &&
-          match.resultatsIndividuels.length > 0;
+          match.resultatsIndividuels?.parties &&
+          Array.isArray(match.resultatsIndividuels.parties) &&
+          match.resultatsIndividuels.parties.length > 0;
         // Parser le score depuis le champ score (format "24-18")
         let hasScore = false;
         if (match.score) {
@@ -1605,7 +1627,7 @@ export class TeamMatchesSyncService {
           console.warn(
             `⚠️ ${
               missingTeamIds.length
-            } équipes référencées dans les matchs n'existent pas dans Firestore: ${missingTeamIds.join(
+            } équipes référencées dans les matchs n'existent pas dans Firestore (exécuter d'abord la sync équipes) : ${missingTeamIds.join(
               ", "
             )}`
           );

@@ -13,11 +13,11 @@ export interface UsePhasePreselectParams {
 }
 
 /**
- * Hook partagé pour pré-sélectionner la phase (aller/retour) sur les pages
- * compositions et compositions par défaut. Algorithme unifié :
+ * Hook partagé pour pré-sélectionner la phase (aller/retour) au chargement initial.
  * - Paris : phase forcée à "aller".
- * - Championnat par équipes : phase du prochain match à jouer, avec fallbacks
- *   (currentPhase, "aller") et sync si la sélection diffère une fois les équipes chargées.
+ * - Championnat par équipes : au premier rendu (selectedPhase === null), on met la phase
+ *   du prochain match à jouer, ou currentPhase, ou "aller". La sélection utilisateur
+ *   n'est jamais écrasée ensuite.
  */
 export function usePhasePreselect({
   equipes,
@@ -49,14 +49,6 @@ export function usePhasePreselect({
 
     if (selectedPhase === null) {
       setSelectedPhase(phase);
-      return;
-    }
-
-    if (
-      phaseOfNext != null &&
-      selectedPhase !== phaseOfNext
-    ) {
-      setSelectedPhase(phaseOfNext);
     }
   }, [
     currentPhase,

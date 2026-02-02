@@ -1,5 +1,5 @@
 import { FFTTAPI } from "@omichalo/ffttapi-node";
-import { getFFTTConfig, isFemaleTeam } from "./fftt-utils";
+import { getFFTTConfig, isFemaleTeam, determinePhaseFromDivision } from "./fftt-utils";
 import type { Firestore } from "firebase-admin/firestore";
 import { Timestamp } from "firebase-admin/firestore";
 import type { FFTTEquipe } from "./fftt-types";
@@ -108,9 +108,13 @@ export class TeamSyncService {
       for (const equipe of filteredEquipes) {
         console.log(`🏆 Traitement de l&apos;équipe ${equipe.libelle}...`);
 
-        // Créer l&apos;équipe
+        // ID unique par phase : Phase 1 et Phase 2 ont des idEquipe identiques côté FFTT,
+        // on suffixe par _aller / _retour pour éviter d'écraser 26 équipes Phase 1.
+        const phase = determinePhaseFromDivision(equipe.division);
+        const teamId = `${equipe.idEquipe}_${phase}`;
+
         const teamData: TeamData = {
-          id: equipe.idEquipe.toString(), // Utiliser directement l&apos;ID FFTT comme clé
+          id: teamId,
           ffttId: equipe.idEquipe.toString(),
           name: equipe.libelle,
           division: equipe.division,
@@ -211,6 +215,22 @@ export class TeamSyncService {
             Math.floor(i / batchSize) + 1
           } sauvegardé (${saved} équipes)`
         );
+      }
+
+      // Supprimer les anciens docs équipe (id sans suffixe _aller/_retour)
+      // pour éviter doublons : 33 anciens + 59 nouveaux → 59 après nettoyage
+      const baseIdsToRemove = new Set(
+        teamsData
+          .filter((t) => /_(aller|retour)$/.test(t.id))
+          .map((t) => t.id.replace(/_(aller|retour)$/, ""))
+      );
+      for (const baseId of baseIdsToRemove) {
+        const ref = db.collection("teams").doc(baseId);
+        const snap = await ref.get();
+        if (snap.exists) {
+          await ref.delete();
+          console.log(`🗑️ Ancien doc équipe supprimé: ${baseId}`);
+        }
       }
 
       // Mettre à jour les métadonnées
