@@ -443,7 +443,7 @@ export class TeamMatchesSyncService {
           "🔄 Enrichissement des matchs avec les licences des joueurs..."
         );
         enrichedMatches = await Promise.all(
-          allMatches.map((match) =>
+          matchesWithRecalculatedJournees.map((match) =>
             this.enrichSQYPlayersFromClub(match, db, playersCache)
           )
         );
@@ -1819,7 +1819,12 @@ export class TeamMatchesSyncService {
       const teamId =
         match.teamId?.trim() ||
         `team_${match.teamNumber}_${match.isFemale ? "F" : "M"}`;
-      const phase = (match.phase || "aller").toLowerCase();
+      const rawPhase = (match.phase || "aller").toLowerCase();
+      // Normaliser "phase 2" / "phase2" → retour pour grouper correctement
+      const phase =
+        rawPhase === "retour" || rawPhase.includes("phase 2") || rawPhase.includes("phase2")
+          ? "retour"
+          : "aller";
       const teamPhaseKey = `${teamId}|${phase}`;
       if (!matchesByTeamAndPhase.has(teamPhaseKey)) {
         matchesByTeamAndPhase.set(teamPhaseKey, []);
