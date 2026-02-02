@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import {
   IconButton,
   Popover,
@@ -106,6 +106,12 @@ export function PoolRankingPopover({
     } finally {
       setLoading(false);
     }
+  }, [teamId, phase]);
+
+  useEffect(() => {
+    setRanking(null);
+    setDivision(null);
+    setError(null);
   }, [teamId, phase]);
 
   const handleOpen = (event: React.MouseEvent<HTMLElement>) => {
