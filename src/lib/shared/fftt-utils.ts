@@ -104,8 +104,9 @@ export const extractClubName = (libelle: string): string => {
 
 // Utilitaires pour déterminer la phase et le résultat
 export const determinePhaseFromDivision = (division: string): string => {
-  if (division.includes("Phase 1")) return "aller";
-  if (division.includes("Phase 2")) return "retour";
+  const d = division.toLowerCase();
+  if (d.includes("phase 1")) return "aller";
+  if (d.includes("phase 2")) return "retour";
   return "aller";
 };
 

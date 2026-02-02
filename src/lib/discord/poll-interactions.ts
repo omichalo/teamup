@@ -371,6 +371,7 @@ export async function handleRespondButton(
       });
     } else {
       // Femme : 2 select menus (vendredi et samedi)
+      // Discord n'autorise qu'un seul select menu par ACTION_ROW → 2 lignes distinctes
       const venAvailable = currentResponse?.fridayAvailable;
       const satAvailable = currentResponse?.saturdayAvailable;
       const hasVenResponse = venAvailable !== undefined;
@@ -386,7 +387,7 @@ export async function handleRespondButton(
           flags: 64,
           components: [
             {
-              type: 1, // ACTION_ROW
+              type: 1, // ACTION_ROW (1 select par ligne max)
               components: [
                 {
                   type: 3, // SELECT_MENU
@@ -394,6 +395,11 @@ export async function handleRespondButton(
                   options: venOptions,
                   placeholder: "Vendredi",
                 },
+              ],
+            },
+            {
+              type: 1, // ACTION_ROW
+              components: [
                 {
                   type: 3, // SELECT_MENU
                   custom_id: `availability_${pollId}_women_sat_select`,
@@ -596,6 +602,7 @@ export async function handleModifyButton(
     });
     } else {
       // Femme : 2 select menus (vendredi et samedi)
+      // Discord n'autorise qu'un seul select menu par ACTION_ROW → 2 lignes distinctes
       const venAvailable = currentResponse?.fridayAvailable;
       const satAvailable = currentResponse?.saturdayAvailable;
       const hasVenResponse = venAvailable !== undefined;
@@ -611,7 +618,7 @@ export async function handleModifyButton(
           flags: 64,
           components: [
             {
-              type: 1,
+              type: 1, // ACTION_ROW (1 select par ligne max)
               components: [
                 {
                   type: 3, // SELECT_MENU
@@ -619,6 +626,11 @@ export async function handleModifyButton(
                   options: venOptions,
                   placeholder: "Vendredi",
                 },
+              ],
+            },
+            {
+              type: 1, // ACTION_ROW
+              components: [
                 {
                   type: 3, // SELECT_MENU
                   custom_id: `availability_${pollId}_women_sat_select`,
@@ -1135,7 +1147,7 @@ export async function handleWomenSelect(
         const venOptions = createSelectOptions(false, fridayAvailable);
         const satOptions = createSelectOptions(false, saturdayAvailable);
 
-        // Mettre à jour le message éphémère
+        // Mettre à jour le message éphémère (1 select par ACTION_ROW)
         await updateEphemeralMessage(
           applicationId,
           interactionToken,
@@ -1144,7 +1156,7 @@ export async function handleWomenSelect(
           }\n\n💡 Vous pouvez modifier votre réponse en sélectionnant une autre option.`,
           [
             {
-              type: 1,
+              type: 1, // ACTION_ROW
               components: [
                 {
                   type: 3,
@@ -1152,6 +1164,11 @@ export async function handleWomenSelect(
                   options: venOptions,
                   placeholder: "Vendredi",
                 },
+              ],
+            },
+            {
+              type: 1, // ACTION_ROW
+              components: [
                 {
                   type: 3,
                   custom_id: `availability_${pollId}_women_sat_select`,
