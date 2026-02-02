@@ -46,6 +46,7 @@ import { Player } from "@/types/team-management";
 import { ChampionshipType, Match } from "@/types";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
+import { divisionIndicatesPhase2 } from "@/lib/shared/fftt-utils";
 import {
   EpreuveType,
   getIdEpreuve,
@@ -85,6 +86,8 @@ import { TeamPicker } from "@/components/compositions/Filters/TeamPicker";
 import { TabPanel } from "@/components/compositions/Filters/TabPanel";
 import { ConfirmationDialog } from "@/components/compositions/dialogs/ConfirmationDialog";
 import { DiscordResendDialog } from "@/components/compositions/dialogs/DiscordResendDialog";
+import { PoolRankingPopover } from "@/components/compositions/PoolRankingPopover";
+import { PreviousMatchesOpponents } from "@/components/compositions/PreviousMatchesOpponents";
 
 // Composant pour afficher les suggestions de mentions
 function MentionSuggestions({
@@ -461,16 +464,24 @@ export function CompositionsPageContainer() {
 
   // Déterminer la phase en cours
   // Grouper les équipes par type (masculin/féminin)
-  // Filtrer les équipes selon l'épreuve sélectionnée
+  // Filtrer les équipes selon l'épreuve sélectionnée et la phase (Phase 1 pour aller, Phase 2 pour retour)
   const filteredEquipes = useMemo(() => {
     if (!selectedEpreuve) {
       return equipes;
     }
     return equipes.filter((equipe) => {
       const epreuve = getMatchEpreuve(equipe.matches[0] || {}, equipe.team);
-      return epreuve === selectedEpreuve;
+      if (epreuve !== selectedEpreuve) return false;
+      if (selectedEpreuve !== "championnat_equipes") return true;
+      const division = equipe.team.division ?? "";
+      // Aller : afficher uniquement les équipes dont la division n'indique pas Phase 2.
+      // Retour : afficher uniquement les équipes dont la division indique explicitement Phase 2
+      // (évite d'afficher des équipes Phase 1 ou sans phase dans le libellé).
+      if (selectedPhase === "aller") return !divisionIndicatesPhase2(division);
+      if (selectedPhase === "retour") return divisionIndicatesPhase2(division);
+      return true;
     });
-  }, [equipes, selectedEpreuve]);
+  }, [equipes, selectedEpreuve, selectedPhase]);
 
   const {
     journeesByPhase,
@@ -2209,8 +2220,9 @@ export function CompositionsPageContainer() {
             startIcon={<ContentCopy />}
             disabled={!canCopyDefaultsButton}
             onClick={handleApplyDefaultsClick}
+            title="Copier les compositions par défaut pour toutes les équipes"
           >
-            Copier les compos par défaut (toutes équipes)
+            Copier compos par défaut
           </Button>
           <Button
             variant="outlined"
@@ -2671,6 +2683,28 @@ export function CompositionsPageContainer() {
                                             </IconButton>
                                           </span>
                                         </Tooltip>
+                                      )}
+                                      <Tooltip title="Voir le classement de la poule">
+                                        <span>
+                                          <PoolRankingPopover
+                                            teamId={equipe.team.id}
+                                            teamName={equipe.team.name}
+                                            phase={selectedPhase}
+                                            opponentTeamName={
+                                              match?.opponent ?? match?.opponentClub ?? null
+                                            }
+                                          />
+                                        </span>
+                                      </Tooltip>
+                                      {(match?.opponent ?? match?.opponentClub) && (
+                                        <PreviousMatchesOpponents
+                                          teamId={equipe.team.id}
+                                          phase={selectedPhase}
+                                          opponentName={
+                                            match?.opponent ?? match?.opponentClub ?? null
+                                          }
+                                          maxMatches={10}
+                                        />
                                       )}
                                     </Box>
                                   }
@@ -3494,6 +3528,28 @@ export function CompositionsPageContainer() {
                                         </span>
                                       </Tooltip>
                                     )}
+                                    <Tooltip title="Voir le classement de la poule">
+                                      <span>
+                                        <PoolRankingPopover
+                                          teamId={equipe.team.id}
+                                          teamName={equipe.team.name}
+                                          phase={selectedPhase}
+                                          opponentTeamName={
+                                            match?.opponent ?? match?.opponentClub ?? null
+                                          }
+                                        />
+                                      </span>
+                                    </Tooltip>
+                                    {(match?.opponent ?? match?.opponentClub) && (
+                                      <PreviousMatchesOpponents
+                                        teamId={equipe.team.id}
+                                        phase={selectedPhase}
+                                        opponentName={
+                                          match?.opponent ?? match?.opponentClub ?? null
+                                        }
+                                        maxMatches={10}
+                                      />
+                                    )}
                                   </Box>
                                 }
                                 renderPlayerIndicators={(player) => {
@@ -4049,7 +4105,7 @@ export function CompositionsPageContainer() {
                                           />
                                         )}
                                     </Box>
-                                  </CardContent>
+                                    </CardContent>
                                 </Card>
                               )}
                           </Box>
