@@ -64,10 +64,11 @@ export function getMatchEpreuve(
  */
 export function isParisEpreuve(epreuve: EpreuveType | string | null | undefined): boolean {
   if (epreuve == null) return false;
+  if (epreuve === "championnat_paris") return true;
   if (typeof epreuve === "string") {
     const lower = epreuve.toLowerCase();
     return lower.includes("excellence") || lower.includes("paris idf");
   }
-  return epreuve === "championnat_paris";
+  return false;
 }
 
