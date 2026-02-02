@@ -121,6 +121,26 @@ export const determinePhaseFromDivision = (division: string): string => {
   return "aller";
 };
 
+export type TeamPhaseKind = "phase1" | "phase2" | "sansPhase";
+
+/**
+ * Retourne la phase d'une équipe à partir de son nom et de sa division (Phase 1 = aller, Phase 2 = retour).
+ * Utilisé pour grouper les équipes par phase sur la page équipes.
+ */
+export function getTeamPhase(equipe: {
+  team: { name: string; division?: string };
+}): TeamPhaseKind {
+  const name = equipe.team.name ?? "";
+  const division = equipe.team.division ?? "";
+  if (PHASE_2_PATTERN.test(division) || PHASE_2_PATTERN.test(name)) {
+    return "phase2";
+  }
+  if (PHASE_1_PATTERN.test(division) || PHASE_1_PATTERN.test(name)) {
+    return "phase1";
+  }
+  return "sansPhase";
+}
+
 export const determineMatchResult = (
   scoreA: number | null,
   scoreB: number | null,

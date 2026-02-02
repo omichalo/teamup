@@ -58,7 +58,16 @@ export function getMatchEpreuve(
   return null;
 }
 
-
-
-
+/**
+ * Indique si l'épreuve correspond au championnat de Paris (une seule phase).
+ * Accepte le type EpreuveType (dispo/compos) ou un libellé d'épreuve (page équipes).
+ */
+export function isParisEpreuve(epreuve: EpreuveType | string | null | undefined): boolean {
+  if (epreuve == null) return false;
+  if (typeof epreuve === "string") {
+    const lower = epreuve.toLowerCase();
+    return lower.includes("excellence") || lower.includes("paris idf");
+  }
+  return epreuve === "championnat_paris";
+}
 
