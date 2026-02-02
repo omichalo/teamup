@@ -1064,6 +1064,7 @@ export default function DisponibilitesPage() {
                   availabilities={availabilities}
                   onAvailabilityChange={handleAvailabilityChange}
                   onCommentChange={handleCommentChange}
+                  selectedEpreuve={selectedEpreuve}
                 />
               </Box>
             )}
@@ -1136,6 +1137,7 @@ export default function DisponibilitesPage() {
                     availabilities={availabilities}
                     onAvailabilityChange={handleAvailabilityChange}
                     onCommentChange={handleCommentChange}
+                    selectedEpreuve={selectedEpreuve}
                   />
                 )}
               </Box>
@@ -1156,6 +1158,7 @@ export default function DisponibilitesPage() {
                     availabilities={availabilities}
                     onAvailabilityChange={handleAvailabilityChange}
                     onCommentChange={handleCommentChange}
+                    selectedEpreuve={selectedEpreuve}
                   />
                 )}
               </Box>
@@ -1176,6 +1179,7 @@ export default function DisponibilitesPage() {
                     availabilities={availabilities}
                     onAvailabilityChange={handleAvailabilityChange}
                     onCommentChange={handleCommentChange}
+                    selectedEpreuve={selectedEpreuve}
                   />
                 )}
               </Box>
