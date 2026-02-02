@@ -1646,8 +1646,17 @@ export class TeamMatchesSyncService {
       const batchPromises: Array<Promise<void>> = [];
 
       for (const [teamId, teamMatches] of matchesByTeam) {
+        // Firestore rejette les segments de chemin vides
+        if (!teamId || typeof teamId !== "string" || teamId.trim() === "") {
+          console.warn(
+            `⚠️ Équipe ignorée (teamId vide): ${teamMatches.length} matchs non sauvegardés`
+          );
+          continue;
+        }
+        const safeTeamId = teamId.trim();
+
         console.log(
-          `💾 Préparation de ${teamMatches.length} matchs pour ${teamId}...`
+          `💾 Préparation de ${teamMatches.length} matchs pour ${safeTeamId}...`
         );
 
         for (let i = 0; i < teamMatches.length; i += batchSize) {
@@ -1657,11 +1666,19 @@ export class TeamMatchesSyncService {
 
           for (let j = i; j < batchEnd; j++) {
             const match = teamMatches[j];
+            const matchId =
+              typeof match.id === "string" ? match.id.trim() : "";
+            if (!matchId) {
+              console.warn(
+                `⚠️ Match ignoré (id vide): teamId=${safeTeamId}, lien=${match.lienDetails || match.ffttId}`
+              );
+              continue;
+            }
             const docRef = db
               .collection("teams")
-              .doc(teamId)
+              .doc(safeTeamId)
               .collection("matches")
-              .doc(match.id);
+              .doc(matchId);
 
             // Préparer les données pour Firestore en filtrant les valeurs undefined
             const matchData = {
@@ -1776,7 +1793,119 @@ export class TeamMatchesSyncService {
               updateDataRaw as Record<string, unknown>
             );
 
-            batch.set(docRef, updateData, { merge: true });
+            // ——— Traces pour analyse de l'erreur Firestore "Element at index 0 should not be an empty string" ———
+            // Pour activer les traces path en prod : dans .env.local ajouter DEBUG_SYNC_TEAM_MATCHES=true
+            const traceSync =
+              process.env.NODE_ENV === "development" ||
+              process.env.DEBUG_SYNC_TEAM_MATCHES === "true";
+
+            const collectFirestoreDiagnostics = (
+              obj: unknown,
+              path = "updateData"
+            ): string[] => {
+              const issues: string[] = [];
+              if (obj === null || obj === undefined) return issues;
+              if (typeof obj === "string") {
+                if (obj === "" || obj.trim() === "")
+                  issues.push(`${path} = chaîne vide`);
+                return issues;
+              }
+              if (Array.isArray(obj)) {
+                obj.forEach((item, index) => {
+                  if (
+                    item === "" ||
+                    (typeof item === "string" && item.trim() === "")
+                  ) {
+                    issues.push(`${path}[${index}] = chaîne vide`);
+                  } else if (
+                    typeof item === "object" &&
+                    item !== null &&
+                    !(item instanceof Timestamp)
+                  ) {
+                    issues.push(
+                      ...collectFirestoreDiagnostics(
+                        item,
+                        `${path}[${index}]`
+                      )
+                    );
+                  }
+                });
+                return issues;
+              }
+              if (typeof obj === "object" && !(obj instanceof Timestamp)) {
+                for (const [key, value] of Object.entries(obj)) {
+                  if (
+                    key === "" ||
+                    (typeof key === "string" && key.trim() === "")
+                  ) {
+                    issues.push(`${path} a une clé vide`);
+                  }
+                  issues.push(
+                    ...collectFirestoreDiagnostics(value, `${path}.${key || '""'}`)
+                  );
+                }
+              }
+              return issues;
+            };
+
+            const pathStr = docRef.path;
+            const pathSegments = pathStr.split("/");
+            const hasEmptySegment = pathSegments.some(
+              (s) => s === "" || s.trim() === ""
+            );
+            if (traceSync) {
+              console.log(
+                `[sync-trace] path=${pathStr} segments=${pathSegments.length} hasEmptySegment=${hasEmptySegment}`
+              );
+            }
+            const diagnostics = collectFirestoreDiagnostics(updateData);
+            if (diagnostics.length > 0) {
+              console.warn(
+                `[sync-trace] Données problématiques pour matchId=${matchId} teamId=${safeTeamId}:`,
+                diagnostics
+              );
+            }
+            if (hasEmptySegment) {
+              console.warn(
+                `[sync-trace] Chemin avec segment vide: path=${pathStr} teamId=${safeTeamId} matchId=${matchId}`
+              );
+            }
+
+            // Firestore rejette les noms de champs vides et les chaînes vides dans les tableaux
+            const sanitizeForFirestore = (
+              obj: Record<string, unknown>
+            ): Record<string, unknown> => {
+              const out: Record<string, unknown> = {};
+              for (const [key, value] of Object.entries(obj)) {
+                if (key === "" || (typeof key === "string" && key.trim() === "")) {
+                  continue;
+                }
+                if (Array.isArray(value)) {
+                  out[key] = value.map((item) =>
+                    item === "" || (typeof item === "string" && item.trim() === "")
+                      ? null
+                      : typeof item === "object" && item !== null && !Array.isArray(item)
+                        ? sanitizeForFirestore(item as Record<string, unknown>)
+                        : item
+                  );
+                } else if (
+                  typeof value === "object" &&
+                  value !== null &&
+                  !(value instanceof Timestamp)
+                ) {
+                  out[key] = sanitizeForFirestore(value as Record<string, unknown>);
+                } else {
+                  out[key] = value;
+                }
+              }
+              return out;
+            };
+
+            const sanitizedData = sanitizeForFirestore(
+              updateData as Record<string, unknown>
+            );
+
+            batch.set(docRef, sanitizedData, { merge: true });
             saved++;
           }
 
@@ -1786,7 +1915,7 @@ export class TeamMatchesSyncService {
 
           // Ajouter la promesse de commit au tableau pour parallélisation
           // Capturer les valeurs dans une closure pour éviter les problèmes de référence
-          const currentTeamId = teamId;
+          const currentTeamId = safeTeamId;
           const currentBatchSize = batchEnd - i;
 
           batchPromises.push(
@@ -1801,6 +1930,9 @@ export class TeamMatchesSyncService {
                 console.error(
                   `❌ Erreur lors du commit du batch pour ${currentTeamId}:`,
                   error
+                );
+                console.error(
+                  `[sync-trace] Batch en échec: teamId=${currentTeamId} nbMatchs=${currentBatchSize}. Vérifier les traces [sync-trace] ci-dessus pour les chemins et données problématiques.`
                 );
                 throw error;
               })

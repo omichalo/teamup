@@ -317,12 +317,17 @@ export default function AdminPage() {
           },
         }));
       } else {
+        const errorMessage =
+          result.details ||
+          result.error ||
+          result.message ||
+          "Erreur inconnue";
         setSyncStatus((prev) => ({
           ...prev,
           teamMatches: {
             ...prev.teamMatches,
             status: "error",
-            error: result.error || result.message || "Erreur inconnue",
+            error: errorMessage,
           },
         }));
       }
