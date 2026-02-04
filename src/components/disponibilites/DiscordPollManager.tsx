@@ -14,6 +14,8 @@ import {
   Chip,
   Tooltip,
   TextField,
+  FormControlLabel,
+  Switch,
   Popper,
   Paper,
   List,
@@ -76,6 +78,7 @@ export function DiscordPollManager({
   const [currentPoll, setCurrentPoll] = useState<DiscordPoll | null>(null);
   const [messageTemplate, setMessageTemplate] = useState<string>("");
   const [closeMessageTemplate, setCloseMessageTemplate] = useState<string>("");
+  const [closeWithMessage, setCloseWithMessage] = useState<boolean>(true);
   // Utiliser les dates passées en props si disponibles, sinon permettre la saisie manuelle
   const [fridayDate, setFridayDate] = useState<string>(propFridayDate || "");
   const [saturdayDate, setSaturdayDate] = useState<string>(
@@ -750,9 +753,8 @@ export function DiscordPollManager({
 
   const handleClosePoll = useCallback(() => {
     if (!currentPoll) return;
-    // Ouvrir la pop-in de fermeture au lieu de window.confirm
     setCloseDialogOpen(true);
-    // Initialiser le message par défaut si vide
+    setCloseWithMessage(true);
     if (!closeMessageTemplate) {
       setCloseMessageTemplate(getDefaultCloseMessage());
     }
@@ -766,9 +768,9 @@ export function DiscordPollManager({
     setSuccess(null);
 
     try {
-      // Envoyer le messageTemplate seulement s'il a été modifié (différent du message par défaut)
       const defaultCloseMsg = getDefaultCloseMessage();
       const finalCloseMessageTemplate =
+        closeWithMessage &&
         closeMessageTemplate.trim() &&
         closeMessageTemplate.trim() !== defaultCloseMsg.trim()
           ? closeMessageTemplate.trim()
@@ -783,6 +785,7 @@ export function DiscordPollManager({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
+            sendMessage: closeWithMessage,
             messageTemplate: finalCloseMessageTemplate,
           }),
         }
@@ -794,6 +797,7 @@ export function DiscordPollManager({
         setSuccess("Sondage fermé avec succès");
         setCloseDialogOpen(false);
         setCloseMessageTemplate("");
+        setCloseWithMessage(true);
         // Mettre à jour le sondage actuel d'abord
         await fetchCurrentPoll();
         // Vérifier immédiatement les sondages actifs
@@ -808,6 +812,7 @@ export function DiscordPollManager({
     }
   }, [
     currentPoll,
+    closeWithMessage,
     closeMessageTemplate,
     getDefaultCloseMessage,
     fetchCurrentPoll,
@@ -1281,6 +1286,19 @@ export function DiscordPollManager({
     </Box>
           </Box>
 
+          <FormControlLabel
+            control={
+              <Switch
+                checked={closeWithMessage}
+                onChange={(_, checked) => setCloseWithMessage(checked)}
+                color="primary"
+              />
+            }
+            label="Envoyer un message dans le canal Discord lors de la fermeture"
+            sx={{ mt: 2, display: "block" }}
+          />
+
+          {closeWithMessage && (
           <Box sx={{ mt: 3, position: "relative" }}>
             <TextField
               fullWidth
@@ -1404,12 +1422,14 @@ export function DiscordPollManager({
               />
             )}
           </Box>
+          )}
         </DialogContent>
         <DialogActions>
           <Button
             onClick={() => {
               setCloseDialogOpen(false);
               setCloseMessageTemplate("");
+              setCloseWithMessage(true);
             }}
             disabled={closing}
           >
