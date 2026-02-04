@@ -34,6 +34,7 @@ import {
   AlternateEmail,
   Warning,
   Accessible as AccessibleIcon,
+  CheckCircle,
 } from "@mui/icons-material";
 import { useTeamData, type EquipeWithMatches } from "@/hooks/useTeamData";
 import { useAvailabilities } from "@/hooks/useAvailabilities";
@@ -2635,6 +2636,29 @@ export function CompositionsPageContainer() {
                                         gap: 1,
                                       }}
                                     >
+                                      {discordSentStatus[equipe.team.id]
+                                        ?.sent && (
+                                        <Chip
+                                          icon={
+                                            <CheckCircle sx={{ fontSize: 16 }} />
+                                          }
+                                          label="Message envoyé"
+                                          size="small"
+                                          color="success"
+                                          variant="filled"
+                                          sx={{ fontWeight: 600 }}
+                                          title={
+                                            discordSentStatus[equipe.team.id]
+                                              ?.sentAt
+                                              ? `Envoyé le ${new Date(
+                                                  discordSentStatus[
+                                                    equipe.team.id
+                                                  ].sentAt!
+                                                ).toLocaleString("fr-FR")}`
+                                              : "Message Discord déjà envoyé"
+                                          }
+                                        />
+                                      )}
                                       {validationError && (
                                         <Chip
                                           label="Invalide"
@@ -3481,6 +3505,29 @@ export function CompositionsPageContainer() {
                                       gap: 1,
                                     }}
                                   >
+                                    {discordSentStatus[equipe.team.id]
+                                      ?.sent && (
+                                      <Chip
+                                        icon={
+                                          <CheckCircle sx={{ fontSize: 16 }} />
+                                        }
+                                        label="Message envoyé"
+                                        size="small"
+                                        color="success"
+                                        variant="filled"
+                                        sx={{ fontWeight: 600 }}
+                                        title={
+                                          discordSentStatus[equipe.team.id]
+                                            ?.sentAt
+                                            ? `Envoyé le ${new Date(
+                                                discordSentStatus[
+                                                  equipe.team.id
+                                                ].sentAt!
+                                              ).toLocaleString("fr-FR")}`
+                                            : "Message Discord déjà envoyé"
+                                        }
+                                      />
+                                    )}
                                     {validationError && (
                                       <Chip
                                         label="Invalide"
