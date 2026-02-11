@@ -3,6 +3,7 @@ import { ChampionshipType, Match } from "@/types";
 import { EquipeWithMatches } from "@/hooks/useTeamData";
 import { validateFFTTRules } from "@/lib/shared/fftt-utils";
 import { getMatchEpreuve, ID_EPREUVE_PARIS } from "@/lib/shared/epreuve-utils";
+import { getTeamsByType } from "@/lib/compositions/championship-utils";
 
 export type PhaseType = "aller" | "retour";
 
@@ -165,14 +166,20 @@ export const getTeamNumberForPlayerJournee1 = (
   playerId: string,
   phase: PhaseType,
   players: Player[],
-  equipes: EquipeWithMatches[]
+  equipes: EquipeWithMatches[],
+  championshipType?: ChampionshipType
 ): number | null => {
   const player = players.find((p) => p.id === playerId);
   if (!player) {
     return null;
   }
 
-  for (const equipe of equipes) {
+  // Filtrer les équipes par type si championshipType est fourni
+  const equipesToCheck = championshipType
+    ? getTeamsByType(equipes)[championshipType]
+    : equipes;
+
+  for (const equipe of equipesToCheck) {
     const matchJ1 = getMatchForTeamAndJournee(equipe, 1, phase);
     if (matchJ1 && isMatchPlayed(matchJ1)) {
       const playersFromMatch = getPlayersFromMatch(matchJ1, players);
@@ -192,13 +199,15 @@ export const didPlayerPlayJ1InLowerTeam = (
   targetTeamNumber: number,
   phase: PhaseType,
   players: Player[],
-  equipes: EquipeWithMatches[]
+  equipes: EquipeWithMatches[],
+  championshipType?: ChampionshipType
 ): boolean => {
   const playerJ1TeamNumber = getTeamNumberForPlayerJournee1(
     playerId,
     phase,
     players,
-    equipes
+    equipes,
+    championshipType
   );
 
   if (playerJ1TeamNumber === null) {
@@ -491,7 +500,8 @@ export const canAssignPlayerToTeam = (
         teamNumber,
         phaseValue,
         players,
-        equipes
+        equipes,
+        championshipType
       )
     );
 
@@ -500,7 +510,8 @@ export const canAssignPlayerToTeam = (
       teamNumber,
       phaseValue,
       players,
-      equipes
+      equipes,
+      championshipType
     );
 
     if (playerFromLowerTeam && playersFromLowerTeams.length > 1) {
@@ -720,7 +731,8 @@ export const validateTeamCompositionState = (
           teamNumber,
           phaseValue,
           players,
-          equipes
+          equipes,
+          championshipType
         )
       );
 
