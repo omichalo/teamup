@@ -93,10 +93,12 @@ export async function GET() {
     const user = {
       uid: decoded.uid,
       email: decoded.email || (userData?.email as string | undefined),
-      role: (userData?.role as string | undefined) || decoded.role || "player",
+      // Prioritize role and status from secure custom claims (decoded token)
+      // and only use Firestore as a fallback for missing data
+      role: decoded.role || (userData?.role as string | undefined) || "player",
       coachRequestStatus:
-        (userData?.coachRequestStatus as string | undefined) ||
         decoded.coachRequestStatus ||
+        (userData?.coachRequestStatus as string | undefined) ||
         "none",
       coachRequestMessage: (userData?.coachRequestMessage as string | undefined) || null,
       coachRequestUpdatedAt,

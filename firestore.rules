@@ -30,11 +30,18 @@ service cloud.firestore {
     // ============================================
     // Collection: users
     // ============================================
-    // Les utilisateurs peuvent créer/mettre à jour leur propre profil
+    // Les utilisateurs peuvent créer leur profil avec des valeurs par défaut sécurisées
+    // Ils peuvent mettre à jour leur profil mais pas leur rôle ni le statut de leur demande coach
     // Seuls les admins peuvent lire/supprimer les profils d'autres utilisateurs
     match /users/{userId} {
-      // Création et mise à jour : uniquement son propre profil
-      allow create, update: if isAuthenticated() && request.auth.uid == userId;
+      // Création : uniquement son propre profil, rôle 'player' par défaut
+      allow create: if isAuthenticated() && request.auth.uid == userId
+        && request.resource.data.role == 'player'
+        && (request.resource.data.get('coachRequestStatus', 'none') == 'none');
+
+      // Mise à jour : uniquement son propre profil, sans pouvoir changer son rôle ni son statut
+      allow update: if isAuthenticated() && request.auth.uid == userId
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'coachRequestStatus']));
       
       // Lecture : son propre profil ou admin
       allow read: if isAuthenticated() && (isAdmin() || request.auth.uid == userId);
@@ -111,10 +118,10 @@ service cloud.firestore {
     // Collection: availabilities
     // ============================================
     // Lecture pour tous les utilisateurs authentifiés
-    // Écriture pour tous les utilisateurs authentifiés (les joueurs peuvent mettre à jour leurs disponibilités)
+    // Écriture réservée aux admins et coachs pour garantir l'intégrité des données
     match /availabilities/{availabilityId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow write: if isCoach();
     }
     
     // ============================================
