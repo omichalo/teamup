@@ -93,10 +93,12 @@ export async function GET() {
     const user = {
       uid: decoded.uid,
       email: decoded.email || (userData?.email as string | undefined),
-      role: (userData?.role as string | undefined) || decoded.role || "player",
+      // 🛡️ Sentinel: Prioritize role and status from Custom Claims (decoded token)
+      // over Firestore data to prevent privilege escalation if the document is tampered with.
+      role: (decoded.role as string | undefined) || (userData?.role as string | undefined) || "player",
       coachRequestStatus:
+        (decoded.coachRequestStatus as string | undefined) ||
         (userData?.coachRequestStatus as string | undefined) ||
-        decoded.coachRequestStatus ||
         "none",
       coachRequestMessage: (userData?.coachRequestMessage as string | undefined) || null,
       coachRequestUpdatedAt,
