@@ -33,8 +33,15 @@ service cloud.firestore {
     // Les utilisateurs peuvent créer/mettre à jour leur propre profil
     // Seuls les admins peuvent lire/supprimer les profils d'autres utilisateurs
     match /users/{userId} {
-      // Création et mise à jour : uniquement son propre profil
-      allow create, update: if isAuthenticated() && request.auth.uid == userId;
+      // Création : uniquement son propre profil, rôle par défaut player
+      allow create: if isAuthenticated() && request.auth.uid == userId
+        && (!('role' in request.resource.data) || request.resource.data.role == 'player')
+        && (!('coachRequestStatus' in request.resource.data) || request.resource.data.coachRequestStatus == 'none');
+
+      // Mise à jour : uniquement son propre profil, interdit de modifier son propre rôle ou statut de demande coach
+      // 🛡️ Sentinel: Empêche l'auto-élévation de privilèges via Firestore
+      allow update: if isAuthenticated() && request.auth.uid == userId
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'coachRequestStatus']);
       
       // Lecture : son propre profil ou admin
       allow read: if isAuthenticated() && (isAdmin() || request.auth.uid == userId);
@@ -111,10 +118,11 @@ service cloud.firestore {
     // Collection: availabilities
     // ============================================
     // Lecture pour tous les utilisateurs authentifiés
-    // Écriture pour tous les utilisateurs authentifiés (les joueurs peuvent mettre à jour leurs disponibilités)
+    // Écriture uniquement pour les coaches/admins (les joueurs répondent via Discord/Admin SDK)
+    // 🛡️ Sentinel: Prévient les modifications non autorisées (BOLA)
     match /availabilities/{availabilityId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow write: if isCoach();
     }
     
     // ============================================
