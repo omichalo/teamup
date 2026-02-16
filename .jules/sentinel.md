@@ -1,0 +1,4 @@
+## 2025-05-15 - Hardening Firestore Security Rules
+**Vulnerability:** Overly permissive Firestore rules allowed any authenticated user to read sensitive club settings (including Discord webhooks) and potentially escalate their own privileges by modifying the 'role' or 'coachRequestStatus' fields in their user profile document.
+**Learning:** Even when using Custom Claims for authorization in middleware, the Firestore documents can still be a target for privilege escalation if the application uses them as a fallback or for UI logic. Sensitive collections like 'clubSettings' must be restricted to admins only if they contain secrets.
+**Prevention:** Use `request.resource.data.diff(resource.data).affectedKeys().hasAny([...])` to block direct updates to sensitive fields in Firestore rules. Always restrict read access to collections containing secrets to the absolute minimum required role (typically 'admin').
