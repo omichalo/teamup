@@ -1,0 +1,4 @@
+## 2025-05-15 - Privilege Escalation via Firestore Field Tampering
+**Vulnerability:** Users could change their own `role` or `coachRequestStatus` fields in the `users` Firestore collection, and the application's session verification endpoint prioritized these Firestore values over secure Custom Claims.
+**Learning:** Mirroring auth claims in Firestore documents without strict security rules (`diff().affectedKeys()`) creates a privilege escalation path. Additionally, server-side code must always prioritize cryptographically signed data (like ID tokens or session cookies) over mutable database records for authorization.
+**Prevention:** Use Firestore security rules to block updates to sensitive fields and ensure the session verification logic treats the decoded token as the source of truth for user roles.
