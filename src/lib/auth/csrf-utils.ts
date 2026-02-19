@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import crypto from "crypto";
 
 /**
  * Génère un token CSRF basé sur l'UID de l'utilisateur et un secret.
@@ -15,10 +16,15 @@ export async function generateCSRFToken(uid: string): Promise<string> {
     );
   }
   
-  // Créer un token simple basé sur l'UID et un timestamp
-  // En production, utilisez une bibliothèque comme `crypto` pour un hash plus sécurisé
-  const timestamp = Date.now();
-  const token = Buffer.from(`${uid}:${timestamp}:${secret}`).toString("base64");
+  // Créer un token basé sur l'UID, un timestamp et une signature HMAC
+  // 🛡️ Sentinel: Utilisation d'un HMAC pour éviter de fuiter le secret dans le token
+  const timestamp = Date.now().toString();
+  const hmac = crypto.createHmac("sha256", secret);
+  hmac.update(`${uid}:${timestamp}`);
+  const signature = hmac.digest("hex");
+
+  // Le token contient l'UID, le timestamp et la signature, mais PAS le secret
+  const token = Buffer.from(`${uid}:${timestamp}:${signature}`).toString("base64");
   
   return token;
 }
@@ -55,21 +61,31 @@ export async function validateCSRFToken(
       return false;
     }
 
-    // Décoder le token fourni pour extraire l'UID et le timestamp
+    // Décoder le token fourni pour extraire l'UID, le timestamp et la signature
     try {
       const decoded = Buffer.from(providedToken, "base64").toString("utf-8");
-      const [tokenUid, timestamp] = decoded.split(":");
+      const [tokenUid, timestamp, signature] = decoded.split(":");
       
+      if (!tokenUid || !timestamp || !signature) {
+        return false;
+      }
+
       // Si un UID est fourni, vérifier qu'il correspond
       if (uid && tokenUid !== uid) {
         return false;
       }
 
-      // Re-générer le token attendu avec le secret
-      const expectedToken = Buffer.from(`${tokenUid}:${timestamp}:${secret}`).toString("base64");
+      // 🛡️ Sentinel: Re-vérifier la signature HMAC
+      const hmac = crypto.createHmac("sha256", secret);
+      hmac.update(`${tokenUid}:${timestamp}`);
+      const expectedSignature = hmac.digest("hex");
       
-      // Comparer les tokens
-      return providedToken === expectedToken && providedToken === csrfCookie;
+      if (signature !== expectedSignature) {
+        return false;
+      }
+
+      // Comparer avec le cookie pour s'assurer de la cohérence
+      return providedToken === csrfCookie;
     } catch {
       // Si le décodage échoue, le token est invalide
       return false;

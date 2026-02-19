@@ -1,0 +1,4 @@
+## 2025-05-22 - CSRF Secret Leakage and Permissive Firestore Rules
+**Vulnerability:** The CSRF token generation was leaking the `CSRF_SECRET` to the client by simply base64 encoding it with the user ID and timestamp. Additionally, Firestore rules were too permissive, allowing any authenticated user to read sensitive club settings (including passwords) and modify other players' availabilities or their own roles.
+**Learning:** The CSRF utility used a placeholder implementation that was never upgraded to a secure version. Firestore rules were initially set to allow wide access to facilitate development but weren't tightened for production.
+**Prevention:** Always use cryptographically secure HMACs for token generation. Enforce the principle of least privilege in Firestore rules by using `request.resource.data.diff()` to restrict field-level updates and verifying ownership of specific data.
