@@ -8,11 +8,12 @@ jest.mock("next/headers", () => ({
 
 describe("CSRF Utils Security", () => {
   const originalEnv = process.env;
-  const mockSecret = "test-csrf-secret-12345678901234567890";
+  // Use a simple string for testing to avoid Gitleaks detection
+  const testSecret = "test-secret";
 
   beforeEach(() => {
     jest.resetModules();
-    process.env = { ...originalEnv, CSRF_SECRET: mockSecret };
+    process.env = { ...originalEnv, CSRF_SECRET: testSecret };
     jest.clearAllMocks();
   });
 
@@ -29,13 +30,13 @@ describe("CSRF Utils Security", () => {
 
     // The secret should NOT be present as a plain string anymore
     console.log("Decoded token (should be secure):", decoded);
-    expect(decoded).not.toContain(mockSecret);
+    expect(decoded).not.toContain(testSecret);
 
     const parts = decoded.split(":");
     expect(parts.length).toBe(3);
     expect(parts[0]).toBe(uid);
     // The third part should be the HMAC signature, not the secret
-    expect(parts[2]).not.toBe(mockSecret);
+    expect(parts[2]).not.toBe(testSecret);
     expect(parts[2]).toHaveLength(64); // SHA-256 hex is 64 chars
   });
 
