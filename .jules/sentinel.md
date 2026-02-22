@@ -1,0 +1,4 @@
+## 2025-05-22 - [CRITICAL] Permissive Firestore Rules leading to Privilege Escalation and Secret Exposure
+**Vulnerability:** The `/users` collection allowed users to modify their own `role` field. The `/availabilities` collection allowed any authenticated user to write to any document. The `/clubSettings` collection allowed any authenticated user to read sensitive secrets (FFTT password, Discord webhooks).
+**Learning:** Security rules were missing field-level validation and proper role-based access control, assuming frontend logic would prevent unauthorized actions.
+**Prevention:** Always enforce "least privilege" in Firestore rules. Use `affectedKeys()` to protect sensitive fields and restrict read/write access to the minimum required roles (e.g., `isAdmin()` for settings, `isCoach()` for shared management data).
