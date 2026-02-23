@@ -1,5 +1,6 @@
 import { generateCSRFToken, validateCSRFToken } from "@/lib/auth/csrf-utils";
 import { cookies } from "next/headers";
+import * as crypto from "crypto";
 
 // Mock de next/headers
 jest.mock("next/headers", () => ({
@@ -66,7 +67,6 @@ describe("CSRF Utils Security", () => {
     const oldTimestamp = (Date.now() - 48 * 60 * 60 * 1000).toString();
     const data = `${uid}:${oldTimestamp}`;
 
-    const crypto = require("crypto");
     const hmac = crypto.createHmac("sha256", "super-secret-key");
     hmac.update(data);
     const signature = hmac.digest("hex");
