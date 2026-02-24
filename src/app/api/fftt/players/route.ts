@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
-import { initializeFirebaseAdmin, getFirestoreAdmin } from "@/lib/firebase-admin";
+import { getFirestoreAdmin } from "@/lib/firebase-admin";
+import { USER_ROLES } from "@/lib/auth/roles";
+import { verifyApiAuth } from "@/lib/auth/api-auth";
 import type { Player } from "@/types";
 
 export async function GET(req: Request) {
   try {
+    // Vérification d'authentification et d'autorisation
+    // L'accès à la liste complète des joueurs est restreint aux administrateurs et coachs
+    const { errorResponse } = await verifyApiAuth([USER_ROLES.ADMIN, USER_ROLES.COACH]);
+    if (errorResponse) return errorResponse;
+
     const { searchParams } = new URL(req.url);
     const clubCode = searchParams.get("clubCode");
 
@@ -14,7 +21,6 @@ export async function GET(req: Request) {
       );
     }
 
-    await initializeFirebaseAdmin();
     const firestore = getFirestoreAdmin();
 
     const playersSnapshot = await firestore.collection("players").get();
@@ -55,7 +61,7 @@ export async function GET(req: Request) {
       { status: 200 }
     );
   } catch (error) {
-    console.error("[app/api/fftt/players] Firestore Error:", error);
+    console.error("[app/api/fftt/players] Error:", error);
     return NextResponse.json(
       {
         error: "Failed to fetch players data",
@@ -65,5 +71,3 @@ export async function GET(req: Request) {
     );
   }
 }
-
-

@@ -480,7 +480,8 @@ export const openApiSpec = {
         tags: ["FFTT"],
         summary: "Liste des joueurs FFTT en base",
         description:
-          "Retourne les joueurs présents dans la collection Firestore `players`, triés par nombre de points décroissant.",
+          "Retourne les joueurs présents dans la collection Firestore `players`, triés par nombre de points décroissant. Accès restreint aux administrateurs et coachs.",
+        security: [{ SessionCookie: [] }],
         parameters: [
           {
             name: "clubCode",
@@ -495,6 +496,8 @@ export const openApiSpec = {
             description: "Liste des joueurs.",
           },
           "400": { description: "Paramètre clubCode manquant." },
+          "401": { description: "Authentification requise." },
+          "403": { description: "Accès refusé." },
         },
       },
     },
@@ -503,9 +506,12 @@ export const openApiSpec = {
         tags: ["Equipes"],
         summary: "Liste des équipes",
         description:
-          "Retourne la liste des équipes (résultats de la dernière synchronisation FFTT) depuis Firestore.",
+          "Retourne la liste des équipes (résultats de la dernière synchronisation FFTT) depuis Firestore. Accès restreint aux administrateurs et coachs.",
+        security: [{ SessionCookie: [] }],
         responses: {
           "200": { description: "Liste des équipes." },
+          "401": { description: "Authentification requise." },
+          "403": { description: "Accès refusé." },
           "500": { description: "Erreur lors de la récupération des équipes." },
         },
       },
@@ -516,6 +522,7 @@ export const openApiSpec = {
         summary: "Liste des matchs pour plusieurs équipes",
         description:
           "Retourne les matchs associés à une ou plusieurs équipes. Si aucun `teamIds` n'est fourni, toutes les équipes sont renvoyées.",
+        security: [{ SessionCookie: [] }],
         parameters: [
           {
             name: "teamIds",
@@ -528,6 +535,8 @@ export const openApiSpec = {
         ],
         responses: {
           "200": { description: "Liste des matchs par équipe." },
+          "401": { description: "Authentification requise." },
+          "403": { description: "Email non vérifié." },
           "500": { description: "Erreur lors de la récupération des matchs." },
         },
       },
@@ -538,6 +547,7 @@ export const openApiSpec = {
         summary: "Liste des matchs pour une équipe",
         description:
           "Retourne tous les matchs connus pour une équipe donnée (FireStore + synchronisations FFTT).",
+        security: [{ SessionCookie: [] }],
         parameters: [
           {
             name: "teamId",
@@ -550,11 +560,11 @@ export const openApiSpec = {
         responses: {
           "200": { description: "Liste des matchs pour l'équipe." },
           "400": { description: "Paramètre teamId manquant." },
+          "401": { description: "Authentification requise." },
+          "403": { description: "Email non vérifié." },
           "500": { description: "Erreur lors de la récupération des matchs." },
         },
       },
     },
   },
 } as const;
-
-

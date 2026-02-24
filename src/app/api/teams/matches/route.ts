@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { initializeFirebaseAdmin, getFirestoreAdmin } from "@/lib/firebase-admin";
+import { getFirestoreAdmin } from "@/lib/firebase-admin";
+import { verifyApiAuth } from "@/lib/auth/api-auth";
 import {
   getTeams,
   getTeamMatches,
@@ -14,7 +15,10 @@ interface TeamMatchSerialized extends Omit<TeamMatch, "date" | "createdAt" | "up
 
 export async function GET(req: Request) {
   try {
-    await initializeFirebaseAdmin();
+    // Vérification d'authentification (tous les utilisateurs authentifiés peuvent voir les matchs)
+    const { errorResponse } = await verifyApiAuth();
+    if (errorResponse) return errorResponse;
+
     const firestore = getFirestoreAdmin();
 
     const teams = await getTeams(firestore);
@@ -75,5 +79,3 @@ export async function GET(req: Request) {
     );
   }
 }
-
-
