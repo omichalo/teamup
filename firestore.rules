@@ -33,8 +33,15 @@ service cloud.firestore {
     // Les utilisateurs peuvent créer/mettre à jour leur propre profil
     // Seuls les admins peuvent lire/supprimer les profils d'autres utilisateurs
     match /users/{userId} {
-      // Création et mise à jour : uniquement son propre profil
-      allow create, update: if isAuthenticated() && request.auth.uid == userId;
+      // Création : uniquement son propre profil avec rôle par défaut
+      allow create: if isAuthenticated() && request.auth.uid == userId
+                    && request.resource.data.role == "player"
+                    && request.resource.data.coachRequestStatus == "none";
+
+      // Mise à jour : uniquement son propre profil, sans changer le rôle ou le statut de demande coach
+      allow update: if isAuthenticated() && request.auth.uid == userId
+                    && !request.resource.data.diff(resource.data).affectedKeys()
+                        .hasAny(["role", "coachRequestStatus", "coachRequestHandledBy", "coachRequestHandledAt"]);
       
       // Lecture : son propre profil ou admin
       allow read: if isAuthenticated() && (isAdmin() || request.auth.uid == userId);
@@ -111,10 +118,19 @@ service cloud.firestore {
     // Collection: availabilities
     // ============================================
     // Lecture pour tous les utilisateurs authentifiés
-    // Écriture pour tous les utilisateurs authentifiés (les joueurs peuvent mettre à jour leurs disponibilités)
+    // Écriture : Coaches/Admins peuvent tout faire.
+    // Les joueurs peuvent créer un document s'ils n'incluent que leur propre ID dans players,
+    // ou mettre à jour un document existant en ne modifiant que leur propre entrée.
     match /availabilities/{availabilityId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow create: if isAuthenticated()
+                    && (isCoach() || (request.resource.data.players.keys().hasOnly([request.auth.uid])));
+      allow update: if isCoach()
+                    || (isAuthenticated()
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["players", "updatedAt"])
+                        && request.resource.data.players.diff(resource.data.players).affectedKeys().hasOnly([request.auth.uid])
+                       );
+      allow delete: if isCoach();
     }
     
     // ============================================
@@ -130,17 +146,14 @@ service cloud.firestore {
     // ============================================
     // Collection: clubSettings (ou club_settings)
     // ============================================
-    // Lecture pour tous les utilisateurs authentifiés
-    // Écriture uniquement pour les admins
+    // Lecture et écriture strictement réservées aux admins (contient des secrets FFTT/Discord)
     match /clubSettings/{settingsId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow read, write: if isAdmin();
     }
     
     // Alias pour club_settings (si utilisé)
     match /club_settings/{settingsId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow read, write: if isAdmin();
     }
     
     // ============================================
