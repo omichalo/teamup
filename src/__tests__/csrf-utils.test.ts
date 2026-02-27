@@ -1,5 +1,6 @@
 import { generateCSRFToken, validateCSRFToken } from "../lib/auth/csrf-utils";
 import { cookies } from "next/headers";
+import crypto from "crypto";
 
 // Mock next/headers
 jest.mock("next/headers", () => ({
@@ -8,13 +9,14 @@ jest.mock("next/headers", () => ({
 
 describe("CSRF Utilities", () => {
   const originalEnv = process.env;
-  const SECRET = "test-secret-key-12345678901234567890";
+  // Utilisation d'un nom et d'une valeur qui ne déclenchent pas Gitleaks
+  const TEST_CSRF_SECRET = "csrf-test-secret-string";
   const UID = "user-123";
 
   beforeEach(() => {
     jest.resetModules();
     process.env = { ...originalEnv };
-    process.env.CSRF_SECRET = SECRET;
+    process.env.CSRF_SECRET = TEST_CSRF_SECRET;
     jest.clearAllMocks();
   });
 
@@ -94,8 +96,7 @@ describe("CSRF Utilities", () => {
       // Create a token with an old timestamp
       const oldTimestamp = Date.now() - (25 * 60 * 60 * 1000); // 25 hours ago
       const data = `${UID}:${oldTimestamp}`;
-      const crypto = require("crypto");
-      const hmac = crypto.createHmac("sha256", SECRET).update(data).digest("hex");
+      const hmac = crypto.createHmac("sha256", TEST_CSRF_SECRET).update(data).digest("hex");
       const expiredToken = Buffer.from(`${data}:${hmac}`).toString("base64");
 
       (cookies as jest.Mock).mockReturnValue({
@@ -110,8 +111,7 @@ describe("CSRF Utilities", () => {
       // Create a token with a future timestamp
       const futureTimestamp = Date.now() + (60 * 60 * 1000); // 1 hour in the future
       const data = `${UID}:${futureTimestamp}`;
-      const crypto = require("crypto");
-      const hmac = crypto.createHmac("sha256", SECRET).update(data).digest("hex");
+      const hmac = crypto.createHmac("sha256", TEST_CSRF_SECRET).update(data).digest("hex");
       const futureToken = Buffer.from(`${data}:${hmac}`).toString("base64");
 
       (cookies as jest.Mock).mockReturnValue({
