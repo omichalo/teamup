@@ -3,9 +3,27 @@ import { cookies } from "next/headers";
 import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, COACH_REQUEST_STATUS, resolveRole } from "@/lib/auth/roles";
 import { FieldValue } from "firebase-admin/firestore";
+import { validateCSRFToken, validateOrigin } from "@/lib/auth/csrf-utils";
 
 export async function POST(req: Request) {
   try {
+    // Valider l'origine et le token CSRF pour prévenir les attaques CSRF (🛡️ Sentinel)
+    const csrfToken = req.headers.get("x-csrf-token");
+    const isOriginValid = validateOrigin(req);
+    const isCSRFValid = await validateCSRFToken(csrfToken);
+
+    if (!isOriginValid || !isCSRFValid) {
+      console.warn("[app/api/coach/request] CSRF validation failed", {
+        isOriginValid,
+        hasCSRFToken: !!csrfToken,
+        isCSRFValid,
+      });
+      return NextResponse.json(
+        { success: false, error: "Validation de sécurité échouée" },
+        { status: 403 }
+      );
+    }
+
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
     if (!sessionCookie) {

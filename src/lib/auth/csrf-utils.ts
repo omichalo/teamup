@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { timingSafeEqual } from "node:crypto";
 
 /**
  * Génère un token CSRF basé sur l'UID de l'utilisateur et un secret.
@@ -68,8 +69,26 @@ export async function validateCSRFToken(
       // Re-générer le token attendu avec le secret
       const expectedToken = Buffer.from(`${tokenUid}:${timestamp}:${secret}`).toString("base64");
       
-      // Comparer les tokens
-      return providedToken === expectedToken && providedToken === csrfCookie;
+      // Comparer les tokens de manière sécurisée contre les attaques temporelles (🛡️ Sentinel)
+      const providedBuffer = Buffer.from(providedToken);
+      const expectedBuffer = Buffer.from(expectedToken);
+      const cookieBuffer = Buffer.from(csrfCookie);
+
+      // timingSafeEqual nécessite des buffers de même longueur
+      if (
+        providedBuffer.length !== expectedBuffer.length ||
+        providedBuffer.length !== cookieBuffer.length
+      ) {
+        // Si les longueurs diffèrent, on effectue quand même une comparaison factice
+        // pour maintenir un temps d'exécution similaire (bien que la longueur trahisse déjà beaucoup)
+        timingSafeEqual(providedBuffer, providedBuffer);
+        return false;
+      }
+
+      const isMatchExpected = timingSafeEqual(providedBuffer, expectedBuffer);
+      const isMatchCookie = timingSafeEqual(providedBuffer, cookieBuffer);
+
+      return isMatchExpected && isMatchCookie;
     } catch {
       // Si le décodage échoue, le token est invalide
       return false;
