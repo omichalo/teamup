@@ -111,10 +111,20 @@ service cloud.firestore {
     // Collection: availabilities
     // ============================================
     // Lecture pour tous les utilisateurs authentifiés
-    // Écriture pour tous les utilisateurs authentifiés (les joueurs peuvent mettre à jour leurs disponibilités)
+    // Écriture :
+    // - Les admins/coaches peuvent tout faire
+    // - Les joueurs peuvent uniquement mettre à jour leur PROPRE disponibilité dans la map 'players'
     match /availabilities/{availabilityId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow create: if isCoach();
+      allow update: if isCoach() || (
+        isAuthenticated() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['players', 'updatedAt']) &&
+        request.resource.data.players.diff(resource.data.players).affectedKeys().hasOnly([
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.playerId
+        ])
+      );
+      allow delete: if isCoach();
     }
     
     // ============================================
@@ -130,17 +140,14 @@ service cloud.firestore {
     // ============================================
     // Collection: clubSettings (ou club_settings)
     // ============================================
-    // Lecture pour tous les utilisateurs authentifiés
-    // Écriture uniquement pour les admins
+    // Lecture et écriture strictement réservées aux admins
     match /clubSettings/{settingsId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow read, write: if isAdmin();
     }
     
     // Alias pour club_settings (si utilisé)
     match /club_settings/{settingsId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow read, write: if isAdmin();
     }
     
     // ============================================
