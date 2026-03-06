@@ -1,9 +1,18 @@
 import { NextResponse } from "next/server";
-import { initializeFirebaseAdmin, getFirestoreAdmin } from "@/lib/firebase-admin";
+import { getFirestoreAdmin } from "@/lib/firebase-admin";
+import { verifyApiAuth } from "@/lib/auth/api-auth";
+import { USER_ROLES } from "@/lib/auth/roles";
 import type { Player } from "@/types";
 
 export async function GET(req: Request) {
   try {
+    // 🛡️ Sentinel: Secure the endpoint by verifying session and roles
+    const { errorResponse } = await verifyApiAuth([
+      USER_ROLES.ADMIN,
+      USER_ROLES.COACH,
+    ]);
+    if (errorResponse) return errorResponse;
+
     const { searchParams } = new URL(req.url);
     const clubCode = searchParams.get("clubCode");
 
@@ -14,7 +23,6 @@ export async function GET(req: Request) {
       );
     }
 
-    await initializeFirebaseAdmin();
     const firestore = getFirestoreAdmin();
 
     const playersSnapshot = await firestore.collection("players").get();
