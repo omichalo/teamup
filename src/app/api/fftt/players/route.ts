@@ -1,9 +1,37 @@
 import { NextResponse } from "next/server";
-import { initializeFirebaseAdmin, getFirestoreAdmin } from "@/lib/firebase-admin";
+import { cookies } from "next/headers";
+import { initializeFirebaseAdmin, getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
+import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
 import type { Player } from "@/types";
 
 export async function GET(req: Request) {
   try {
+    // 🛡️ Sentinel: Verify authentication and authorization
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("__session")?.value;
+    if (!sessionCookie) {
+      return NextResponse.json(
+        { success: false, error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
+    try {
+      const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+      const role = resolveRole(decoded.role as string | undefined);
+      if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
+        return NextResponse.json(
+          { success: false, error: "Access denied" },
+          { status: 403 }
+        );
+      }
+    } catch {
+      return NextResponse.json(
+        { success: false, error: "Invalid session" },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const clubCode = searchParams.get("clubCode");
 

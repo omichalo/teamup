@@ -9,6 +9,7 @@ import {
   initializeFirebaseAdmin,
 } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
 
 const COLLECTION_NAME = "discordAvailabilityConfig";
 const DOCUMENT_ID = "default";
@@ -24,7 +25,7 @@ export async function GET() {
 
     if (!sessionCookie) {
       return NextResponse.json(
-        { success: false, error: "Non authentifié" },
+        { success: false, error: "Authentication required" },
         { status: 401 }
       );
     }
@@ -32,7 +33,7 @@ export async function GET() {
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     if (!decoded.email_verified) {
       return NextResponse.json(
-        { success: false, error: "Email non vérifié" },
+        { success: false, error: "Email not verified" },
         { status: 403 }
       );
     }
@@ -41,7 +42,7 @@ export async function GET() {
     const role = resolveRole(decoded.role as string | undefined);
     if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
       return NextResponse.json(
-        { success: false, error: "Accès refusé - Admin uniquement" },
+        { success: false, error: "Access denied - Admin only" },
         { status: 403 }
       );
     }
@@ -75,13 +76,13 @@ export async function GET() {
     });
   } catch (error) {
     console.error(
-      "[Discord Availability Config] Erreur lors de la récupération:",
+      "[Discord Availability Config] Error during fetch:",
       error
     );
     return NextResponse.json(
       {
         success: false,
-        error: "Erreur lors de la récupération de la configuration",
+        error: "Error during configuration fetch",
       },
       { status: 500 }
     );
@@ -93,13 +94,21 @@ export async function GET() {
  */
 export async function POST(req: Request) {
   try {
+    // 🛡️ Sentinel: Validate request origin to prevent CSRF attacks
+    if (!validateOrigin(req)) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized request (CSRF mismatch)" },
+        { status: 403 }
+      );
+    }
+
     // Vérifier l'authentification
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
 
     if (!sessionCookie) {
       return NextResponse.json(
-        { success: false, error: "Non authentifié" },
+        { success: false, error: "Authentication required" },
         { status: 401 }
       );
     }
@@ -107,7 +116,7 @@ export async function POST(req: Request) {
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     if (!decoded.email_verified) {
       return NextResponse.json(
-        { success: false, error: "Email non vérifié" },
+        { success: false, error: "Email not verified" },
         { status: 403 }
       );
     }
@@ -116,7 +125,7 @@ export async function POST(req: Request) {
     const role = resolveRole(decoded.role as string | undefined);
     if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
       return NextResponse.json(
-        { success: false, error: "Accès refusé - Admin uniquement" },
+        { success: false, error: "Access denied - Admin only" },
         { status: 403 }
       );
     }
@@ -134,7 +143,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: "parisChannelId doit être une chaîne ou null",
+          error: "parisChannelId must be a string or null",
         },
         { status: 400 }
       );
@@ -148,7 +157,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: "equipesChannelId doit être une chaîne ou null",
+          error: "equipesChannelId must be a string or null",
         },
         { status: 400 }
       );
@@ -160,7 +169,7 @@ export async function POST(req: Request) {
       typeof parisMention !== "string"
     ) {
       return NextResponse.json(
-        { success: false, error: "parisMention doit être une chaîne ou null" },
+        { success: false, error: "parisMention must be a string or null" },
         { status: 400 }
       );
     }
@@ -173,7 +182,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: "equipesMention doit être une chaîne ou null",
+          error: "equipesMention must be a string or null",
         },
         { status: 400 }
       );
@@ -205,13 +214,13 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error(
-      "[Discord Availability Config] Erreur lors de la sauvegarde:",
+      "[Discord Availability Config] Error during save:",
       error
     );
     return NextResponse.json(
       {
         success: false,
-        error: "Erreur lors de la sauvegarde de la configuration",
+        error: "Error during configuration save",
       },
       { status: 500 }
     );

@@ -3,14 +3,23 @@ import { cookies } from "next/headers";
 import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, COACH_REQUEST_STATUS, resolveRole } from "@/lib/auth/roles";
 import { FieldValue } from "firebase-admin/firestore";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
 
 export async function POST(req: Request) {
   try {
+    // 🛡️ Sentinel: Validate request origin to prevent CSRF attacks
+    if (!validateOrigin(req)) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized request (CSRF mismatch)" },
+        { status: 403 }
+      );
+    }
+
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
     if (!sessionCookie) {
       return NextResponse.json(
-        { success: false, error: "Authentification requise" },
+        { success: false, error: "Authentication required" },
         { status: 401 }
       );
     }
@@ -23,7 +32,7 @@ export async function POST(req: Request) {
       !hasAnyRole(role, [USER_ROLES.COACH, USER_ROLES.ADMIN])
     ) {
       return NextResponse.json(
-        { success: false, error: "Accès refusé" },
+        { success: false, error: "Access denied" },
         { status: 403 }
       );
     }
@@ -64,7 +73,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         success: false,
-        error: "Impossible d'enregistrer la demande",
+        error: "Failed to save request",
       },
       { status: 500 }
     );
