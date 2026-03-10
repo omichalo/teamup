@@ -7,7 +7,7 @@ import type { DecodedIdToken } from "firebase-admin/auth";
 
 export interface ApiAuthResult {
   uid: string;
-  email?: string;
+  email?: string | undefined;
   role: UserRole;
   decodedToken: DecodedIdToken;
 }
