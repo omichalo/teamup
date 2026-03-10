@@ -1,0 +1,4 @@
+## 2025-05-15 - [HIGH] Unauthenticated Access to Sensitive Player Data
+**Vulnerability:** The `/api/fftt/players` endpoint was publicly accessible, exposing the entire Firestore `players` collection (including potential PII) without any authentication or authorization checks.
+**Learning:** API routes in Next.js (App Router) are public by default unless explicitly protected. Relying solely on middleware might not cover all API routes if the matcher is not correctly configured or if the route is intended to be protected by a different logic.
+**Prevention:** Standardize API protection using a dedicated utility (like `verifyApiAuth`) that enforces session verification and role-based access control (RBAC) at the route level. Always add anti-caching headers to responses containing sensitive data.

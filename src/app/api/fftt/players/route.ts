@@ -1,69 +1,42 @@
 import { NextResponse } from "next/server";
-import { initializeFirebaseAdmin, getFirestoreAdmin } from "@/lib/firebase-admin";
+import { getFirestoreAdmin } from "@/lib/firebase-admin";
+import { verifyApiAuth } from "@/lib/auth/api-auth";
+import { USER_ROLES } from "@/lib/auth/roles";
 import type { Player } from "@/types";
 
 export async function GET(req: Request) {
   try {
+    const auth = await verifyApiAuth([USER_ROLES.ADMIN, USER_ROLES.COACH]);
+    if (!auth.success) return auth.response;
+
     const { searchParams } = new URL(req.url);
     const clubCode = searchParams.get("clubCode");
+    if (!clubCode) return NextResponse.json({ error: "Club code required" }, { status: 400 });
 
-    if (!clubCode) {
-      return NextResponse.json(
-        { error: "Club code parameter is required" },
-        { status: 400 }
-      );
-    }
-
-    await initializeFirebaseAdmin();
-    const firestore = getFirestoreAdmin();
-
-    const playersSnapshot = await firestore.collection("players").get();
-
+    const playersSnapshot = await getFirestoreAdmin().collection("players").get();
     const players: Player[] = [];
     playersSnapshot.forEach((doc) => {
       const data = doc.data();
-      const createdAtValue = data.createdAt;
-      const updatedAtValue = data.updatedAt;
-      const createdAt = createdAtValue instanceof Date 
-        ? createdAtValue 
-        : (createdAtValue && typeof createdAtValue === "object" && "toDate" in createdAtValue && typeof createdAtValue.toDate === "function")
-          ? createdAtValue.toDate()
-          : new Date();
-      const updatedAt = updatedAtValue instanceof Date 
-        ? updatedAtValue 
-        : (updatedAtValue && typeof updatedAtValue === "object" && "toDate" in updatedAtValue && typeof updatedAtValue.toDate === "function")
-          ? updatedAtValue.toDate()
-          : new Date();
+      const toDate = (v: unknown) =>
+        v instanceof Date ? v : (v && typeof v === "object" && "toDate" in v && typeof v.toDate === "function" ? v.toDate() : new Date());
       players.push({
         id: doc.id,
         ...(data as Partial<Player>),
-        createdAt,
-        updatedAt,
+        createdAt: toDate(data.createdAt),
+        updatedAt: toDate(data.updatedAt),
       } as Player);
     });
 
     players.sort((a, b) => b.points - a.points);
+    const res = NextResponse.json({ players, total: players.length, clubCode }, { status: 200 });
 
-    console.log(`📊 [app/api/fftt/players] ${players.length} joueurs récupérés depuis Firestore`);
-
-    return NextResponse.json(
-      {
-        players,
-        total: players.length,
-        clubCode,
-      },
-      { status: 200 }
-    );
+    // 🛡️ Sentinel: Prevent caching of sensitive data
+    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.headers.set("Pragma", "no-cache");
+    res.headers.set("Expires", "0");
+    return res;
   } catch (error) {
-    console.error("[app/api/fftt/players] Firestore Error:", error);
-    return NextResponse.json(
-      {
-        error: "Failed to fetch players data",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
-    );
+    console.error("[api/fftt/players] Error:", error);
+    return NextResponse.json({ error: "Fetch failed" }, { status: 500 });
   }
 }
-
-
