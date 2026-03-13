@@ -1,8 +1,11 @@
 import { cookies } from "next/headers";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 /**
  * Génère un token CSRF basé sur l'UID de l'utilisateur et un secret.
  * Le token est stocké dans un cookie HTTP-only pour éviter les attaques XSS.
+ *
+ * 🛡️ Sentinel: Utilise HMAC-SHA256 pour signer le token et éviter de fuiter le secret.
  */
 export async function generateCSRFToken(uid: string): Promise<string> {
   // Le secret CSRF doit être défini via la variable d'environnement CSRF_SECRET
@@ -15,12 +18,15 @@ export async function generateCSRFToken(uid: string): Promise<string> {
     );
   }
   
-  // Créer un token simple basé sur l'UID et un timestamp
-  // En production, utilisez une bibliothèque comme `crypto` pour un hash plus sécurisé
-  const timestamp = Date.now();
-  const token = Buffer.from(`${uid}:${timestamp}:${secret}`).toString("base64");
+  // Créer un token basé sur l'UID, un timestamp et une signature HMAC
+  const timestamp = Date.now().toString();
+  const data = `${uid}:${timestamp}`;
+  const hmac = createHmac("sha256", secret);
+  hmac.update(data);
+  const signature = hmac.digest("hex");
   
-  return token;
+  // Le token public contient les données et la signature
+  return Buffer.from(`${data}:${signature}`).toString("base64");
 }
 
 /**
@@ -55,21 +61,52 @@ export async function validateCSRFToken(
       return false;
     }
 
-    // Décoder le token fourni pour extraire l'UID et le timestamp
+    // Décoder le token fourni pour extraire l'UID, le timestamp et la signature
     try {
       const decoded = Buffer.from(providedToken, "base64").toString("utf-8");
-      const [tokenUid, timestamp] = decoded.split(":");
+      const parts = decoded.split(":");
+
+      if (parts.length !== 3) {
+        return false;
+      }
+
+      const [tokenUid, timestamp, signature] = parts;
       
       // Si un UID est fourni, vérifier qu'il correspond
       if (uid && tokenUid !== uid) {
         return false;
       }
 
-      // Re-générer le token attendu avec le secret
-      const expectedToken = Buffer.from(`${tokenUid}:${timestamp}:${secret}`).toString("base64");
+      // Re-générer la signature attendue
+      const data = `${tokenUid}:${timestamp}`;
+      const hmac = createHmac("sha256", secret);
+      hmac.update(data);
+      const expectedSignature = hmac.digest("hex");
+
+      // 🛡️ Sentinel: Comparaison constante dans le temps pour éviter les attaques par timing
+      // timingSafeEqual lève une erreur si les buffers ont des longueurs différentes
+      const sigBuf = Buffer.from(signature, "hex");
+      const expectedSigBuf = Buffer.from(expectedSignature, "hex");
+
+      if (sigBuf.length !== expectedSigBuf.length) {
+        return false;
+      }
+
+      const signatureValid = timingSafeEqual(sigBuf, expectedSigBuf);
+
+      if (!signatureValid) {
+        return false;
+      }
+
+      // 🛡️ Sentinel: Comparaison constante dans le temps avec le cookie
+      const providedBuf = Buffer.from(providedToken);
+      const cookieBuf = Buffer.from(csrfCookie);
       
-      // Comparer les tokens
-      return providedToken === expectedToken && providedToken === csrfCookie;
+      if (providedBuf.length !== cookieBuf.length) {
+        return false;
+      }
+
+      return timingSafeEqual(providedBuf, cookieBuf);
     } catch {
       // Si le décodage échoue, le token est invalide
       return false;
