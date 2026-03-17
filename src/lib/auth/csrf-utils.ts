@@ -1,8 +1,11 @@
 import { cookies } from "next/headers";
+import crypto from "node:crypto";
 
 /**
  * Génère un token CSRF basé sur l'UID de l'utilisateur et un secret.
  * Le token est stocké dans un cookie HTTP-only pour éviter les attaques XSS.
+ *
+ * 🛡️ Sentinel: Utilise HMAC-SHA256 pour signer le payload et éviter de fuiter le secret.
  */
 export async function generateCSRFToken(uid: string): Promise<string> {
   // Le secret CSRF doit être défini via la variable d'environnement CSRF_SECRET
@@ -15,18 +18,21 @@ export async function generateCSRFToken(uid: string): Promise<string> {
     );
   }
   
-  // Créer un token simple basé sur l'UID et un timestamp
-  // En production, utilisez une bibliothèque comme `crypto` pour un hash plus sécurisé
+  // Créer un token signé avec HMAC-SHA256 basé sur l'UID et un timestamp
   const timestamp = Date.now();
-  const token = Buffer.from(`${uid}:${timestamp}:${secret}`).toString("base64");
+  const payload = `${uid}:${timestamp}`;
+  const signature = crypto.createHmac("sha256", secret).update(payload).digest("hex");
   
-  return token;
+  // Le token retourné contient le payload et la signature, mais pas le secret lui-même
+  return Buffer.from(`${payload}:${signature}`).toString("base64");
 }
 
 /**
  * Valide un token CSRF en le comparant avec celui stocké dans le cookie.
  * @param providedToken - Le token fourni par le client
  * @param uid - L'UID de l'utilisateur (optionnel, extrait du cookie si non fourni)
+ *
+ * 🛡️ Sentinel: Utilise timingSafeEqual pour prévenir les attaques temporelles.
  */
 export async function validateCSRFToken(
   providedToken: string | null | undefined,
@@ -55,21 +61,44 @@ export async function validateCSRFToken(
       return false;
     }
 
-    // Décoder le token fourni pour extraire l'UID et le timestamp
+    // Décoder le token fourni pour extraire l'UID, le timestamp et la signature
     try {
       const decoded = Buffer.from(providedToken, "base64").toString("utf-8");
-      const [tokenUid, timestamp] = decoded.split(":");
+      const parts = decoded.split(":");
+
+      if (parts.length !== 3) {
+        return false;
+      }
+
+      const [tokenUid, timestamp, signature] = parts;
       
       // Si un UID est fourni, vérifier qu'il correspond
       if (uid && tokenUid !== uid) {
         return false;
       }
 
-      // Re-générer le token attendu avec le secret
-      const expectedToken = Buffer.from(`${tokenUid}:${timestamp}:${secret}`).toString("base64");
+      // Re-générer la signature attendue pour vérification
+      const payload = `${tokenUid}:${timestamp}`;
+      const expectedSignature = crypto.createHmac("sha256", secret).update(payload).digest("hex");
       
-      // Comparer les tokens
-      return providedToken === expectedToken && providedToken === csrfCookie;
+      // Utiliser timingSafeEqual pour la comparaison des signatures et des tokens
+      const signatureBuffer = Buffer.from(signature);
+      const expectedSignatureBuffer = Buffer.from(expectedSignature);
+      const providedTokenBuffer = Buffer.from(providedToken);
+      const csrfCookieBuffer = Buffer.from(csrfCookie);
+
+      // timingSafeEqual nécessite des buffers de même longueur
+      if (
+        signatureBuffer.length !== expectedSignatureBuffer.length ||
+        providedTokenBuffer.length !== csrfCookieBuffer.length
+      ) {
+        return false;
+      }
+
+      const isSignatureValid = crypto.timingSafeEqual(signatureBuffer, expectedSignatureBuffer);
+      const isCookieValid = crypto.timingSafeEqual(providedTokenBuffer, csrfCookieBuffer);
+
+      return isSignatureValid && isCookieValid;
     } catch {
       // Si le décodage échoue, le token est invalide
       return false;
