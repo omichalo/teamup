@@ -8,3 +8,6 @@ eb060e5f5844f3ccd9789aa132ae5c6bd66dc6b6:.env.example:private-key:37
 # Ignore l'exemple DISCORD_APPLICATION_ID dans scripts/register-discord-command.ts
 # C'est un placeholder de documentation, pas un vrai secret
 ebdea02acda725d0eaaf2806c298bc3fa3fa44d9:scripts/register-discord-command.ts:discord-client-id:79
+
+# Ignore le faux positif de secret dans les tests CSRF (clé de test à faible entropie)
+8ac2c774e086f6ecf859dc7e643f94de84616163:src/__tests__/csrf-utils.test.ts:generic-api-key:12
