@@ -1,79 +1,67 @@
 import { cookies } from "next/headers";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 /**
  * Génère un token CSRF basé sur l'UID de l'utilisateur et un secret.
- * Le token est stocké dans un cookie HTTP-only pour éviter les attaques XSS.
+ * Utilise HMAC-SHA256 pour garantir l'intégrité et masquer le secret.
  */
 export async function generateCSRFToken(uid: string): Promise<string> {
-  // Le secret CSRF doit être défini via la variable d'environnement CSRF_SECRET
   const secret = process.env.CSRF_SECRET;
   
   if (!secret) {
-    throw new Error(
-      "CSRF_SECRET environment variable is required. " +
-      "Please configure it in your environment variables or Firebase App Hosting secrets."
-    );
+    throw new Error("CSRF_SECRET environment variable is required.");
   }
   
-  // Créer un token simple basé sur l'UID et un timestamp
-  // En production, utilisez une bibliothèque comme `crypto` pour un hash plus sécurisé
   const timestamp = Date.now();
-  const token = Buffer.from(`${uid}:${timestamp}:${secret}`).toString("base64");
+  const dataToSign = `${uid}:${timestamp}`;
   
-  return token;
+  // 🛡️ Sentinel: Utilisation de HMAC-SHA256 pour éviter la fuite du secret
+  const signature = createHmac("sha256", secret)
+    .update(dataToSign)
+    .digest("base64");
+
+  // Le token final est uid:timestamp:signature, encodé en base64
+  return Buffer.from(`${dataToSign}:${signature}`).toString("base64");
 }
 
 /**
- * Valide un token CSRF en le comparant avec celui stocké dans le cookie.
- * @param providedToken - Le token fourni par le client
- * @param uid - L'UID de l'utilisateur (optionnel, extrait du cookie si non fourni)
+ * Valide un token CSRF en vérifiant sa signature HMAC et sa présence en cookie.
  */
 export async function validateCSRFToken(
   providedToken: string | null | undefined,
   uid?: string
 ): Promise<boolean> {
-  if (!providedToken) {
-    return false;
-  }
+  if (!providedToken) return false;
 
   try {
+    const secret = process.env.CSRF_SECRET;
+    if (!secret) return false;
+
     const cookieStore = await cookies();
     const csrfCookie = cookieStore.get("__csrf")?.value;
+    if (!csrfCookie) return false;
 
-    if (!csrfCookie) {
-      return false;
-    }
-
-    // Le secret CSRF doit être défini via la variable d'environnement CSRF_SECRET
-    const secret = process.env.CSRF_SECRET;
+    // 🛡️ Sentinel: Comparaison en temps constant pour éviter les attaques temporelles
+    const providedBuffer = Buffer.from(providedToken);
+    const cookieBuffer = Buffer.from(csrfCookie);
     
-    if (!secret) {
-      console.error(
-        "[CSRF] CSRF_SECRET environment variable is required for token validation. " +
-        "Please configure it in your environment variables or Firebase App Hosting secrets."
-      );
+    if (providedBuffer.length !== cookieBuffer.length || !timingSafeEqual(providedBuffer, cookieBuffer)) {
       return false;
     }
 
-    // Décoder le token fourni pour extraire l'UID et le timestamp
-    try {
-      const decoded = Buffer.from(providedToken, "base64").toString("utf-8");
-      const [tokenUid, timestamp] = decoded.split(":");
-      
-      // Si un UID est fourni, vérifier qu'il correspond
-      if (uid && tokenUid !== uid) {
-        return false;
-      }
+    // Décoder et vérifier la signature HMAC
+    const decoded = Buffer.from(providedToken, "base64").toString("utf-8");
+    const parts = decoded.split(":");
+    if (parts.length !== 3) return false;
 
-      // Re-générer le token attendu avec le secret
-      const expectedToken = Buffer.from(`${tokenUid}:${timestamp}:${secret}`).toString("base64");
-      
-      // Comparer les tokens
-      return providedToken === expectedToken && providedToken === csrfCookie;
-    } catch {
-      // Si le décodage échoue, le token est invalide
-      return false;
-    }
+    const [tokenUid, timestamp, providedSignature] = parts;
+    if (uid && tokenUid !== uid) return false;
+
+    const expectedSignature = createHmac("sha256", secret)
+      .update(`${tokenUid}:${timestamp}`)
+      .digest("base64");
+
+    return providedSignature === expectedSignature;
   } catch {
     return false;
   }
