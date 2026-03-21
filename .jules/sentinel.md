@@ -1,0 +1,4 @@
+## 2025-05-22 - Insecure CSRF Implementation and Missing Endpoint Validation
+**Vulnerability:** CSRF tokens were generated using simple base64 concatenation of UID, timestamp, and secret, which is susceptible to forgery if the format is known. Additionally, sensitive POST endpoints like `/api/coach/request` lacked CSRF validation entirely.
+**Learning:** Legacy security utilities often use placeholder implementations that aren't upgraded before production. A robust CSRF strategy requires both cryptographic signing (HMAC) and consistent enforcement across all state-changing API routes.
+**Prevention:** Always use HMAC-SHA256 for token signing and `crypto.timingSafeEqual` for verification. Use the Double-Submit Cookie pattern with a non-httpOnly cookie to allow client-side header injection while maintaining server-side verification.

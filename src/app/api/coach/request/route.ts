@@ -3,11 +3,46 @@ import { cookies } from "next/headers";
 import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, COACH_REQUEST_STATUS, resolveRole } from "@/lib/auth/roles";
 import { FieldValue } from "firebase-admin/firestore";
+import { validateOrigin, validateCSRFToken } from "@/lib/auth/csrf-utils";
 
 export async function POST(req: Request) {
   try {
+    // 🛡️ Sentinel: Valider l'origine et le token CSRF pour prévenir les attaques CSRF
+    const csrfToken = req.headers.get("X-CSRF-Token");
+    const isOriginValid = validateOrigin(req);
+
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
+
+    let uid: string | undefined;
+    if (sessionCookie) {
+      try {
+        const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+        uid = decoded.uid;
+      } catch {
+        // Ignorer l'erreur ici, elle sera gérée plus bas lors de la vérification de session
+      }
+    }
+
+    const isTokenValid = await validateCSRFToken(csrfToken, uid);
+
+    if (!isOriginValid || !isTokenValid) {
+      console.warn("[app/api/coach/request] CSRF validation failed:", {
+        isOriginValid,
+        isTokenValid,
+        hasToken: !!csrfToken,
+        uid: uid || "anonymous",
+      });
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid CSRF",
+          message: "Requête non autorisée (protection CSRF)",
+        },
+        { status: 403 }
+      );
+    }
+
     if (!sessionCookie) {
       return NextResponse.json(
         { success: false, error: "Authentification requise" },
