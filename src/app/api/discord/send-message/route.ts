@@ -2,11 +2,20 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase-admin";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
 
 const db = getFirestore();
 
 export async function POST(req: Request) {
   try {
+    // 🛡️ Sentinel: Valider l'origine de la requête pour prévenir les attaques CSRF
+    if (!validateOrigin(req)) {
+      return NextResponse.json(
+        { success: false, error: "Requête invalide (origine non autorisée)" },
+        { status: 403 }
+      );
+    }
+
     // Configuration du bot Discord (vérifier à l'intérieur de la fonction)
     const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
     const DISCORD_SERVER_ID = process.env.DISCORD_SERVER_ID;
