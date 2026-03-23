@@ -1,0 +1,4 @@
+## 2025-05-15 - [CRITICAL] Missing authentication on player list API
+**Vulnerability:** The `/api/fftt/players` endpoint was publicly accessible without any authentication or authorization checks. It exposed full names, FFTT IDs, and current ranking points for all players in the database.
+**Learning:** Security-sensitive API routes in Next.js (App Router) are NOT automatically protected by the root `middleware.ts` if they are explicitly excluded (as seen in the matcher `(?!api|...)`). Each API route must implement its own authentication logic.
+**Prevention:** Always verify that API routes handling personally identifiable information (PII) or administrative data implement session cookie verification (`adminAuth.verifySessionCookie`) and role checks (`hasAnyRole`). Add automated tests to verify these constraints.
