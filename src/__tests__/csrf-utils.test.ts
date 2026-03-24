@@ -12,7 +12,8 @@ describe("CSRF Utils Security", () => {
   beforeEach(() => {
     jest.resetModules();
     process.env = { ...originalEnv };
-    process.env.CSRF_SECRET = "test-secret-key-12345678901234567890";
+    // 🛡️ Sentinel: Utiliser un secret de test à faible entropie pour éviter les faux positifs Gitleaks.
+    process.env.CSRF_SECRET = "test_csrf_secret_for_unit_tests";
     process.env.NODE_ENV = "production";
   });
 
