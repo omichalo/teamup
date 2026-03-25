@@ -9,6 +9,7 @@ import {
   initializeFirebaseAdmin,
 } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { validateOrigin, validateCSRFToken } from "@/lib/auth/csrf-utils";
 
 const COLLECTION_NAME = "discordAvailabilityConfig";
 const DOCUMENT_ID = "default";
@@ -93,6 +94,14 @@ export async function GET() {
  */
 export async function POST(req: Request) {
   try {
+    // Valider l'origine et le token CSRF pour prévenir les attaques CSRF
+    if (!validateOrigin(req) || !(await validateCSRFToken())) {
+      return NextResponse.json(
+        { success: false, error: "Requête non autorisée" },
+        { status: 403 }
+      );
+    }
+
     // Vérifier l'authentification
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;

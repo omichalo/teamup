@@ -3,9 +3,18 @@ import { cookies } from "next/headers";
 import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, COACH_REQUEST_STATUS, resolveRole } from "@/lib/auth/roles";
 import { FieldValue } from "firebase-admin/firestore";
+import { validateOrigin, validateCSRFToken } from "@/lib/auth/csrf-utils";
 
 export async function POST(req: Request) {
   try {
+    // Valider l'origine et le token CSRF pour prévenir les attaques CSRF
+    if (!validateOrigin(req) || !(await validateCSRFToken())) {
+      return NextResponse.json(
+        { success: false, error: "Requête non autorisée" },
+        { status: 403 }
+      );
+    }
+
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
     if (!sessionCookie) {
