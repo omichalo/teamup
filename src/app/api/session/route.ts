@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase-admin";
+import { generateCSRFToken } from "@/lib/auth/csrf-utils";
 
 export const runtime = "nodejs";
 
@@ -80,6 +81,20 @@ export async function POST(req: Request) {
       name: "__session",
       value: sessionCookie,
       httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? "strict" : "lax",
+      path: "/",
+      maxAge: Math.floor((14 * 24 * 60 * 60 * 1000) / 1000),
+    });
+
+    // Générer un token CSRF signé
+    const csrfToken = await generateCSRFToken(decoded.uid);
+    // Le cookie CSRF n'est PAS httpOnly pour permettre au client de le lire
+    // et de l'envoyer dans le header X-CSRF-Token (Double-Submit Cookie)
+    res.cookies.set({
+      name: "__csrf",
+      value: csrfToken,
+      httpOnly: false,
       secure: isProduction,
       sameSite: isProduction ? "strict" : "lax",
       path: "/",

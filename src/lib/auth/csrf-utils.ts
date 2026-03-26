@@ -1,79 +1,67 @@
 import { cookies } from "next/headers";
+import crypto from "node:crypto";
 
 /**
- * Génère un token CSRF basé sur l'UID de l'utilisateur et un secret.
- * Le token est stocké dans un cookie HTTP-only pour éviter les attaques XSS.
+ * Génère un token CSRF sécurisé (HMAC-SHA256).
+ * Empêche la fuite du secret CSRF présent dans l'ancienne implémentation base64.
  */
 export async function generateCSRFToken(uid: string): Promise<string> {
-  // Le secret CSRF doit être défini via la variable d'environnement CSRF_SECRET
   const secret = process.env.CSRF_SECRET;
   
   if (!secret) {
-    throw new Error(
-      "CSRF_SECRET environment variable is required. " +
-      "Please configure it in your environment variables or Firebase App Hosting secrets."
-    );
+    throw new Error("CSRF_SECRET environment variable is required.");
   }
   
-  // Créer un token simple basé sur l'UID et un timestamp
-  // En production, utilisez une bibliothèque comme `crypto` pour un hash plus sécurisé
   const timestamp = Date.now();
-  const token = Buffer.from(`${uid}:${timestamp}:${secret}`).toString("base64");
+  const payload = `${uid}:${timestamp}`;
+  // Signature HMAC-SHA256 pour éviter que le secret ne soit décodable depuis le token
+  const signature = crypto
+    .createHmac("sha256", secret)
+    .update(payload)
+    .digest("base64");
   
-  return token;
+  return `${Buffer.from(payload).toString("base64")}.${signature}`;
 }
 
 /**
- * Valide un token CSRF en le comparant avec celui stocké dans le cookie.
- * @param providedToken - Le token fourni par le client
- * @param uid - L'UID de l'utilisateur (optionnel, extrait du cookie si non fourni)
+ * Valide un token CSRF avec une comparaison timing-safe.
  */
 export async function validateCSRFToken(
   providedToken: string | null | undefined,
   uid?: string
 ): Promise<boolean> {
-  if (!providedToken) {
-    return false;
-  }
+  if (!providedToken) return false;
 
   try {
     const cookieStore = await cookies();
     const csrfCookie = cookieStore.get("__csrf")?.value;
+    if (!csrfCookie || providedToken !== csrfCookie) return false;
 
-    if (!csrfCookie) {
-      return false;
-    }
-
-    // Le secret CSRF doit être défini via la variable d'environnement CSRF_SECRET
     const secret = process.env.CSRF_SECRET;
-    
-    if (!secret) {
-      console.error(
-        "[CSRF] CSRF_SECRET environment variable is required for token validation. " +
-        "Please configure it in your environment variables or Firebase App Hosting secrets."
-      );
+    if (!secret) return false;
+
+    const [payloadB64, signature] = providedToken.split(".");
+    if (!payloadB64 || !signature) return false;
+
+    const payload = Buffer.from(payloadB64, "base64").toString("utf-8");
+    const [tokenUid] = payload.split(":");
+
+    if (uid && tokenUid !== uid) return false;
+
+    const expectedSignature = crypto
+      .createHmac("sha256", secret)
+      .update(payload)
+      .digest("base64");
+
+    const signatureBuffer = Buffer.from(signature);
+    const expectedSignatureBuffer = Buffer.from(expectedSignature);
+
+    // timingSafeEqual nécessite des buffers de même longueur
+    if (signatureBuffer.length !== expectedSignatureBuffer.length) {
       return false;
     }
 
-    // Décoder le token fourni pour extraire l'UID et le timestamp
-    try {
-      const decoded = Buffer.from(providedToken, "base64").toString("utf-8");
-      const [tokenUid, timestamp] = decoded.split(":");
-      
-      // Si un UID est fourni, vérifier qu'il correspond
-      if (uid && tokenUid !== uid) {
-        return false;
-      }
-
-      // Re-générer le token attendu avec le secret
-      const expectedToken = Buffer.from(`${tokenUid}:${timestamp}:${secret}`).toString("base64");
-      
-      // Comparer les tokens
-      return providedToken === expectedToken && providedToken === csrfCookie;
-    } catch {
-      // Si le décodage échoue, le token est invalide
-      return false;
-    }
+    return crypto.timingSafeEqual(signatureBuffer, expectedSignatureBuffer);
   } catch {
     return false;
   }
