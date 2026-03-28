@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
+import { validateOrigin, validateCSRFToken } from "@/lib/auth/csrf-utils";
 import {
   getFirestoreAdmin,
   initializeFirebaseAdmin,
@@ -93,6 +94,22 @@ export async function GET() {
  */
 export async function POST(req: Request) {
   try {
+    // Valider l'origine de la requête pour prévenir les attaques CSRF
+    if (!validateOrigin(req)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid origin", message: "Requête non autorisée" },
+        { status: 403 }
+      );
+    }
+
+    // Valider le token CSRF pour le pattern Double-Submit Cookie
+    if (!(await validateCSRFToken())) {
+      return NextResponse.json(
+        { success: false, error: "Invalid CSRF token", message: "Session expirée ou invalide" },
+        { status: 403 }
+      );
+    }
+
     // Vérifier l'authentification
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;

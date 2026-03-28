@@ -2,11 +2,28 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase-admin";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
+import { validateOrigin, validateCSRFToken } from "@/lib/auth/csrf-utils";
 
 const db = getFirestore();
 
 export async function POST(req: Request) {
   try {
+    // Valider l'origine de la requête pour prévenir les attaques CSRF
+    if (!validateOrigin(req)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid origin", message: "Requête non autorisée" },
+        { status: 403 }
+      );
+    }
+
+    // Valider le token CSRF pour le pattern Double-Submit Cookie
+    if (!(await validateCSRFToken())) {
+      return NextResponse.json(
+        { success: false, error: "Invalid CSRF token", message: "Session expirée ou invalide" },
+        { status: 403 }
+      );
+    }
+
     // Configuration du bot Discord (vérifier à l'intérieur de la fonction)
     const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
     const DISCORD_SERVER_ID = process.env.DISCORD_SERVER_ID;

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase-admin";
+import { generateCSRFToken } from "@/lib/auth/csrf-utils";
 
 export const runtime = "nodejs";
 
@@ -76,6 +77,17 @@ export async function POST(req: Request) {
     const res = NextResponse.json({ ok: true });
     // Normaliser les paramètres du cookie : Secure et SameSite=Strict en production
     const isProduction = process.env.NODE_ENV === "production";
+
+    // Générer un token CSRF pour le Double-Submit Cookie pattern
+    let csrfToken;
+    try {
+      csrfToken = await generateCSRFToken(decoded.uid);
+    } catch (error) {
+      console.error("[session] Erreur lors de la génération du token CSRF:", error);
+      // On continue quand même sans CSRF pour ne pas bloquer l'auth,
+      // mais les futures requêtes POST échoueront à la validation CSRF.
+    }
+
     res.cookies.set({
       name: "__session",
       value: sessionCookie,
@@ -85,6 +97,19 @@ export async function POST(req: Request) {
       path: "/",
       maxAge: Math.floor((14 * 24 * 60 * 60 * 1000) / 1000),
     });
+
+    if (csrfToken) {
+      res.cookies.set({
+        name: "__csrf",
+        value: csrfToken,
+        httpOnly: false, // Doit être accessible par le JS client pour être renvoyé dans un header
+        secure: isProduction,
+        sameSite: "lax", // Nécessaire pour que le cookie soit envoyé lors de redirections POST
+        path: "/",
+        maxAge: Math.floor((14 * 24 * 60 * 60 * 1000) / 1000),
+      });
+    }
+
     // Ajouter Cache-Control pour éviter la mise en cache
     res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     res.headers.set("Pragma", "no-cache");
@@ -131,7 +156,7 @@ export async function DELETE() {
       }
     }
 
-    // Supprimer le cookie côté client avec les mêmes paramètres que la création
+    // Supprimer les cookies côté client avec les mêmes paramètres que la création
     const isProduction = process.env.NODE_ENV === "production";
     const res = NextResponse.json({ ok: true });
     res.cookies.set({
@@ -143,13 +168,22 @@ export async function DELETE() {
       path: "/",
       maxAge: 0,
     });
+    res.cookies.set({
+      name: "__csrf",
+      value: "",
+      httpOnly: false,
+      secure: isProduction,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
     res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     res.headers.set("Pragma", "no-cache");
     res.headers.set("Expires", "0");
     return res;
   } catch (error) {
     console.error("[session] Erreur lors de la déconnexion:", error);
-    // Même en cas d'erreur, on supprime le cookie côté client avec les mêmes paramètres
+    // Même en cas d'erreur, on supprime les cookies côté client avec les mêmes paramètres
     const isProduction = process.env.NODE_ENV === "production";
     const res = NextResponse.json({ ok: true });
     res.cookies.set({
@@ -158,6 +192,15 @@ export async function DELETE() {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? "strict" : "lax",
+      path: "/",
+      maxAge: 0,
+    });
+    res.cookies.set({
+      name: "__csrf",
+      value: "",
+      httpOnly: false,
+      secure: isProduction,
+      sameSite: "lax",
       path: "/",
       maxAge: 0,
     });
