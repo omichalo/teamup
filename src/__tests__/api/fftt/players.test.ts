@@ -4,7 +4,6 @@
 import { GET } from "@/app/api/fftt/players/route";
 import { adminAuth, getFirestoreAdmin } from "@/lib/firebase-admin";
 import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
 
 jest.mock("@/lib/firebase-admin", () => ({
   initializeFirebaseAdmin: jest.fn(),
@@ -87,7 +86,7 @@ describe("GET /api/fftt/players", () => {
     ];
 
     const mockSnapshot = {
-      forEach: (callback: any) => {
+      forEach: (callback: (doc: { id: string; data: () => unknown }) => void) => {
         mockPlayers.forEach((p) => callback({ id: p.id, data: () => p }));
       },
     };
