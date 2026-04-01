@@ -32,9 +32,18 @@ service cloud.firestore {
     // ============================================
     // Les utilisateurs peuvent créer/mettre à jour leur propre profil
     // Seuls les admins peuvent lire/supprimer les profils d'autres utilisateurs
+    // Sécurité: Empêche l'escalade de privilèges en bloquant la modification du rôle par l'utilisateur
     match /users/{userId} {
-      // Création et mise à jour : uniquement son propre profil
-      allow create, update: if isAuthenticated() && request.auth.uid == userId;
+      // Création : uniquement son propre profil, avec rôle par défaut 'player'
+      allow create: if isAuthenticated() && request.auth.uid == userId
+        && request.resource.data.role == "player"
+        && (request.resource.data.coachRequestStatus == "none" || !("coachRequestStatus" in request.resource.data));
+
+      // Mise à jour : uniquement son propre profil, sans modifier les champs sensibles (role, status coach, etc.)
+      allow update: if isAuthenticated() && request.auth.uid == userId
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          "role", "coachRequestStatus", "coachRequestHandledBy", "coachRequestHandledAt", "coachRequestUpdatedAt"
+        ]);
       
       // Lecture : son propre profil ou admin
       allow read: if isAuthenticated() && (isAdmin() || request.auth.uid == userId);
@@ -130,17 +139,15 @@ service cloud.firestore {
     // ============================================
     // Collection: clubSettings (ou club_settings)
     // ============================================
-    // Lecture pour tous les utilisateurs authentifiés
-    // Écriture uniquement pour les admins
+    // Lecture et écriture uniquement pour les admins
+    // Sécurité: Protège les identifiants FFTT et autres configurations sensibles
     match /clubSettings/{settingsId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow read, write: if isAdmin();
     }
     
     // Alias pour club_settings (si utilisé)
     match /club_settings/{settingsId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow read, write: if isAdmin();
     }
     
     // ============================================
