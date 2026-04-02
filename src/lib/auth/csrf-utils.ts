@@ -1,8 +1,10 @@
 import { cookies } from "next/headers";
+import crypto from "node:crypto";
 
 /**
  * Génère un token CSRF basé sur l'UID de l'utilisateur et un secret.
- * Le token est stocké dans un cookie HTTP-only pour éviter les attaques XSS.
+ * 🛡️ Sentinel: Utilise HMAC-SHA256 pour signer le token, évitant ainsi la fuite du secret
+ * présente dans l'implémentation précédente par simple concaténation base64.
  */
 export async function generateCSRFToken(uid: string): Promise<string> {
   // Le secret CSRF doit être défini via la variable d'environnement CSRF_SECRET
@@ -15,18 +17,20 @@ export async function generateCSRFToken(uid: string): Promise<string> {
     );
   }
   
-  // Créer un token simple basé sur l'UID et un timestamp
-  // En production, utilisez une bibliothèque comme `crypto` pour un hash plus sécurisé
-  const timestamp = Date.now();
-  const token = Buffer.from(`${uid}:${timestamp}:${secret}`).toString("base64");
+  const timestamp = Date.now().toString();
+  // Utilisation de HMAC pour signer l'UID et le timestamp
+  const hmac = crypto.createHmac("sha256", secret);
+  hmac.update(`${uid}:${timestamp}`);
+  const signature = hmac.digest("hex");
   
-  return token;
+  // Le token contient l'UID, le timestamp et la signature (HMAC)
+  return Buffer.from(`${uid}:${timestamp}:${signature}`).toString("base64");
 }
 
 /**
  * Valide un token CSRF en le comparant avec celui stocké dans le cookie.
- * @param providedToken - Le token fourni par le client
- * @param uid - L'UID de l'utilisateur (optionnel, extrait du cookie si non fourni)
+ * 🛡️ Sentinel: Utilisation de timingSafeEqual pour prévenir les attaques temporelles.
+ * Vérifie l'intégrité via la signature HMAC.
  */
 export async function validateCSRFToken(
   providedToken: string | null | undefined,
@@ -49,27 +53,51 @@ export async function validateCSRFToken(
     
     if (!secret) {
       console.error(
-        "[CSRF] CSRF_SECRET environment variable is required for token validation. " +
-        "Please configure it in your environment variables or Firebase App Hosting secrets."
+        "[CSRF] CSRF_SECRET environment variable is required for token validation."
       );
       return false;
     }
 
-    // Décoder le token fourni pour extraire l'UID et le timestamp
+    // Décoder le token fourni pour extraire l'UID, le timestamp et la signature
     try {
       const decoded = Buffer.from(providedToken, "base64").toString("utf-8");
-      const [tokenUid, timestamp] = decoded.split(":");
+      const [tokenUid, timestamp, providedSignature] = decoded.split(":");
+
+      if (!tokenUid || !timestamp || !providedSignature) {
+        return false;
+      }
       
       // Si un UID est fourni, vérifier qu'il correspond
       if (uid && tokenUid !== uid) {
         return false;
       }
 
-      // Re-générer le token attendu avec le secret
-      const expectedToken = Buffer.from(`${tokenUid}:${timestamp}:${secret}`).toString("base64");
+      // Re-générer la signature attendue avec le secret
+      const hmac = crypto.createHmac("sha256", secret);
+      hmac.update(`${tokenUid}:${timestamp}`);
+      const expectedSignature = hmac.digest("hex");
+
+      // Comparaison sécurisée des signatures (prévention des attaques temporelles)
+      const providedSigBuf = Buffer.from(providedSignature);
+      const expectedSigBuf = Buffer.from(expectedSignature);
+
+      if (providedSigBuf.length !== expectedSigBuf.length) {
+        return false;
+      }
       
-      // Comparer les tokens
-      return providedToken === expectedToken && providedToken === csrfCookie;
+      const isSignatureValid = crypto.timingSafeEqual(providedSigBuf, expectedSigBuf);
+
+      // Comparaison sécurisée avec le cookie (Double Submit Cookie)
+      const providedTokenBuf = Buffer.from(providedToken);
+      const cookieTokenBuf = Buffer.from(csrfCookie);
+
+      if (providedTokenBuf.length !== cookieTokenBuf.length) {
+        return false;
+      }
+
+      const matchesCookie = crypto.timingSafeEqual(providedTokenBuf, cookieTokenBuf);
+
+      return isSignatureValid && matchesCookie;
     } catch {
       // Si le décodage échoue, le token est invalide
       return false;
