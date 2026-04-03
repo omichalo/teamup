@@ -111,10 +111,11 @@ service cloud.firestore {
     // Collection: availabilities
     // ============================================
     // Lecture pour tous les utilisateurs authentifiés
-    // Écriture pour tous les utilisateurs authentifiés (les joueurs peuvent mettre à jour leurs disponibilités)
+    // Écriture uniquement pour les admins/coaches
+    // (Les joueurs utilisent l'interface coach/admin ou les sondages Discord)
     match /availabilities/{availabilityId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow write: if isCoach();
     }
     
     // ============================================
@@ -130,17 +131,14 @@ service cloud.firestore {
     // ============================================
     // Collection: clubSettings (ou club_settings)
     // ============================================
-    // Lecture pour tous les utilisateurs authentifiés
-    // Écriture uniquement pour les admins
+    // Accès strictement réservé aux admins (contient des secrets comme les webhooks Discord et les accès FFTT)
     match /clubSettings/{settingsId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow read, write: if isAdmin();
     }
     
     // Alias pour club_settings (si utilisé)
     match /club_settings/{settingsId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
+      allow read, write: if isAdmin();
     }
     
     // ============================================
