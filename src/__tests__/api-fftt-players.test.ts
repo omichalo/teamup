@@ -4,7 +4,6 @@
 import { GET } from "../app/api/fftt/players/route";
 import { adminAuth, getFirestoreAdmin } from "@/lib/firebase-admin";
 import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
 
 jest.mock("@/lib/firebase-admin", () => ({
   adminAuth: {
@@ -94,7 +93,8 @@ describe("GET /api/fftt/players security", () => {
     (getFirestoreAdmin as jest.Mock).mockReturnValue({
       collection: jest.fn().mockReturnValue({
         get: jest.fn().mockResolvedValue({
-          forEach: (callback: any) => mockDocs.forEach(callback),
+          forEach: (callback: (doc: { id: string; data: () => Record<string, unknown> }) => void) =>
+            mockDocs.forEach(callback as (doc: unknown) => void),
         }),
       }),
     });
@@ -131,7 +131,8 @@ describe("GET /api/fftt/players security", () => {
     (getFirestoreAdmin as jest.Mock).mockReturnValue({
       collection: jest.fn().mockReturnValue({
         get: jest.fn().mockResolvedValue({
-          forEach: (callback: any) => mockDocs.forEach(callback),
+          forEach: (callback: (doc: { id: string; data: () => Record<string, unknown> }) => void) =>
+            mockDocs.forEach(callback as (doc: unknown) => void),
         }),
       }),
     });
