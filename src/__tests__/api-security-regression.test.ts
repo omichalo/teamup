@@ -4,6 +4,7 @@
 import { GET as getFfttPlayers } from "@/app/api/fftt/players/route";
 import { GET as getTeamsMatches } from "@/app/api/teams/matches/route";
 import { adminAuth } from "@/lib/firebase-admin";
+import { cookies } from "next/headers";
 
 // Mock Firebase Admin
 jest.mock("@/lib/firebase-admin", () => ({
@@ -39,7 +40,6 @@ describe("API Security Regression Tests", () => {
   });
 
   it("GET /api/fftt/players should now return 401 without session cookie", async () => {
-    const { cookies } = require("next/headers");
     (cookies as jest.Mock).mockResolvedValue({
       get: jest.fn().mockReturnValue(undefined),
     });
@@ -53,7 +53,6 @@ describe("API Security Regression Tests", () => {
   });
 
   it("GET /api/fftt/players should return 403 if email not verified", async () => {
-    const { cookies } = require("next/headers");
     (cookies as jest.Mock).mockResolvedValue({
       get: jest.fn().mockReturnValue({ value: "fake-cookie" }),
     });
@@ -70,7 +69,6 @@ describe("API Security Regression Tests", () => {
   });
 
   it("GET /api/fftt/players should return 403 if user is just a player", async () => {
-    const { cookies } = require("next/headers");
     (cookies as jest.Mock).mockResolvedValue({
       get: jest.fn().mockReturnValue({ value: "fake-cookie" }),
     });
@@ -88,7 +86,6 @@ describe("API Security Regression Tests", () => {
   });
 
   it("GET /api/teams/matches should now return 401 without session cookie", async () => {
-    const { cookies } = require("next/headers");
     (cookies as jest.Mock).mockResolvedValue({
       get: jest.fn().mockReturnValue(undefined),
     });
