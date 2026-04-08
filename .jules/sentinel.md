@@ -1,0 +1,4 @@
+## 2025-05-15 - [HIGH] Unprotected API Endpoints due to Middleware Exclusion
+**Vulnerability:** Sensitive API endpoints (`/api/fftt/players`, `/api/teams/matches`) were accessible without any authentication or authorization, potentially exposing sensitive player data (emails, phones) and club match details.
+**Learning:** The project's `middleware.ts` explicitly excludes the `/api` route prefix from its matcher. This creates a dangerous assumption that "everything is protected by middleware" while API routes are actually completely open by default unless manually secured.
+**Prevention:** All new API routes in `/api` must explicitly implement session verification using `adminAuth.verifySessionCookie` and enforce role-based access control (RBAC). A security audit of all files in `src/app/api` should be performed to ensure no other endpoints are exposed.
