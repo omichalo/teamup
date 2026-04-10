@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
+import { validateCSRFToken, validateOrigin } from "@/lib/auth/csrf-utils";
 import {
   getFirestoreAdmin,
   initializeFirebaseAdmin,
@@ -30,6 +31,7 @@ export async function GET() {
     }
 
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+
     if (!decoded.email_verified) {
       return NextResponse.json(
         { success: false, error: "Email non vérifié" },
@@ -93,6 +95,14 @@ export async function GET() {
  */
 export async function POST(req: Request) {
   try {
+    // Valider l'origine de la requête pour prévenir les attaques CSRF
+    if (!validateOrigin(req)) {
+      return NextResponse.json(
+        { success: false, error: "Origine invalide" },
+        { status: 403 }
+      );
+    }
+
     // Vérifier l'authentification
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
@@ -105,6 +115,15 @@ export async function POST(req: Request) {
     }
 
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+
+    // Valider le token CSRF (Double-Submit Cookie) avec UID pour plus de sécurité
+    if (!(await validateCSRFToken(undefined, decoded.uid))) {
+      return NextResponse.json(
+        { success: false, error: "Token CSRF invalide ou manquant" },
+        { status: 403 }
+      );
+    }
+
     if (!decoded.email_verified) {
       return NextResponse.json(
         { success: false, error: "Email non vérifié" },

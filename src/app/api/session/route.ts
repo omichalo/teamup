@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase-admin";
+import { generateCSRFToken } from "@/lib/auth/csrf-utils";
 
 export const runtime = "nodejs";
 
@@ -73,9 +74,20 @@ export async function POST(req: Request) {
       );
     }
 
+    // Génération du token CSRF
+    let csrfToken;
+    try {
+      csrfToken = await generateCSRFToken(decoded.uid);
+    } catch (error) {
+      console.error("[session] Erreur lors de la génération du token CSRF:", error);
+      // On continue quand même, mais sans protection CSRF (dégradé)
+    }
+
     const res = NextResponse.json({ ok: true });
     // Normaliser les paramètres du cookie : Secure et SameSite=Strict en production
     const isProduction = process.env.NODE_ENV === "production";
+
+    // Cookie de session (HTTP-only)
     res.cookies.set({
       name: "__session",
       value: sessionCookie,
@@ -85,6 +97,19 @@ export async function POST(req: Request) {
       path: "/",
       maxAge: Math.floor((14 * 24 * 60 * 60 * 1000) / 1000),
     });
+
+    // Cookie CSRF (accessible au client pour Double-Submit Cookie)
+    if (csrfToken) {
+      res.cookies.set({
+        name: "__csrf",
+        value: csrfToken,
+        httpOnly: false, // Doit être accessible au JS client
+        secure: isProduction,
+        sameSite: isProduction ? "strict" : "lax",
+        path: "/",
+        maxAge: Math.floor((14 * 24 * 60 * 60 * 1000) / 1000),
+      });
+    }
     // Ajouter Cache-Control pour éviter la mise en cache
     res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     res.headers.set("Pragma", "no-cache");
