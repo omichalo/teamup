@@ -9,7 +9,7 @@ jest.mock("next/headers", () => ({
 
 describe("CSRF Utils Hardening", () => {
   const mockUid = "test-uid";
-  const mockSecret = "test-secret-that-is-at-least-32-chars-long";
+  const mockSecret = "test_csrf_secret_for_unit_tests_that_is_long_enough";
   const originalEnv = process.env;
 
   beforeEach(() => {
