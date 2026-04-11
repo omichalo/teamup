@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { initializeFirebaseAdmin, getFirestoreAdmin } from "@/lib/firebase-admin";
+import { cookies } from "next/headers";
+import { initializeFirebaseAdmin, getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
+import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
 import {
   getTeams,
   getTeamMatches,
@@ -14,7 +16,44 @@ interface TeamMatchSerialized extends Omit<TeamMatch, "date" | "createdAt" | "up
 
 export async function GET(req: Request) {
   try {
+    // Vérifier l'authentification et l'autorisation
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("__session")?.value;
+    if (!sessionCookie) {
+      return NextResponse.json(
+        { success: false, error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     await initializeFirebaseAdmin();
+
+    let decoded;
+    try {
+      decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+    } catch (error) {
+      console.error("[app/api/teams/matches] Session verification failed:", error);
+      return NextResponse.json(
+        { success: false, error: "Invalid session" },
+        { status: 401 }
+      );
+    }
+
+    if (!decoded.email_verified) {
+      return NextResponse.json(
+        { success: false, error: "Email not verified" },
+        { status: 403 }
+      );
+    }
+
+    const role = resolveRole(decoded.role as string | undefined);
+    if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
+      return NextResponse.json(
+        { success: false, error: "Access denied" },
+        { status: 403 }
+      );
+    }
+
     const firestore = getFirestoreAdmin();
 
     const teams = await getTeams(firestore);
@@ -56,14 +95,22 @@ export async function GET(req: Request) {
       })
     );
 
-    return NextResponse.json(
+    const res = NextResponse.json(
       {
+        success: true,
         teams: teamMatches,
         totalTeams: teamMatches.length,
         totalMatches: teamMatches.reduce((acc, entry) => acc + entry.total, 0),
       },
       { status: 200 }
     );
+
+    // Ajouter des en-têtes anti-cache pour protéger les données
+    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.headers.set("Pragma", "no-cache");
+    res.headers.set("Expires", "0");
+
+    return res;
   } catch (error) {
     console.error("[app/api/teams/matches] Firestore Error:", error);
     return NextResponse.json(
