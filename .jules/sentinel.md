@@ -1,0 +1,4 @@
+## 2025-05-14 - API Endpoints Exposed by Default
+**Vulnerability:** Sensitive API endpoints (e.g., `/api/fftt/players`) were accessible without authentication or authorization, exposing Player PII (email, phone).
+**Learning:** The Next.js `middleware.ts` was configured with a matcher that explicitly excluded all paths starting with `/api`, leaving them unprotected by default. In an App Router application where middleware is the primary gatekeeper, excluding `/api` requires every single route handler to implement its own security checks manually, which is error-prone.
+**Prevention:** Always implement a "secure by default" approach. Either include `/api` in the middleware matcher and explicitly allowlist public endpoints, or implement a shared high-order function/wrapper for all protected API routes to ensure consistency. Use anti-caching headers for any endpoint returning PII.
