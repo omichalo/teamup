@@ -1,0 +1,4 @@
+## 2025-04-14 - Privilege Escalation via Firestore and Session Logic
+**Vulnerability:** Users could potentially escalate their privileges by modifying the `role` or `coachRequestStatus` fields in their Firestore user document, or by self-approving coach requests. Additionally, the session verification API prioritized Firestore data over signed custom claims.
+**Learning:** Security depends on both robust database rules and authoritative source selection in the backend. Relying on mutable database fields for authorization when signed claims are available creates an escalation vector.
+**Prevention:** Enforce strict field-level write permissions in Firestore using `affectedKeys()`. Always prioritize signed, immutable custom claims over database fields for role-based access control in session verification.
