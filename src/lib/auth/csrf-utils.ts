@@ -1,11 +1,11 @@
 import { cookies } from "next/headers";
+import { createHmac, timingSafeEqual } from "crypto";
 
 /**
  * Génère un token CSRF basé sur l'UID de l'utilisateur et un secret.
- * Le token est stocké dans un cookie HTTP-only pour éviter les attaques XSS.
+ * Le token est signé avec HMAC-SHA256 pour éviter la falsification et le vol du secret.
  */
 export async function generateCSRFToken(uid: string): Promise<string> {
-  // Le secret CSRF doit être défini via la variable d'environnement CSRF_SECRET
   const secret = process.env.CSRF_SECRET;
   
   if (!secret) {
@@ -15,16 +15,17 @@ export async function generateCSRFToken(uid: string): Promise<string> {
     );
   }
   
-  // Créer un token simple basé sur l'UID et un timestamp
-  // En production, utilisez une bibliothèque comme `crypto` pour un hash plus sécurisé
   const timestamp = Date.now();
-  const token = Buffer.from(`${uid}:${timestamp}:${secret}`).toString("base64");
+  const message = `${uid}:${timestamp}`;
+  // Utiliser HMAC-SHA256 pour signer le token avec le secret
+  const hmac = createHmac("sha256", secret).update(message).digest("hex");
   
-  return token;
+  // Le token final contient l'UID, le timestamp et la signature
+  return Buffer.from(`${message}:${hmac}`).toString("base64");
 }
 
 /**
- * Valide un token CSRF en le comparant avec celui stocké dans le cookie.
+ * Valide un token CSRF en vérifiant sa signature HMAC et sa durée de validité.
  * @param providedToken - Le token fourni par le client
  * @param uid - L'UID de l'utilisateur (optionnel, extrait du cookie si non fourni)
  */
@@ -40,41 +41,54 @@ export async function validateCSRFToken(
     const cookieStore = await cookies();
     const csrfCookie = cookieStore.get("__csrf")?.value;
 
-    if (!csrfCookie) {
+    if (!csrfCookie || providedToken !== csrfCookie) {
       return false;
     }
 
-    // Le secret CSRF doit être défini via la variable d'environnement CSRF_SECRET
     const secret = process.env.CSRF_SECRET;
     
     if (!secret) {
-      console.error(
-        "[CSRF] CSRF_SECRET environment variable is required for token validation. " +
-        "Please configure it in your environment variables or Firebase App Hosting secrets."
-      );
+      console.error("[CSRF] CSRF_SECRET is missing");
       return false;
     }
 
-    // Décoder le token fourni pour extraire l'UID et le timestamp
-    try {
-      const decoded = Buffer.from(providedToken, "base64").toString("utf-8");
-      const [tokenUid, timestamp] = decoded.split(":");
-      
-      // Si un UID est fourni, vérifier qu'il correspond
-      if (uid && tokenUid !== uid) {
-        return false;
-      }
+    // Décoder le token
+    const decoded = Buffer.from(providedToken, "base64").toString("utf-8");
+    const parts = decoded.split(":");
 
-      // Re-générer le token attendu avec le secret
-      const expectedToken = Buffer.from(`${tokenUid}:${timestamp}:${secret}`).toString("base64");
-      
-      // Comparer les tokens
-      return providedToken === expectedToken && providedToken === csrfCookie;
-    } catch {
-      // Si le décodage échoue, le token est invalide
+    if (parts.length !== 3) {
       return false;
     }
-  } catch {
+
+    const [tokenUid, timestampStr, providedHmac] = parts;
+    const timestamp = parseInt(timestampStr, 10);
+
+    // 1. Vérifier l'expiration (24 heures)
+    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+    if (isNaN(timestamp) || Date.now() - timestamp > ONE_DAY_MS) {
+      return false;
+    }
+
+    // 2. Si un UID est fourni, vérifier qu'il correspond
+    if (uid && tokenUid !== uid) {
+      return false;
+    }
+
+    // 3. Vérifier la signature HMAC
+    const message = `${tokenUid}:${timestampStr}`;
+    const expectedHmac = createHmac("sha256", secret).update(message).digest("hex");
+
+    const providedHmacBuffer = Buffer.from(providedHmac);
+    const expectedHmacBuffer = Buffer.from(expectedHmac);
+
+    // timingSafeEqual nécessite des buffers de même longueur
+    if (providedHmacBuffer.length !== expectedHmacBuffer.length) {
+      return false;
+    }
+
+    return timingSafeEqual(providedHmacBuffer, expectedHmacBuffer);
+  } catch (error) {
+    console.error("[CSRF] Validation error:", error);
     return false;
   }
 }
@@ -124,23 +138,8 @@ export function validateOrigin(req: Request): boolean {
   }
 
   // En production, valider contre le domaine attendu
-  // Priorité: APP_URL (runtime serveur) > NEXT_PUBLIC_APP_URL
-  // APP_URL est disponible uniquement au runtime serveur (Firebase App Hosting)
   const expectedOrigin = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
   const expectedHostname = expectedOrigin ? extractHostname(expectedOrigin) : null;
-
-  // Log de debug en production pour diagnostiquer les problèmes
-  if (process.env.NODE_ENV === "production" && process.env.DEBUG === "true") {
-    console.log("[validateOrigin] Début de validation:", {
-      origin: origin || null,
-      referer: referer || null,
-      host: host || null,
-      APP_URL: process.env.APP_URL || null,
-      NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || null,
-      expectedOrigin: expectedOrigin || null,
-      expectedHostname: expectedHostname || null,
-    });
-  }
 
   if (expectedOrigin && expectedHostname) {
     const normalizedExpected = normalizeHostname(expectedHostname);
@@ -151,25 +150,10 @@ export function validateOrigin(req: Request): boolean {
         const originHostname = extractHostname(origin);
         if (originHostname) {
           const normalizedOrigin = normalizeHostname(originHostname);
-          const isValid = normalizedOrigin === normalizedExpected;
-          
-          if (!isValid && process.env.NODE_ENV === "production" && process.env.DEBUG === "true") {
-            console.warn("[validateOrigin] Origin mismatch:", {
-              originRaw: origin,
-              originHostname: originHostname,
-              originNormalized: normalizedOrigin,
-              expectedOrigin,
-              expectedHostname,
-              expectedNormalized: normalizedExpected,
-            });
-          }
-          
-          if (isValid) return true;
+          if (normalizedOrigin === normalizedExpected) return true;
         }
-      } catch (error) {
-        if (process.env.NODE_ENV === "production" && process.env.DEBUG === "true") {
-          console.warn("[validateOrigin] Erreur lors de la validation de l'origine:", error);
-        }
+      } catch {
+        // Ignorer les erreurs d'extraction
       }
     }
 
@@ -179,64 +163,25 @@ export function validateOrigin(req: Request): boolean {
         const refererHostname = extractHostname(referer);
         if (refererHostname) {
           const normalizedReferer = normalizeHostname(refererHostname);
-          const isValid = normalizedReferer === normalizedExpected;
-          
-          if (!isValid && process.env.NODE_ENV === "production" && process.env.DEBUG === "true") {
-            console.warn("[validateOrigin] Referer mismatch:", {
-              refererRaw: referer,
-              refererHostname: refererHostname,
-              refererNormalized: normalizedReferer,
-              expectedOrigin,
-              expectedHostname,
-              expectedNormalized: normalizedExpected,
-            });
-          }
-          
-          if (isValid) return true;
+          if (normalizedReferer === normalizedExpected) return true;
         }
-      } catch (error) {
-        if (process.env.NODE_ENV === "production" && process.env.DEBUG === "true") {
-          console.warn("[validateOrigin] Erreur lors de la validation du referer:", error);
-        }
+      } catch {
+        // Ignorer les erreurs d'extraction
       }
     }
 
-    // Si pas d'origine/referer mais un host header présent, vérifier le host
-    // (utile pour les requêtes depuis le même domaine)
+    // Vérifier le host header si pas d'origine/referer
     if (host && !origin && !referer) {
       const normalizedHost = normalizeHostname(host);
-      const isValid = normalizedHost === normalizedExpected;
-      
-      if (!isValid && process.env.NODE_ENV === "production" && process.env.DEBUG === "true") {
-        console.warn("[validateOrigin] Host mismatch:", {
-          hostRaw: host,
-          hostNormalized: normalizedHost,
-          expectedOrigin,
-          expectedHostname,
-          expectedNormalized: normalizedExpected,
-        });
-      }
-      
-      if (isValid) return true;
+      if (normalizedHost === normalizedExpected) return true;
     }
   }
 
-  // Si pas d'origine/referer/host et pas de domaine configuré, rejeter en production
+  // En production, rejeter si aucune validation n'a réussi
   if (process.env.NODE_ENV === "production") {
-    if (process.env.DEBUG === "true") {
-      console.warn("[validateOrigin] Validation échouée - aucune origine valide trouvée", {
-        origin: origin || null,
-        referer: referer || null,
-        host: host || null,
-        expectedOrigin,
-        expectedHostname: expectedHostname || null,
-        normalizedExpected: expectedHostname ? normalizeHostname(expectedHostname) : null,
-      });
-    }
     return false;
   }
 
-  // En développement, accepter si pas de validation possible
+  // En développement, accepter par défaut si pas de domaine configuré
   return true;
 }
-
