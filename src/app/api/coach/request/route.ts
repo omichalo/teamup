@@ -3,8 +3,17 @@ import { cookies } from "next/headers";
 import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, COACH_REQUEST_STATUS, resolveRole } from "@/lib/auth/roles";
 import { FieldValue } from "firebase-admin/firestore";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
 
 export async function POST(req: Request) {
+  // Valider l'origine de la requête pour prévenir les attaques CSRF
+  if (!validateOrigin(req)) {
+    return NextResponse.json(
+      { success: false, error: "Requête invalide (origine non autorisée)" },
+      { status: 403 }
+    );
+  }
+
   try {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;

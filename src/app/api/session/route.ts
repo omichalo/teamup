@@ -1,10 +1,19 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase-admin";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
+  // Valider l'origine de la requête pour prévenir les attaques CSRF
+  if (!validateOrigin(req)) {
+    return NextResponse.json(
+      { error: "Invalid origin", message: "Origine non autorisée" },
+      { status: 403 }
+    );
+  }
+
   try {
     const body = await req.json().catch(() => ({}));
     const { idToken } = body;
