@@ -1,5 +1,6 @@
 import { generateCSRFToken, validateCSRFToken } from "./csrf-utils";
 import { cookies } from "next/headers";
+import { createHmac } from "node:crypto";
 
 jest.mock("next/headers", () => ({
   cookies: jest.fn(),
@@ -51,7 +52,7 @@ describe("CSRF Utils Security Audit", () => {
     const [payloadBase64, signature] = token.split(".");
 
     const decoded = Buffer.from(payloadBase64, "base64").toString("utf-8");
-    const [uid, timestamp] = decoded.split(":");
+    const [, timestamp] = decoded.split(":");
 
     // Tamper with UID but keep original signature
     const tamperedPayload = Buffer.from(`attacker-uid:${timestamp}`).toString("base64");
@@ -69,8 +70,7 @@ describe("CSRF Utils Security Audit", () => {
     // 25 hours ago
     const oldTimestamp = Date.now() - (25 * 60 * 60 * 1000);
     const message = `${MOCK_UID}:${oldTimestamp}`;
-    const crypto = require("node:crypto");
-    const signature = crypto.createHmac("sha256", MOCK_SECRET).update(message).digest("base64");
+    const signature = createHmac("sha256", MOCK_SECRET).update(message).digest("base64");
     const expiredToken = `${Buffer.from(message).toString("base64")}.${signature}`;
 
     (cookies as jest.Mock).mockReturnValue(Promise.resolve({
