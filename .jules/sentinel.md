@@ -1,0 +1,4 @@
+## 2025-05-15 - [HIGH] Unprotected API endpoints exposing PII
+**Vulnerability:** The `/api/fftt/players` endpoint was publicly accessible and returned sensitive player information including full names and potentially other PII without any authentication or authorization.
+**Learning:** The application's `middleware.ts` explicitly excludes the `/api` prefix from its matcher. This architecture requires every API route to independently implement session verification and role-based access control. If a developer forgets to add these checks, the endpoint becomes a security gap.
+**Prevention:** Always verify that new API routes implement `adminAuth.verifySessionCookie` and appropriate role checks (`hasAnyRole`). Add anti-caching headers (`Cache-Control: no-store`) for any endpoint returning PII. Standardize security checks in a reusable utility or wrapper for API routes.
