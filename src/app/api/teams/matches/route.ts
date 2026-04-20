@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { initializeFirebaseAdmin, getFirestoreAdmin } from "@/lib/firebase-admin";
+import { cookies } from "next/headers";
+import { initializeFirebaseAdmin, getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
+import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
 import {
   getTeams,
   getTeamMatches,
@@ -14,7 +16,43 @@ interface TeamMatchSerialized extends Omit<TeamMatch, "date" | "createdAt" | "up
 
 export async function GET(req: Request) {
   try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("__session")?.value;
+
+    if (!sessionCookie) {
+      return NextResponse.json(
+        { error: "Authentification requise" },
+        { status: 401 }
+      );
+    }
+
     await initializeFirebaseAdmin();
+
+    try {
+      const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+      if (!decoded.email_verified) {
+        return NextResponse.json(
+          { error: "Email non vérifié" },
+          { status: 403 }
+        );
+      }
+
+      // Vérifier que l'utilisateur est admin ou coach pour accéder aux matchs
+      const role = resolveRole(decoded.role as string | undefined);
+      if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
+        return NextResponse.json(
+          { error: "Accès refusé" },
+          { status: 403 }
+        );
+      }
+    } catch (error) {
+      console.error("[app/api/teams/matches] Session verification error:", error);
+      return NextResponse.json(
+        { error: "Session invalide ou expirée" },
+        { status: 401 }
+      );
+    }
+
     const firestore = getFirestoreAdmin();
 
     const teams = await getTeams(firestore);
@@ -56,7 +94,7 @@ export async function GET(req: Request) {
       })
     );
 
-    return NextResponse.json(
+    const res = NextResponse.json(
       {
         teams: teamMatches,
         totalTeams: teamMatches.length,
@@ -64,6 +102,13 @@ export async function GET(req: Request) {
       },
       { status: 200 }
     );
+
+    // Empêcher la mise en cache des données privées
+    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.headers.set("Pragma", "no-cache");
+    res.headers.set("Expires", "0");
+
+    return res;
   } catch (error) {
     console.error("[app/api/teams/matches] Firestore Error:", error);
     return NextResponse.json(

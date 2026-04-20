@@ -1,9 +1,48 @@
 import { NextResponse } from "next/server";
-import { initializeFirebaseAdmin, getFirestoreAdmin } from "@/lib/firebase-admin";
+import { cookies } from "next/headers";
+import { initializeFirebaseAdmin, getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
+import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
 import type { Player } from "@/types";
 
 export async function GET(req: Request) {
   try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("__session")?.value;
+
+    if (!sessionCookie) {
+      return NextResponse.json(
+        { error: "Authentification requise" },
+        { status: 401 }
+      );
+    }
+
+    await initializeFirebaseAdmin();
+
+    try {
+      const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+      if (!decoded.email_verified) {
+        return NextResponse.json(
+          { error: "Email non vérifié" },
+          { status: 403 }
+        );
+      }
+
+      // Vérifier que l'utilisateur est admin ou coach pour accéder aux données des joueurs (PII)
+      const role = resolveRole(decoded.role as string | undefined);
+      if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
+        return NextResponse.json(
+          { error: "Accès refusé" },
+          { status: 403 }
+        );
+      }
+    } catch (error) {
+      console.error("[app/api/fftt/players] Session verification error:", error);
+      return NextResponse.json(
+        { error: "Session invalide ou expirée" },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const clubCode = searchParams.get("clubCode");
 
@@ -46,7 +85,7 @@ export async function GET(req: Request) {
 
     console.log(`📊 [app/api/fftt/players] ${players.length} joueurs récupérés depuis Firestore`);
 
-    return NextResponse.json(
+    const res = NextResponse.json(
       {
         players,
         total: players.length,
@@ -54,6 +93,13 @@ export async function GET(req: Request) {
       },
       { status: 200 }
     );
+
+    // Empêcher la mise en cache des données sensibles (PII des joueurs)
+    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.headers.set("Pragma", "no-cache");
+    res.headers.set("Expires", "0");
+
+    return res;
   } catch (error) {
     console.error("[app/api/fftt/players] Firestore Error:", error);
     return NextResponse.json(

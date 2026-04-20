@@ -1,0 +1,4 @@
+## 2025-05-14 - Unprotected API routes due to Middleware exclusion
+**Vulnerability:** The `/api/fftt/players` and `/api/teams/matches` endpoints were accessible without authentication, exposing PII (email, phone) and internal club data.
+**Learning:** The application's `middleware.ts` explicitly excludes `/api` routes from its protection logic (via the `matcher` regex). This requires every API route to manually implement session verification and RBAC, which is error-prone and leads to unprotected endpoints.
+**Prevention:** 1. Always implement `adminAuth.verifySessionCookie` and role checks (`hasAnyRole`) in API routes that handle sensitive data. 2. Add anti-caching headers (`Cache-Control: no-store`) to prevent PII from being cached by browsers or proxies. 3. Regularly audit `src/app/api` for missing security checks.
