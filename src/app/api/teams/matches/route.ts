@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { initializeFirebaseAdmin, getFirestoreAdmin } from "@/lib/firebase-admin";
+import { cookies } from "next/headers";
+import { initializeFirebaseAdmin, getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
 import {
   getTeams,
   getTeamMatches,
@@ -14,6 +15,17 @@ interface TeamMatchSerialized extends Omit<TeamMatch, "date" | "createdAt" | "up
 
 export async function GET(req: Request) {
   try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("__session")?.value;
+    if (!sessionCookie) {
+      return NextResponse.json(
+        { success: false, error: "Authentification requise" },
+        { status: 401 }
+      );
+    }
+
+    await adminAuth.verifySessionCookie(sessionCookie, true);
+
     await initializeFirebaseAdmin();
     const firestore = getFirestoreAdmin();
 
@@ -56,7 +68,7 @@ export async function GET(req: Request) {
       })
     );
 
-    return NextResponse.json(
+    const res = NextResponse.json(
       {
         teams: teamMatches,
         totalTeams: teamMatches.length,
@@ -64,6 +76,10 @@ export async function GET(req: Request) {
       },
       { status: 200 }
     );
+    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.headers.set("Pragma", "no-cache");
+    res.headers.set("Expires", "0");
+    return res;
   } catch (error) {
     console.error("[app/api/teams/matches] Firestore Error:", error);
     return NextResponse.json(
