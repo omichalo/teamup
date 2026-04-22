@@ -1,15 +1,72 @@
 import { NextResponse } from "next/server";
-import { initializeFirebaseAdmin, getFirestoreAdmin } from "@/lib/firebase-admin";
+import { cookies } from "next/headers";
+import { initializeFirebaseAdmin, getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
+import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
 import type { Player } from "@/types";
 
+export const runtime = "nodejs";
+
+/**
+ * GET /api/fftt/players?clubCode=xxx
+ * Récupère la liste des joueurs depuis Firestore.
+ * Sécurisé par session, vérification d'email et rôle (ADMIN/COACH).
+ */
 export async function GET(req: Request) {
   try {
+    // 🛡️ Sentinel: Valider l'origine de la requête pour prévenir les attaques CSRF
+    if (!validateOrigin(req)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid origin" },
+        { status: 403 }
+      );
+    }
+
+    // 🛡️ Sentinel: Vérification d'authentification par cookie de session
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("__session")?.value;
+
+    if (!sessionCookie) {
+      return NextResponse.json(
+        { success: false, error: "Authentification requise" },
+        { status: 401 }
+      );
+    }
+
+    let decoded;
+    try {
+      decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+    } catch (error) {
+      console.error("[app/api/fftt/players] Session verification failed:", error);
+      return NextResponse.json(
+        { success: false, error: "Session invalide ou expirée" },
+        { status: 401 }
+      );
+    }
+
+    // 🛡️ Sentinel: Vérifier que l'email est vérifié
+    if (!decoded.email_verified) {
+      return NextResponse.json(
+        { success: false, error: "Email non vérifié" },
+        { status: 403 }
+      );
+    }
+
+    // 🛡️ Sentinel: Vérifier les permissions (ADMIN ou COACH requis pour voir les PII des joueurs)
+    const role = resolveRole(decoded.role as string | undefined);
+    if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
+      return NextResponse.json(
+        { success: false, error: "Accès refusé - Permissions insuffisantes" },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const clubCode = searchParams.get("clubCode");
 
     if (!clubCode) {
       return NextResponse.json(
-        { error: "Club code parameter is required" },
+        { success: false, error: "Club code parameter is required" },
         { status: 400 }
       );
     }
@@ -46,24 +103,30 @@ export async function GET(req: Request) {
 
     console.log(`📊 [app/api/fftt/players] ${players.length} joueurs récupérés depuis Firestore`);
 
-    return NextResponse.json(
+    const res = NextResponse.json(
       {
+        success: true,
         players,
         total: players.length,
         clubCode,
       },
       { status: 200 }
     );
+
+    // 🛡️ Sentinel: Ajouter des headers anti-cache pour protéger les données PII
+    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.headers.set("Pragma", "no-cache");
+    res.headers.set("Expires", "0");
+
+    return res;
   } catch (error) {
-    console.error("[app/api/fftt/players] Firestore Error:", error);
+    console.error("[app/api/fftt/players] Error:", error);
     return NextResponse.json(
       {
+        success: false,
         error: "Failed to fetch players data",
-        details: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 }
     );
   }
 }
-
-
