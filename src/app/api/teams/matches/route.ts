@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
-import { initializeFirebaseAdmin, getFirestoreAdmin } from "@/lib/firebase-admin";
+import { cookies } from "next/headers";
+import { initializeFirebaseAdmin, getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
 import {
   getTeams,
   getTeamMatches,
   TeamMatch,
 } from "@/lib/server/team-matches";
+import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
 
 interface TeamMatchSerialized extends Omit<TeamMatch, "date" | "createdAt" | "updatedAt"> {
   date: string;
@@ -14,7 +16,47 @@ interface TeamMatchSerialized extends Omit<TeamMatch, "date" | "createdAt" | "up
 
 export async function GET(req: Request) {
   try {
+    // Ensure Firebase Admin is initialized before using any services
     await initializeFirebaseAdmin();
+
+    // 🛡️ Sentinel: Session verification and RBAC (ADMIN/COACH)
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("__session")?.value;
+
+    if (!sessionCookie) {
+      return NextResponse.json(
+        { success: false, error: "Authentification requise" },
+        { status: 401 }
+      );
+    }
+
+    let decoded;
+    try {
+      decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+    } catch (error) {
+      console.error("[app/api/teams/matches] Session Verification Error:", error);
+      return NextResponse.json(
+        { success: false, error: "Session invalide" },
+        { status: 401 }
+      );
+    }
+
+    if (!decoded.email_verified) {
+      return NextResponse.json(
+        { success: false, error: "Email non vérifié" },
+        { status: 403 }
+      );
+    }
+
+    // Vérifier que l'utilisateur est admin ou coach
+    const role = resolveRole(decoded.role as string | undefined);
+    if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
+      return NextResponse.json(
+        { success: false, error: "Accès refusé" },
+        { status: 403 }
+      );
+    }
+
     const firestore = getFirestoreAdmin();
 
     const teams = await getTeams(firestore);
@@ -56,18 +98,27 @@ export async function GET(req: Request) {
       })
     );
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
+        success: true,
         teams: teamMatches,
         totalTeams: teamMatches.length,
         totalMatches: teamMatches.reduce((acc, entry) => acc + entry.total, 0),
       },
       { status: 200 }
     );
+
+    // 🛡️ Sentinel: Anti-caching headers for sensitive data
+    response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    response.headers.set("Pragma", "no-cache");
+    response.headers.set("Expires", "0");
+
+    return response;
   } catch (error) {
     console.error("[app/api/teams/matches] Firestore Error:", error);
     return NextResponse.json(
       {
+        success: false,
         error: "Failed to fetch teams matches",
         details: error instanceof Error ? error.message : "Unknown error",
       },
@@ -75,5 +126,3 @@ export async function GET(req: Request) {
     );
   }
 }
-
-
