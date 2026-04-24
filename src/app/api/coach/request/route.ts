@@ -3,9 +3,18 @@ import { cookies } from "next/headers";
 import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, COACH_REQUEST_STATUS, resolveRole } from "@/lib/auth/roles";
 import { FieldValue } from "firebase-admin/firestore";
+import { validateOrigin, validateCSRFToken } from "@/lib/auth/csrf-utils";
 
 export async function POST(req: Request) {
   try {
+    // 1. Validation de l'origine (Defense in depth)
+    if (!validateOrigin(req)) {
+      return NextResponse.json(
+        { success: false, error: "Origine invalide" },
+        { status: 403 }
+      );
+    }
+
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
     if (!sessionCookie) {
@@ -16,6 +25,16 @@ export async function POST(req: Request) {
     }
 
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+
+    // 2. Validation du token CSRF
+    const csrfToken = req.headers.get("X-CSRF-Token");
+    if (!(await validateCSRFToken(csrfToken, decoded.uid))) {
+      return NextResponse.json(
+        { success: false, error: "Token CSRF invalide ou expiré" },
+        { status: 403 }
+      );
+    }
+
     const role = resolveRole(decoded.role as string | undefined);
 
     if (
