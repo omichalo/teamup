@@ -5,9 +5,9 @@ service cloud.firestore {
     // Fonctions helper
     // ============================================
     
-    // Vérifie si l'utilisateur est authentifié
+    // Vérifie si l'utilisateur est authentifié et son email vérifié
     function isAuthenticated() {
-      return request.auth != null;
+      return request.auth != null && request.auth.token.email_verified == true;
     }
     
     // Récupère le rôle de l'utilisateur depuis les custom claims
@@ -26,15 +26,25 @@ service cloud.firestore {
     function isCoach() {
       return isAdmin() || authRole() == "coach";
     }
+
+    // Récupère l'ID du joueur associé à l'utilisateur
+    function getPlayerId() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get("playerId", null);
+    }
     
     // ============================================
     // Collection: users
     // ============================================
-    // Les utilisateurs peuvent créer/mettre à jour leur propre profil
-    // Seuls les admins peuvent lire/supprimer les profils d'autres utilisateurs
     match /users/{userId} {
-      // Création et mise à jour : uniquement son propre profil
-      allow create, update: if isAuthenticated() && request.auth.uid == userId;
+      // Permettre la création de son propre profil avec des valeurs par défaut sécurisées
+      allow create: if isAuthenticated() && request.auth.uid == userId &&
+        request.resource.data.role == "player" &&
+        request.resource.data.get("coachRequestStatus", "none") == "none";
+
+      // Empêcher la modification des champs sensibles par l'utilisateur
+      allow update: if isAuthenticated() && request.auth.uid == userId &&
+        !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(["role", "playerId", "coachRequestHandledBy", "coachRequestHandledAt"]);
       
       // Lecture : son propre profil ou admin
       allow read: if isAuthenticated() && (isAdmin() || request.auth.uid == userId);
@@ -110,11 +120,23 @@ service cloud.firestore {
     // ============================================
     // Collection: availabilities
     // ============================================
-    // Lecture pour tous les utilisateurs authentifiés
-    // Écriture pour tous les utilisateurs authentifiés (les joueurs peuvent mettre à jour leurs disponibilités)
     match /availabilities/{availabilityId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+
+      // Seuls les admins/coachs peuvent tout modifier.
+      // Les joueurs ne peuvent modifier que leur propre entrée dans la map 'players'.
+      allow create: if isCoach() || (
+        isAuthenticated() &&
+        request.resource.data.players.keys().hasOnly([getPlayerId()])
+      );
+
+      allow update: if isCoach() || (
+        isAuthenticated() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["players", "updatedAt"]) &&
+        request.resource.data.players.diff(resource.data.players).affectedKeys().hasOnly([getPlayerId()])
+      );
+
+      allow delete: if isCoach();
     }
     
     // ============================================
