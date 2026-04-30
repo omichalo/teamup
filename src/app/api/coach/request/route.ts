@@ -1,11 +1,26 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, COACH_REQUEST_STATUS, resolveRole } from "@/lib/auth/roles";
 import { FieldValue } from "firebase-admin/firestore";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
+import { logAuditAction, AUDIT_ACTIONS } from "@/lib/auth/audit-logger";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
+    // Valider l'origine de la requête pour prévenir les attaques CSRF
+    if (!validateOrigin(req)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid origin",
+          message: "Requête non autorisée",
+        },
+        { status: 403 }
+      );
+    }
+
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
     if (!sessionCookie) {
@@ -54,11 +69,21 @@ export async function POST(req: Request) {
       });
     }
 
-    console.log("[app/api/coach/request] Coach request submitted successfully", {
-      uid: decoded.uid,
+    // Log d'audit pour la demande de rôle coach
+    logAuditAction(AUDIT_ACTIONS.COACH_REQUEST_SUBMITTED, decoded.uid, {
+      resource: "user",
+      details: {
+        message: message ? "***" : null, // Masquer le message potentiel
+      },
+      success: true,
     });
 
-    return NextResponse.json({ success: true }, { status: 200 });
+    const res = NextResponse.json({ success: true }, { status: 200 });
+    // Ajouter Cache-Control pour éviter la mise en cache de données potentiellement sensibles
+    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.headers.set("Pragma", "no-cache");
+    res.headers.set("Expires", "0");
+    return res;
   } catch (error) {
     console.error("[app/api/coach/request] error", error);
     return NextResponse.json(
