@@ -91,5 +91,6 @@ export const AUDIT_ACTIONS = {
   PLAYER_UPDATED: "player.updated",
   PLAYER_DELETED: "player.deleted",
   DATA_SYNCED: "data.synced",
+  COACH_REQUEST_SUBMITTED: "coach.request.submitted",
 } as const;
 
