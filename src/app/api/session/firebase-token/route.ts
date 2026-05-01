@@ -31,7 +31,7 @@ function checkRateLimit(uid: string): boolean {
 
 export async function POST(req: NextRequest) {
   // Valider l'origine de la requête pour prévenir les attaques CSRF
-  if (!validateOrigin(req)) {
+  if (!(await validateOrigin(req))) {
     return NextResponse.json(
       { error: "Invalid origin" },
       { status: 403 }

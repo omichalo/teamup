@@ -51,7 +51,7 @@ const resolveCoachStatusForRole = (
 export async function POST(req: NextRequest) {
   try {
     // Valider l'origine de la requête pour prévenir les attaques CSRF
-    if (!validateOrigin(req)) {
+    if (!(await validateOrigin(req))) {
       return NextResponse.json(
         {
           success: false,

@@ -9,7 +9,7 @@ import { logAuditAction, AUDIT_ACTIONS } from "@/lib/auth/audit-logger";
 export async function POST(req: Request) {
   try {
     // Valider l'origine de la requête pour prévenir les attaques CSRF
-    if (!validateOrigin(req)) {
+    if (!(await validateOrigin(req))) {
       return NextResponse.json(
         {
           success: false,

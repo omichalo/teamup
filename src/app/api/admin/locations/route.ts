@@ -61,7 +61,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     // Valider l'origine de la requête pour prévenir les attaques CSRF
-    if (!validateOrigin(req)) {
+    if (!(await validateOrigin(req))) {
       return NextResponse.json(
         {
           success: false,
@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     // Valider l'origine de la requête pour prévenir les attaques CSRF
-    if (!validateOrigin(req)) {
+    if (!(await validateOrigin(req))) {
       return NextResponse.json(
         {
           success: false,
