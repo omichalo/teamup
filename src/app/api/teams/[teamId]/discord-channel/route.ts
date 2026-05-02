@@ -7,12 +7,21 @@ import {
   adminAuth,
 } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ teamId: string }> }
 ) {
   try {
+    // Valider l'origine de la requête pour prévenir les attaques CSRF
+    if (!validateOrigin(request)) {
+      return NextResponse.json(
+        { error: "Invalid origin", message: "Requête non autorisée" },
+        { status: 403 }
+      );
+    }
+
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
     if (!sessionCookie) {

@@ -3,9 +3,19 @@ import { cookies } from "next/headers";
 import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, COACH_REQUEST_STATUS, resolveRole } from "@/lib/auth/roles";
 import { FieldValue } from "firebase-admin/firestore";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
+import { logAuditAction, AUDIT_ACTIONS } from "@/lib/auth/audit-logger";
 
 export async function POST(req: Request) {
   try {
+    // Valider l'origine de la requête pour prévenir les attaques CSRF
+    if (!validateOrigin(req)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid origin", message: "Requête non autorisée" },
+        { status: 403 }
+      );
+    }
+
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
     if (!sessionCookie) {
@@ -56,6 +66,15 @@ export async function POST(req: Request) {
 
     console.log("[app/api/coach/request] Coach request submitted successfully", {
       uid: decoded.uid,
+    });
+
+    // Log d'audit pour la soumission de la demande
+    logAuditAction(AUDIT_ACTIONS.COACH_REQUEST_SUBMITTED, decoded.uid, {
+      resource: "user",
+      details: {
+        message: message ? "***" : null,
+      },
+      success: true,
     });
 
     return NextResponse.json({ success: true }, { status: 200 });

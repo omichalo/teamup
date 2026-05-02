@@ -1,8 +1,9 @@
 import { cookies } from "next/headers";
+import { createHmac, timingSafeEqual } from "crypto";
 
 /**
  * Génère un token CSRF basé sur l'UID de l'utilisateur et un secret.
- * Le token est stocké dans un cookie HTTP-only pour éviter les attaques XSS.
+ * Le token est signé avec HMAC-SHA256 et stocké dans un cookie HTTP-only.
  */
 export async function generateCSRFToken(uid: string): Promise<string> {
   // Le secret CSRF doit être défini via la variable d'environnement CSRF_SECRET
@@ -15,18 +16,20 @@ export async function generateCSRFToken(uid: string): Promise<string> {
     );
   }
   
-  // Créer un token simple basé sur l'UID et un timestamp
-  // En production, utilisez une bibliothèque comme `crypto` pour un hash plus sécurisé
-  const timestamp = Date.now();
-  const token = Buffer.from(`${uid}:${timestamp}:${secret}`).toString("base64");
+  const timestamp = Date.now().toString();
+  const hmac = createHmac("sha256", secret);
+  hmac.update(`${uid}:${timestamp}`);
+  const signature = hmac.digest("hex");
   
-  return token;
+  // Le token contient l'UID, le timestamp et la signature pour permettre la validation
+  return Buffer.from(`${uid}:${timestamp}:${signature}`).toString("base64");
 }
 
 /**
- * Valide un token CSRF en le comparant avec celui stocké dans le cookie.
- * @param providedToken - Le token fourni par le client
- * @param uid - L'UID de l'utilisateur (optionnel, extrait du cookie si non fourni)
+ * Valide un token CSRF en le comparant avec celui stocké dans le cookie
+ * et en vérifiant sa signature HMAC.
+ * @param providedToken - Le token fourni par le client (souvent via un header)
+ * @param uid - L'UID de l'utilisateur (optionnel, extrait du token si non fourni)
  */
 export async function validateCSRFToken(
   providedToken: string | null | undefined,
@@ -40,7 +43,8 @@ export async function validateCSRFToken(
     const cookieStore = await cookies();
     const csrfCookie = cookieStore.get("__csrf")?.value;
 
-    if (!csrfCookie) {
+    // Double check: le token doit être présent dans le cookie et correspondre à celui fourni
+    if (!csrfCookie || providedToken !== csrfCookie) {
       return false;
     }
 
@@ -48,33 +52,46 @@ export async function validateCSRFToken(
     const secret = process.env.CSRF_SECRET;
     
     if (!secret) {
-      console.error(
-        "[CSRF] CSRF_SECRET environment variable is required for token validation. " +
-        "Please configure it in your environment variables or Firebase App Hosting secrets."
-      );
+      console.error("[CSRF] CSRF_SECRET missing for validation");
       return false;
     }
 
-    // Décoder le token fourni pour extraire l'UID et le timestamp
-    try {
-      const decoded = Buffer.from(providedToken, "base64").toString("utf-8");
-      const [tokenUid, timestamp] = decoded.split(":");
-      
-      // Si un UID est fourni, vérifier qu'il correspond
-      if (uid && tokenUid !== uid) {
-        return false;
-      }
+    // Décoder le token fourni
+    const decoded = Buffer.from(providedToken, "base64").toString("utf-8");
+    const [tokenUid, timestamp, providedSignature] = decoded.split(":");
 
-      // Re-générer le token attendu avec le secret
-      const expectedToken = Buffer.from(`${tokenUid}:${timestamp}:${secret}`).toString("base64");
-      
-      // Comparer les tokens
-      return providedToken === expectedToken && providedToken === csrfCookie;
-    } catch {
-      // Si le décodage échoue, le token est invalide
+    if (!tokenUid || !timestamp || !providedSignature) {
       return false;
     }
-  } catch {
+
+    // Si un UID est fourni, vérifier qu'il correspond
+    if (uid && tokenUid !== uid) {
+      return false;
+    }
+
+    // Vérifier l'expiration du token (24 heures)
+    const tokenTime = parseInt(timestamp, 10);
+    const now = Date.now();
+    if (isNaN(tokenTime) || now - tokenTime > 24 * 60 * 60 * 1000) {
+      return false;
+    }
+
+    // Re-générer la signature attendue
+    const hmac = createHmac("sha256", secret);
+    hmac.update(`${tokenUid}:${timestamp}`);
+    const expectedSignature = hmac.digest("hex");
+
+    // Comparaison sécurisée contre les attaques temporelles (timing attacks)
+    const providedSigBuffer = Buffer.from(providedSignature, "hex");
+    const expectedSigBuffer = Buffer.from(expectedSignature, "hex");
+
+    if (providedSigBuffer.length !== expectedSigBuffer.length) {
+      return false;
+    }
+
+    return timingSafeEqual(providedSigBuffer, expectedSigBuffer);
+  } catch (error) {
+    console.error("[CSRF] Validation error:", error);
     return false;
   }
 }
@@ -239,4 +256,3 @@ export function validateOrigin(req: Request): boolean {
   // En développement, accepter si pas de validation possible
   return true;
 }
-
