@@ -4,9 +4,18 @@ import { adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
 import { BrulageService } from "@/services/brulageService";
 import { getBurnRecords, getPlayers } from "@/services/firebase";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
 
 export async function POST(req: Request) {
   try {
+    // CSRF Protection
+    if (!validateOrigin(req)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid origin" },
+        { status: 403 }
+      );
+    }
+
     // Auth via cookie de session (__session)
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
