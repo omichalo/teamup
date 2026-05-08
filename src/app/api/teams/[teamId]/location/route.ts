@@ -7,12 +7,22 @@ import {
   adminAuth,
 } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
+import { logAuditAction, AUDIT_ACTIONS } from "@/lib/auth/audit-logger";
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ teamId: string }> }
 ) {
   try {
+    // CSRF Protection
+    if (!validateOrigin(request)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid origin" },
+        { status: 403 }
+      );
+    }
+
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
     if (!sessionCookie) {
@@ -92,6 +102,14 @@ export async function PATCH(
     }
 
     await teamRef.update(updateData);
+
+    // Audit logging
+    logAuditAction(AUDIT_ACTIONS.TEAM_UPDATED, decoded.uid, {
+      resource: "team",
+      resourceId: teamId,
+      details: { location: updateData.location },
+      success: true,
+    });
 
     return NextResponse.json({
       success: true,
