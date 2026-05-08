@@ -556,7 +556,7 @@ export function CompositionsPageContainer() {
   useEffect(() => {
     const loadLocations = async () => {
       try {
-        const response = await fetch("/api/admin/locations", {
+        const response = await fetch("/api/locations", {
           method: "GET",
           credentials: "include",
           headers: {
