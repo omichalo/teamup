@@ -1,5 +1,7 @@
 import { CoachRequestStatus, UserRole } from "@/types";
 
+export type { UserRole };
+
 export const USER_ROLES = {
   ADMIN: "admin",
   COACH: "coach",
@@ -70,4 +72,3 @@ export const hasAnyRole = (
   }
   return allowed.includes(role);
 };
-

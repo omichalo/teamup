@@ -82,6 +82,7 @@ export const AUDIT_ACTIONS = {
   USER_ROLE_CHANGED: "user.role.changed",
   USER_IMPORTED: "user.imported",
   USER_EXPORTED: "user.exported",
+  COACH_REQUEST_SUBMITTED: "coach.request.submitted",
   COACH_REQUEST_APPROVED: "coach.request.approved",
   COACH_REQUEST_REJECTED: "coach.request.rejected",
   TEAM_CREATED: "team.created",
