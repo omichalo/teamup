@@ -8,6 +8,15 @@ import { checkRateLimit } from "@/lib/auth/rate-limit";
 
 export const runtime = "nodejs";
 
+function getAuthErrorCode(error: unknown): string {
+  if (typeof error !== "object" || error === null) {
+    return "";
+  }
+
+  const maybeCode = (error as { code?: unknown }).code;
+  return typeof maybeCode === "string" ? maybeCode : "";
+}
+
 export async function POST(req: Request) {
   try {
     const { email } = await req.json();
@@ -91,16 +100,26 @@ export async function POST(req: Request) {
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const authCode = getAuthErrorCode(error);
       
       // Erreurs Firebase spécifiques
-      if (errorMessage.includes("user-not-found") || errorMessage.includes("USER_NOT_FOUND")) {
+      if (
+        authCode === "auth/user-not-found" ||
+        errorMessage.includes("user-not-found") ||
+        errorMessage.includes("USER_NOT_FOUND") ||
+        errorMessage.includes("no user record")
+      ) {
         return NextResponse.json(
           { error: "Utilisateur non trouvé", message: "Aucun compte n'est associé à cet email" },
           { status: 404 }
         );
       }
       
-      if (errorMessage.includes("invalid-email") || errorMessage.includes("INVALID_EMAIL")) {
+      if (
+        authCode === "auth/invalid-email" ||
+        errorMessage.includes("invalid-email") ||
+        errorMessage.includes("INVALID_EMAIL")
+      ) {
         return NextResponse.json(
           { error: "Email invalide", message: "L'adresse email n'est pas valide" },
           { status: 400 }
