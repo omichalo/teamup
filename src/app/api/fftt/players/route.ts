@@ -1,9 +1,50 @@
 import { NextResponse } from "next/server";
-import { initializeFirebaseAdmin, getFirestoreAdmin } from "@/lib/firebase-admin";
+import { cookies } from "next/headers";
+import { initializeFirebaseAdmin, getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
+import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
 import type { Player } from "@/types";
 
 export async function GET(req: Request) {
   try {
+    // Initialiser Firebase Admin pour accéder à Auth et Firestore
+    await initializeFirebaseAdmin();
+
+    // Vérification d'authentification
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("__session")?.value;
+
+    if (!sessionCookie) {
+      return NextResponse.json(
+        { error: "Authentification requise" },
+        { status: 401 }
+      );
+    }
+
+    try {
+      const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+      if (!decoded.email_verified) {
+        return NextResponse.json(
+          { error: "Email non vérifié" },
+          { status: 403 }
+        );
+      }
+
+      // Vérifier que l'utilisateur est admin ou coach pour accéder aux données des joueurs (PII)
+      const role = resolveRole(decoded.role as string | undefined);
+      if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
+        return NextResponse.json(
+          { error: "Accès refusé" },
+          { status: 403 }
+        );
+      }
+    } catch (error) {
+      console.error("[app/api/fftt/players] Session Verification Error:", error);
+      return NextResponse.json(
+        { error: "Session invalide ou expirée" },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const clubCode = searchParams.get("clubCode");
 
@@ -14,7 +55,6 @@ export async function GET(req: Request) {
       );
     }
 
-    await initializeFirebaseAdmin();
     const firestore = getFirestoreAdmin();
 
     const playersSnapshot = await firestore.collection("players").get();
@@ -46,7 +86,7 @@ export async function GET(req: Request) {
 
     console.log(`📊 [app/api/fftt/players] ${players.length} joueurs récupérés depuis Firestore`);
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         players,
         total: players.length,
@@ -54,6 +94,13 @@ export async function GET(req: Request) {
       },
       { status: 200 }
     );
+
+    // Protection contre le cache pour les données sensibles
+    response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    response.headers.set("Pragma", "no-cache");
+    response.headers.set("Expires", "0");
+
+    return response;
   } catch (error) {
     console.error("[app/api/fftt/players] Firestore Error:", error);
     return NextResponse.json(
