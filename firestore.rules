@@ -30,11 +30,27 @@ service cloud.firestore {
     // ============================================
     // Collection: users
     // ============================================
-    // Les utilisateurs peuvent créer/mettre à jour leur propre profil
-    // Seuls les admins peuvent lire/supprimer les profils d'autres utilisateurs
+    // Les utilisateurs peuvent créer/mettre à jour leur propre profil.
+    // Les règles empêchent l'escalade de privilèges en restreignant les champs modifiables.
+    // Seuls les admins peuvent lire/supprimer les profils d'autres utilisateurs via le client.
     match /users/{userId} {
-      // Création et mise à jour : uniquement son propre profil
-      allow create, update: if isAuthenticated() && request.auth.uid == userId;
+      // Création : uniquement son propre profil, le rôle doit être 'player'
+      allow create: if isAuthenticated() && request.auth.uid == userId
+                    && request.resource.data.get('role', 'player') == 'player'
+                    && request.resource.data.get('coachRequestStatus', 'none') == 'none';
+
+      // Mise à jour : uniquement son propre profil, empêche la modification des champs sensibles
+      allow update: if isAuthenticated() && request.auth.uid == userId
+                    && !request.resource.data.diff(resource.data).affectedKeys()
+                        .hasAny(['role', 'playerId', 'coachRequestHandledBy', 'coachRequestHandledAt'])
+                    && (
+                      // Soit le statut de demande coach ne change pas
+                      !request.resource.data.diff(resource.data).affectedKeys().hasAny(['coachRequestStatus'])
+                      // Soit il passe à 'pending' depuis 'none' ou 'rejected'
+                      || (request.resource.data.coachRequestStatus == 'pending'
+                          && (resource.data.get('coachRequestStatus', 'none') == 'none'
+                              || resource.data.get('coachRequestStatus', 'none') == 'rejected'))
+                    );
       
       // Lecture : son propre profil ou admin
       allow read: if isAuthenticated() && (isAdmin() || request.auth.uid == userId);
