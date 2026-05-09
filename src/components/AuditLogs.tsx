@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -49,91 +49,31 @@ import {
   Download as DownloadIcon,
   Refresh as RefreshIcon,
   Info as InfoIcon,
-  Warning as WarningIcon,
-  Error as ErrorIcon,
-  CheckCircle as CheckCircleIcon,
   ExpandMore as ExpandMoreIcon,
   Person as PersonIcon,
-  Event as EventIcon,
-  Sports as SportsIcon,
-  Settings as SettingsIcon,
   Delete as DeleteIcon,
   // Edit as EditIcon,
   // Add as AddIcon,
 } from "@mui/icons-material";
-
-interface AuditLogsProps {
-  logs: AuditLog[];
-  onSearch: (filters: AuditLogFilters) => Promise<void>;
-  onExport: (
-    filters: AuditLogFilters,
-    format: "csv" | "pdf" | "excel"
-  ) => Promise<void>;
-  onClearLogs: (olderThan: string) => Promise<void>;
-  onGetLogDetails: (id: string) => Promise<AuditLogDetails>;
-  loading?: boolean;
-  totalCount?: number;
-  page?: number;
-  pageSize?: number;
-  onPageChange?: (page: number) => void;
-}
-
-interface AuditLog {
-  id: string;
-  timestamp: string;
-  userId: string;
-  userName: string;
-  action: string;
-  resource: string;
-  resourceId: string;
-  resourceName: string;
-  level: "info" | "warning" | "error" | "success";
-  category:
-    | "user"
-    | "team"
-    | "match"
-    | "player"
-    | "system"
-    | "security"
-    | "data";
-  details: {
-    [key: string]: unknown;
-  };
-  ipAddress: string;
-  userAgent: string;
-  sessionId: string;
-  changes?: {
-    field: string;
-    oldValue: unknown;
-    newValue: unknown;
-  }[];
-  metadata?: {
-    [key: string]: unknown;
-  };
-}
-
-interface AuditLogDetails extends AuditLog {
-  relatedLogs: AuditLog[];
-  impact: {
-    affectedUsers: number;
-    affectedResources: number;
-    severity: "low" | "medium" | "high" | "critical";
-  };
-  recommendations: string[];
-}
-
-interface AuditLogFilters {
-  search?: string;
-  level?: string[];
-  category?: string[];
-  userId?: string;
-  resource?: string;
-  dateFrom?: string;
-  dateTo?: string;
-  action?: string[];
-  ipAddress?: string;
-  sessionId?: string;
-}
+import {
+  AUDIT_ACTIONS,
+  AUDIT_CATEGORIES,
+  AUDIT_LEVELS,
+} from "@/components/audit-logs/constants";
+import type {
+  AuditLog,
+  AuditLogDetails,
+  AuditLogFilters,
+  AuditLogsProps,
+} from "@/components/audit-logs/types";
+import {
+  formatAuditDate,
+  getCategoryIcon,
+  getCategoryLabel,
+  getLevelColor,
+  getLevelIcon,
+  getSeverityColor,
+} from "@/components/audit-logs/utils";
 
 export function AuditLogs({
   logs,
@@ -155,42 +95,6 @@ export function AuditLogs({
   const [clearDate, setClearDate] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
-
-  const levels = [
-    { value: "info", label: "Information", color: "info" },
-    { value: "warning", label: "Avertissement", color: "warning" },
-    { value: "error", label: "Erreur", color: "error" },
-    { value: "success", label: "Succès", color: "success" },
-  ];
-
-  const categories = [
-    { value: "user", label: "Utilisateur", icon: <PersonIcon /> },
-    { value: "team", label: "Équipe", icon: <SportsIcon /> },
-    { value: "match", label: "Match", icon: <EventIcon /> },
-    { value: "player", label: "Joueur", icon: <PersonIcon /> },
-    { value: "system", label: "Système", icon: <SettingsIcon /> },
-    { value: "security", label: "Sécurité", icon: <WarningIcon /> },
-    { value: "data", label: "Données", icon: <InfoIcon /> },
-  ];
-
-  const actions = [
-    "create",
-    "read",
-    "update",
-    "delete",
-    "login",
-    "logout",
-    "export",
-    "import",
-    "backup",
-    "restore",
-    "sync",
-    "validate",
-    "approve",
-    "reject",
-    "assign",
-    "unassign",
-  ];
 
   // const resources = [
   //   "player",
@@ -275,65 +179,6 @@ export function AuditLogs({
     } finally {
       setProcessing(false);
     }
-  };
-
-  const getLevelIcon = (level: string) => {
-    switch (level) {
-      case "info":
-        return <InfoIcon color="info" />;
-      case "warning":
-        return <WarningIcon color="warning" />;
-      case "error":
-        return <ErrorIcon color="error" />;
-      case "success":
-        return <CheckCircleIcon color="success" />;
-      default:
-        return <InfoIcon color="inherit" />;
-    }
-  };
-
-  const getLevelColor = (level: string) => {
-    switch (level) {
-      case "info":
-        return "info";
-      case "warning":
-        return "warning";
-      case "error":
-        return "error";
-      case "success":
-        return "success";
-      default:
-        return "default";
-    }
-  };
-
-  const getCategoryIcon = (category: string) => {
-    const cat = categories.find((c) => c.value === category);
-    return cat ? cat.icon : <InfoIcon />;
-  };
-
-  const getCategoryLabel = (category: string) => {
-    const cat = categories.find((c) => c.value === category);
-    return cat ? cat.label : category;
-  };
-
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case "critical":
-        return "error";
-      case "high":
-        return "warning";
-      case "medium":
-        return "info";
-      case "low":
-        return "default";
-      default:
-        return "default";
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString("fr-FR");
   };
 
   // const formatDuration = (start: string, end: string) => {
@@ -441,9 +286,14 @@ export function AuditLogs({
                       {selected.map((value) => (
                         <Chip
                           key={value}
-                          label={levels.find((l) => l.value === value)?.label}
+                          label={
+                            AUDIT_LEVELS.find((level) => level.value === value)
+                              ?.label
+                          }
                           color={
-                            levels.find((l) => l.value === value)?.color as
+                            AUDIT_LEVELS.find(
+                              (level) => level.value === value
+                            )?.color as
                               | "default"
                               | "primary"
                               | "secondary"
@@ -458,7 +308,7 @@ export function AuditLogs({
                     </Box>
                   )}
                 >
-                  {levels.map((level) => (
+                  {AUDIT_LEVELS.map((level) => (
                     <MenuItem key={level.value} value={level.value}>
                       {level.label}
                     </MenuItem>
@@ -490,7 +340,7 @@ export function AuditLogs({
                     </Box>
                   )}
                 >
-                  {categories.map((category) => (
+                  {AUDIT_CATEGORIES.map((category) => (
                     <MenuItem key={category.value} value={category.value}>
                       <Box display="flex" alignItems="center" gap={1}>
                         {category.icon}
@@ -521,7 +371,7 @@ export function AuditLogs({
                     </Box>
                   )}
                 >
-                  {actions.map((action) => (
+                  {AUDIT_ACTIONS.map((action) => (
                     <MenuItem key={action} value={action}>
                       {action}
                     </MenuItem>
@@ -651,7 +501,7 @@ export function AuditLogs({
                     <TableRow key={log.id} hover>
                       <TableCell>
                         <Typography variant="body2">
-                          {formatDate(log.timestamp)}
+                          {formatAuditDate(log.timestamp)}
                         </Typography>
                       </TableCell>
                       <TableCell>
@@ -750,7 +600,7 @@ export function AuditLogs({
                     <ListItem>
                       <ListItemText
                         primary="Horodatage"
-                        secondary={formatDate(logDetails.timestamp)}
+                        secondary={formatAuditDate(logDetails.timestamp)}
                       />
                     </ListItem>
                     <ListItem>
