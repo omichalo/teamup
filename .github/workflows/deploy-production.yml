@@ -4,18 +4,13 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - "**.md"
-      - ".github/workflows/*.md"
-      - "docs/**"
-      - "README.md"
 
 jobs:
   deploy:
     name: Deploy to Firebase App Hosting
     runs-on: ubuntu-latest
-    # Déclenché par tout push sur main (merges de PR inclus). Si aucun fichier
-    # hors paths-ignore ne change, le workflow entier ne tourne pas (voir `on.push`).
+    # Tout push sur main déclenche un déploiement (merges de PR inclus,
+    # y compris changements uniquement docs / markdown).
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
