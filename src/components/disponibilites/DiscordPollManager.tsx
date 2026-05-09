@@ -4,11 +4,6 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   Box,
   Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Typography,
   Alert,
   CircularProgress,
   Chip,
@@ -36,6 +31,8 @@ import {
   buildDefaultPollMessage,
   filterMentionItems,
 } from "@/components/disponibilites/discord-poll-manager/utils";
+import { CreatePollDialog } from "@/components/disponibilites/discord-poll-manager/CreatePollDialog";
+import { ClosePollDialog } from "@/components/disponibilites/discord-poll-manager/ClosePollDialog";
 import { MentionSuggestions } from "@/components/disponibilites/discord-poll-manager/MentionSuggestions";
 
 export function DiscordPollManager({
@@ -707,170 +704,22 @@ export function DiscordPollManager({
         ) : null}
       </Box>
 
-      <Dialog
+      <CreatePollDialog
         open={createDialogOpen}
-        onClose={() => !creating && setCreateDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Créer un sondage Discord</DialogTitle>
-        <DialogContent>
-          <Alert severity="info" sx={{ mb: 2 }}>
-            Un sondage sera créé dans le channel Discord configuré pour{" "}
-            {epreuveType === "championnat_equipes"
-              ? "le championnat par équipes"
-              : "le championnat de Paris"}
-            . Tous les utilisateurs ayant accès à ce channel pourront répondre.
-            {discordConfig?.channelId && (
-              <Typography variant="caption" display="block" sx={{ mt: 1 }}>
-                Channel:{" "}
-                {discordConfig.channelName
-                  ? `#${discordConfig.channelName}`
-                  : `ID: ${discordConfig.channelId}`}
-          </Typography>
-            )}
-            {!discordConfig?.channelId && (
-              <Typography
-                variant="caption"
-                display="block"
-                sx={{ mt: 1, color: "warning.main" }}
-              >
-                ⚠️ Aucun channel Discord configuré. Configurez-le dans
-                l&apos;administration.
-              </Typography>
-            )}
-          </Alert>
-
-          <Box
-            sx={{
-              mb: 2,
-              p: 1.5,
-              bgcolor: "background.default",
-              borderRadius: 1,
-            }}
-          >
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Informations du sondage
-            </Typography>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-            <Typography variant="body2">
-              <strong>Journée :</strong> {journee || "—"}
-            </Typography>
-            <Typography variant="body2">
-              <strong>Phase :</strong> {phase || "—"}
-            </Typography>
-            {date && (
-              <Typography variant="body2">
-                <strong>Date :</strong>{" "}
-                {new Date(date).toLocaleDateString("fr-FR", {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </Typography>
-            )}
-              {discordConfig?.mention && (
-                <Typography variant="body2" sx={{ mt: 0.5 }}>
-                  <strong>Mention :</strong>{" "}
-                  {discordConfig.mentionLabel || discordConfig.mention}
-              </Typography>
-            )}
-            </Box>
-          </Box>
-
-          {epreuveType === "championnat_equipes" && (
-            <Box sx={{ mt: 3 }}>
-              {propFridayDate || propSaturdayDate ? (
-                <Box>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                    sx={{ mb: 1 }}
-                >
-                  Dates extraites automatiquement depuis les matchs :
-                  </Typography>
-                  <Box
-                    sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}
-                  >
-                  {propFridayDate && (
-                      <Typography variant="body2">
-                        <strong>Vendredi :</strong>{" "}
-                      {(() => {
-                        // Parser la date en évitant les problèmes de timezone
-                        const [year, month, day] = propFridayDate
-                          .split("-")
-                          .map(Number);
-                        const date = new Date(year, month - 1, day);
-                        const dayOfWeek = date.getDay();
-                        const dayName = date.toLocaleDateString("fr-FR", {
-                          weekday: "long",
-                        });
-                        // Vérifier que c'est bien un vendredi (jour 5)
-                        if (dayOfWeek !== 5) {
-                          console.warn(
-                            `[DiscordPollManager] Date identifiée comme vendredi mais jour de la semaine réel: ${dayName} (${dayOfWeek})`,
-                            { date: propFridayDate }
-                          );
-                        }
-                        return `${dayName} ${day}/${month}/${year}`;
-                      })()}
-                      </Typography>
-                  )}
-                  {propSaturdayDate && (
-                      <Typography variant="body2">
-                        <strong>Samedi :</strong>{" "}
-                      {(() => {
-                        const [year, month, day] = propSaturdayDate
-                          .split("-")
-                          .map(Number);
-                        const date = new Date(year, month - 1, day);
-                        const dayOfWeek = date.getDay();
-                        const dayName = date.toLocaleDateString("fr-FR", {
-                          weekday: "long",
-                        });
-                        // Vérifier que c'est bien un samedi (jour 6)
-                        if (dayOfWeek !== 6) {
-                          console.warn(
-                            `[DiscordPollManager] Date identifiée comme samedi mais jour de la semaine réel: ${dayName} (${dayOfWeek})`,
-                            { date: propSaturdayDate }
-                          );
-                        }
-                        return `${dayName} ${day}/${month}/${year}`;
-                      })()}
-                </Typography>
-                    )}
-                  </Box>
-                </Box>
-              ) : (
-                <>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                    Dates spécifiques (optionnel)
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    label="Date vendredi"
-                    type="date"
-                    value={fridayDate}
-                    onChange={(e) => setFridayDate(e.target.value)}
-                    InputLabelProps={{ shrink: true }}
-                    sx={{ mb: 2 }}
-                    helperText="Date du vendredi pour le championnat par équipes"
-                  />
-                  <TextField
-                    fullWidth
-                    label="Date samedi"
-                    type="date"
-                    value={saturdayDate}
-                    onChange={(e) => setSaturdayDate(e.target.value)}
-                    InputLabelProps={{ shrink: true }}
-                    helperText="Date du samedi pour les rég et équipes filles"
-                  />
-                </>
-              )}
-            </Box>
-          )}
-
+        creating={creating}
+        canCreatePoll={canCreatePoll}
+        epreuveType={epreuveType}
+        discordConfig={discordConfig}
+        journee={journee}
+        phase={phase}
+        date={date}
+        propFridayDate={propFridayDate}
+        propSaturdayDate={propSaturdayDate}
+        fridayDate={fridayDate}
+        saturdayDate={saturdayDate}
+        setFridayDate={setFridayDate}
+        setSaturdayDate={setSaturdayDate}
+        messageField={
           <Box sx={{ mt: 3, position: "relative" }}>
             <TextField
               fullWidth
@@ -964,83 +813,22 @@ export function DiscordPollManager({
               />
             )}
           </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => {
-              setCreateDialogOpen(false);
-              setMessageTemplate("");
-              setFridayDate("");
-              setSaturdayDate("");
-            }}
-            disabled={creating}
-          >
-            Annuler
-          </Button>
-          <Button
-            onClick={() => void handleCreatePoll()}
-            variant="contained"
-            disabled={creating || !canCreatePoll}
-            startIcon={creating ? <CircularProgress size={20} /> : <AddIcon />}
-          >
-            {creating ? "Création..." : "Créer le sondage"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        }
+        onCancel={() => {
+          setCreateDialogOpen(false);
+          setMessageTemplate("");
+          setFridayDate("");
+          setSaturdayDate("");
+        }}
+        onCreate={() => void handleCreatePoll()}
+      />
 
-      {/* Dialog de fermeture */}
-      <Dialog
+      <ClosePollDialog
         open={closeDialogOpen}
-        onClose={() => !closing && setCloseDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Fermer le sondage Discord</DialogTitle>
-        <DialogContent>
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            Le sondage sera fermé et les utilisateurs ne pourront plus répondre.
-            {currentPoll?.channelId && (
-              <Typography variant="caption" display="block" sx={{ mt: 1 }}>
-                Channel:{" "}
-                {discordConfig?.channelName
-                  ? `#${discordConfig.channelName}`
-                  : `ID: ${currentPoll.channelId}`}
-              </Typography>
-            )}
-          </Alert>
-
-          <Box
-            sx={{
-              mb: 2,
-              p: 1.5,
-              bgcolor: "background.default",
-              borderRadius: 1,
-            }}
-          >
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Informations du sondage
-            </Typography>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-              <Typography variant="body2">
-                <strong>Journée :</strong> {currentPoll?.journee || "—"}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Phase :</strong> {currentPoll?.phase || "—"}
-              </Typography>
-              {currentPoll?.date && (
-                <Typography variant="body2">
-                  <strong>Date :</strong>{" "}
-                  {new Date(currentPoll.date).toLocaleDateString("fr-FR", {
-                    weekday: "long",
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </Typography>
-              )}
-    </Box>
-          </Box>
-
+        closing={closing}
+        currentPoll={currentPoll}
+        discordConfig={discordConfig}
+        messageField={
           <Box sx={{ mt: 3, position: "relative" }}>
             <TextField
               fullWidth
@@ -1125,28 +913,13 @@ export function DiscordPollManager({
               />
             )}
           </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => {
-              setCloseDialogOpen(false);
-              setCloseMessageTemplate("");
-            }}
-            disabled={closing}
-          >
-            Annuler
-          </Button>
-          <Button
-            onClick={() => void handleConfirmClosePoll()}
-            variant="contained"
-            color="error"
-            disabled={closing}
-            startIcon={closing ? <CircularProgress size={20} /> : <CloseIcon />}
-          >
-            {closing ? "Fermeture..." : "Fermer le sondage"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        }
+        onCancel={() => {
+          setCloseDialogOpen(false);
+          setCloseMessageTemplate("");
+        }}
+        onConfirm={() => void handleConfirmClosePoll()}
+      />
     </Box>
   );
 }
