@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   Card,
   CardContent,
@@ -20,7 +20,6 @@ import {
   FormControlLabel,
   Checkbox,
   Alert,
-  LinearProgress,
   List,
   ListItem,
   ListItemText,
@@ -42,78 +41,30 @@ import {
   FileDownload as FileDownloadIcon,
   Delete as DeleteIcon,
   Refresh as RefreshIcon,
-  CheckCircle as CheckCircleIcon,
-  Info as InfoIcon,
-  Error as ErrorIcon,
   CloudDownload as CloudDownloadIcon,
   CloudUpload as CloudUploadIcon,
   Backup as BackupIcon,
   Restore as RestoreIcon,
 } from "@mui/icons-material";
-
-interface DataExportImportProps {
-  onExport: (options: ExportOptions) => Promise<void>;
-  onImport: (file: File, options: ImportOptions) => Promise<void>;
-  onBackup: () => Promise<void>;
-  onRestore: (file: File) => Promise<void>;
-  onDeleteBackup: (backupId: string) => Promise<void>;
-  onListBackups: () => Promise<BackupInfo[]>;
-  onGetExportHistory: () => Promise<ExportHistoryItem[]>;
-  onGetImportHistory: () => Promise<ImportHistoryItem[]>;
-  loading?: boolean;
-}
-
-interface ExportOptions {
-  format: "csv" | "excel" | "pdf" | "json";
-  dataTypes: string[];
-  dateRange: {
-    start: string;
-    end: string;
-  };
-  includeMetadata: boolean;
-  includeHistory: boolean;
-  compression: boolean;
-  password?: string;
-}
-
-interface ImportOptions {
-  format: "csv" | "excel" | "json";
-  dataTypes: string[];
-  updateExisting: boolean;
-  validateData: boolean;
-  createBackup: boolean;
-  mapping?: { [key: string]: string };
-}
-
-interface BackupInfo {
-  id: string;
-  name: string;
-  size: number;
-  createdAt: string;
-  type: "full" | "incremental";
-  status: "completed" | "failed" | "in_progress";
-}
-
-interface ExportHistoryItem {
-  id: string;
-  format: string;
-  dataTypes: string[];
-  size: number;
-  createdAt: string;
-  status: "completed" | "failed" | "in_progress";
-  downloadUrl?: string;
-}
-
-interface ImportHistoryItem {
-  id: string;
-  format: string;
-  dataTypes: string[];
-  size: number;
-  createdAt: string;
-  status: "completed" | "failed" | "in_progress";
-  recordsProcessed: number;
-  recordsFailed: number;
-}
+import {
+  DATA_TYPES,
+  DEFAULT_EXPORT_OPTIONS,
+  DEFAULT_IMPORT_OPTIONS,
+} from "@/components/data-export-import/constants";
+import type {
+  BackupInfo,
+  DataExportImportProps,
+  ExportHistoryItem,
+  ExportOptions,
+  ImportHistoryItem,
+  ImportOptions,
+} from "@/components/data-export-import/types";
+import {
+  formatDate,
+  formatFileSize,
+  getStatusColor,
+  getStatusIcon,
+} from "@/components/data-export-import/utils";
 
 export function DataExportImport({
   onExport,
@@ -129,42 +80,18 @@ export function DataExportImport({
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [backupDialogOpen, setBackupDialogOpen] = useState(false);
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
-  const [exportOptions, setExportOptions] = useState<ExportOptions>({
-    format: "csv",
-    dataTypes: ["players", "teams", "matches"],
-    dateRange: {
-      start: "",
-      end: "",
-    },
-    includeMetadata: true,
-    includeHistory: false,
-    compression: false,
-  });
-  const [importOptions, setImportOptions] = useState<ImportOptions>({
-    format: "csv",
-    dataTypes: ["players"],
-    updateExisting: false,
-    validateData: true,
-    createBackup: true,
-  });
+  const [exportOptions, setExportOptions] = useState<ExportOptions>(
+    DEFAULT_EXPORT_OPTIONS
+  );
+  const [importOptions, setImportOptions] = useState<ImportOptions>(
+    DEFAULT_IMPORT_OPTIONS
+  );
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [backups, setBackups] = useState<BackupInfo[]>([]);
   const [exportHistory, setExportHistory] = useState<ExportHistoryItem[]>([]);
   const [importHistory, setImportHistory] = useState<ImportHistoryItem[]>([]);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const dataTypes = [
-    { value: "players", label: "Joueurs" },
-    { value: "teams", label: "Équipes" },
-    { value: "matches", label: "Matchs" },
-    { value: "championships", label: "Championnats" },
-    { value: "availabilities", label: "Disponibilités" },
-    { value: "compositions", label: "Compositions" },
-    { value: "settings", label: "Paramètres" },
-    { value: "users", label: "Utilisateurs" },
-    { value: "audit_logs", label: "Logs d&apos;audit" },
-  ];
 
   const handleExport = async () => {
     try {
@@ -271,44 +198,6 @@ export function DataExportImport({
     } catch (err) {
       console.error("Erreur lors du chargement de l&apos;historique d&apos;import:", err);
     }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "completed":
-        return <CheckCircleIcon color="success" />;
-      case "failed":
-        return <ErrorIcon color="error" />;
-      case "in_progress":
-        return <LinearProgress />;
-      default:
-        return <InfoIcon color="inherit" />;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "completed":
-        return "success";
-      case "failed":
-        return "error";
-      case "in_progress":
-        return "info";
-      default:
-        return "default";
-    }
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString("fr-FR");
   };
 
   return (
@@ -613,7 +502,7 @@ export function DataExportImport({
                 <FormControl fullWidth>
                   <FormLabel>Types de données</FormLabel>
                   <FormGroup>
-                    {dataTypes.map((type) => (
+                    {DATA_TYPES.map((type) => (
                       <FormControlLabel
                         key={type.value}
                         control={
@@ -791,7 +680,7 @@ export function DataExportImport({
                 <FormControl fullWidth>
                   <FormLabel>Types de données</FormLabel>
                   <FormGroup>
-                    {dataTypes.map((type) => (
+                    {DATA_TYPES.map((type) => (
                       <FormControlLabel
                         key={type.value}
                         control={
