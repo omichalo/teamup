@@ -83,6 +83,8 @@ Le script `scripts/setup-functions-config.js` lit les variables d'environnement 
 
 Les variables préfixées par `NEXT_PUBLIC_` sont **publiques** et incluses dans le bundle JavaScript côté client. C'est normal pour la configuration Firebase (clés API, domaines, etc.) car elles sont sécurisées par des restrictions de domaine dans Firebase Console.
 
+Elles doivent être définies dans l’environnement au **build** (`.env.local`, CI, `apphosting.yaml`) : **`next.config.ts` ne duplique plus de valeurs par défaut** pour éviter la divergence entre environnements et les faux positifs « tout marche sans .env » en local.
+
 ## En cas d'exposition de secrets
 
 Si un secret a été commité par erreur :
