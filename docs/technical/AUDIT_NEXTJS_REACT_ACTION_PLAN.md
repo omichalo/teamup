@@ -272,3 +272,4 @@ Pour chaque fichier (traiter par ordre métier / douleur) :
 | 2026-05-09 | — | Epic G (lot 11) : extraction des dialogs `CreatePollDialog` / `ClosePollDialog` pour alléger `DiscordPollManager` |
 | 2026-05-09 | — | Epic G (lot 12) : extraction de `MentionMessageField` pour mutualiser l’édition + autocomplete des mentions dans `DiscordPollManager` |
 | 2026-05-09 | — | Epic G (lot 13) : `validators/index.ts` découpé en modules (`validators/types`, `team-utils`, `burnout-utils`, `paris-rules`) avec API publique conservée |
+| 2026-05-09 | — | Epic G (lot 14) : `api/discord/interactions/route.ts` découpé en modules (`types`, `signature`, `command-handlers`, `component-handlers`) avec flux API conservé |
