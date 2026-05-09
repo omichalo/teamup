@@ -14,12 +14,6 @@ import {
   Chip,
   Tooltip,
   TextField,
-  Popper,
-  Paper,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -42,6 +36,7 @@ import {
   buildDefaultPollMessage,
   filterMentionItems,
 } from "@/components/disponibilites/discord-poll-manager/utils";
+import { MentionSuggestions } from "@/components/disponibilites/discord-poll-manager/MentionSuggestions";
 
 export function DiscordPollManager({
   journee,
@@ -304,113 +299,35 @@ export function DiscordPollManager({
     ]
   );
 
-  // Composant pour les suggestions de mentions
-  const MentionSuggestions = ({
-    query,
-    anchorEl,
-    position,
-    isCloseMessage = false,
-  }: {
-    query: string;
-    anchorEl: HTMLElement;
-    position: number;
-    isCloseMessage?: boolean;
-  }) => {
-    // Combiner utilisateurs et rôles
-    const filtered = filterMentionItems({
-      discordMembers: discordMembers || [],
-      discordRoles,
-      query,
-    });
+  const updateMentionAutocomplete = useCallback(
+    (
+      value: string,
+      cursorPos: number,
+      target: HTMLInputElement | HTMLTextAreaElement,
+      setQuery: (query: string) => void,
+      setAnchor: (anchor: MentionAnchorState | null) => void
+    ) => {
+      const textBeforeCursor = value.substring(0, cursorPos);
+      const lastAtIndex = textBeforeCursor.lastIndexOf("@");
 
-    if (filtered.length === 0) {
-      return null;
-    }
+      if (lastAtIndex === -1) {
+        setAnchor(null);
+        return;
+      }
 
-    return (
-      <Popper
-        open={true}
-        anchorEl={anchorEl}
-        placement="bottom-start"
-        sx={{ zIndex: 1300, mt: 0.5 }}
-      >
-        <Paper
-          elevation={8}
-          sx={{
-            maxHeight: 300,
-            overflow: "auto",
-            minWidth: 280,
-            borderRadius: 2,
-            border: "1px solid",
-            borderColor: "divider",
-            boxShadow: "0 4px 20px rgba(0, 0, 0, 0.15)",
-          }}
-        >
-          <List dense sx={{ py: 0.5 }}>
-            {filtered.map((item) => (
-              <ListItem key={`${item.type}-${item.id}`} disablePadding>
-                <ListItemButton
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                  }}
-                  onClick={() => {
-                    insertMention(position, item, isCloseMessage);
-                  }}
-                  sx={{
-                    borderRadius: 1,
-                    mx: 0.5,
-                    my: 0.25,
-                    "&:hover": {
-                      backgroundColor: "action.hover",
-                    },
-                  }}
-                >
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      width: 32,
-                      height: 32,
-                      borderRadius: "50%",
-                      backgroundColor:
-                        item.type === "user"
-                          ? "primary.main"
-                          : "secondary.main",
-                      color: "primary.contrastText",
-                      mr: 1.5,
-                      fontSize: "0.875rem",
-                      fontWeight: 600,
-                    }}
-                  >
-                    {item.type === "user"
-                      ? item.displayName.charAt(0).toUpperCase()
-                      : "@"}
-                  </Box>
-                  <ListItemText
-                    primary={
-                      <Typography variant="body2" fontWeight={500}>
-                        {item.type === "user"
-                          ? item.displayName
-                          : `@${item.displayName}`}
-                      </Typography>
-                    }
-                    secondary={
-                      <Typography variant="caption" color="text.secondary">
-                        {item.type === "user"
-                          ? `@${"username" in item ? item.username : ""}`
-                          : "Rôle"}
-                      </Typography>
-                    }
-                  />
-                </ListItemButton>
-              </ListItem>
-            ))}
-          </List>
-        </Paper>
-      </Popper>
-    );
-  };
+      const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+      if (!textAfterAt.includes(" ") && !textAfterAt.includes("\n")) {
+        setQuery(textAfterAt.toLowerCase());
+        setAnchor({
+          anchorEl: target,
+          position: lastAtIndex,
+        });
+      } else {
+        setAnchor(null);
+      }
+    },
+    []
+  );
 
   // Mettre à jour les dates quand les props changent
   useEffect(() => {
@@ -970,33 +887,13 @@ export function DiscordPollManager({
                 const value = e.target.value;
                 const cursorPos = e.target.selectionStart || 0;
                 setMessageTemplate(value);
-
-                // Détecter si on tape "@" ou si on est en train de taper après "@"
-                const textBeforeCursor = value.substring(0, cursorPos);
-                const lastAtIndex = textBeforeCursor.lastIndexOf("@");
-
-                if (lastAtIndex !== -1) {
-                  // Vérifier qu'il n'y a pas d'espace entre "@" et le curseur
-                  const textAfterAt = textBeforeCursor.substring(
-                    lastAtIndex + 1
-                  );
-                  if (
-                    !textAfterAt.includes(" ") &&
-                    !textAfterAt.includes("\n")
-                  ) {
-                    // On est en train de taper une mention
-                    const query = textAfterAt.toLowerCase();
-                    setMentionQuery(query);
-                    setMentionMenuAnchor({
-                      anchorEl: e.target,
-                      position: lastAtIndex,
-                    });
-                  } else {
-                    setMentionMenuAnchor(null);
-                  }
-                } else {
-                  setMentionMenuAnchor(null);
-                }
+                updateMentionAutocomplete(
+                  value,
+                  cursorPos,
+                  e.target,
+                  setMentionQuery,
+                  setMentionMenuAnchor
+                );
               }}
               onKeyDown={(e) => {
                 if (mentionMenuAnchor) {
@@ -1016,12 +913,7 @@ export function DiscordPollManager({
                     if (e.key === "Escape") {
                       setMentionMenuAnchor(null);
                     } else if (e.key === "Enter" && filtered.length > 0) {
-                      // Insérer la première mention
-                      const selectedMention = filtered[0];
-                      insertMention(
-                        mentionMenuAnchor.position,
-                        selectedMention
-                      );
+                      insertMention(mentionMenuAnchor.position, filtered[0]);
                     }
                   }
                 }
@@ -1064,6 +956,11 @@ export function DiscordPollManager({
                 query={mentionQuery}
                 anchorEl={mentionMenuAnchor.anchorEl}
                 position={mentionMenuAnchor.position}
+                discordMembers={discordMembers || []}
+                discordRoles={discordRoles}
+                onSelect={(position, item) => {
+                  insertMention(position, item);
+                }}
               />
             )}
           </Box>
@@ -1160,33 +1057,13 @@ export function DiscordPollManager({
                 const value = e.target.value;
                 const cursorPos = e.target.selectionStart || 0;
                 setCloseMessageTemplate(value);
-
-                // Détecter si on tape "@" ou si on est en train de taper après "@"
-                const textBeforeCursor = value.substring(0, cursorPos);
-                const lastAtIndex = textBeforeCursor.lastIndexOf("@");
-
-                if (lastAtIndex !== -1) {
-                  // Vérifier qu'il n'y a pas d'espace entre "@" et le curseur
-                  const textAfterAt = textBeforeCursor.substring(
-                    lastAtIndex + 1
-                  );
-                  if (
-                    !textAfterAt.includes(" ") &&
-                    !textAfterAt.includes("\n")
-                  ) {
-                    // On est en train de taper une mention
-                    const query = textAfterAt.toLowerCase();
-                    setCloseMentionQuery(query);
-                    setCloseMentionMenuAnchor({
-                      anchorEl: e.target,
-                      position: lastAtIndex,
-                    });
-                  } else {
-                    setCloseMentionMenuAnchor(null);
-                  }
-                } else {
-                  setCloseMentionMenuAnchor(null);
-                }
+                updateMentionAutocomplete(
+                  value,
+                  cursorPos,
+                  e.target,
+                  setCloseMentionQuery,
+                  setCloseMentionMenuAnchor
+                );
               }}
               onKeyDown={(e) => {
                 if (closeMentionMenuAnchor) {
@@ -1206,13 +1083,7 @@ export function DiscordPollManager({
                     if (e.key === "Escape") {
                       setCloseMentionMenuAnchor(null);
                     } else if (e.key === "Enter" && filtered.length > 0) {
-                      // Insérer la première mention
-                      const selectedMention = filtered[0];
-                      insertMention(
-                        closeMentionMenuAnchor.position,
-                        selectedMention,
-                        true
-                      );
+                      insertMention(closeMentionMenuAnchor.position, filtered[0], true);
                     }
                   }
                 }
@@ -1246,7 +1117,11 @@ export function DiscordPollManager({
                 query={closeMentionQuery}
                 anchorEl={closeMentionMenuAnchor.anchorEl}
                 position={closeMentionMenuAnchor.position}
-                isCloseMessage={true}
+                discordMembers={discordMembers || []}
+                discordRoles={discordRoles}
+                onSelect={(position, item) => {
+                  insertMention(position, item, true);
+                }}
               />
             )}
           </Box>
