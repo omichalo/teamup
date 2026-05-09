@@ -269,3 +269,4 @@ Pour chaque fichier (traiter par ordre métier / douleur) :
 | 2026-05-09 | — | Epic G (cleanup) : suppression des composants non utilisés `AdvancedSettings`, `NotificationCenter`, `ReportsManager`, `SystemMaintenance` |
 | 2026-05-09 | — | Epic G (cleanup 2) : suppression des composants non utilisés `NotificationManager`, `ThemeManager`, `DataExportImport`, `AuditLogs`, `AppSettings` et de leurs modules associés |
 | 2026-05-09 | — | Epic G (cleanup 3) : suppression des composants non utilisés `UserManagement`, `BackupRestore`, `GlobalStats`, `TeamManager`, `MatchHistoryManager`, `BurnoutRulesManager` et des modules associés |
+| 2026-05-09 | — | Epic G (lot 11) : extraction des dialogs `CreatePollDialog` / `ClosePollDialog` pour alléger `DiscordPollManager` |
