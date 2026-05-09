@@ -2,11 +2,23 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
+import {
+  enforceRateLimit,
+  RATE_LIMIT_DISCORD_PROXY_PER_UID,
+} from "@/lib/auth/rate-limit-http";
 
 const db = getFirestore();
 
 export async function POST(req: Request) {
   try {
+    if (!validateOrigin(req)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid origin" },
+        { status: 403 }
+      );
+    }
+
     // Vérifier l'authentification
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
@@ -19,6 +31,14 @@ export async function POST(req: Request) {
     }
 
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+
+    const discordRl = enforceRateLimit(
+      `discord:update-custom:${decoded.uid}`,
+      RATE_LIMIT_DISCORD_PROXY_PER_UID.max,
+      RATE_LIMIT_DISCORD_PROXY_PER_UID.windowMs
+    );
+    if (discordRl) return discordRl;
+
     const role = decoded.role || "player";
     
     // Seuls les admins et coaches peuvent modifier les messages

@@ -9,6 +9,10 @@ import {
 import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
 import { logAuditAction, AUDIT_ACTIONS } from "@/lib/auth/audit-logger";
+import {
+  enforceRateLimit,
+  RATE_LIMIT_ADMIN_SYNC_PER_UID,
+} from "@/lib/auth/rate-limit-http";
 
 export const runtime = "nodejs";
 
@@ -49,6 +53,13 @@ export async function POST(req: NextRequest) {
         { status: 403 }
       );
     }
+
+    const syncRl = enforceRateLimit(
+      `admin:sync-teams:${decoded.uid}`,
+      RATE_LIMIT_ADMIN_SYNC_PER_UID.max,
+      RATE_LIMIT_ADMIN_SYNC_PER_UID.windowMs
+    );
+    if (syncRl) return syncRl;
 
     console.log("🔄 [app/api/admin/sync-teams] Déclenchement de la synchronisation des équipes directe");
 
