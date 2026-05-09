@@ -8,7 +8,6 @@ import {
   CircularProgress,
   Chip,
   Tooltip,
-  TextField,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -33,7 +32,7 @@ import {
 } from "@/components/disponibilites/discord-poll-manager/utils";
 import { CreatePollDialog } from "@/components/disponibilites/discord-poll-manager/CreatePollDialog";
 import { ClosePollDialog } from "@/components/disponibilites/discord-poll-manager/ClosePollDialog";
-import { MentionSuggestions } from "@/components/disponibilites/discord-poll-manager/MentionSuggestions";
+import { MentionMessageField } from "@/components/disponibilites/discord-poll-manager/MentionMessageField";
 
 export function DiscordPollManager({
   journee,
@@ -324,6 +323,20 @@ export function DiscordPollManager({
       }
     },
     []
+  );
+
+  const selectFirstMention = useCallback(
+    (query: string, position: number, isCloseMessage = false) => {
+      const filtered = filterMentionItems({
+        discordMembers: discordMembers || [],
+        discordRoles,
+        query,
+      });
+      if (filtered.length > 0) {
+        insertMention(position, filtered[0], isCloseMessage);
+      }
+    },
+    [discordMembers, discordRoles, insertMention]
   );
 
   // Mettre à jour les dates quand les props changent
@@ -720,99 +733,53 @@ export function DiscordPollManager({
         setFridayDate={setFridayDate}
         setSaturdayDate={setSaturdayDate}
         messageField={
-          <Box sx={{ mt: 3, position: "relative" }}>
-            <TextField
-              fullWidth
-              multiline
-              rows={8}
-              label="Message qui sera envoyé"
-              value={messageTemplate || getDefaultMessage()}
-              inputRef={(ref) => {
-                if (ref) {
-                  setMessageTextareaRef(ref);
-                }
-              }}
-              onChange={(e) => {
-                const value = e.target.value;
-                const cursorPos = e.target.selectionStart || 0;
-                setMessageTemplate(value);
-                updateMentionAutocomplete(
-                  value,
-                  cursorPos,
-                  e.target,
-                  setMentionQuery,
-                  setMentionMenuAnchor
-                );
-              }}
-              onKeyDown={(e) => {
-                if (mentionMenuAnchor) {
-                  const filtered = filterMentionItems({
-                    discordMembers: discordMembers || [],
-                    discordRoles,
-                    query: mentionQuery,
-                  });
-
-                  if (
-                    e.key === "ArrowDown" ||
-                    e.key === "ArrowUp" ||
-                    e.key === "Enter" ||
-                    e.key === "Escape"
-                  ) {
-                    e.preventDefault();
-                    if (e.key === "Escape") {
-                      setMentionMenuAnchor(null);
-                    } else if (e.key === "Enter" && filtered.length > 0) {
-                      insertMention(mentionMenuAnchor.position, filtered[0]);
-                    }
-                  }
-                }
-              }}
-              onBlur={(e) => {
-                // Ne pas fermer si on clique sur une suggestion
-                const relatedTarget = e.relatedTarget as HTMLElement | null;
-                if (
-                  relatedTarget &&
-                  relatedTarget.closest('[role="listbox"]')
-                ) {
-                  return;
-                }
-                // Délai pour permettre le clic sur une suggestion
-                setTimeout(() => {
-                  setMentionMenuAnchor(null);
-                }, 200);
-              }}
-              helperText={
-                <>
-                  Vous pouvez modifier ce message.
-                  <br />
-                  Tapez <strong>@</strong> pour mentionner un utilisateur ou un
-                  rôle Discord.
-                  {discordConfig?.mention && (
-                    <>
-                      <br />
-                      <strong>Note :</strong> La mention{" "}
-                      {discordConfig.mentionLabel || discordConfig.mention} sera
-                      automatiquement ajoutée au début du message envoyé sur
-                      Discord.
-                    </>
-                  )}
-                </>
-              }
-              placeholder="Le message par défaut sera utilisé si ce champ est vide"
-            />
-            {mentionMenuAnchor && messageTextareaRef && (
-              <MentionSuggestions
-                query={mentionQuery}
-                anchorEl={mentionMenuAnchor.anchorEl}
-                position={mentionMenuAnchor.position}
-                discordMembers={discordMembers || []}
-                discordRoles={discordRoles}
-                onSelect={(position, item) => {
-                  insertMention(position, item);
-                }}
-              />
-            )}
-          </Box>
+          <MentionMessageField
+            label="Message qui sera envoyé"
+            value={messageTemplate || getDefaultMessage()}
+            textareaRef={messageTextareaRef}
+            setTextareaRef={setMessageTextareaRef}
+            mentionAnchor={mentionMenuAnchor}
+            mentionQuery={mentionQuery}
+            discordMembers={discordMembers || []}
+            discordRoles={discordRoles}
+            onValueChange={(value, cursorPos, target) => {
+              setMessageTemplate(value);
+              updateMentionAutocomplete(
+                value,
+                cursorPos,
+                target,
+                setMentionQuery,
+                setMentionMenuAnchor
+              );
+            }}
+            onEnterMention={(position) => {
+              selectFirstMention(mentionQuery, position);
+            }}
+            onDismissMentions={() => {
+              setMentionMenuAnchor(null);
+            }}
+            onSelectMention={(position, item) => {
+              insertMention(position, item);
+            }}
+            helperText={
+              <>
+                Vous pouvez modifier ce message.
+                <br />
+                Tapez <strong>@</strong> pour mentionner un utilisateur ou un
+                rôle Discord.
+                {discordConfig?.mention && (
+                  <>
+                    <br />
+                    <strong>Note :</strong> La mention{" "}
+                    {discordConfig.mentionLabel || discordConfig.mention} sera
+                    automatiquement ajoutée au début du message envoyé sur
+                    Discord.
+                  </>
+                )}
+              </>
+            }
+            placeholder="Le message par défaut sera utilisé si ce champ est vide"
+          />
         }
         onCancel={() => {
           setCreateDialogOpen(false);
@@ -829,90 +796,44 @@ export function DiscordPollManager({
         currentPoll={currentPoll}
         discordConfig={discordConfig}
         messageField={
-          <Box sx={{ mt: 3, position: "relative" }}>
-            <TextField
-              fullWidth
-              multiline
-              rows={8}
-              label="Message qui sera envoyé"
-              value={closeMessageTemplate || getDefaultCloseMessage()}
-              inputRef={(ref) => {
-                if (ref) {
-                  setCloseMessageTextareaRef(ref);
-                }
-              }}
-              onChange={(e) => {
-                const value = e.target.value;
-                const cursorPos = e.target.selectionStart || 0;
-                setCloseMessageTemplate(value);
-                updateMentionAutocomplete(
-                  value,
-                  cursorPos,
-                  e.target,
-                  setCloseMentionQuery,
-                  setCloseMentionMenuAnchor
-                );
-              }}
-              onKeyDown={(e) => {
-                if (closeMentionMenuAnchor) {
-                  const filtered = filterMentionItems({
-                    discordMembers: discordMembers || [],
-                    discordRoles,
-                    query: closeMentionQuery,
-                  });
-
-                  if (
-                    e.key === "ArrowDown" ||
-                    e.key === "ArrowUp" ||
-                    e.key === "Enter" ||
-                    e.key === "Escape"
-                  ) {
-                    e.preventDefault();
-                    if (e.key === "Escape") {
-                      setCloseMentionMenuAnchor(null);
-                    } else if (e.key === "Enter" && filtered.length > 0) {
-                      insertMention(closeMentionMenuAnchor.position, filtered[0], true);
-                    }
-                  }
-                }
-              }}
-              onBlur={(e) => {
-                // Ne pas fermer si on clique sur une suggestion
-                const relatedTarget = e.relatedTarget as HTMLElement | null;
-                if (
-                  relatedTarget &&
-                  relatedTarget.closest('[role="listbox"]')
-                ) {
-                  return;
-                }
-                // Délai pour permettre le clic sur une suggestion
-                setTimeout(() => {
-                  setCloseMentionMenuAnchor(null);
-                }, 200);
-              }}
-              helperText={
-                <>
-                  Vous pouvez modifier ce message.
-                  <br />
-                  Tapez <strong>@</strong> pour mentionner un utilisateur ou un
-                  rôle Discord.
-                </>
-              }
-              placeholder="Le message par défaut sera utilisé si ce champ est vide"
-            />
-            {closeMentionMenuAnchor && closeMessageTextareaRef && (
-              <MentionSuggestions
-                query={closeMentionQuery}
-                anchorEl={closeMentionMenuAnchor.anchorEl}
-                position={closeMentionMenuAnchor.position}
-                discordMembers={discordMembers || []}
-                discordRoles={discordRoles}
-                onSelect={(position, item) => {
-                  insertMention(position, item, true);
-                }}
-              />
-            )}
-          </Box>
+          <MentionMessageField
+            label="Message qui sera envoyé"
+            value={closeMessageTemplate || getDefaultCloseMessage()}
+            textareaRef={closeMessageTextareaRef}
+            setTextareaRef={setCloseMessageTextareaRef}
+            mentionAnchor={closeMentionMenuAnchor}
+            mentionQuery={closeMentionQuery}
+            discordMembers={discordMembers || []}
+            discordRoles={discordRoles}
+            onValueChange={(value, cursorPos, target) => {
+              setCloseMessageTemplate(value);
+              updateMentionAutocomplete(
+                value,
+                cursorPos,
+                target,
+                setCloseMentionQuery,
+                setCloseMentionMenuAnchor
+              );
+            }}
+            onEnterMention={(position) => {
+              selectFirstMention(closeMentionQuery, position, true);
+            }}
+            onDismissMentions={() => {
+              setCloseMentionMenuAnchor(null);
+            }}
+            onSelectMention={(position, item) => {
+              insertMention(position, item, true);
+            }}
+            helperText={
+              <>
+                Vous pouvez modifier ce message.
+                <br />
+                Tapez <strong>@</strong> pour mentionner un utilisateur ou un
+                rôle Discord.
+              </>
+            }
+            placeholder="Le message par défaut sera utilisé si ce champ est vide"
+          />
         }
         onCancel={() => {
           setCloseDialogOpen(false);
