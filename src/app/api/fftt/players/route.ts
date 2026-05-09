@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 import { jsonNoStore } from "@/lib/http/cache-headers";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { withAuth } from "@/lib/auth/api-utils";

@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 import { jsonNoStore } from "@/lib/http/cache-headers";
 import { NextRequest } from "next/server";
 import { cookies } from "next/headers";

@@ -2,7 +2,7 @@
 
 Ce document consolide les constats des audits **phase 1** (qualité globale Next.js, sécurité, perf, tests) et **phase 2** (matrice des routes API + qualité des composants React). Il sert de **backlog traçable** : cocher les cases au fil des PR / merges.
 
-**Dernière mise à jour :** 2026-05-09 (Epic B)  
+**Dernière mise à jour :** 2026-05-09 (Epic C)  
 **Statuts :** `[ ]` à faire · `[~]` en cours · `[x]` terminé
 
 ---
@@ -33,7 +33,7 @@ Ce document consolide les constats des audits **phase 1** (qualité globale Next
 |------|-------------|--------------|
 | A | Sécurité API : CSRF (`validateOrigin`), compléments rate limiting | ~~P0~~ **traité (2026-05-09)** |
 | B | En-têtes `Cache-Control` sur réponses sensibles | ~~P0 / P1~~ **traité (2026-05-09)** |
-| C | `export const runtime = "nodejs"` sur routes concernées | P1 |
+| C | `export const runtime = "nodejs"` sur routes concernées | ~~P1~~ **traité (2026-05-09)** |
 | D | Cohérence des rôles (`resolveRole`, `hasAnyRole`, `USER_ROLES`) | P1 |
 | E | Toolchain : ESLint vs build, config Next (`next.config.ts`) | P2 |
 | F | Stratégie rendu : réduction du `force-dynamic` global si pertinent | P2 |
@@ -105,23 +105,23 @@ Ce document consolide les constats des audits **phase 1** (qualité globale Next
 
 ### C.1 Routes signalées sans export explicite (audit phase 2)
 
-- [ ] **C.1.1** `admin/sync-status`
-- [ ] **C.1.2** `admin/users` (+ sous-routes si besoin)
-- [ ] **C.1.3** `admin/users/coach-request`
-- [ ] **C.1.4** `admin/users/set-role`
-- [ ] **C.1.5** `brulage/validate`
-- [ ] **C.1.6** `coach/request`
-- [ ] **C.1.7** `discord/link-license`
-- [ ] **C.1.8** `discord/members`
-- [ ] **C.1.9** `discord/send-message`
-- [ ] **C.1.10** `discord/update-custom-message`
-- [ ] **C.1.11** `fftt/players`
-- [ ] **C.1.12** `openapi` (si reste sur Node — sinon documenter)
-- [ ] **C.1.13** `teams/[teamId]/discord-channel`
-- [ ] **C.1.14** `teams/[teamId]/location`
-- [ ] **C.1.15** `teams/matches`
+- [x] **C.1.1** `admin/sync-status`
+- [x] **C.1.2** `admin/users` (+ sous-routes si besoin)
+- [x] **C.1.3** `admin/users/coach-request`
+- [x] **C.1.4** `admin/users/set-role`
+- [x] **C.1.5** `brulage/validate`
+- [x] **C.1.6** `coach/request`
+- [x] **C.1.7** `discord/link-license`
+- [x] **C.1.8** `discord/members`
+- [x] **C.1.9** `discord/send-message`
+- [x] **C.1.10** `discord/update-custom-message`
+- [x] **C.1.11** `fftt/players`
+- [x] **C.1.12** `openapi` — Node.js explicite (cohérence avec les autres handlers App Router)
+- [x] **C.1.13** `teams/[teamId]/discord-channel`
+- [x] **C.1.14** `teams/[teamId]/location`
+- [x] **C.1.15** `teams/matches`
 
-- [ ] **C.2** Script ou checklist CI : optionnel — grep pour `firebase-admin` / `getFirestore` dans `route.ts` sans `runtime` (à discuter).
+- [ ] **C.2** Script ou checklist CI : optionnel — grep pour `firebase-admin` / `getFirestore` dans `route.ts` sans `runtime` (non fait ; tous les `route.ts` ont désormais `runtime`).
 
 ---
 
@@ -250,3 +250,4 @@ Pour chaque fichier (traiter par ordre métier / douleur) :
 | 2026-05-09 | — | Création initiale à partir des audits phase 1 et 2 |
 | 2026-05-09 | — | Epic A complété : CSRF sur routes listées, rate limiting session / Discord / admin sync / discord config, doc `SECURITY.md`, helpers HTTP |
 | 2026-05-09 | — | Epic B complété : `lib/http/cache-headers`, `withAuth` + toutes les routes `app/api` en `jsonNoStore` / `applyNoStoreHeaders`, doc `SECURITY.md` |
+| 2026-05-09 | — | Epic C complété : `export const runtime = "nodejs"` sur les 14 routes restantes ; tous les `app/api/**/route.ts` ont l’export |
