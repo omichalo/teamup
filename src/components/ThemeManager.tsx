@@ -39,175 +39,17 @@ import {
   Download as DownloadIcon,
   Upload as UploadIcon,
 } from "@mui/icons-material";
-
-interface ThemeManagerProps {
-  themes: Theme[];
-  currentTheme: string;
-  onApplyTheme: (themeId: string) => Promise<void>;
-  onCreateTheme: (theme: CreateTheme) => Promise<void>;
-  onUpdateTheme: (themeId: string, theme: UpdateTheme) => Promise<void>;
-  onDeleteTheme: (themeId: string) => Promise<void>;
-  onExportTheme: (themeId: string) => Promise<void>;
-  onImportTheme: (file: File) => Promise<void>;
-  onPreviewTheme: (theme: Theme) => void;
-  loading?: boolean;
-}
-
-interface Theme {
-  id: string;
-  name: string;
-  description: string;
-  version: string;
-  author: string;
-  createdAt: string;
-  updatedAt: string;
-  isDefault: boolean;
-  isPublic: boolean;
-  colors: {
-    primary: {
-      main: string;
-      light: string;
-      dark: string;
-      contrastText: string;
-    };
-    secondary: {
-      main: string;
-      light: string;
-      dark: string;
-      contrastText: string;
-    };
-    background: {
-      default: string;
-      paper: string;
-    };
-    text: {
-      primary: string;
-      secondary: string;
-      disabled: string;
-    };
-    error: {
-      main: string;
-      light: string;
-      dark: string;
-    };
-    warning: {
-      main: string;
-      light: string;
-      dark: string;
-    };
-    info: {
-      main: string;
-      light: string;
-      dark: string;
-    };
-    success: {
-      main: string;
-      light: string;
-      dark: string;
-    };
-  };
-  typography: {
-    fontFamily: string;
-    fontSize: number;
-    fontWeightLight: number;
-    fontWeightRegular: number;
-    fontWeightMedium: number;
-    fontWeightBold: number;
-    h1: {
-      fontSize: string;
-      fontWeight: number;
-      lineHeight: number;
-    };
-    h2: {
-      fontSize: string;
-      fontWeight: number;
-      lineHeight: number;
-    };
-    h3: {
-      fontSize: string;
-      fontWeight: number;
-      lineHeight: number;
-    };
-    h4: {
-      fontSize: string;
-      fontWeight: number;
-      lineHeight: number;
-    };
-    h5: {
-      fontSize: string;
-      fontWeight: number;
-      lineHeight: number;
-    };
-    h6: {
-      fontSize: string;
-      fontWeight: number;
-      lineHeight: number;
-    };
-    body1: {
-      fontSize: string;
-      fontWeight: number;
-      lineHeight: number;
-    };
-    body2: {
-      fontSize: string;
-      fontWeight: number;
-      lineHeight: number;
-    };
-    caption: {
-      fontSize: string;
-      fontWeight: number;
-      lineHeight: number;
-    };
-    overline: {
-      fontSize: string;
-      fontWeight: number;
-      lineHeight: number;
-    };
-  };
-  spacing: {
-    unit: number;
-    xs: number;
-    sm: number;
-    md: number;
-    lg: number;
-    xl: number;
-  };
-  shape: {
-    borderRadius: number;
-  };
-  shadows: {
-    elevation: number;
-    color: string;
-    opacity: number;
-  };
-  components: {
-    [key: string]: {
-      [key: string]: unknown;
-    };
-  };
-}
-
-interface CreateTheme {
-  name: string;
-  description: string;
-  colors: Theme["colors"];
-  typography: Theme["typography"];
-  spacing: Theme["spacing"];
-  shape: Theme["shape"];
-  shadows: Theme["shadows"];
-  components: Theme["components"];
-}
-
-interface UpdateTheme {
-  name?: string;
-  description?: string;
-  colors?: Partial<Theme["colors"]>;
-  typography?: Partial<Theme["typography"]>;
-  spacing?: Partial<Theme["spacing"]>;
-  shape?: Partial<Theme["shape"]>;
-  shadows?: Partial<Theme["shadows"]>;
-  components?: Partial<Theme["components"]>;
-}
+import { DEFAULT_THEME_DRAFT } from "@/components/theme-manager/constants";
+import type {
+  CreateTheme,
+  Theme,
+  ThemeManagerProps,
+} from "@/components/theme-manager/types";
+import {
+  formatThemeDate,
+  getThemeStatus,
+  getThemeStatusColor,
+} from "@/components/theme-manager/utils";
 
 export function ThemeManager({
   themes,
@@ -226,128 +68,7 @@ export function ThemeManager({
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState<Theme | null>(null);
-  const [newTheme, setNewTheme] = useState<CreateTheme>({
-    name: "",
-    description: "",
-    colors: {
-      primary: {
-        main: "#1976d2",
-        light: "#42a5f5",
-        dark: "#1565c0",
-        contrastText: "#ffffff",
-      },
-      secondary: {
-        main: "#dc004e",
-        light: "#ff5983",
-        dark: "#9a0036",
-        contrastText: "#ffffff",
-      },
-      background: {
-        default: "#ffffff",
-        paper: "#f5f5f5",
-      },
-      text: {
-        primary: "#212121",
-        secondary: "#757575",
-        disabled: "#bdbdbd",
-      },
-      error: {
-        main: "#f44336",
-        light: "#e57373",
-        dark: "#d32f2f",
-      },
-      warning: {
-        main: "#ff9800",
-        light: "#ffb74d",
-        dark: "#f57c00",
-      },
-      info: {
-        main: "#2196f3",
-        light: "#64b5f6",
-        dark: "#1976d2",
-      },
-      success: {
-        main: "#4caf50",
-        light: "#81c784",
-        dark: "#388e3c",
-      },
-    },
-    typography: {
-      fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-      fontSize: 14,
-      fontWeightLight: 300,
-      fontWeightRegular: 400,
-      fontWeightMedium: 500,
-      fontWeightBold: 700,
-      h1: {
-        fontSize: "2.5rem",
-        fontWeight: 700,
-        lineHeight: 1.2,
-      },
-      h2: {
-        fontSize: "2rem",
-        fontWeight: 600,
-        lineHeight: 1.3,
-      },
-      h3: {
-        fontSize: "1.75rem",
-        fontWeight: 600,
-        lineHeight: 1.4,
-      },
-      h4: {
-        fontSize: "1.5rem",
-        fontWeight: 500,
-        lineHeight: 1.4,
-      },
-      h5: {
-        fontSize: "1.25rem",
-        fontWeight: 500,
-        lineHeight: 1.5,
-      },
-      h6: {
-        fontSize: "1rem",
-        fontWeight: 500,
-        lineHeight: 1.6,
-      },
-      body1: {
-        fontSize: "1rem",
-        fontWeight: 400,
-        lineHeight: 1.5,
-      },
-      body2: {
-        fontSize: "0.875rem",
-        fontWeight: 400,
-        lineHeight: 1.43,
-      },
-      caption: {
-        fontSize: "0.75rem",
-        fontWeight: 400,
-        lineHeight: 1.66,
-      },
-      overline: {
-        fontSize: "0.75rem",
-        fontWeight: 400,
-        lineHeight: 2.66,
-      },
-    },
-    spacing: {
-      unit: 8,
-      xs: 4,
-      sm: 8,
-      md: 16,
-      lg: 24,
-      xl: 32,
-    },
-    shape: {
-      borderRadius: 4,
-    },
-    shadows: {
-      elevation: 1,
-      color: "#000000",
-      opacity: 0.12,
-    },
-    components: {},
-  });
+  const [newTheme, setNewTheme] = useState<CreateTheme>(DEFAULT_THEME_DRAFT);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
@@ -358,128 +79,7 @@ export function ThemeManager({
       setError(null);
       await onCreateTheme(newTheme);
       setCreateDialogOpen(false);
-      setNewTheme({
-        name: "",
-        description: "",
-        colors: {
-          primary: {
-            main: "#1976d2",
-            light: "#42a5f5",
-            dark: "#1565c0",
-            contrastText: "#ffffff",
-          },
-          secondary: {
-            main: "#dc004e",
-            light: "#ff5983",
-            dark: "#9a0036",
-            contrastText: "#ffffff",
-          },
-          background: {
-            default: "#ffffff",
-            paper: "#f5f5f5",
-          },
-          text: {
-            primary: "#212121",
-            secondary: "#757575",
-            disabled: "#bdbdbd",
-          },
-          error: {
-            main: "#f44336",
-            light: "#e57373",
-            dark: "#d32f2f",
-          },
-          warning: {
-            main: "#ff9800",
-            light: "#ffb74d",
-            dark: "#f57c00",
-          },
-          info: {
-            main: "#2196f3",
-            light: "#64b5f6",
-            dark: "#1976d2",
-          },
-          success: {
-            main: "#4caf50",
-            light: "#81c784",
-            dark: "#388e3c",
-          },
-        },
-        typography: {
-          fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-          fontSize: 14,
-          fontWeightLight: 300,
-          fontWeightRegular: 400,
-          fontWeightMedium: 500,
-          fontWeightBold: 700,
-          h1: {
-            fontSize: "2.5rem",
-            fontWeight: 700,
-            lineHeight: 1.2,
-          },
-          h2: {
-            fontSize: "2rem",
-            fontWeight: 600,
-            lineHeight: 1.3,
-          },
-          h3: {
-            fontSize: "1.75rem",
-            fontWeight: 600,
-            lineHeight: 1.4,
-          },
-          h4: {
-            fontSize: "1.5rem",
-            fontWeight: 500,
-            lineHeight: 1.4,
-          },
-          h5: {
-            fontSize: "1.25rem",
-            fontWeight: 500,
-            lineHeight: 1.5,
-          },
-          h6: {
-            fontSize: "1rem",
-            fontWeight: 500,
-            lineHeight: 1.6,
-          },
-          body1: {
-            fontSize: "1rem",
-            fontWeight: 400,
-            lineHeight: 1.5,
-          },
-          body2: {
-            fontSize: "0.875rem",
-            fontWeight: 400,
-            lineHeight: 1.43,
-          },
-          caption: {
-            fontSize: "0.75rem",
-            fontWeight: 400,
-            lineHeight: 1.66,
-          },
-          overline: {
-            fontSize: "0.75rem",
-            fontWeight: 400,
-            lineHeight: 2.66,
-          },
-        },
-        spacing: {
-          unit: 8,
-          xs: 4,
-          sm: 8,
-          md: 16,
-          lg: 24,
-          xl: 32,
-        },
-        shape: {
-          borderRadius: 4,
-        },
-        shadows: {
-          elevation: 1,
-          color: "#000000",
-          opacity: 0.12,
-        },
-        components: {},
-      });
+      setNewTheme(DEFAULT_THEME_DRAFT);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Erreur lors de la création"
@@ -557,22 +157,6 @@ export function ThemeManager({
     setSelectedTheme(theme);
     onPreviewTheme(theme);
     setPreviewDialogOpen(true);
-  };
-
-  const getThemeStatus = (theme: Theme) => {
-    if (theme.isDefault) return "Par défaut";
-    if (theme.id === currentTheme) return "Actif";
-    return "Disponible";
-  };
-
-  const getThemeStatusColor = (theme: Theme) => {
-    if (theme.isDefault) return "primary";
-    if (theme.id === currentTheme) return "success";
-    return "default";
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString("fr-FR");
   };
 
   return (
@@ -682,9 +266,9 @@ export function ThemeManager({
                           </TableCell>
                           <TableCell>
                             <Chip
-                              label={getThemeStatus(theme)}
+                              label={getThemeStatus(theme, currentTheme)}
                               color={
-                                getThemeStatusColor(theme) as
+                                getThemeStatusColor(theme, currentTheme) as
                                   | "default"
                                   | "primary"
                                   | "secondary"
@@ -698,7 +282,7 @@ export function ThemeManager({
                           </TableCell>
                           <TableCell>
                             <Typography variant="body2">
-                              {formatDate(theme.updatedAt)}
+                              {formatThemeDate(theme.updatedAt)}
                             </Typography>
                           </TableCell>
                           <TableCell>
