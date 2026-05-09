@@ -12,10 +12,6 @@ export const metadata: Metadata = {
   // sont automatiquement détectés et servis par Next.js App Router
 };
 
-// Force dynamic rendering to avoid static generation errors
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
-
 export default function RootLayout({
   children,
 }: {
