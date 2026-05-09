@@ -2,7 +2,7 @@
 
 Ce document consolide les constats des audits **phase 1** (qualité globale Next.js, sécurité, perf, tests) et **phase 2** (matrice des routes API + qualité des composants React). Il sert de **backlog traçable** : cocher les cases au fil des PR / merges.
 
-**Dernière mise à jour :** 2026-05-09 (Epic E)  
+**Dernière mise à jour :** 2026-05-09 (Epic F — F.1/F.2, F.3 mesures à planifier)  
 **Statuts :** `[ ]` à faire · `[~]` en cours · `[x]` terminé
 
 ---
@@ -36,7 +36,7 @@ Ce document consolide les constats des audits **phase 1** (qualité globale Next
 | C | `export const runtime = "nodejs"` sur routes concernées | ~~P1~~ **traité (2026-05-09)** |
 | D | Cohérence des rôles (`resolveRole`, `hasAnyRole`, `USER_ROLES`) | ~~P1~~ **traité (2026-05-09)** |
 | E | Toolchain : ESLint vs build, config Next (`next.config.ts`) | ~~P2~~ **traité (2026-05-09)** |
-| F | Stratégie rendu : réduction du `force-dynamic` global si pertinent | P2 |
+| F | Stratégie rendu : réduction du `force-dynamic` global si pertinent | ~~P2~~ **F.1–F.2 traités (2026-05-09)** ; F.3 mesures à faire |
 | G | Qualité React : découpage, couche API client, patterns | P2 |
 | H | Accessibilité (a11y) ciblée | P3 |
 | I | Tests automatisés (API, hooks critiques, composants clés) | P2 |
@@ -155,9 +155,10 @@ Ce document consolide les constats des audits **phase 1** (qualité globale Next
 
 **Objectif :** Ne pas sur-optimiser prématurément ; récupérer du cache Next là où c’est safe.
 
-- [ ] **F.1** Cartographier les segments qui **peuvent** être statiques ou partiellement mis en cache (pages publiques, assets).
-- [ ] **F.2** Envisager de retirer `export const dynamic = "force-dynamic"` du **layout racine** si possible, et le pousser sur les segments qui posent problème (MUI/Firebase).
-- [ ] **F.3** Mesurer (Lighthouse / Web Vitals) avant/après sur 1–2 pages représentatives.
+- [x] **F.1** Cartographier les segments qui **peuvent** être statiques ou partiellement mis en cache (pages publiques, assets).  
+  _Constat :_ après `next build`, la majorité des routes `app/` sont en **○ Static** ; les routes `app/api/**` restent **ƒ Dynamic**. Pages utilisant `useSearchParams` : `login`, `reset-password`, `auth/verify-email` — isolées dans des client components enveloppés par `<Suspense>` dans le `page.tsx` serveur pour permettre le prérendu.
+- [x] **F.2** Retrait de `export const dynamic = "force-dynamic"` et de `export const runtime = "nodejs"` du **layout racine** (`src/app/layout.tsx`). Ajustements Suspense côté auth pour éviter l’erreur de build « `useSearchParams` should be wrapped in a suspense boundary ».
+- [ ] **F.3** Mesurer (Lighthouse / Web Vitals) avant/après sur 1–2 pages représentatives (ex. `/`, `/login`) une fois un baseline prod ou préprod disponible.
 
 ---
 
@@ -253,3 +254,4 @@ Pour chaque fichier (traiter par ordre métier / douleur) :
 | 2026-05-09 | — | Epic C complété : `export const runtime = "nodejs"` sur les 14 routes restantes ; tous les `app/api/**/route.ts` ont l’export |
 | 2026-05-09 | — | Epic D complété : rôles Discord API + session/verify + `useAuth` + `AuthGuard` alignés sur `USER_ROLES` / helpers |
 | 2026-05-09 | — | Epic E complété : ESLint dans `next build`, retrait fallbacks Firebase dans next.config, source maps prod désactivées, doc QUALITY_GATES + SECURITY |
+| 2026-05-09 | — | Epic F — F.1/F.2 : retrait `force-dynamic` / `runtime` du layout racine ; `LoginContent`, `ResetPasswordContent`, `VerifyEmailContent` + Suspense sur les pages correspondantes ; build statique OK pour les segments concernés |
