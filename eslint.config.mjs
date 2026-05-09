@@ -21,6 +21,7 @@ const eslintConfig = [
       "jest.config.js",
       "scripts/**/*.js",
       ".history/**",
+      "functions/lib/**",
     ],
   },
 ];

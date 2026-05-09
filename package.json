@@ -76,5 +76,9 @@
     "ts-node": "^10.9.2",
     "tsx": "^4.20.6",
     "typescript": "^5"
+  },
+  "overrides": {
+    "axios": "^0.31.1",
+    "undici": "^6.24.0"
   }
 }
