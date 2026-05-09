@@ -26,6 +26,11 @@ service cloud.firestore {
     function isCoach() {
       return isAdmin() || authRole() == "coach";
     }
+
+    // Récupère le playerId de l'utilisateur depuis son document
+    function getPlayerId() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('playerId', null);
+    }
     
     // ============================================
     // Collection: users
@@ -127,10 +132,23 @@ service cloud.firestore {
     // Collection: availabilities
     // ============================================
     // Lecture pour tous les utilisateurs authentifiés
-    // Écriture pour tous les utilisateurs authentifiés (les joueurs peuvent mettre à jour leurs disponibilités)
+    // Les admins/coachs peuvent tout modifier.
+    // Les joueurs ne peuvent modifier que leur propre entrée dans la map 'players'
+    // et ne peuvent pas modifier les métadonnées du match.
     match /availabilities/{availabilityId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow create: if isCoach() || (
+        isAuthenticated() && getPlayerId() != null
+        && request.resource.data.players.keys().hasOnly([getPlayerId()])
+      );
+      allow update: if isCoach() || (
+        isAuthenticated() && getPlayerId() != null
+        && !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['journee', 'phase', 'championshipType', 'idEpreuve', 'date', 'createdAt'])
+        && request.resource.data.players.diff(resource.data.players).affectedKeys()
+            .hasOnly([getPlayerId()])
+      );
+      allow delete: if isCoach();
     }
     
     // ============================================
