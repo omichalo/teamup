@@ -2,7 +2,7 @@
 
 Ce document consolide les constats des audits **phase 1** (qualité globale Next.js, sécurité, perf, tests) et **phase 2** (matrice des routes API + qualité des composants React). Il sert de **backlog traçable** : cocher les cases au fil des PR / merges.
 
-**Dernière mise à jour :** 2026-05-09 (Epic D)  
+**Dernière mise à jour :** 2026-05-09 (Epic E)  
 **Statuts :** `[ ]` à faire · `[~]` en cours · `[x]` terminé
 
 ---
@@ -35,7 +35,7 @@ Ce document consolide les constats des audits **phase 1** (qualité globale Next
 | B | En-têtes `Cache-Control` sur réponses sensibles | ~~P0 / P1~~ **traité (2026-05-09)** |
 | C | `export const runtime = "nodejs"` sur routes concernées | ~~P1~~ **traité (2026-05-09)** |
 | D | Cohérence des rôles (`resolveRole`, `hasAnyRole`, `USER_ROLES`) | ~~P1~~ **traité (2026-05-09)** |
-| E | Toolchain : ESLint vs build, config Next (`next.config.ts`) | P2 |
+| E | Toolchain : ESLint vs build, config Next (`next.config.ts`) | ~~P2~~ **traité (2026-05-09)** |
 | F | Stratégie rendu : réduction du `force-dynamic` global si pertinent | P2 |
 | G | Qualité React : découpage, couche API client, patterns | P2 |
 | H | Accessibilité (a11y) ciblée | P3 |
@@ -140,14 +140,14 @@ Ce document consolide les constats des audits **phase 1** (qualité globale Next
 
 ### E.1 ESLint et build
 
-- [ ] **E.1.1** Décider : `eslint.ignoreDuringBuilds: false` dans `next.config.ts` **ou** politique explicite « le build CI utilise `npm run check` » — documenter dans `docs/QUALITY_GATES.md`.
-- [ ] **E.1.2** Si passage à `false`, corriger toutes les erreurs ESLint bloquantes puis valider `npm run check`.
+- [x] **E.1.1** `eslint.ignoreDuringBuilds: false` ; politique documentée dans `docs/QUALITY_GATES.md`.
+- [x] **E.1.2** `npm run check` vert (ESLint pendant `next build`).
 
 ### E.2 `next.config.ts`
 
-- [ ] **E.2.1** **Fallbacks Firebase** : retirer ou isoler les valeurs par défaut ; utiliser variables d’environnement obligatoires en CI / App Hosting ; documenter pour dev local.
-- [ ] **E.2.2** **`productionBrowserSourceMaps`** : décision produit / sécurité — garder, désactiver, ou activer seulement sur branches / sentry ; documenter.
-- [ ] **E.2.3** Commentaire sur `generateBuildId` / `standalone` : vérifier qu’ils restent justifiés avec la stratégie de déploiement actuelle.
+- [x] **E.2.1** Bloc `env` avec fallbacks Firebase **supprimé** ; injection standard Next depuis `process.env` ; `.env.example` + `SECURITY.md` mis à jour.
+- [x] **E.2.2** `productionBrowserSourceMaps: false` par défaut (réduit l’exposition du source client) ; commentaire dans `next.config.ts` pour réactivation ponctuelle / Sentry.
+- [x] **E.2.3** Commentaires à jour sur `output: "standalone"` (App Hosting / image autonome) et `generateBuildId` (invalidation cache entre builds).
 
 ---
 
@@ -252,3 +252,4 @@ Pour chaque fichier (traiter par ordre métier / douleur) :
 | 2026-05-09 | — | Epic B complété : `lib/http/cache-headers`, `withAuth` + toutes les routes `app/api` en `jsonNoStore` / `applyNoStoreHeaders`, doc `SECURITY.md` |
 | 2026-05-09 | — | Epic C complété : `export const runtime = "nodejs"` sur les 14 routes restantes ; tous les `app/api/**/route.ts` ont l’export |
 | 2026-05-09 | — | Epic D complété : rôles Discord API + session/verify + `useAuth` + `AuthGuard` alignés sur `USER_ROLES` / helpers |
+| 2026-05-09 | — | Epic E complété : ESLint dans `next build`, retrait fallbacks Firebase dans next.config, source maps prod désactivées, doc QUALITY_GATES + SECURITY |

@@ -18,8 +18,13 @@ npm run check
 ```
 - Lint (ESLint)
 - Type-check (TypeScript)
-- Build (Next.js)
-- **Utilisation**: Avant chaque commit/push
+- Build (Next.js), avec **ESLint exécuté pendant `next build`** (`eslint.ignoreDuringBuilds: false` dans `next.config.ts`). Une divergence entre lint CLI et build est donc impossible si `npm run check` passe.
+
+### Variables `NEXT_PUBLIC_*` au build
+
+Sans valeurs dans l’environnement au moment du `next build`, le bundle client peut manquer la config Firebase. En local : remplir `.env.local` à partir de `.env.example`. En production : définir les variables dans Firebase App Hosting (`apphosting.yaml`) ou dans les secrets CI, comme pour tout déploiement Next.js.
+
+**Utilisation**: Avant chaque commit/push
 
 ### Smoke Tests
 
@@ -47,9 +52,9 @@ npm run emulators:smoke
 
 La CI GitHub Actions exécute automatiquement:
 
-1. **Lint**: Vérifie le code avec ESLint
+1. **Lint**: Vérifie le code avec ESLint (`eslint` en ligne de commande)
 2. **Type-check**: Vérifie les types TypeScript
-3. **Build**: Compile l'application Next.js
+3. **Build**: Compile l'application Next.js (**inclut ESLint** comme ci-dessus, doublon acceptable pour une détection précoce dans les logs de job)
 4. **TODO Check**: Vérifie qu'il n'y a pas de TODO dans le code
 5. **Security Audit**: Audit npm des dépendances
 
