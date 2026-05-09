@@ -1,6 +1,6 @@
 export const runtime = "nodejs";
 
-import { NextResponse } from "next/server";
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
@@ -28,7 +28,7 @@ export async function GET() {
     const sessionCookie = cookieStore.get("__session")?.value;
 
     if (!sessionCookie) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Non authentifié" },
         { status: 401 }
       );
@@ -36,7 +36,7 @@ export async function GET() {
 
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     if (!decoded.email_verified) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Email non vérifié" },
         { status: 403 }
       );
@@ -45,7 +45,7 @@ export async function GET() {
     // Vérifier que l'utilisateur est admin
     const role = resolveRole(decoded.role as string | undefined);
     if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Accès refusé - Admin uniquement" },
         { status: 403 }
       );
@@ -57,7 +57,7 @@ export async function GET() {
     const docSnap = await docRef.get();
 
     if (!docSnap.exists) {
-      return NextResponse.json({
+      return jsonNoStore({
         success: true,
         config: {
           parisChannelId: null,
@@ -69,7 +69,7 @@ export async function GET() {
     }
 
     const data = docSnap.data();
-    return NextResponse.json({
+    return jsonNoStore({
       success: true,
       config: {
         parisChannelId: data?.parisChannelId || null,
@@ -83,7 +83,7 @@ export async function GET() {
       "[Discord Availability Config] Erreur lors de la récupération:",
       error
     );
-    return NextResponse.json(
+    return jsonNoStore(
       {
         success: false,
         error: "Erreur lors de la récupération de la configuration",
@@ -99,7 +99,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     if (!validateOrigin(req)) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Invalid origin" },
         { status: 403 }
       );
@@ -110,7 +110,7 @@ export async function POST(req: Request) {
     const sessionCookie = cookieStore.get("__session")?.value;
 
     if (!sessionCookie) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Non authentifié" },
         { status: 401 }
       );
@@ -118,7 +118,7 @@ export async function POST(req: Request) {
 
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     if (!decoded.email_verified) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Email non vérifié" },
         { status: 403 }
       );
@@ -127,7 +127,7 @@ export async function POST(req: Request) {
     // Vérifier que l'utilisateur est admin
     const role = resolveRole(decoded.role as string | undefined);
     if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Accès refusé - Admin uniquement" },
         { status: 403 }
       );
@@ -150,7 +150,7 @@ export async function POST(req: Request) {
       parisChannelId !== undefined &&
       typeof parisChannelId !== "string"
     ) {
-      return NextResponse.json(
+      return jsonNoStore(
         {
           success: false,
           error: "parisChannelId doit être une chaîne ou null",
@@ -164,7 +164,7 @@ export async function POST(req: Request) {
       equipesChannelId !== undefined &&
       typeof equipesChannelId !== "string"
     ) {
-      return NextResponse.json(
+      return jsonNoStore(
         {
           success: false,
           error: "equipesChannelId doit être une chaîne ou null",
@@ -178,7 +178,7 @@ export async function POST(req: Request) {
       parisMention !== undefined &&
       typeof parisMention !== "string"
     ) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "parisMention doit être une chaîne ou null" },
         { status: 400 }
       );
@@ -189,7 +189,7 @@ export async function POST(req: Request) {
       equipesMention !== undefined &&
       typeof equipesMention !== "string"
     ) {
-      return NextResponse.json(
+      return jsonNoStore(
         {
           success: false,
           error: "equipesMention doit être une chaîne ou null",
@@ -213,7 +213,7 @@ export async function POST(req: Request) {
 
     await docRef.set(dataToSave, { merge: true });
 
-    return NextResponse.json({
+    return jsonNoStore({
       success: true,
       config: {
         parisChannelId: parisChannelId || null,
@@ -227,7 +227,7 @@ export async function POST(req: Request) {
       "[Discord Availability Config] Erreur lors de la sauvegarde:",
       error
     );
-    return NextResponse.json(
+    return jsonNoStore(
       {
         success: false,
         error: "Erreur lors de la sauvegarde de la configuration",

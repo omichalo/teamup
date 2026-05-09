@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
@@ -15,7 +15,7 @@ export async function GET(req: Request) {
     const sessionCookie = cookieStore.get("__session")?.value;
     
     if (!sessionCookie) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Non authentifié" },
         { status: 401 }
       );
@@ -23,7 +23,7 @@ export async function GET(req: Request) {
 
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     if (!decoded.email_verified) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Email non vérifié" },
         { status: 403 }
       );
@@ -32,7 +32,7 @@ export async function GET(req: Request) {
     // Vérifier que l'utilisateur est admin ou coach
     const role = resolveRole(decoded.role as string | undefined);
     if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Accès refusé" },
         { status: 403 }
       );
@@ -45,7 +45,7 @@ export async function GET(req: Request) {
     const phase = searchParams.get("phase");
 
     if (!journee || !phase) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "journee et phase sont requis" },
         { status: 400 }
       );
@@ -60,14 +60,14 @@ export async function GET(req: Request) {
       // Ancien format : un seul teamId (rétrocompatibilité)
       teamIds = [teamId];
     } else {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "teamIds ou teamId est requis" },
         { status: 400 }
       );
     }
 
     if (teamIds.length === 0) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Au moins un teamId est requis" },
         { status: 400 }
       );
@@ -76,7 +76,7 @@ export async function GET(req: Request) {
     // Limiter le nombre de teamIds pour éviter l'énumération et les abus
     const MAX_TEAM_IDS = 50;
     if (teamIds.length > MAX_TEAM_IDS) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: `Maximum ${MAX_TEAM_IDS} teamIds autorisés` },
         { status: 400 }
       );
@@ -87,7 +87,7 @@ export async function GET(req: Request) {
     const validTeamIdPattern = /^[a-zA-Z0-9_-]+$/;
     const invalidTeamIds = teamIds.filter(id => !validTeamIdPattern.test(id));
     if (invalidTeamIds.length > 0) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Format de teamId invalide" },
         { status: 400 }
       );
@@ -141,7 +141,7 @@ export async function GET(req: Request) {
     // Si un seul teamId était demandé (ancien format), retourner le format simple pour compatibilité
     if (teamIds.length === 1 && teamId) {
       const result = results[teamIds[0]];
-      return NextResponse.json({
+      return jsonNoStore({
         success: true,
         sent: result.sent,
         sentAt: result.sentAt,
@@ -150,10 +150,10 @@ export async function GET(req: Request) {
     }
 
     // Nouveau format : retourner tous les résultats
-    return NextResponse.json({ success: true, results });
+    return jsonNoStore({ success: true, results });
   } catch (error) {
     console.error("[Discord] Erreur lors de la vérification:", error);
-    return NextResponse.json(
+    return jsonNoStore(
       { success: false, error: "Erreur lors de la vérification" },
       { status: 500 }
     );

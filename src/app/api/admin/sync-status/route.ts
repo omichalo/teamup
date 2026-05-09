@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import { initializeFirebaseAdmin, getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
@@ -8,7 +8,7 @@ export async function GET() {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
     if (!sessionCookie) {
-      return NextResponse.json(
+      return jsonNoStore(
         { error: "Session cookie requis" },
         { status: 401 }
       );
@@ -18,7 +18,7 @@ export async function GET() {
     const role = resolveRole(decoded.role as string | undefined);
 
     if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
-      return NextResponse.json(
+      return jsonNoStore(
         {
           success: false,
           error: "Accès refusé",
@@ -48,7 +48,7 @@ export async function GET() {
       `✅ Statut récupéré: ${playersCount} joueurs, ${teamsCount} équipes, ${teamMatchesCount} matchs par équipe`
     );
 
-    return NextResponse.json(
+    return jsonNoStore(
       {
         success: true,
         data: {
@@ -73,7 +73,7 @@ export async function GET() {
     );
   } catch (error) {
     console.error("❌ [app/api/admin/sync-status] Erreur lors de la récupération du statut:", error);
-    return NextResponse.json(
+    return jsonNoStore(
       {
         success: false,
         error: "Erreur lors de la récupération du statut de synchronisation",

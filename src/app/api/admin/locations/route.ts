@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { adminDb, adminAuth } from "@/lib/firebase-admin";
@@ -15,7 +15,7 @@ export async function GET() {
     const sessionCookie = cookieStore.get("__session")?.value;
     
     if (!sessionCookie) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Authentification requise" },
         { status: 401 }
       );
@@ -23,7 +23,7 @@ export async function GET() {
 
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     if (!decoded.email_verified) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Email non vérifié" },
         { status: 403 }
       );
@@ -32,7 +32,7 @@ export async function GET() {
     // Vérifier que l'utilisateur est admin
     const role = resolveRole(decoded.role as string | undefined);
     if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Accès refusé" },
         { status: 403 }
       );
@@ -48,10 +48,10 @@ export async function GET() {
       updatedAt: doc.data().updatedAt?.toDate?.()?.toISOString() || new Date().toISOString(),
     }));
 
-    return NextResponse.json({ success: true, locations });
+    return jsonNoStore({ success: true, locations });
   } catch (error) {
     console.error("[locations] GET error", error);
-    return NextResponse.json(
+    return jsonNoStore(
       { success: false, error: "Erreur lors de la récupération des lieux" },
       { status: 500 }
     );
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
   try {
     // Valider l'origine de la requête pour prévenir les attaques CSRF
     if (!validateOrigin(req)) {
-      return NextResponse.json(
+      return jsonNoStore(
         {
           success: false,
           error: "Invalid origin",
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
     const sessionCookie = cookieStore.get("__session")?.value;
     
     if (!sessionCookie) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Authentification requise" },
         { status: 401 }
       );
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
 
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     if (!decoded.email_verified) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Email non vérifié" },
         { status: 403 }
       );
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
     // Vérifier que l'utilisateur est admin
     const role = resolveRole(decoded.role as string | undefined);
     if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Accès refusé" },
         { status: 403 }
       );
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
     const { name } = await req.json();
 
     if (!name || typeof name !== "string" || name.trim() === "") {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Le nom du lieu est requis" },
         { status: 400 }
       );
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
       .get();
     
     if (!existingSnapshot.empty) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Ce lieu existe déjà" },
         { status: 400 }
       );
@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
       updatedAt: Timestamp.fromDate(now),
     });
 
-    return NextResponse.json({
+    return jsonNoStore({
       success: true,
       location: {
         id: docRef.id,
@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("[locations] POST error", error);
-    return NextResponse.json(
+    return jsonNoStore(
       { success: false, error: "Erreur lors de l'ajout du lieu" },
       { status: 500 }
     );
@@ -152,7 +152,7 @@ export async function DELETE(req: NextRequest) {
   try {
     // Valider l'origine de la requête pour prévenir les attaques CSRF
     if (!validateOrigin(req)) {
-      return NextResponse.json(
+      return jsonNoStore(
         {
           success: false,
           error: "Invalid origin",
@@ -167,7 +167,7 @@ export async function DELETE(req: NextRequest) {
     const sessionCookie = cookieStore.get("__session")?.value;
     
     if (!sessionCookie) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Authentification requise" },
         { status: 401 }
       );
@@ -175,7 +175,7 @@ export async function DELETE(req: NextRequest) {
 
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     if (!decoded.email_verified) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Email non vérifié" },
         { status: 403 }
       );
@@ -184,7 +184,7 @@ export async function DELETE(req: NextRequest) {
     // Vérifier que l'utilisateur est admin
     const role = resolveRole(decoded.role as string | undefined);
     if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Accès refusé" },
         { status: 403 }
       );
@@ -194,7 +194,7 @@ export async function DELETE(req: NextRequest) {
     const id = searchParams.get("id");
 
     if (!id) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "L'ID du lieu est requis" },
         { status: 400 }
       );
@@ -203,10 +203,10 @@ export async function DELETE(req: NextRequest) {
     const locationRef = adminDb.collection("locations").doc(id);
     await locationRef.delete();
 
-    return NextResponse.json({ success: true });
+    return jsonNoStore({ success: true });
   } catch (error) {
     console.error("[locations] DELETE error", error);
-    return NextResponse.json(
+    return jsonNoStore(
       { success: false, error: "Erreur lors de la suppression du lieu" },
       { status: 500 }
     );

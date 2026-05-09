@@ -1,6 +1,6 @@
 export const runtime = "nodejs";
 
-import { NextResponse } from "next/server";
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
@@ -24,7 +24,7 @@ export async function POST(
 ) {
   try {
     if (!validateOrigin(req)) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Invalid origin" },
         { status: 403 }
       );
@@ -37,7 +37,7 @@ export async function POST(
     const sessionCookie = cookieStore.get("__session")?.value;
 
     if (!sessionCookie) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Non authentifié" },
         { status: 401 }
       );
@@ -45,7 +45,7 @@ export async function POST(
 
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     if (!decoded.email_verified) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Email non vérifié" },
         { status: 403 }
       );
@@ -54,7 +54,7 @@ export async function POST(
     // Vérifier que l'utilisateur est admin ou coach
     const role = resolveRole(decoded.role as string | undefined);
     if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Accès refusé - Admin ou Coach requis" },
         { status: 403 }
       );
@@ -68,7 +68,7 @@ export async function POST(
     if (pollRl) return pollRl;
 
     if (!DISCORD_TOKEN) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Configuration Discord manquante" },
         { status: 500 }
       );
@@ -80,7 +80,7 @@ export async function POST(
     // Récupérer le sondage
     const parts = params.pollId.split("_");
     if (parts.length < 3) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Format de pollId invalide" },
         { status: 400 }
       );
@@ -99,14 +99,14 @@ export async function POST(
     );
 
     if (!poll) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Sondage introuvable" },
         { status: 404 }
       );
     }
 
     if (!poll.isActive) {
-      return NextResponse.json({
+      return jsonNoStore({
         success: true,
         message: "Le sondage est déjà fermé",
         poll,
@@ -231,13 +231,13 @@ export async function POST(
     // Fermer le sondage dans Firestore
     await pollService.closePoll(journee, phase, championshipType, idEpreuve);
 
-    return NextResponse.json({
+    return jsonNoStore({
       success: true,
       message: "Sondage fermé avec succès",
     });
   } catch (error) {
     console.error("[Discord Poll Close] Erreur:", error);
-    return NextResponse.json(
+    return jsonNoStore(
       { success: false, error: "Erreur lors de la fermeture du sondage" },
       { status: 500 }
     );

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/auth/rate-limit";
+import { jsonNoStore } from "@/lib/http/cache-headers";
 
 /** Limites par défaut pour l’Epic A (mutations coûteuses / auth). */
 export const RATE_LIMIT_SESSION_POST_PER_IP = {
@@ -34,7 +35,7 @@ export const RATE_LIMIT_FIREBASE_CUSTOM_TOKEN_PER_UID = {
 } as const;
 
 export function tooManyRequestsResponse(): NextResponse {
-  return NextResponse.json(
+  return jsonNoStore(
     {
       error: "Too many requests",
       message: "Trop de requêtes. Réessayez plus tard.",

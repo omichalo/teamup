@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import { initializeFirebaseAdmin, getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
 import { getTeams, TeamSummary } from "@/lib/server/team-matches";
@@ -12,7 +12,7 @@ export async function GET() {
   const sessionCookie = cookieStore.get("__session")?.value;
   
   if (!sessionCookie) {
-    return NextResponse.json(
+    return jsonNoStore(
       { error: "Authentification requise" },
       { status: 401 }
     );
@@ -21,7 +21,7 @@ export async function GET() {
   try {
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     if (!decoded.email_verified) {
-      return NextResponse.json(
+      return jsonNoStore(
         { error: "Email non vérifié" },
         { status: 403 }
       );
@@ -30,13 +30,13 @@ export async function GET() {
     // Vérifier que l'utilisateur est admin ou coach
     const role = resolveRole(decoded.role as string | undefined);
     if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
-      return NextResponse.json(
+      return jsonNoStore(
         { error: "Accès refusé" },
         { status: 403 }
       );
     }
   } catch {
-    return NextResponse.json(
+    return jsonNoStore(
       { error: "Session invalide" },
       { status: 401 }
     );
@@ -49,7 +49,7 @@ export async function GET() {
 
     console.log(`📊 [app/api/teams] ${teams.length} équipes récupérées depuis Firestore`);
 
-    return NextResponse.json(
+    return jsonNoStore(
       {
         teams,
         total: teams.length,
@@ -65,7 +65,7 @@ export async function GET() {
       errorMessage.includes("credentials") ||
       errorMessage.includes("Could not load the default credentials")
     ) {
-      return NextResponse.json(
+      return jsonNoStore(
         {
           error: "Firebase Admin credentials not configured",
           details:
@@ -76,7 +76,7 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json(
+    return jsonNoStore(
       {
         error: "Failed to fetch teams data",
         details: errorMessage,

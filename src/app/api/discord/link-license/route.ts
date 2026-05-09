@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import { getFirestoreAdmin, initializeFirebaseAdmin } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
     // Vérifier la configuration
     if (!DISCORD_LICENSE_CHANNEL_ID) {
       console.error("[Discord Link License] DISCORD_LICENSE_CHANNEL_ID non configuré");
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Configuration manquante: DISCORD_LICENSE_CHANNEL_ID" },
         { status: 500 }
       );
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     // Authentification via secret partagé (obligatoire)
     if (!DISCORD_WEBHOOK_SECRET) {
       console.error("[Discord Link License] DISCORD_WEBHOOK_SECRET non configuré");
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Configuration manquante: DISCORD_WEBHOOK_SECRET" },
         { status: 500 }
       );
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
 
     const authHeader = req.headers.get("authorization");
     if (!authHeader || authHeader !== `Bearer ${DISCORD_WEBHOOK_SECRET}`) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Non autorisé" },
         { status: 401 }
       );
@@ -47,12 +47,12 @@ export async function POST(req: Request) {
     // Vérifier que le message vient du bon canal
     if (channelId !== DISCORD_LICENSE_CHANNEL_ID) {
       console.log(`[Discord Link License] Message ignoré (canal ${channelId} != ${DISCORD_LICENSE_CHANNEL_ID})`);
-      return NextResponse.json({ success: true, message: "Message ignoré (mauvais canal)" });
+      return jsonNoStore({ success: true, message: "Message ignoré (mauvais canal)" });
     }
 
     // Vérifier que le message n'est pas vide
     if (!content || typeof content !== "string") {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Contenu du message requis" },
         { status: 400 }
       );
@@ -64,7 +64,7 @@ export async function POST(req: Request) {
     // Vérifier que le message ne contient que des chiffres
     if (!/^\d+$/.test(trimmedContent)) {
       console.log(`[Discord Link License] Message ignoré (contient autre chose que des chiffres): "${trimmedContent}"`);
-      return NextResponse.json({ success: true, message: "Message ignoré (doit contenir uniquement des chiffres)" });
+      return jsonNoStore({ success: true, message: "Message ignoré (doit contenir uniquement des chiffres)" });
     }
 
     const licenseNumber = trimmedContent;
@@ -91,7 +91,7 @@ export async function POST(req: Request) {
         `❌ Un utilisateur Discord ne peut être associé qu'à un seul joueur. Vous êtes déjà associé à la licence ${existingLicense}.`
       );
 
-      return NextResponse.json({
+      return jsonNoStore({
         success: false,
         error: "Utilisateur déjà associé à un joueur",
         existingLicense,
@@ -111,7 +111,7 @@ export async function POST(req: Request) {
         `❌ Aucun joueur trouvé avec la licence ${licenseNumber}. Vérifiez que le numéro de licence est correct.`
       );
 
-      return NextResponse.json({
+      return jsonNoStore({
         success: false,
         error: "Licence non trouvée",
         licenseNumber,
@@ -125,7 +125,7 @@ export async function POST(req: Request) {
     // Vérifier que l'ID Discord n'est pas déjà dans la liste
     if (existingDiscordMentions.includes(userId)) {
       console.log(`[Discord Link License] Utilisateur ${userId} déjà dans la liste des mentions pour la licence ${licenseNumber}`);
-      return NextResponse.json({
+      return jsonNoStore({
         success: true,
         message: "Utilisateur déjà associé à ce joueur",
         licenseNumber,
@@ -149,7 +149,7 @@ export async function POST(req: Request) {
       `✅ Votre compte Discord a été associé à la licence ${licenseNumber} (${playerData?.prenom || ""} ${playerData?.nom || ""}). Vous recevrez désormais les notifications pour ce joueur.`
     );
 
-    return NextResponse.json({
+    return jsonNoStore({
       success: true,
       message: "Licence associée avec succès",
       licenseNumber,
@@ -157,7 +157,7 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error("[Discord Link License] Erreur:", error);
-    return NextResponse.json(
+    return jsonNoStore(
       {
         success: false,
         error: "Erreur lors de l'association de la licence",

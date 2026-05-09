@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
@@ -15,7 +15,7 @@ export async function GET() {
     const sessionCookie = cookieStore.get("__session")?.value;
     
     if (!sessionCookie) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Non authentifié" },
         { status: 401 }
       );
@@ -23,7 +23,7 @@ export async function GET() {
 
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     if (!decoded.email_verified) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Email non vérifié" },
         { status: 403 }
       );
@@ -32,14 +32,14 @@ export async function GET() {
     // Vérifier que l'utilisateur est admin ou coach
     const role = resolveRole(decoded.role as string | undefined);
     if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Accès refusé" },
         { status: 403 }
       );
     }
 
     if (!DISCORD_TOKEN || !DISCORD_SERVER_ID) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Configuration Discord manquante" },
         { status: 500 }
       );
@@ -59,7 +59,7 @@ export async function GET() {
     if (!response.ok) {
       const errorText = await response.text();
       console.error("[Discord Channels] Erreur lors de la récupération des canaux:", errorText);
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: `Erreur lors de la récupération des canaux Discord: ${errorText}` },
         { status: response.status }
       );
@@ -152,14 +152,14 @@ export async function GET() {
       .map(({ id, name }) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    return NextResponse.json({ 
+    return jsonNoStore({ 
       success: true, 
       channels: flatChannels, // Format plat pour compatibilité
       hierarchy: channelsByCategory, // Structure hiérarchique
     });
   } catch (error) {
     console.error("[Discord] Erreur:", error);
-    return NextResponse.json(
+    return jsonNoStore(
       { success: false, error: "Erreur lors de la récupération des canaux" },
       { status: 500 }
     );

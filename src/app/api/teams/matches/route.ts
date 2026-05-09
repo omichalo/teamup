@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { withAuth } from "@/lib/auth/api-utils";
 import { USER_ROLES } from "@/lib/auth/roles";
@@ -15,8 +15,8 @@ export const GET = withAuth(async (req: Request) => {
       const fmt = (d: unknown) => (d instanceof Date ? d : new Date()).toISOString();
       return { team, matches: ms.map(m => ({ ...m, date: fmt(m.date), createdAt: fmt(m.createdAt), updatedAt: fmt(m.updatedAt) })), total: ms.length };
     }));
-    return NextResponse.json({ teams: teamMatches, totalTeams: teamMatches.length, totalMatches: teamMatches.reduce((acc, e) => acc + e.total, 0) });
+    return jsonNoStore({ teams: teamMatches, totalTeams: teamMatches.length, totalMatches: teamMatches.reduce((acc, e) => acc + e.total, 0) });
   } catch {
-    return NextResponse.json({ error: "Failed to fetch matches" }, { status: 500 });
+    return jsonNoStore({ error: "Failed to fetch matches" }, { status: 500 });
   }
 }, [USER_ROLES.ADMIN, USER_ROLES.COACH]);

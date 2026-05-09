@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { hasAnyRole, resolveRole, USER_ROLES } from "@/lib/auth/roles";
@@ -11,7 +11,7 @@ export async function GET() {
     const sessionCookie = cookieStore.get("__session")?.value;
 
     if (!sessionCookie) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Authentification requise" },
         { status: 401 }
       );
@@ -19,7 +19,7 @@ export async function GET() {
 
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     if (!decoded.email_verified) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Email non vérifié" },
         { status: 403 }
       );
@@ -27,7 +27,7 @@ export async function GET() {
 
     const role = resolveRole(decoded.role as string | undefined);
     if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Accès refusé" },
         { status: 403 }
       );
@@ -47,10 +47,10 @@ export async function GET() {
         new Date().toISOString(),
     }));
 
-    return NextResponse.json({ success: true, locations }, { status: 200 });
+    return jsonNoStore({ success: true, locations }, { status: 200 });
   } catch (error) {
     console.error("[app/api/locations] GET error", error);
-    return NextResponse.json(
+    return jsonNoStore(
       { success: false, error: "Erreur lors de la récupération des lieux" },
       { status: 500 }
     );
