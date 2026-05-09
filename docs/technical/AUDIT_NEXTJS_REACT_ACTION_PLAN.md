@@ -174,15 +174,15 @@ Pour chaque fichier (traiter par ordre métier / douleur) :
 - [x] **G.1.1** `AdvancedSettings` — composant supprimé (non utilisé dans l’application)
 - [x] **G.1.2** `DiscordPollManager` — extraction en modules (`discord-poll-manager/types|constants|utils`)
 - [x] **G.1.3** `NotificationCenter` / `NotificationManager` — `NotificationCenter` supprimé (non utilisé) ; `NotificationManager` déjà factorisé
-- [ ] **G.1.4** `ThemeManager`
+- [x] **G.1.4** `ThemeManager` — composant supprimé (non utilisé dans l’application)
 - [x] **G.1.5** `ReportsManager` — composant supprimé (non utilisé dans l’application)
 - [ ] **G.1.6** `UserManagement`
-- [ ] **G.1.7** `DataExportImport`
-- [ ] **G.1.8** `AuditLogs`
-- [ ] **G.1.9** `AppSettings`
+- [x] **G.1.7** `DataExportImport` — composant supprimé (non utilisé dans l’application)
+- [x] **G.1.8** `AuditLogs` — composant supprimé (non utilisé dans l’application)
+- [x] **G.1.9** `AppSettings` — composant supprimé (non utilisé dans l’application)
 - [x] **G.1.10** `SystemMaintenance` — composant supprimé (non utilisé dans l’application)
 - [~] **G.1.11** Autres fichiers > ~500 lignes restants (grep `wc -l`)  
-  _Avancement :_ `GlobalStats`, `BackupRestore`, `UserManagement`, `DataExportImport`, `AuditLogs`, `AppSettings`, `NotificationManager`, `ThemeManager` et `DiscordPollManager` découpés en modules dédiés (`components/global-stats/*`, `components/backup-restore/*`, `components/user-management/*`, `components/data-export-import/*`, `components/audit-logs/*`, `components/app-settings/*`, `components/notification-manager/*`, `components/theme-manager/*`, `components/disponibilites/discord-poll-manager/*`) ; les composants racine deviennent des orchestrateurs. `AdvancedSettings`, `NotificationCenter`, `ReportsManager` et `SystemMaintenance` ont été retirés car non branchés dans l’app.
+  _Avancement :_ `GlobalStats`, `BackupRestore`, `UserManagement` et `DiscordPollManager` sont conservés et découpés en modules dédiés (`components/global-stats/*`, `components/backup-restore/*`, `components/user-management/*`, `components/disponibilites/discord-poll-manager/*`). `AdvancedSettings`, `NotificationCenter`, `ReportsManager`, `SystemMaintenance`, `NotificationManager`, `ThemeManager`, `DataExportImport`, `AuditLogs` et `AppSettings` ont été retirés car non branchés dans l’app.
 
 **Critère :** Fichier principal < ~400 lignes **ou** justification inline (composant purement présentationnel sans logique).
 
@@ -266,3 +266,4 @@ Pour chaque fichier (traiter par ordre métier / douleur) :
 | 2026-05-09 | — | Epic G (lot 8) : `ThemeManager` factorisé en types/constantes/utilitaires (`theme-manager/*`) avec composant principal simplifié |
 | 2026-05-09 | — | Epic G (lot 9) : `DiscordPollManager` factorisé en modules (`disponibilites/discord-poll-manager/*`) pour centraliser types/constantes/utilitaires |
 | 2026-05-09 | — | Epic G (cleanup) : suppression des composants non utilisés `AdvancedSettings`, `NotificationCenter`, `ReportsManager`, `SystemMaintenance` |
+| 2026-05-09 | — | Epic G (cleanup 2) : suppression des composants non utilisés `NotificationManager`, `ThemeManager`, `DataExportImport`, `AuditLogs`, `AppSettings` et de leurs modules associés |
