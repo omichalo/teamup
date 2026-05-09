@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -40,140 +40,28 @@ import {
   Delete as DeleteIcon,
   Send as SendIcon,
   Schedule as ScheduleIcon,
-  Warning as WarningIcon,
-  Info as InfoIcon,
-  Error as ErrorIcon,
   CheckCircle as CheckCircleIcon,
   ExpandMore as ExpandMoreIcon,
   Refresh as RefreshIcon,
   Settings as SettingsIcon,
-  Person as PersonIcon,
-  Group as GroupIcon,
-  Event as EventIcon,
-  Sports as SportsIcon,
 } from "@mui/icons-material";
-
-interface NotificationManagerProps {
-  notifications: Notification[];
-  onSendNotification: (notification: CreateNotification) => Promise<void>;
-  onUpdateNotification: (
-    id: string,
-    notification: UpdateNotification
-  ) => Promise<void>;
-  onDeleteNotification: (id: string) => Promise<void>;
-  onMarkAsRead: (id: string) => Promise<void>;
-  onMarkAllAsRead: () => Promise<void>;
-  onGetNotificationSettings: () => Promise<NotificationSettings>;
-  onUpdateNotificationSettings: (
-    settings: NotificationSettings
-  ) => Promise<void>;
-  loading?: boolean;
-}
-
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  type: "info" | "warning" | "error" | "success";
-  priority: "low" | "medium" | "high" | "urgent";
-  status: "draft" | "scheduled" | "sent" | "failed";
-  recipients: {
-    type: "all" | "players" | "teams" | "specific";
-    ids: string[];
-  };
-  channels: ("email" | "sms" | "push" | "in_app")[];
-  scheduledAt?: string;
-  sentAt?: string;
-  createdAt: string;
-  createdBy: string;
-  readBy: string[];
-  metadata?: {
-    [key: string]: unknown;
-  };
-}
-
-interface CreateNotification {
-  title: string;
-  message: string;
-  type: "info" | "warning" | "error" | "success";
-  priority: "low" | "medium" | "high" | "urgent";
-  recipients: {
-    type: "all" | "players" | "teams" | "specific";
-    ids: string[];
-  };
-  channels: ("email" | "sms" | "push" | "in_app")[];
-  scheduledAt?: string;
-  metadata?: {
-    [key: string]: unknown;
-  };
-}
-
-interface UpdateNotification {
-  title?: string;
-  message?: string;
-  type?: "info" | "warning" | "error" | "success";
-  priority?: "low" | "medium" | "high" | "urgent";
-  recipients?: {
-    type: "all" | "players" | "teams" | "specific";
-    ids: string[];
-  };
-  channels?: ("email" | "sms" | "push" | "in_app")[];
-  scheduledAt?: string;
-  metadata?: {
-    [key: string]: unknown;
-  };
-}
-
-interface NotificationSettings {
-  email: {
-    enabled: boolean;
-    smtp: {
-      host: string;
-      port: number;
-      secure: boolean;
-      auth: {
-        user: string;
-        pass: string;
-      };
-    };
-    templates: {
-      [key: string]: string;
-    };
-  };
-  sms: {
-    enabled: boolean;
-    provider: string;
-    apiKey: string;
-    templates: {
-      [key: string]: string;
-    };
-  };
-  push: {
-    enabled: boolean;
-    firebase: {
-      serverKey: string;
-      projectId: string;
-    };
-  };
-  inApp: {
-    enabled: boolean;
-    retention: number;
-    maxPerUser: number;
-  };
-  scheduling: {
-    enabled: boolean;
-    timezone: string;
-    workingHours: {
-      start: string;
-      end: string;
-    };
-  };
-  limits: {
-    maxPerDay: number;
-    maxPerUser: number;
-    maxMessageLength: number;
-  };
-}
+import {
+  DEFAULT_NOTIFICATION,
+  NOTIFICATION_CHANNELS,
+} from "@/components/notification-manager/constants";
+import type {
+  CreateNotification,
+  Notification,
+  NotificationManagerProps,
+  NotificationSettings,
+} from "@/components/notification-manager/types";
+import {
+  formatNotificationDate,
+  getNotificationTypeIcon,
+  getPriorityColor,
+  getRecipientsIcon,
+  getStatusColor,
+} from "@/components/notification-manager/utils";
 
 export function NotificationManager({
   notifications,
@@ -189,18 +77,8 @@ export function NotificationManager({
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [selectedNotification, setSelectedNotification] =
     useState<Notification | null>(null);
-  const [newNotification, setNewNotification] = useState<CreateNotification>({
-    title: "",
-    message: "",
-    type: "info",
-    priority: "medium",
-    recipients: {
-      type: "all",
-      ids: [],
-    },
-    channels: ["in_app"],
-    metadata: {},
-  });
+  const [newNotification, setNewNotification] =
+    useState<CreateNotification>(DEFAULT_NOTIFICATION);
   const [settings, setSettings] = useState<NotificationSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
@@ -224,18 +102,7 @@ export function NotificationManager({
       setError(null);
       await onSendNotification(newNotification);
       setCreateDialogOpen(false);
-      setNewNotification({
-        title: "",
-        message: "",
-        type: "info",
-        priority: "medium",
-        recipients: {
-          type: "all",
-          ids: [],
-        },
-        channels: ["in_app"],
-        metadata: {},
-      });
+      setNewNotification(DEFAULT_NOTIFICATION);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Erreur lors de la création"
@@ -302,70 +169,6 @@ export function NotificationManager({
     } finally {
       setProcessing(false);
     }
-  };
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "info":
-        return <InfoIcon color="info" />;
-      case "warning":
-        return <WarningIcon color="warning" />;
-      case "error":
-        return <ErrorIcon color="error" />;
-      case "success":
-        return <CheckCircleIcon color="success" />;
-      default:
-        return <InfoIcon color="inherit" />;
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case "urgent":
-        return "error";
-      case "high":
-        return "warning";
-      case "medium":
-        return "info";
-      case "low":
-        return "default";
-      default:
-        return "default";
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "sent":
-        return "success";
-      case "failed":
-        return "error";
-      case "scheduled":
-        return "info";
-      case "draft":
-        return "default";
-      default:
-        return "default";
-    }
-  };
-
-  const getRecipientsIcon = (type: string) => {
-    switch (type) {
-      case "all":
-        return <GroupIcon />;
-      case "players":
-        return <PersonIcon />;
-      case "teams":
-        return <SportsIcon />;
-      case "specific":
-        return <EventIcon />;
-      default:
-        return <GroupIcon />;
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString("fr-FR");
   };
 
   const unreadCount = notifications.filter(
@@ -439,7 +242,7 @@ export function NotificationManager({
                       <ListItemText
                         primary={
                           <Box display="flex" alignItems="center" gap={1}>
-                            {getTypeIcon(notification.type)}
+                            {getNotificationTypeIcon(notification.type)}
                             <Typography variant="subtitle1">
                               {notification.title}
                             </Typography>
@@ -491,7 +294,7 @@ export function NotificationManager({
                                 variant="caption"
                                 color="text.secondary"
                               >
-                                {formatDate(notification.createdAt)}
+                                {formatNotificationDate(notification.createdAt)}
                               </Typography>
                             </Box>
                           </Box>
@@ -698,7 +501,7 @@ export function NotificationManager({
                 <FormControl fullWidth>
                   <FormLabel>Canal de communication</FormLabel>
                   <FormGroup row>
-                    {["email", "sms", "push", "in_app"].map((channel) => (
+                    {NOTIFICATION_CHANNELS.map((channel) => (
                       <FormControlLabel
                         key={channel}
                         control={
