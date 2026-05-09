@@ -9,6 +9,7 @@ import {
   enforceRateLimit,
   RATE_LIMIT_DISCORD_PROXY_PER_UID,
 } from "@/lib/auth/rate-limit-http";
+import { hasAnyRole, resolveRole, USER_ROLES } from "@/lib/auth/roles";
 
 const db = getFirestore();
 
@@ -60,10 +61,8 @@ export async function POST(req: Request) {
     );
     if (discordRl) return discordRl;
 
-    const role = decoded.role || "player";
-
-    // Seuls les admins et coaches peuvent envoyer des messages Discord
-    if (role !== "admin" && role !== "coach") {
+    const role = resolveRole(decoded.role as string | undefined);
+    if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
       return jsonNoStore(
         { success: false, error: "Accès refusé" },
         { status: 403 }

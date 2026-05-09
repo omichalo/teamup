@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { Box, CircularProgress } from "@mui/material";
 import { useAuth } from "@/hooks/useAuth";
 import { validateInternalRedirect } from "@/lib/auth/redirect-utils";
+import { USER_ROLES } from "@/lib/auth/roles";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -50,9 +51,9 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
       // Redirection intelligente vers une page autorisée selon le rôle
       const role = user.role;
       const fallbackByRole: Record<string, string> = {
-        player: "/joueur",
-        coach: "/",
-        admin: "/",
+        [USER_ROLES.PLAYER]: "/joueur",
+        [USER_ROLES.COACH]: "/",
+        [USER_ROLES.ADMIN]: "/",
       };
       const target = fallbackByRole[role] || (redirectWhenUnauthorized || "/");
       router.push(target);
