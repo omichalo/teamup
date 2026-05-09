@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import type { DocumentData, QueryDocumentSnapshot, Query } from "firebase-admin/firestore";
 import { adminAuth, getFirestoreAdmin } from "@/lib/firebase-admin";
@@ -10,7 +10,7 @@ export async function GET() {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
     if (!sessionCookie) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Session cookie requis" },
         { status: 401 }
       );
@@ -19,7 +19,7 @@ export async function GET() {
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     const role = resolveRole(decoded.role as string | undefined);
     if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Accès refusé" },
         { status: 403 }
       );
@@ -160,14 +160,10 @@ export async function GET() {
       };
     });
 
-    const res = NextResponse.json({ success: true, users }, { status: 200 });
-    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    res.headers.set("Pragma", "no-cache");
-    res.headers.set("Expires", "0");
-    return res;
+    return jsonNoStore({ success: true, users }, { status: 200 });
   } catch (error) {
     console.error("[app/api/admin/users] error", error);
-    return NextResponse.json(
+    return jsonNoStore(
       {
         success: false,
         error: "Impossible de récupérer la liste des utilisateurs",

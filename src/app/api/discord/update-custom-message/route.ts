@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
@@ -13,7 +13,7 @@ const db = getFirestore();
 export async function POST(req: Request) {
   try {
     if (!validateOrigin(req)) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Invalid origin" },
         { status: 403 }
       );
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     const sessionCookie = cookieStore.get("__session")?.value;
     
     if (!sessionCookie) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Non authentifié" },
         { status: 401 }
       );
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     
     // Seuls les admins et coaches peuvent modifier les messages
     if (role !== "admin" && role !== "coach") {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Accès refusé" },
         { status: 403 }
       );
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
     const { teamId, journee, phase, customMessage } = await req.json();
 
     if (!teamId || journee === undefined || !phase) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "teamId, journee et phase sont requis" },
         { status: 400 }
       );
@@ -71,10 +71,10 @@ export async function POST(req: Request) {
 
     await db.collection("discordMessages").doc(messageId).set(messageDoc, { merge: true });
 
-    return NextResponse.json({ success: true });
+    return jsonNoStore({ success: true });
   } catch (error) {
     console.error("[Discord] Erreur lors de la mise à jour:", error);
-    return NextResponse.json(
+    return jsonNoStore(
       { success: false, error: "Erreur lors de la mise à jour" },
       { status: 500 }
     );

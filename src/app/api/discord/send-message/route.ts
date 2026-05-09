@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase-admin";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
@@ -13,7 +13,7 @@ const db = getFirestore();
 export async function POST(req: Request) {
   try {
     if (!validateOrigin(req)) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Invalid origin" },
         { status: 403 }
       );
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
         hasToken: !!DISCORD_TOKEN,
         hasServerId: !!DISCORD_SERVER_ID,
       });
-      return NextResponse.json(
+      return jsonNoStore(
         {
           success: false,
           error:
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     const sessionCookie = cookieStore.get("__session")?.value;
 
     if (!sessionCookie) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Non authentifié" },
         { status: 401 }
       );
@@ -62,7 +62,7 @@ export async function POST(req: Request) {
 
     // Seuls les admins et coaches peuvent envoyer des messages Discord
     if (role !== "admin" && role !== "coach") {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Accès refusé" },
         { status: 403 }
       );
@@ -72,14 +72,14 @@ export async function POST(req: Request) {
       await req.json();
 
     if (!content || typeof content !== "string") {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Le contenu du message est requis" },
         { status: 400 }
       );
     }
 
     if (!teamId || journee === undefined || !phase) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "teamId, journee et phase sont requis" },
         { status: 400 }
       );
@@ -97,7 +97,7 @@ export async function POST(req: Request) {
 
     // Le channelId doit être fourni (configuré au niveau de l'équipe)
     if (!channelId) {
-      return NextResponse.json(
+      return jsonNoStore(
         {
           success: false,
           error:
@@ -128,7 +128,7 @@ export async function POST(req: Request) {
     if (!response.ok) {
       const errorText = await response.text();
       console.error("[Discord] Erreur lors de l'envoi:", errorText);
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Erreur lors de l'envoi du message Discord" },
         { status: 500 }
       );
@@ -156,10 +156,10 @@ export async function POST(req: Request) {
       // Ne pas faire échouer l'envoi si l'enregistrement échoue
     }
 
-    return NextResponse.json({ success: true });
+    return jsonNoStore({ success: true });
   } catch (error) {
     console.error("[Discord] Erreur:", error);
-    return NextResponse.json(
+    return jsonNoStore(
       { success: false, error: "Erreur lors de l'envoi du message" },
       { status: 500 }
     );

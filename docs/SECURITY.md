@@ -160,6 +160,14 @@ Les autres routes admin / coach déjà couvertes par l’audit (ex. `brulage/val
 
 **Limitation** : le rate limiting en mémoire n’est pas distribué ; pour plusieurs instances, prévoir Redis ou équivalent.
 
+## API : en-têtes anti-cache (`Cache-Control`)
+
+Les réponses JSON des route handlers passent par **`jsonNoStore`** ou **`applyNoStoreHeaders`** (`src/lib/http/cache-headers.ts`) : `Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate`, `Pragma: no-cache`, `Expires: 0` (aligné sur les règles projet).
+
+- Le wrapper **`withAuth`** (`src/lib/auth/api-utils.ts`) applique `applyNoStoreHeaders` sur la réponse du handler et renvoie les erreurs d’authentification via **`jsonNoStore`**.
+- **`POST` / `DELETE` `/api/session`** : construction d’une `NextResponse` avec cookies, puis **`applyNoStoreHeaders`** (seul cas courant de `NextResponse.json` direct hors helper).
+- **`GET` `/api/openapi`** et **`GET` `/api/health`** : `jsonNoStore` pour une politique homogène (le contenu reste public, sans cache intermédiaire sur le JSON).
+
 ## Audit de sécurité automatisé
 
 Le projet utilise des outils automatisés pour détecter les secrets commités par erreur :

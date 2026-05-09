@@ -2,7 +2,7 @@
 
 Ce document consolide les constats des audits **phase 1** (qualité globale Next.js, sécurité, perf, tests) et **phase 2** (matrice des routes API + qualité des composants React). Il sert de **backlog traçable** : cocher les cases au fil des PR / merges.
 
-**Dernière mise à jour :** 2026-05-09  
+**Dernière mise à jour :** 2026-05-09 (Epic B)  
 **Statuts :** `[ ]` à faire · `[~]` en cours · `[x]` terminé
 
 ---
@@ -32,7 +32,7 @@ Ce document consolide les constats des audits **phase 1** (qualité globale Next
 | Epic | Description | Priorité max |
 |------|-------------|--------------|
 | A | Sécurité API : CSRF (`validateOrigin`), compléments rate limiting | ~~P0~~ **traité (2026-05-09)** |
-| B | En-têtes `Cache-Control` sur réponses sensibles | P0 / P1 |
+| B | En-têtes `Cache-Control` sur réponses sensibles | ~~P0 / P1~~ **traité (2026-05-09)** |
 | C | `export const runtime = "nodejs"` sur routes concernées | P1 |
 | D | Cohérence des rôles (`resolveRole`, `hasAnyRole`, `USER_ROLES`) | P1 |
 | E | Toolchain : ESLint vs build, config Next (`next.config.ts`) | P2 |
@@ -83,19 +83,19 @@ Ce document consolide les constats des audits **phase 1** (qualité globale Next
 
 ### B.1 Helper réutilisable (optionnel mais recommandé)
 
-- [ ] **B.1.1** Introduire une fonction utilitaire du type `applyNoStoreHeaders(res: NextResponse)` dans `lib/auth/` ou `lib/http/` pour éviter la duplication.
-- [ ] **B.1.2** Utiliser ce helper dans les route handlers et dans `withAuth` si pertinent (évaluer double emballage).
+- [x] **B.1.1** `src/lib/http/cache-headers.ts` : `applyNoStoreHeaders`, `jsonNoStore`.
+- [x] **B.1.2** `withAuth` utilise `applyNoStoreHeaders` / `jsonNoStore` ; routes API migrées vers `jsonNoStore` (remplace `NextResponse.json`).
 
 ### B.2 Routes à corriger ou vérifier (audit)
 
-- [ ] **B.2.1** `admin/discord-availability-config` — `GET` et `POST` : ajouter en-têtes si absent.
-- [ ] **B.2.2** `brulage/validate` — `POST` : ajouter en-têtes sur la réponse JSON.
-- [ ] **B.2.3** `coach/request` — `POST`
-- [ ] **B.2.4** `discord/*` (create, close, send-message, update-custom-message, members, channels, etc.) : passer en revue **chaque** réponse JSON.
-- [ ] **B.2.5** Routes sans `Cache-Control` explicite **et** sans passage par `withAuth` : compléter (ex. certains `GET` admin).
-- [ ] **B.2.6** `openapi` — `GET` : décider si public OK sans `no-store` ou si restriction / désactivation en prod (documenter).
+- [x] **B.2.1** `admin/discord-availability-config` — `GET` / `POST` via `jsonNoStore`.
+- [x] **B.2.2** `brulage/validate` — `jsonNoStore`.
+- [x] **B.2.3** `coach/request` — `jsonNoStore`.
+- [x] **B.2.4** Toutes les routes `discord/**/route.ts` passées en revue — `jsonNoStore`.
+- [x] **B.2.5** Passage systématique sur `src/app/api/**/route.ts` (sauf `session` : cookies + `applyNoStoreHeaders`).
+- [x] **B.2.6** `openapi` — `jsonNoStore` ; politique documentée dans `docs/SECURITY.md` (homogénéité, contenu toujours public).
 
-**Critère d’acceptation :** Revue grep `NextResponse.json` sur `app/api` : soit headers no-store, soit `withAuth`, soit exception documentée (ex. health).
+**Critère d’acceptation :** Plus de `NextResponse.json` nu dans `app/api` sauf `session/route.ts` (cookies) ; ou passage par `withAuth`.
 
 ---
 
@@ -249,3 +249,4 @@ Pour chaque fichier (traiter par ordre métier / douleur) :
 |------|--------|------------|
 | 2026-05-09 | — | Création initiale à partir des audits phase 1 et 2 |
 | 2026-05-09 | — | Epic A complété : CSRF sur routes listées, rate limiting session / Discord / admin sync / discord config, doc `SECURITY.md`, helpers HTTP |
+| 2026-05-09 | — | Epic B complété : `lib/http/cache-headers`, `withAuth` + toutes les routes `app/api` en `jsonNoStore` / `applyNoStoreHeaders`, doc `SECURITY.md` |

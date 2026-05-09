@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
@@ -13,7 +13,7 @@ export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
   // Valider l'origine de la requête pour prévenir les attaques CSRF
   if (!validateOrigin(req)) {
-    return NextResponse.json(
+    return jsonNoStore(
       { error: "Invalid origin" },
       { status: 403 }
     );
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   const cookie = cookieStore.get("__session")?.value;
 
   if (!cookie) {
-    return NextResponse.json({ error: "No session" }, { status: 401 });
+    return jsonNoStore({ error: "No session" }, { status: 401 });
   }
 
   try {
@@ -42,9 +42,9 @@ export async function POST(req: NextRequest) {
       coachRequestStatus: decoded.coachRequestStatus,
     });
 
-    return NextResponse.json({ customToken });
+    return jsonNoStore({ customToken });
   } catch (error) {
     console.error("[session/firebase-token] Error:", error);
-    return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+    return jsonNoStore({ error: "Invalid session" }, { status: 401 });
   }
 }

@@ -7,13 +7,14 @@ import {
   enforceRateLimit,
   RATE_LIMIT_SESSION_POST_PER_IP,
 } from "@/lib/auth/rate-limit-http";
+import { applyNoStoreHeaders, jsonNoStore } from "@/lib/http/cache-headers";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
     if (!validateOrigin(req)) {
-      return NextResponse.json(
+      return jsonNoStore(
         { error: "Invalid origin", message: "Requête non autorisée" },
         { status: 403 }
       );
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
     const { idToken } = body;
 
     if (!idToken || typeof idToken !== "string") {
-      return NextResponse.json(
+      return jsonNoStore(
         { error: "Missing token", message: "Le token d'authentification est requis" },
         { status: 400 }
       );
@@ -46,7 +47,7 @@ export async function POST(req: Request) {
       
       // Token expiré
       if (errorMessage.includes("expired") || errorMessage.includes("Expired")) {
-        return NextResponse.json(
+        return jsonNoStore(
           { error: "Token expired", message: "Le token d'authentification a expiré" },
           { status: 401 }
         );
@@ -58,7 +59,7 @@ export async function POST(req: Request) {
         errorMessage.includes("Invalid") ||
         errorMessage.includes("malformed")
       ) {
-        return NextResponse.json(
+        return jsonNoStore(
           { error: "Invalid token", message: "Le token d'authentification est invalide" },
           { status: 401 }
         );
@@ -66,14 +67,14 @@ export async function POST(req: Request) {
 
       // Autres erreurs de vérification
       console.error("[session] Erreur lors de la vérification du token:", error);
-      return NextResponse.json(
+      return jsonNoStore(
         { error: "Token verification failed", message: "Échec de la vérification du token" },
         { status: 401 }
       );
     }
 
     if (!decoded.email_verified) {
-      return NextResponse.json(
+      return jsonNoStore(
         { error: "Email non vérifié", message: "L'email associé au compte n'est pas vérifié" },
         { status: 403 }
       );
@@ -88,7 +89,7 @@ export async function POST(req: Request) {
       });
     } catch (error) {
       console.error("[session] Erreur lors de la création du cookie de session:", error);
-      return NextResponse.json(
+      return jsonNoStore(
         { error: "Session creation failed", message: "Impossible de créer la session" },
         { status: 500 }
       );
@@ -106,14 +107,10 @@ export async function POST(req: Request) {
       path: "/",
       maxAge: Math.floor((14 * 24 * 60 * 60 * 1000) / 1000),
     });
-    // Ajouter Cache-Control pour éviter la mise en cache
-    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    res.headers.set("Pragma", "no-cache");
-    res.headers.set("Expires", "0");
-    return res;
+    return applyNoStoreHeaders(res);
   } catch (error) {
     console.error("[session] Erreur inattendue lors de la création de session:", error);
-    return NextResponse.json(
+    return jsonNoStore(
       {
         error: "Internal server error",
         message: "Une erreur inattendue s'est produite lors de la création de la session",
@@ -164,10 +161,7 @@ export async function DELETE() {
       path: "/",
       maxAge: 0,
     });
-    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    res.headers.set("Pragma", "no-cache");
-    res.headers.set("Expires", "0");
-    return res;
+    return applyNoStoreHeaders(res);
   } catch (error) {
     console.error("[session] Erreur lors de la déconnexion:", error);
     // Même en cas d'erreur, on supprime le cookie côté client avec les mêmes paramètres
@@ -182,10 +176,7 @@ export async function DELETE() {
       path: "/",
       maxAge: 0,
     });
-    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    res.headers.set("Pragma", "no-cache");
-    res.headers.set("Expires", "0");
-    return res;
+    return applyNoStoreHeaders(res);
   }
 }
 

@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import { openApiSpec } from "@/lib/openapi";
 
 export async function GET() {
-  return NextResponse.json(openApiSpec, { status: 200 });
+  return jsonNoStore(openApiSpec, { status: 200 });
 }
 
 

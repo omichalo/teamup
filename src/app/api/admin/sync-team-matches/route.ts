@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import {
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   try {
     // Valider l'origine de la requête pour prévenir les attaques CSRF
     if (!validateOrigin(req)) {
-      return NextResponse.json(
+      return jsonNoStore(
         {
           error: "Invalid origin",
           message: "Requête non autorisée",
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
     if (!sessionCookie) {
-      return NextResponse.json(
+      return jsonNoStore(
         {
           error: "Token d'authentification requis",
           message: "Cette API nécessite une authentification valide",
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     const role = resolveRole(decoded.role as string | undefined);
 
     if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
-      return NextResponse.json(
+      return jsonNoStore(
         {
           error: "Accès refusé",
           message: "Cette opération est réservée aux administrateurs",
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     const syncResult = await teamMatchesSyncService.syncMatchesForAllTeams(db);
 
     if (!syncResult.success || !syncResult.processedMatches) {
-      return NextResponse.json(
+      return jsonNoStore(
         {
           success: false,
           error: "Erreur lors de la synchronisation",
@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
       success: true,
     });
 
-    const res = NextResponse.json(
+    return jsonNoStore(
       {
         success: true,
         message: `Synchronisation des matchs réussie: ${saveResult.saved} matchs sauvegardés dans les sous-collections`,
@@ -133,13 +133,9 @@ export async function POST(req: NextRequest) {
       },
       { status: 200 }
     );
-    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    res.headers.set("Pragma", "no-cache");
-    res.headers.set("Expires", "0");
-    return res;
   } catch (error) {
     console.error("❌ [app/api/admin/sync-team-matches] Erreur lors de la synchronisation des matchs:", error);
-    return NextResponse.json(
+    return jsonNoStore(
       {
         success: false,
         error: "Erreur lors de la synchronisation des matchs",

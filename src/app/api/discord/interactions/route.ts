@@ -1,7 +1,7 @@
 // Forcer le runtime Node.js pour utiliser les modules crypto natifs
 export const runtime = "nodejs";
 
-import { NextResponse } from "next/server";
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import {
   getFirestoreAdmin,
   initializeFirebaseAdmin,
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
     // Vérifier que DISCORD_PUBLIC_KEY est configuré (obligatoire en production)
     if (!DISCORD_PUBLIC_KEY) {
       console.error("[Discord Interactions] DISCORD_PUBLIC_KEY non configuré");
-      return NextResponse.json(
+      return jsonNoStore(
         { error: "Server misconfiguration" },
         { status: 500 }
       );
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
 
     if (!signature || !timestamp) {
       console.error("[Discord Interactions] Headers de signature manquants");
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+      return jsonNoStore({ error: "Invalid signature" }, { status: 401 });
     }
 
     const isValid = verifyDiscordSignature(
@@ -70,7 +70,7 @@ export async function POST(req: Request) {
     );
     if (!isValid) {
       console.error("[Discord Interactions] Signature invalide");
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+      return jsonNoStore({ error: "Invalid signature" }, { status: 401 });
     }
 
     const data = JSON.parse(body) as DiscordInteraction;
@@ -78,7 +78,7 @@ export async function POST(req: Request) {
     // Gérer les interactions Discord (slash commands, etc.)
     if (data.type === InteractionType.PING) {
       // PING - répondre avec PONG (Discord exige une réponse en moins de 3 secondes)
-      return NextResponse.json({ type: InteractionType.PING });
+      return jsonNoStore({ type: InteractionType.PING });
     }
 
     // Gérer les commandes slash (type 2)
@@ -113,7 +113,7 @@ export async function POST(req: Request) {
       }
 
       // Commande inconnue
-      return NextResponse.json({
+      return jsonNoStore({
         type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
         data: {
           content: `❌ Commande inconnue : ${commandName || "N/A"}`,
@@ -153,7 +153,7 @@ export async function POST(req: Request) {
       });
 
       if (!customId || !customId.startsWith("availability_")) {
-        return NextResponse.json({
+        return jsonNoStore({
           type: 4,
           data: {
             content: "❌ Interaction non reconnue.",
@@ -167,7 +167,7 @@ export async function POST(req: Request) {
         // Select menu
         const parts = customId.split("_");
         if (parts.length < 3) {
-          return NextResponse.json({
+          return jsonNoStore({
             type: 4,
             data: {
               content: "❌ Format d'interaction invalide.",
@@ -206,7 +206,7 @@ export async function POST(req: Request) {
           pollId = parts.slice(1, -3).join("_");
           selectType = "women_sat";
         } else {
-          return NextResponse.json({
+          return jsonNoStore({
             type: 4,
             data: {
               content: "❌ Format de select menu invalide.",
@@ -238,7 +238,7 @@ export async function POST(req: Request) {
             return await handleWomenSelect(interactionWithMetadata, pollId, "sat");
           }
 
-          return NextResponse.json({
+          return jsonNoStore({
             type: 4,
             data: {
               content: "❌ Type de select menu non reconnu.",
@@ -247,7 +247,7 @@ export async function POST(req: Request) {
           });
         } catch (error) {
           console.error("[Discord Interactions] Erreur dans le handler select menu:", error);
-          return NextResponse.json({
+          return jsonNoStore({
             type: 4,
             data: {
               content: "❌ Erreur lors du traitement. Veuillez réessayer.",
@@ -265,7 +265,7 @@ export async function POST(req: Request) {
       // - availability_${pollId}_comment
       const parts = customId.split("_");
       if (parts.length < 3) {
-        return NextResponse.json({
+        return jsonNoStore({
           type: 4,
           data: {
             content: "❌ Format d'interaction invalide.",
@@ -286,7 +286,7 @@ export async function POST(req: Request) {
       });
 
       if (!pollId || !action) {
-        return NextResponse.json({
+        return jsonNoStore({
           type: 4,
           data: {
             content: "❌ Format d'interaction invalide (pollId ou action manquant).",
@@ -311,7 +311,7 @@ export async function POST(req: Request) {
           return await handleCommentButton(interactionWithMetadata, pollId);
         }
 
-        return NextResponse.json({
+        return jsonNoStore({
           type: 4,
           data: {
             content: "❌ Action non reconnue.",
@@ -320,7 +320,7 @@ export async function POST(req: Request) {
         });
       } catch (error) {
         console.error("[Discord Interactions] Erreur dans le handler:", error);
-        return NextResponse.json({
+        return jsonNoStore({
           type: 4,
           data: {
             content: "❌ Erreur lors du traitement. Veuillez réessayer.",
@@ -337,7 +337,7 @@ export async function POST(req: Request) {
       const customId = interaction.data?.custom_id;
 
       if (!customId) {
-        return NextResponse.json({
+        return jsonNoStore({
           type: 4,
           data: {
             content: "❌ Modal non reconnu.",
@@ -351,7 +351,7 @@ export async function POST(req: Request) {
       if (customId.startsWith("availability_") && customId.endsWith("_comment_modal")) {
         const parts = customId.split("_");
         if (parts.length < 4) {
-          return NextResponse.json({
+          return jsonNoStore({
             type: 4,
             data: {
               content: "❌ Format de modal invalide.",
@@ -368,7 +368,7 @@ export async function POST(req: Request) {
         const pollId = pollIdParts.join("_");
 
         if (!pollId) {
-          return NextResponse.json({
+          return jsonNoStore({
             type: 4,
             data: {
               content: "❌ Impossible d'extraire l'ID du sondage.",
@@ -384,7 +384,7 @@ export async function POST(req: Request) {
             "[Discord Interactions] Erreur dans handleModalSubmit:",
             error
           );
-          return NextResponse.json({
+          return jsonNoStore({
             type: 4,
             data: {
               content: "❌ Erreur lors du traitement. Veuillez réessayer.",
@@ -395,7 +395,7 @@ export async function POST(req: Request) {
       }
 
       // Modal non reconnu
-      return NextResponse.json({
+      return jsonNoStore({
         type: 4,
         data: {
           content: "❌ Modal non reconnu.",
@@ -405,7 +405,7 @@ export async function POST(req: Request) {
     }
 
     // Type d'interaction non géré
-    return NextResponse.json(
+    return jsonNoStore(
       { error: "Unknown interaction type" },
       { status: 400 }
     );
@@ -415,7 +415,7 @@ export async function POST(req: Request) {
       error instanceof Error ? error.message : "Unknown error";
     console.error("[Discord Interactions] Détails:", errorMessage);
 
-    return NextResponse.json(
+    return jsonNoStore(
       {
         error: "Erreur lors du traitement de l'interaction",
         details: errorMessage,
@@ -518,7 +518,7 @@ async function handleLinkLicenseCommand(data: DiscordInteraction) {
       console.error(
         "[Discord Interactions] Impossible de récupérer l'ID utilisateur"
       );
-      return NextResponse.json({
+      return jsonNoStore({
         type: 4, // CHANNEL_MESSAGE_WITH_SOURCE
         data: {
           content: "❌ Erreur: Impossible de récupérer votre ID Discord.",
@@ -539,7 +539,7 @@ async function handleLinkLicenseCommand(data: DiscordInteraction) {
         : undefined;
 
     if (!licenseNumber || typeof licenseNumber !== "string") {
-      return NextResponse.json({
+      return jsonNoStore({
         type: 4,
         data: {
           content: "❌ Erreur: Numéro de licence requis.",
@@ -551,7 +551,7 @@ async function handleLinkLicenseCommand(data: DiscordInteraction) {
     // Valider que le numéro de licence ne contient que des chiffres
     const trimmedLicense = licenseNumber.trim();
     if (!/^\d+$/.test(trimmedLicense)) {
-      return NextResponse.json({
+      return jsonNoStore({
         type: 4,
         data: {
           content:
@@ -578,7 +578,7 @@ async function handleLinkLicenseCommand(data: DiscordInteraction) {
         existingPlayerData?.nom || ""
       }`.trim();
 
-      return NextResponse.json({
+      return jsonNoStore({
         type: 4,
         data: {
           content: `❌ Un utilisateur Discord ne peut être associé qu'à un seul joueur. Vous êtes déjà associé à la licence ${existingLicense}${
@@ -593,7 +593,7 @@ async function handleLinkLicenseCommand(data: DiscordInteraction) {
     const playerDoc = await db.collection("players").doc(trimmedLicense).get();
 
     if (!playerDoc.exists) {
-      return NextResponse.json({
+      return jsonNoStore({
         type: 4,
         data: {
           content: `❌ Aucun joueur trouvé avec la licence ${trimmedLicense}. Vérifiez que le numéro de licence est correct.`,
@@ -611,7 +611,7 @@ async function handleLinkLicenseCommand(data: DiscordInteraction) {
         playerData?.nom || ""
       }`.trim();
 
-      return NextResponse.json({
+      return jsonNoStore({
         type: 4,
         data: {
           content: `ℹ️ Vous êtes déjà associé à la licence ${trimmedLicense}${
@@ -638,7 +638,7 @@ async function handleLinkLicenseCommand(data: DiscordInteraction) {
       `[Discord Interactions] Utilisateur ${userId} associé à la licence ${trimmedLicense}`
     );
 
-    return NextResponse.json({
+    return jsonNoStore({
       type: 4,
       data: {
         content: `✅ Votre compte Discord a été associé à la licence ${trimmedLicense}${
@@ -656,7 +656,7 @@ async function handleLinkLicenseCommand(data: DiscordInteraction) {
       error instanceof Error ? error.message : "Unknown error";
     console.error("[Discord Interactions] Détails de l'erreur:", errorMessage);
 
-    return NextResponse.json({
+    return jsonNoStore({
       type: 4,
       data: {
         content: `❌ Erreur lors de l'association de la licence. Veuillez réessayer plus tard.`,
@@ -678,7 +678,7 @@ async function handleUpdateLicenseCommand(data: DiscordInteraction) {
       console.error(
         "[Discord Interactions] Impossible de récupérer l'ID utilisateur"
       );
-      return NextResponse.json({
+      return jsonNoStore({
         type: 4,
         data: {
           content: "❌ Erreur: Impossible de récupérer votre ID Discord.",
@@ -699,7 +699,7 @@ async function handleUpdateLicenseCommand(data: DiscordInteraction) {
         : undefined;
 
     if (!licenseNumber || typeof licenseNumber !== "string") {
-      return NextResponse.json({
+      return jsonNoStore({
         type: 4,
         data: {
           content: "❌ Erreur: Numéro de licence requis.",
@@ -711,7 +711,7 @@ async function handleUpdateLicenseCommand(data: DiscordInteraction) {
     // Valider que le numéro de licence ne contient que des chiffres
     const trimmedLicense = licenseNumber.trim();
     if (!/^\d+$/.test(trimmedLicense)) {
-      return NextResponse.json({
+      return jsonNoStore({
         type: 4,
         data: {
           content:
@@ -732,7 +732,7 @@ async function handleUpdateLicenseCommand(data: DiscordInteraction) {
       .get();
 
     if (existingPlayerQuery.empty) {
-      return NextResponse.json({
+      return jsonNoStore({
         type: 4,
         data: {
           content:
@@ -751,7 +751,7 @@ async function handleUpdateLicenseCommand(data: DiscordInteraction) {
         oldPlayerData?.nom || ""
       }`.trim();
 
-      return NextResponse.json({
+      return jsonNoStore({
         type: 4,
         data: {
           content: `✅ Vous êtes déjà associé à la licence ${trimmedLicense}${
@@ -769,7 +769,7 @@ async function handleUpdateLicenseCommand(data: DiscordInteraction) {
       .get();
 
     if (!newPlayerDoc.exists) {
-      return NextResponse.json({
+      return jsonNoStore({
         type: 4,
         data: {
           content: `❌ Aucun joueur trouvé avec la licence ${trimmedLicense}. Vérifiez que le numéro de licence est correct.`,
@@ -799,7 +799,7 @@ async function handleUpdateLicenseCommand(data: DiscordInteraction) {
         newPlayerData?.nom || ""
       }`.trim();
 
-      return NextResponse.json({
+      return jsonNoStore({
         type: 4,
         data: {
           content: `✅ Vous êtes déjà associé à la licence ${trimmedLicense}${
@@ -828,7 +828,7 @@ async function handleUpdateLicenseCommand(data: DiscordInteraction) {
       `[Discord Interactions] Utilisateur ${userId} a modifié son association de la licence ${oldLicense} vers ${trimmedLicense}`
     );
 
-    return NextResponse.json({
+    return jsonNoStore({
       type: 4,
       data: {
         content: `✅ Votre association a été modifiée de la licence ${oldLicense}${
@@ -848,7 +848,7 @@ async function handleUpdateLicenseCommand(data: DiscordInteraction) {
       error instanceof Error ? error.message : "Unknown error";
     console.error("[Discord Interactions] Détails de l'erreur:", errorMessage);
 
-    return NextResponse.json({
+    return jsonNoStore({
       type: 4,
       data: {
         content: `❌ Erreur lors de la modification de l'association. Veuillez réessayer plus tard.`,
@@ -870,7 +870,7 @@ async function handleUnlinkLicenseCommand(data: DiscordInteraction) {
       console.error(
         "[Discord Interactions] Impossible de récupérer l'ID utilisateur"
       );
-      return NextResponse.json({
+      return jsonNoStore({
         type: 4,
         data: {
           content: "❌ Erreur: Impossible de récupérer votre ID Discord.",
@@ -890,7 +890,7 @@ async function handleUnlinkLicenseCommand(data: DiscordInteraction) {
       .get();
 
     if (existingPlayerQuery.empty) {
-      return NextResponse.json({
+      return jsonNoStore({
         type: 4,
         data: {
           content: "❌ Vous n'êtes actuellement associé à aucune licence.",
@@ -921,7 +921,7 @@ async function handleUnlinkLicenseCommand(data: DiscordInteraction) {
       `[Discord Interactions] Utilisateur ${userId} a supprimé son association avec la licence ${license}`
     );
 
-    return NextResponse.json({
+    return jsonNoStore({
       type: 4,
       data: {
         content: `✅ Votre association avec la licence ${license}${
@@ -939,7 +939,7 @@ async function handleUnlinkLicenseCommand(data: DiscordInteraction) {
       error instanceof Error ? error.message : "Unknown error";
     console.error("[Discord Interactions] Détails de l'erreur:", errorMessage);
 
-    return NextResponse.json({
+    return jsonNoStore({
       type: 4,
       data: {
         content: `❌ Erreur lors de la suppression de l'association. Veuillez réessayer plus tard.`,
@@ -961,7 +961,7 @@ async function handleGetLicenseCommand(data: DiscordInteraction) {
       console.error(
         "[Discord Interactions] Impossible de récupérer l'ID utilisateur"
       );
-      return NextResponse.json({
+      return jsonNoStore({
         type: 4,
         data: {
           content: "❌ Erreur: Impossible de récupérer votre ID Discord.",
@@ -981,7 +981,7 @@ async function handleGetLicenseCommand(data: DiscordInteraction) {
       .get();
 
     if (existingPlayerQuery.empty) {
-      return NextResponse.json({
+      return jsonNoStore({
         type: 4,
         data: {
           content:
@@ -997,7 +997,7 @@ async function handleGetLicenseCommand(data: DiscordInteraction) {
       playerData?.nom || ""
     }`.trim();
 
-    return NextResponse.json({
+    return jsonNoStore({
       type: 4,
       data: {
         content: `📋 Vous êtes associé à la licence **${license}**${
@@ -1015,7 +1015,7 @@ async function handleGetLicenseCommand(data: DiscordInteraction) {
       error instanceof Error ? error.message : "Unknown error";
     console.error("[Discord Interactions] Détails de l'erreur:", errorMessage);
 
-    return NextResponse.json({
+    return jsonNoStore({
       type: 4,
       data: {
         content: `❌ Erreur lors de la récupération de votre licence. Veuillez réessayer plus tard.`,

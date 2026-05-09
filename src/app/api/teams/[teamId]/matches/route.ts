@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { NextResponse } from "next/server";
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import { initializeFirebaseAdmin, getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
 import { getTeamMatches } from "@/lib/server/team-matches";
@@ -15,7 +15,7 @@ export async function GET(
   const sessionCookie = cookieStore.get("__session")?.value;
   
   if (!sessionCookie) {
-    return NextResponse.json(
+    return jsonNoStore(
       { error: "Authentification requise" },
       { status: 401 }
     );
@@ -24,13 +24,13 @@ export async function GET(
   try {
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     if (!decoded.email_verified) {
-      return NextResponse.json(
+      return jsonNoStore(
         { error: "Email non vérifié" },
         { status: 403 }
       );
     }
   } catch {
-    return NextResponse.json(
+    return jsonNoStore(
       { error: "Session invalide" },
       { status: 401 }
     );
@@ -40,7 +40,7 @@ export async function GET(
   const { teamId } = await params;
 
   if (!teamId || typeof teamId !== "string") {
-    return NextResponse.json(
+    return jsonNoStore(
       { error: "Team ID parameter is required" },
       { status: 400 }
     );
@@ -55,7 +55,7 @@ export async function GET(
       `📊 [app/api/teams/${teamId}/matches] ${matches.length} matchs récupérés pour l'équipe ${teamId}`
     );
 
-    return NextResponse.json(
+    return jsonNoStore(
       {
         teamId,
         matches,
@@ -65,7 +65,7 @@ export async function GET(
     );
   } catch (error) {
     console.error("[app/api/teams/[teamId]/matches] Firestore Error:", error);
-    return NextResponse.json(
+    return jsonNoStore(
       {
         error: "Failed to fetch team matches",
         details: error instanceof Error ? error.message : "Unknown error",
