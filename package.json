@@ -79,6 +79,26 @@
   },
   "overrides": {
     "axios": "^0.31.1",
-    "undici": "^6.24.0"
+    "undici": "^6.24.0",
+    "qs": "^6.14.2",
+    "xml2js": "^0.5.0",
+    "postcss": "^8.5.10",
+    "@tootallnate/once": "^3.0.1",
+    "micromatch": {
+      "picomatch": "2.3.2"
+    },
+    "anymatch": {
+      "picomatch": "2.3.2"
+    },
+    "fdir": {
+      "picomatch": "4.0.4"
+    },
+    "jest-util": {
+      "picomatch": "4.0.4"
+    },
+    "tinyglobby": {
+      "picomatch": "4.0.4"
+    },
+    "ajv": "^6.14.0"
   }
 }
