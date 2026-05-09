@@ -182,7 +182,7 @@ Pour chaque fichier (traiter par ordre métier / douleur) :
 - [ ] **G.1.9** `AppSettings`
 - [ ] **G.1.10** `SystemMaintenance`
 - [~] **G.1.11** Autres fichiers > ~500 lignes restants (grep `wc -l`)  
-  _Avancement :_ `GlobalStats` découpé en sous-composants (`components/global-stats/*`) ; le composant racine devient un orchestrateur.
+  _Avancement :_ `GlobalStats` puis `BackupRestore` découpés en sous-composants dédiés (`components/global-stats/*`, `components/backup-restore/*`) ; les composants racine deviennent des orchestrateurs.
 
 **Critère :** Fichier principal < ~400 lignes **ou** justification inline (composant purement présentationnel sans logique).
 
@@ -257,3 +257,4 @@ Pour chaque fichier (traiter par ordre métier / douleur) :
 | 2026-05-09 | — | Epic E complété : ESLint dans `next build`, retrait fallbacks Firebase dans next.config, source maps prod désactivées, doc QUALITY_GATES + SECURITY |
 | 2026-05-09 | — | Epic F — F.1/F.2 : retrait `force-dynamic` / `runtime` du layout racine ; `LoginContent`, `ResetPasswordContent`, `VerifyEmailContent` + Suspense sur les pages correspondantes ; build statique OK pour les segments concernés |
 | 2026-05-09 | — | Epic G (lot 1) : `GlobalStats` découpé en sous-composants (`global-stats/*`) sans changement fonctionnel |
+| 2026-05-09 | — | Epic G (lot 2) : `BackupRestore` découpé en modules (`backup-restore/*`) pour isoler table, dialogs, types et utilitaires |
