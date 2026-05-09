@@ -182,7 +182,7 @@ Pour chaque fichier (traiter par ordre métier / douleur) :
 - [ ] **G.1.9** `AppSettings`
 - [ ] **G.1.10** `SystemMaintenance`
 - [~] **G.1.11** Autres fichiers > ~500 lignes restants (grep `wc -l`)  
-  _Avancement :_ `GlobalStats`, `BackupRestore`, `UserManagement`, `DataExportImport` et `AuditLogs` découpés en modules dédiés (`components/global-stats/*`, `components/backup-restore/*`, `components/user-management/*`, `components/data-export-import/*`, `components/audit-logs/*`) ; les composants racine deviennent des orchestrateurs.
+  _Avancement :_ `GlobalStats`, `BackupRestore`, `UserManagement`, `DataExportImport`, `AuditLogs` et `AppSettings` découpés en modules dédiés (`components/global-stats/*`, `components/backup-restore/*`, `components/user-management/*`, `components/data-export-import/*`, `components/audit-logs/*`, `components/app-settings/*`) ; les composants racine deviennent des orchestrateurs.
 
 **Critère :** Fichier principal < ~400 lignes **ou** justification inline (composant purement présentationnel sans logique).
 
@@ -261,3 +261,4 @@ Pour chaque fichier (traiter par ordre métier / douleur) :
 | 2026-05-09 | — | Epic G (lot 3) : `UserManagement` découpé en modules (`user-management/*`) pour isoler table utilisateurs, formulaires, permissions, constantes et types |
 | 2026-05-09 | — | Epic G (lot 4) : `DataExportImport` factorisé en types/constantes/utilitaires (`data-export-import/*`) avec composant principal recentré |
 | 2026-05-09 | — | Epic G (lot 5) : `AuditLogs` factorisé en types/constantes/utilitaires (`audit-logs/*`) avec composant principal simplifié |
+| 2026-05-09 | — | Epic G (lot 6) : `AppSettings` factorisé en types/constantes/utilitaires (`app-settings/*`) avec composants et actions simplifiés |

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   Card,
   CardContent,
@@ -37,57 +37,14 @@ import {
   // Delete as DeleteIcon,
   // Add as AddIcon,
 } from "@mui/icons-material";
-
-interface AppSettingsProps {
-  settings: {
-    general: {
-      appName: string;
-      appVersion: string;
-      environment: "development" | "staging" | "production";
-      timezone: string;
-      language: string;
-      currency: string;
-      dateFormat: string;
-      timeFormat: "12h" | "24h";
-    };
-    features: {
-      enableNotifications: boolean;
-      enableAuditLog: boolean;
-      enableBackup: boolean;
-      enableMaintenance: boolean;
-      enableReports: boolean;
-      enableUserManagement: boolean;
-      enableThemeCustomization: boolean;
-    };
-    limits: {
-      maxUsers: number;
-      maxTeams: number;
-      maxPlayers: number;
-      maxMatches: number;
-      maxFileSize: number;
-      maxBackups: number;
-    };
-    security: {
-      sessionTimeout: number;
-      maxLoginAttempts: number;
-      passwordMinLength: number;
-      requireTwoFactor: boolean;
-      allowedOrigins: string[];
-      enableCORS: boolean;
-    };
-    performance: {
-      cacheEnabled: boolean;
-      cacheTtl: number;
-      maxConcurrentRequests: number;
-      requestTimeout: number;
-      enableCompression: boolean;
-      enableGzip: boolean;
-    };
-  };
-  onSaveSettings: (settings: Record<string, unknown>) => Promise<void>;
-  onResetSettings: () => Promise<void>;
-  onTestConnection: (type: string) => Promise<void>;
-}
+import { CONNECTION_TESTS, FEATURE_CONFIG } from "@/components/app-settings/constants";
+import type { AppSettingsProps } from "@/components/app-settings/types";
+import {
+  getEnvironmentColor,
+  getEnvironmentLabel,
+  getFeatureColor,
+  getFeatureStatus,
+} from "@/components/app-settings/utils";
 
 export function AppSettings({
   settings,
@@ -145,40 +102,6 @@ export function AppSettings({
   const handleCancel = () => {
     setEditDialogOpen(false);
     setEditingSettings(settings);
-  };
-
-  const getEnvironmentColor = (env: string) => {
-    switch (env) {
-      case "development":
-        return "info";
-      case "staging":
-        return "warning";
-      case "production":
-        return "success";
-      default:
-        return "default";
-    }
-  };
-
-  const getEnvironmentLabel = (env: string) => {
-    switch (env) {
-      case "development":
-        return "Développement";
-      case "staging":
-        return "Staging";
-      case "production":
-        return "Production";
-      default:
-        return env;
-    }
-  };
-
-  const getFeatureStatus = (enabled: boolean) => {
-    return enabled ? "Activé" : "Désactivé";
-  };
-
-  const getFeatureColor = (enabled: boolean) => {
-    return enabled ? "success" : "default";
   };
 
   return (
@@ -546,30 +469,17 @@ export function AppSettings({
           <Divider sx={{ my: 3 }} />
 
           <Box display="flex" gap={2} flexWrap="wrap">
-            <Button
-              variant="outlined"
-              startIcon={<RefreshIcon />}
-              onClick={() => handleTestConnection("database")}
-              disabled={testing === "database"}
-            >
-              {testing === "database" ? "Test..." : "Tester la base de données"}
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<RefreshIcon />}
-              onClick={() => handleTestConnection("api")}
-              disabled={testing === "api"}
-            >
-              {testing === "api" ? "Test..." : "Tester l&apos;API"}
-            </Button>
-            <Button
-              variant="outlined"
-              startIcon={<RefreshIcon />}
-              onClick={() => handleTestConnection("cache")}
-              disabled={testing === "cache"}
-            >
-              {testing === "cache" ? "Test..." : "Tester le cache"}
-            </Button>
+            {CONNECTION_TESTS.map((connectionTest) => (
+              <Button
+                key={connectionTest.key}
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={() => handleTestConnection(connectionTest.key)}
+                disabled={testing === connectionTest.key}
+              >
+                {testing === connectionTest.key ? "Test..." : connectionTest.label}
+              </Button>
+            ))}
             <Button
               variant="outlined"
               startIcon={<RefreshIcon />}
@@ -743,30 +653,27 @@ export function AppSettings({
               Fonctionnalités
             </Typography>
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mb: 3 }}>
-              {Object.entries(editingSettings.features).map(([key, value]) => (
+              {FEATURE_CONFIG.map((feature) => (
                 <Box
                   sx={{ width: { xs: "100%", sm: "50%", md: "33.33%" } }}
-                  key={key}
+                  key={feature.key}
                 >
                   <FormControlLabel
                     control={
                       <Switch
-                        checked={value}
+                        checked={editingSettings.features[feature.key]}
                         onChange={(e) =>
                           setEditingSettings({
                             ...editingSettings,
                             features: {
                               ...editingSettings.features,
-                              [key]: e.target.checked,
+                              [feature.key]: e.target.checked,
                             },
                           })
                         }
                       />
                     }
-                    label={key
-                      .replace("enable", "")
-                      .replace(/([A-Z])/g, " $1")
-                      .trim()}
+                    label={feature.label}
                   />
                 </Box>
               ))}
