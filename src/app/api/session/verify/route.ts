@@ -1,6 +1,7 @@
 import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import { adminAuth, getFirestoreAdmin } from "@/lib/firebase-admin";
+import { USER_ROLES } from "@/lib/auth/roles";
 
 export const runtime = "nodejs";
 
@@ -89,7 +90,7 @@ export async function GET() {
     const user = {
       uid: decoded.uid,
       email: decoded.email || (userData?.email as string | undefined),
-      role: (userData?.role as string | undefined) || decoded.role || "player",
+      role: (userData?.role as string | undefined) || decoded.role || USER_ROLES.PLAYER,
       coachRequestStatus:
         (userData?.coachRequestStatus as string | undefined) ||
         decoded.coachRequestStatus ||

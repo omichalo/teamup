@@ -2,7 +2,7 @@
 
 Ce document consolide les constats des audits **phase 1** (qualité globale Next.js, sécurité, perf, tests) et **phase 2** (matrice des routes API + qualité des composants React). Il sert de **backlog traçable** : cocher les cases au fil des PR / merges.
 
-**Dernière mise à jour :** 2026-05-09 (Epic C)  
+**Dernière mise à jour :** 2026-05-09 (Epic D)  
 **Statuts :** `[ ]` à faire · `[~]` en cours · `[x]` terminé
 
 ---
@@ -34,7 +34,7 @@ Ce document consolide les constats des audits **phase 1** (qualité globale Next
 | A | Sécurité API : CSRF (`validateOrigin`), compléments rate limiting | ~~P0~~ **traité (2026-05-09)** |
 | B | En-têtes `Cache-Control` sur réponses sensibles | ~~P0 / P1~~ **traité (2026-05-09)** |
 | C | `export const runtime = "nodejs"` sur routes concernées | ~~P1~~ **traité (2026-05-09)** |
-| D | Cohérence des rôles (`resolveRole`, `hasAnyRole`, `USER_ROLES`) | P1 |
+| D | Cohérence des rôles (`resolveRole`, `hasAnyRole`, `USER_ROLES`) | ~~P1~~ **traité (2026-05-09)** |
 | E | Toolchain : ESLint vs build, config Next (`next.config.ts`) | P2 |
 | F | Stratégie rendu : réduction du `force-dynamic` global si pertinent | P2 |
 | G | Qualité React : découpage, couche API client, patterns | P2 |
@@ -129,10 +129,10 @@ Ce document consolide les constats des audits **phase 1** (qualité globale Next
 
 **Objectif :** Éviter les comparaisons magiques `"admin"`, `"coach"` ; utiliser `resolveRole`, `hasAnyRole`, `USER_ROLES`.
 
-- [ ] **D.1** Passer en revue **toutes** les routes API qui lisent `decoded.role` ou équivalent.
-- [ ] **D.2** Corriger les fichiers identifiés (ex. `discord/send-message`, `discord/update-custom-message`, autres grep `role !==` / `===`).
-- [ ] **D.3** Côté client : `useAuth` (`isAdmin`, `isCoach`, etc.) — aligner sur les constantes / types partagés si possible.
-- [ ] **D.4** Vérifier alignement **AuthGuard** (`allowedRoles`) vs routes API pour les pages modifiées (règle projet).
+- [x] **D.1** Revue des routes API : les comparaisons magiques restantes étaient surtout Discord + fallback session.
+- [x] **D.2** `discord/send-message`, `discord/update-custom-message` : `resolveRole` + `hasAnyRole([ADMIN, COACH])`. `session/verify` : fallback rôle avec `USER_ROLES.PLAYER`.
+- [x] **D.3** `useAuth` : `isAdmin` / `isCoach` / `isPlayer` via `USER_ROLES`.
+- [x] **D.4** `AuthGuard` : carte `fallbackByRole` indexée par `USER_ROLES.*` (pas de changement des pages ; middleware/API déjà sur les mêmes littéraux).
 
 ---
 
@@ -251,3 +251,4 @@ Pour chaque fichier (traiter par ordre métier / douleur) :
 | 2026-05-09 | — | Epic A complété : CSRF sur routes listées, rate limiting session / Discord / admin sync / discord config, doc `SECURITY.md`, helpers HTTP |
 | 2026-05-09 | — | Epic B complété : `lib/http/cache-headers`, `withAuth` + toutes les routes `app/api` en `jsonNoStore` / `applyNoStoreHeaders`, doc `SECURITY.md` |
 | 2026-05-09 | — | Epic C complété : `export const runtime = "nodejs"` sur les 14 routes restantes ; tous les `app/api/**/route.ts` ont l’export |
+| 2026-05-09 | — | Epic D complété : rôles Discord API + session/verify + `useAuth` + `AuthGuard` alignés sur `USER_ROLES` / helpers |

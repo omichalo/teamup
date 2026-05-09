@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { User } from "@/types";
+import { USER_ROLES } from "@/lib/auth/roles";
 
 // Stub minimal pour compatibilité avec l'ancien code
 // Le nouveau système utilise les cookies HTTP-only côté serveur
@@ -49,9 +50,10 @@ export const useAuth = () => {
     signOut,
     signIn: async () => ({ success: false, error: "Use /login page" }),
     signUp: async () => ({ success: false, error: "Use /signup page" }),
-    isAdmin: user?.role === "admin",
-    isCoach: user?.role === "coach" || user?.role === "admin",
-    isPlayer: user?.role === "player",
+    isAdmin: user?.role === USER_ROLES.ADMIN,
+    isCoach:
+      user?.role === USER_ROLES.COACH || user?.role === USER_ROLES.ADMIN,
+    isPlayer: user?.role === USER_ROLES.PLAYER,
     refreshUser,
     sendEmailVerification: async () => {},
   };
