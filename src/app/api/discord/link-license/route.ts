@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 import { jsonNoStore } from "@/lib/http/cache-headers";
 import { getFirestoreAdmin, initializeFirebaseAdmin } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
