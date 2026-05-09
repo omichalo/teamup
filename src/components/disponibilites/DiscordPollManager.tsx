@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Box,
   Button,
@@ -28,34 +28,20 @@ import {
   Cancel as CancelIcon,
   OpenInNew as OpenInNewIcon,
 } from "@mui/icons-material";
-import { ChampionshipType } from "@/types";
 import { useDiscordMembers } from "@/hooks/useDiscordMembers";
-
-interface DiscordPoll {
-  id: string;
-  messageId: string;
-  channelId: string;
-  journee: number;
-  phase: "aller" | "retour";
-  championshipType: ChampionshipType;
-  idEpreuve?: number;
-  date?: string;
-  isActive: boolean;
-  closedAt?: string | null;
-  createdAt?: string | null;
-  createdBy: string;
-}
-
-interface DiscordPollManagerProps {
-  journee: number | null;
-  phase: "aller" | "retour" | null;
-  championshipType: ChampionshipType | null;
-  idEpreuve?: number;
-  date?: string;
-  epreuveType?: "championnat_equipes" | "championnat_paris" | null;
-  fridayDate?: string;
-  saturdayDate?: string;
-}
+import { DEFAULT_CLOSE_MESSAGE, JSON_HEADERS } from "@/components/disponibilites/discord-poll-manager/constants";
+import type {
+  DiscordConfigState,
+  DiscordPoll,
+  DiscordPollManagerProps,
+  DiscordRole,
+  MentionAnchorState,
+  MentionableItem,
+} from "@/components/disponibilites/discord-poll-manager/types";
+import {
+  buildDefaultPollMessage,
+  filterMentionItems,
+} from "@/components/disponibilites/discord-poll-manager/utils";
 
 export function DiscordPollManager({
   journee,
@@ -83,30 +69,21 @@ export function DiscordPollManager({
   );
   const [loadingPoll, setLoadingPoll] = useState(false);
   const [hasActivePoll, setHasActivePoll] = useState(false);
-  const [discordConfig, setDiscordConfig] = useState<{
-    channelId: string | null;
-    mention: string | null;
-    channelName?: string | null;
-    mentionLabel?: string | null;
-  } | null>(null);
-  const [discordRoles, setDiscordRoles] = useState<
-    Array<{ id: string; name: string; color: number }>
-  >([]);
+  const [discordConfig, setDiscordConfig] = useState<DiscordConfigState | null>(
+    null
+  );
+  const [discordRoles, setDiscordRoles] = useState<DiscordRole[]>([]);
   const { members: discordMembers } = useDiscordMembers();
 
   // États pour l'autocomplete @ dans le message
-  const [mentionMenuAnchor, setMentionMenuAnchor] = useState<{
-    anchorEl: HTMLElement;
-    position: number;
-  } | null>(null);
+  const [mentionMenuAnchor, setMentionMenuAnchor] =
+    useState<MentionAnchorState | null>(null);
   const [mentionQuery, setMentionQuery] = useState("");
   const [messageTextareaRef, setMessageTextareaRef] =
     useState<HTMLTextAreaElement | null>(null);
   // États pour l'autocomplete @ dans le message de fermeture
-  const [closeMentionMenuAnchor, setCloseMentionMenuAnchor] = useState<{
-    anchorEl: HTMLElement;
-    position: number;
-  } | null>(null);
+  const [closeMentionMenuAnchor, setCloseMentionMenuAnchor] =
+    useState<MentionAnchorState | null>(null);
   const [closeMentionQuery, setCloseMentionQuery] = useState("");
   const [closeMessageTextareaRef, setCloseMessageTextareaRef] =
     useState<HTMLTextAreaElement | null>(null);
@@ -117,9 +94,7 @@ export function DiscordPollManager({
       const response = await fetch("/api/discord/roles", {
         method: "GET",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: JSON_HEADERS,
       });
       const result = await response.json();
 
@@ -139,23 +114,17 @@ export function DiscordPollManager({
           fetch("/api/admin/discord-availability-config", {
             method: "GET",
             credentials: "include",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: JSON_HEADERS,
           }),
           fetch("/api/discord/channels", {
             method: "GET",
             credentials: "include",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: JSON_HEADERS,
           }),
           fetch("/api/discord/roles", {
             method: "GET",
             credentials: "include",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: JSON_HEADERS,
           }),
         ]);
 
@@ -193,9 +162,7 @@ export function DiscordPollManager({
             mentionLabel = member ? member.displayName : null;
           } else if (roleMatch && rolesResponse.ok && rolesResult.success) {
             const roleId = roleMatch[1];
-            const role = rolesResult.roles?.find(
-              (r: { id: string; name: string }) => r.id === roleId
-            );
+            const role = rolesResult.roles?.find((r: DiscordRole) => r.id === roleId);
             mentionLabel = role ? `@${role.name}` : null;
           }
         }
@@ -227,77 +194,18 @@ export function DiscordPollManager({
   }, [createDialogOpen, fetchDiscordConfig, fetchDiscordRoles]);
 
   // Calculer le message par défaut pour la fermeture (sans la mention, elle sera ajoutée automatiquement)
-  const getDefaultCloseMessage = useCallback(() => {
-    return `Les inscriptions sont terminées pour cette journée.\n\nSi vous voulez vous ajoutez, il faut envoyer un message à Joffrey en privé.`;
-  }, []);
+  const getDefaultCloseMessage = useCallback(() => DEFAULT_CLOSE_MESSAGE, []);
 
-  // Calculer le message par défaut (sans la mention, elle sera ajoutée automatiquement)
   const getDefaultMessage = useCallback(() => {
-    if (epreuveType === "championnat_equipes") {
-      // Utiliser les dates passées en props si disponibles (déjà formatées correctement)
-      const fridayLabel = propFridayDate
-        ? (() => {
-            // Parser la date en évitant les problèmes de timezone
-            const [year, month, day] = propFridayDate.split("-").map(Number);
-            const date = new Date(year, month - 1, day);
-            return date.toLocaleDateString("fr-FR", {
-              weekday: "long",
-              day: "numeric",
-              month: "numeric",
-            });
-          })()
-        : fridayDate
-        ? (() => {
-            const [year, month, day] = fridayDate.split("-").map(Number);
-            const date = new Date(year, month - 1, day);
-            return date.toLocaleDateString("fr-FR", {
-              weekday: "long",
-              day: "numeric",
-              month: "numeric",
-            });
-          })()
-        : "{fridayDate}";
-      const saturdayLabel = propSaturdayDate
-        ? (() => {
-            const [year, month, day] = propSaturdayDate.split("-").map(Number);
-            const date = new Date(year, month - 1, day);
-            return date.toLocaleDateString("fr-FR", {
-              weekday: "long",
-              day: "numeric",
-              month: "numeric",
-            });
-          })()
-        : saturdayDate
-        ? (() => {
-            const [year, month, day] = saturdayDate.split("-").map(Number);
-            const date = new Date(year, month - 1, day);
-            return date.toLocaleDateString("fr-FR", {
-              weekday: "long",
-              day: "numeric",
-              month: "numeric",
-            });
-          })()
-        : "{saturdayDate}";
-      return `Bonjour,\n\nProchaine journée de championnat par équipes le ${fridayLabel} (${saturdayLabel} pour les rég et équipes filles).\n\nMerci de me dire si vous êtes disponibles!\n\nPour les filles, merci de préciser vendredi et/ou samedi.`;
-    } else {
-      // Formater la date pour le championnat de Paris : "ce vendredi 24 mai"
-      const parisDateLabel = date
-        ? (() => {
-            const dateObj = new Date(date);
-            const weekday = dateObj.toLocaleDateString("fr-FR", {
-              weekday: "long",
-            });
-            const day = dateObj.getDate();
-            const month = dateObj.toLocaleDateString("fr-FR", {
-              month: "long",
-            });
-            return `ce ${weekday} ${day} ${month}`;
-          })()
-        : "{date}";
-      return `Bonjour,\n\nProchaine journée de championnat de Paris - Journée ${
-        journee || "{journee}"
-      }${date ? ` ${parisDateLabel}` : ""}.\n\nMerci de me dire si vous êtes disponibles!`;
-    }
+    return buildDefaultPollMessage({
+      epreuveType,
+      propFridayDate,
+      propSaturdayDate,
+      fridayDate,
+      saturdayDate,
+      journee,
+      date,
+    });
   }, [
     epreuveType,
     propFridayDate,
@@ -356,13 +264,7 @@ export function DiscordPollManager({
   const insertMention = useCallback(
     (
       startPos: number,
-      member: {
-        id: string;
-        username?: string;
-        displayName: string;
-        name?: string;
-        type: "user" | "role";
-      },
+      member: MentionableItem,
       isCloseMessage = false
     ) => {
       const mention =
@@ -415,25 +317,11 @@ export function DiscordPollManager({
     isCloseMessage?: boolean;
   }) => {
     // Combiner utilisateurs et rôles
-    const allMentions = [
-      ...(discordMembers || []).map((m) => ({ ...m, type: "user" as const })),
-      ...(discordRoles || []).map((r) => ({
-        ...r,
-        type: "role" as const,
-        displayName: r.name,
-      })),
-    ];
-
-    const filtered = allMentions
-      .filter((item) => {
-        const searchQuery = query.toLowerCase();
-        return (
-          item.displayName.toLowerCase().includes(searchQuery) ||
-          ("username" in item &&
-            item.username.toLowerCase().includes(searchQuery))
-        );
-      })
-      .slice(0, 10);
+    const filtered = filterMentionItems({
+      discordMembers: discordMembers || [],
+      discordRoles,
+      query,
+    });
 
     if (filtered.length === 0) {
       return null;
@@ -548,9 +436,7 @@ export function DiscordPollManager({
       const response = await fetch("/api/discord/availability-polls", {
         method: "GET",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: JSON_HEADERS,
       });
 
       const result = await response.json();
@@ -621,9 +507,7 @@ export function DiscordPollManager({
         {
           method: "GET",
           credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: JSON_HEADERS,
         }
       );
 
@@ -694,9 +578,7 @@ export function DiscordPollManager({
       const response = await fetch("/api/discord/availability-polls/create", {
         method: "POST",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: JSON_HEADERS,
         body: JSON.stringify({
           journee,
           phase,
@@ -779,9 +661,7 @@ export function DiscordPollManager({
         {
           method: "POST",
           credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: JSON_HEADERS,
           body: JSON.stringify({
             messageTemplate: finalCloseMessageTemplate,
           }),
@@ -1120,28 +1000,11 @@ export function DiscordPollManager({
               }}
               onKeyDown={(e) => {
                 if (mentionMenuAnchor) {
-                  const allMentions = [
-                    ...(discordMembers || []).map((m) => ({
-                      ...m,
-                      type: "user" as const,
-                    })),
-                    ...(discordRoles || []).map((r) => ({
-                      ...r,
-                      type: "role" as const,
-                      displayName: r.name,
-                    })),
-                  ];
-
-                  const filtered = allMentions
-                    .filter((item) => {
-                      const searchQuery = mentionQuery.toLowerCase();
-                      return (
-                        item.displayName.toLowerCase().includes(searchQuery) ||
-                        ("username" in item &&
-                          item.username.toLowerCase().includes(searchQuery))
-                      );
-                    })
-                    .slice(0, 10);
+                  const filtered = filterMentionItems({
+                    discordMembers: discordMembers || [],
+                    discordRoles,
+                    query: mentionQuery,
+                  });
 
                   if (
                     e.key === "ArrowDown" ||
@@ -1327,28 +1190,11 @@ export function DiscordPollManager({
               }}
               onKeyDown={(e) => {
                 if (closeMentionMenuAnchor) {
-                  const allMentions = [
-                    ...(discordMembers || []).map((m) => ({
-                      ...m,
-                      type: "user" as const,
-                    })),
-                    ...(discordRoles || []).map((r) => ({
-                      ...r,
-                      type: "role" as const,
-                      displayName: r.name,
-                    })),
-                  ];
-
-                  const filtered = allMentions
-                    .filter((item) => {
-                      const searchQuery = closeMentionQuery.toLowerCase();
-                      return (
-                        item.displayName.toLowerCase().includes(searchQuery) ||
-                        ("username" in item &&
-                          item.username.toLowerCase().includes(searchQuery))
-                      );
-                    })
-                    .slice(0, 10);
+                  const filtered = filterMentionItems({
+                    discordMembers: discordMembers || [],
+                    discordRoles,
+                    query: closeMentionQuery,
+                  });
 
                   if (
                     e.key === "ArrowDown" ||
