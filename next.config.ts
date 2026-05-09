@@ -18,12 +18,8 @@ const nextConfig: NextConfig = {
     return "build-" + Date.now();
   },
   productionBrowserSourceMaps: true,
-  webpack: (config, { dev }) => {
-    if (dev) {
-      config.devtool = "source-map";
-    }
-    return config;
-  },
+  // Ne pas définir webpack devtool en dev : Next.js impose la valeur adaptée au mode
+  // (voir https://nextjs.org/docs/messages/improper-devtool — source-map en dev dégrade fortement les perfs).
   // Forcer l'injection des variables d'environnement au build
   // Next.js injecte NEXT_PUBLIC_* dans le bundle client au moment du build
   env: {
