@@ -1,11 +1,32 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase-admin";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
+import { getClientIp } from "@/lib/auth/request-ip";
+import {
+  enforceRateLimit,
+  RATE_LIMIT_SESSION_POST_PER_IP,
+} from "@/lib/auth/rate-limit-http";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
   try {
+    if (!validateOrigin(req)) {
+      return NextResponse.json(
+        { error: "Invalid origin", message: "Requête non autorisée" },
+        { status: 403 }
+      );
+    }
+
+    const ip = getClientIp(req);
+    const rateLimited = enforceRateLimit(
+      `session:post:${ip}`,
+      RATE_LIMIT_SESSION_POST_PER_IP.max,
+      RATE_LIMIT_SESSION_POST_PER_IP.windowMs
+    );
+    if (rateLimited) return rateLimited;
+
     const body = await req.json().catch(() => ({}));
     const { idToken } = body;
 

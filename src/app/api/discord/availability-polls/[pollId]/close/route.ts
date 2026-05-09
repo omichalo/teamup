@@ -7,6 +7,11 @@ import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
 import { initializeFirebaseAdmin } from "@/lib/firebase-admin";
 import { DiscordPollServiceAdmin } from "@/lib/services/discord-poll-service-admin";
 import { ChampionshipType } from "@/types/championship";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
+import {
+  enforceRateLimit,
+  RATE_LIMIT_DISCORD_POLL_MUTATION_PER_UID,
+} from "@/lib/auth/rate-limit-http";
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 
@@ -18,6 +23,13 @@ export async function POST(
   context: { params: Promise<{ pollId: string }> }
 ) {
   try {
+    if (!validateOrigin(req)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid origin" },
+        { status: 403 }
+      );
+    }
+
     const params = await context.params;
 
     // Vérifier l'authentification
@@ -47,6 +59,13 @@ export async function POST(
         { status: 403 }
       );
     }
+
+    const pollRl = enforceRateLimit(
+      `discord:poll-close:${decoded.uid}`,
+      RATE_LIMIT_DISCORD_POLL_MUTATION_PER_UID.max,
+      RATE_LIMIT_DISCORD_POLL_MUTATION_PER_UID.windowMs
+    );
+    if (pollRl) return pollRl;
 
     if (!DISCORD_TOKEN) {
       return NextResponse.json(

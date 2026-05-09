@@ -3,31 +3,12 @@ import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
+import {
+  enforceRateLimit,
+  RATE_LIMIT_FIREBASE_CUSTOM_TOKEN_PER_UID,
+} from "@/lib/auth/rate-limit-http";
 
 export const runtime = "nodejs";
-
-// Rate limiting simple en mémoire (pour éviter les abus)
-// En production, utilisez un service dédié comme Redis
-const tokenRequests = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
-const RATE_LIMIT_MAX_REQUESTS = 10; // Max 10 requêtes par minute
-
-function checkRateLimit(uid: string): boolean {
-  const now = Date.now();
-  const userLimit = tokenRequests.get(uid);
-
-  if (!userLimit || now > userLimit.resetAt) {
-    tokenRequests.set(uid, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
-    return true;
-  }
-
-  if (userLimit.count >= RATE_LIMIT_MAX_REQUESTS) {
-    return false;
-  }
-
-  userLimit.count++;
-  return true;
-}
 
 export async function POST(req: NextRequest) {
   // Valider l'origine de la requête pour prévenir les attaques CSRF
@@ -47,15 +28,14 @@ export async function POST(req: NextRequest) {
 
   try {
     const decoded = await adminAuth.verifySessionCookie(cookie, true);
-    
-    // Rate limiting par utilisateur
-    if (!checkRateLimit(decoded.uid)) {
-      return NextResponse.json(
-        { error: "Too many requests" },
-        { status: 429 }
-      );
-    }
-    
+
+    const limited = enforceRateLimit(
+      `session:firebase-token:${decoded.uid}`,
+      RATE_LIMIT_FIREBASE_CUSTOM_TOKEN_PER_UID.max,
+      RATE_LIMIT_FIREBASE_CUSTOM_TOKEN_PER_UID.windowMs
+    );
+    if (limited) return limited;
+
     // Créer un custom token pour cet utilisateur
     const customToken = await adminAuth.createCustomToken(decoded.uid, {
       role: decoded.role,
@@ -68,4 +48,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid session" }, { status: 401 });
   }
 }
-

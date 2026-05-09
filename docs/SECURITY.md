@@ -120,6 +120,46 @@ Ce projet utilise les secrets suivants (stockés dans Firebase Secret Manager en
 
 **Note** : Cette liste est fournie à titre informatif. Les valeurs réelles ne doivent jamais être exposées.
 
+## API : CSRF (`validateOrigin`) et rate limiting
+
+Les mutations exposées au navigateur sur la même origine passent par **`validateOrigin`** (`src/lib/auth/csrf-utils.ts`), qui vérifie `Origin` / `Referer` / `Host` par rapport à `APP_URL` ou `NEXT_PUBLIC_APP_URL`. En développement, `localhost` est autorisé.
+
+### Politique par type de route
+
+| Type | CSRF (`validateOrigin`) | Rate limiting |
+|------|-------------------------|---------------|
+| Formulaires / fetch same-origin avec cookie de session | **Oui** sur POST/PATCH/DELETE concernés | Identifiants stables (IP ou `uid`) via `checkRateLimit` / `enforceRateLimit` |
+| Webhooks Discord (`discord/interactions`) | **N/A** — signature Ed25519 | N/A (Discord applique ses propres limites) |
+| Webhooks / secrets serveur (`discord/link-license`, etc.) | **N/A** — secret partagé ou équivalent | Optionnel selon la route |
+| Envoi d’emails anonymes (`auth/send-password-reset`, `auth/send-verification`) | **N/A** — pas de session cookie | **Oui** — limite par email (voir routes) |
+| Lecture OpenAPI (`openapi`) | **N/A** — GET public | N/A |
+| Health (`health`) | **N/A** | N/A |
+
+### Inventaire des mutations (référence maintenance)
+
+**Session & auth navigateur**
+
+- `POST /api/session` — CSRF oui ; rate limit **par IP** (`session:post:<ip>`).
+- `POST /api/session/firebase-token` — CSRF oui ; rate limit **par uid** (`session:firebase-token:<uid>`).
+
+**Discord (proxy HTTP avec cookie)**
+
+- `POST /api/discord/send-message` — CSRF oui ; rate limit par uid.
+- `POST /api/discord/update-custom-message` — CSRF oui ; rate limit par uid.
+- `POST /api/discord/availability-polls/create` — CSRF oui ; rate limit par uid (sondages).
+- `POST /api/discord/availability-polls/[pollId]/close` — CSRF oui ; rate limit par uid.
+
+**Admin**
+
+- `POST /api/admin/discord-availability-config` — CSRF oui ; rate limit par uid (admin).
+- `POST /api/admin/sync-teams` — CSRF déjà présent ; rate limit par uid (sync).
+- `POST /api/admin/sync-players` — idem.
+- `POST /api/admin/sync-team-matches` — idem.
+
+Les autres routes admin / coach déjà couvertes par l’audit (ex. `brulage/validate`, `coach/request`, `teams/.../location`) conservent leur `validateOrigin` existant.
+
+**Limitation** : le rate limiting en mémoire n’est pas distribué ; pour plusieurs instances, prévoir Redis ou équivalent.
+
 ## Audit de sécurité automatisé
 
 Le projet utilise des outils automatisés pour détecter les secrets commités par erreur :

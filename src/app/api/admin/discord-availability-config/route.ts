@@ -9,6 +9,11 @@ import {
   initializeFirebaseAdmin,
 } from "@/lib/firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
+import {
+  enforceRateLimit,
+  RATE_LIMIT_ADMIN_DISCORD_CONFIG_PER_UID,
+} from "@/lib/auth/rate-limit-http";
 
 const COLLECTION_NAME = "discordAvailabilityConfig";
 const DOCUMENT_ID = "default";
@@ -93,6 +98,13 @@ export async function GET() {
  */
 export async function POST(req: Request) {
   try {
+    if (!validateOrigin(req)) {
+      return NextResponse.json(
+        { success: false, error: "Invalid origin" },
+        { status: 403 }
+      );
+    }
+
     // Vérifier l'authentification
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
@@ -120,6 +132,13 @@ export async function POST(req: Request) {
         { status: 403 }
       );
     }
+
+    const configRl = enforceRateLimit(
+      `admin:discord-availability-config:${decoded.uid}`,
+      RATE_LIMIT_ADMIN_DISCORD_CONFIG_PER_UID.max,
+      RATE_LIMIT_ADMIN_DISCORD_CONFIG_PER_UID.windowMs
+    );
+    if (configRl) return configRl;
 
     const body = await req.json();
     const { parisChannelId, equipesChannelId, parisMention, equipesMention } =
