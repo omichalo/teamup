@@ -1,4 +1,6 @@
-import { NextResponse } from "next/server";
+export const runtime = "nodejs";
+
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
@@ -52,7 +54,7 @@ export async function POST(req: NextRequest) {
   try {
     // Valider l'origine de la requête pour prévenir les attaques CSRF
     if (!validateOrigin(req)) {
-      return NextResponse.json(
+      return jsonNoStore(
         {
           success: false,
           error: "Invalid origin",
@@ -65,7 +67,7 @@ export async function POST(req: NextRequest) {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
     if (!sessionCookie) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Session cookie requis" },
         { status: 401 }
       );
@@ -75,7 +77,7 @@ export async function POST(req: NextRequest) {
     const requesterRole = resolveRole(decoded.role as string | undefined);
 
     if (!hasAnyRole(requesterRole, ADMIN_ONLY_ROLES)) {
-      return NextResponse.json(
+      return jsonNoStore(
         {
           success: false,
           error: "Accès refusé",
@@ -91,7 +93,7 @@ export async function POST(req: NextRequest) {
       body ?? {};
 
     if (!userId || typeof userId !== "string") {
-      return NextResponse.json(
+      return jsonNoStore(
         {
           success: false,
           error: "Paramètre 'userId' invalide",
@@ -103,7 +105,7 @@ export async function POST(req: NextRequest) {
     const resolvedRole = resolveRole(role ?? null);
 
     if (!MANAGED_ROLES.includes(resolvedRole)) {
-      return NextResponse.json(
+      return jsonNoStore(
         {
           success: false,
           error: "Rôle invalide",
@@ -164,7 +166,7 @@ export async function POST(req: NextRequest) {
       success: true,
     });
 
-    const res = NextResponse.json(
+    return jsonNoStore(
       {
         success: true,
         data: {
@@ -175,10 +177,6 @@ export async function POST(req: NextRequest) {
       },
       { status: 200 }
     );
-    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    res.headers.set("Pragma", "no-cache");
-    res.headers.set("Expires", "0");
-    return res;
   } catch (error) {
     console.error("[app/api/admin/users/set-role] error", error);
     
@@ -198,7 +196,7 @@ export async function POST(req: NextRequest) {
       // Ignorer les erreurs de logging d'audit
     }
 
-    const res = NextResponse.json(
+    return jsonNoStore(
       {
         success: false,
         error: "Erreur lors de la mise à jour du rôle",
@@ -206,8 +204,6 @@ export async function POST(req: NextRequest) {
       },
       { status: 500 }
     );
-    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    return res;
   }
 }
 

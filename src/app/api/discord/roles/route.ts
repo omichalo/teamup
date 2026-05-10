@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
@@ -23,7 +23,7 @@ export async function GET() {
     const sessionCookie = cookieStore.get("__session")?.value;
     
     if (!sessionCookie) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Non authentifié" },
         { status: 401 }
       );
@@ -31,7 +31,7 @@ export async function GET() {
 
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     if (!decoded.email_verified) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Email non vérifié" },
         { status: 403 }
       );
@@ -40,14 +40,14 @@ export async function GET() {
     // Vérifier que l'utilisateur est admin ou coach
     const role = resolveRole(decoded.role as string | undefined);
     if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Accès refusé" },
         { status: 403 }
       );
     }
 
     if (!DISCORD_TOKEN || !DISCORD_SERVER_ID) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Configuration Discord manquante" },
         { status: 500 }
       );
@@ -67,7 +67,7 @@ export async function GET() {
     if (!response.ok) {
       const errorText = await response.text();
       console.error("[Discord Roles] Erreur lors de la récupération des rôles:", errorText);
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: `Erreur lors de la récupération des rôles Discord: ${errorText}` },
         { status: response.status }
       );
@@ -98,13 +98,13 @@ export async function GET() {
 
     console.log("[Discord Roles] Rôles retournés:", allRoles.length, allRoles.map(r => r.name));
 
-    return NextResponse.json({ 
+    return jsonNoStore({ 
       success: true, 
       roles: allRoles,
     });
   } catch (error) {
     console.error("[Discord Roles] Erreur:", error);
-    return NextResponse.json(
+    return jsonNoStore(
       { success: false, error: "Erreur lors de la récupération des rôles" },
       { status: 500 }
     );

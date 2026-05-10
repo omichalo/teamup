@@ -1,15 +1,27 @@
-import { NextResponse } from "next/server";
+export const runtime = "nodejs";
+
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, COACH_REQUEST_STATUS, resolveRole } from "@/lib/auth/roles";
 import { FieldValue } from "firebase-admin/firestore";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
+import { logAuditAction, AUDIT_ACTIONS } from "@/lib/auth/audit-logger";
 
 export async function POST(req: Request) {
   try {
+    // CSRF Protection
+    if (!validateOrigin(req)) {
+      return jsonNoStore(
+        { success: false, error: "Invalid origin" },
+        { status: 403 }
+      );
+    }
+
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
     if (!sessionCookie) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Authentification requise" },
         { status: 401 }
       );
@@ -22,7 +34,7 @@ export async function POST(req: Request) {
       !hasAnyRole(role, [USER_ROLES.PLAYER]) &&
       !hasAnyRole(role, [USER_ROLES.COACH, USER_ROLES.ADMIN])
     ) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Accès refusé" },
         { status: 403 }
       );
@@ -54,14 +66,18 @@ export async function POST(req: Request) {
       });
     }
 
-    console.log("[app/api/coach/request] Coach request submitted successfully", {
-      uid: decoded.uid,
+    // Audit logging
+    logAuditAction(AUDIT_ACTIONS.COACH_REQUEST_SUBMITTED, decoded.uid, {
+      resource: "user",
+      resourceId: decoded.uid,
+      details: { message },
+      success: true,
     });
 
-    return NextResponse.json({ success: true }, { status: 200 });
+    return jsonNoStore({ success: true }, { status: 200 });
   } catch (error) {
     console.error("[app/api/coach/request] error", error);
-    return NextResponse.json(
+    return jsonNoStore(
       {
         success: false,
         error: "Impossible d'enregistrer la demande",

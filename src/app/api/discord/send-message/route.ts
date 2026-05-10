@@ -1,12 +1,27 @@
-import { NextResponse } from "next/server";
+export const runtime = "nodejs";
+
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase-admin";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
+import {
+  enforceRateLimit,
+  RATE_LIMIT_DISCORD_PROXY_PER_UID,
+} from "@/lib/auth/rate-limit-http";
+import { hasAnyRole, resolveRole, USER_ROLES } from "@/lib/auth/roles";
 
 const db = getFirestore();
 
 export async function POST(req: Request) {
   try {
+    if (!validateOrigin(req)) {
+      return jsonNoStore(
+        { success: false, error: "Invalid origin" },
+        { status: 403 }
+      );
+    }
+
     // Configuration du bot Discord (vérifier à l'intérieur de la fonction)
     const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
     const DISCORD_SERVER_ID = process.env.DISCORD_SERVER_ID;
@@ -16,7 +31,7 @@ export async function POST(req: Request) {
         hasToken: !!DISCORD_TOKEN,
         hasServerId: !!DISCORD_SERVER_ID,
       });
-      return NextResponse.json(
+      return jsonNoStore(
         {
           success: false,
           error:
@@ -31,18 +46,24 @@ export async function POST(req: Request) {
     const sessionCookie = cookieStore.get("__session")?.value;
 
     if (!sessionCookie) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Non authentifié" },
         { status: 401 }
       );
     }
 
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    const role = decoded.role || "player";
 
-    // Seuls les admins et coaches peuvent envoyer des messages Discord
-    if (role !== "admin" && role !== "coach") {
-      return NextResponse.json(
+    const discordRl = enforceRateLimit(
+      `discord:send-message:${decoded.uid}`,
+      RATE_LIMIT_DISCORD_PROXY_PER_UID.max,
+      RATE_LIMIT_DISCORD_PROXY_PER_UID.windowMs
+    );
+    if (discordRl) return discordRl;
+
+    const role = resolveRole(decoded.role as string | undefined);
+    if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
+      return jsonNoStore(
         { success: false, error: "Accès refusé" },
         { status: 403 }
       );
@@ -52,14 +73,14 @@ export async function POST(req: Request) {
       await req.json();
 
     if (!content || typeof content !== "string") {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Le contenu du message est requis" },
         { status: 400 }
       );
     }
 
     if (!teamId || journee === undefined || !phase) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "teamId, journee et phase sont requis" },
         { status: 400 }
       );
@@ -77,7 +98,7 @@ export async function POST(req: Request) {
 
     // Le channelId doit être fourni (configuré au niveau de l'équipe)
     if (!channelId) {
-      return NextResponse.json(
+      return jsonNoStore(
         {
           success: false,
           error:
@@ -108,7 +129,7 @@ export async function POST(req: Request) {
     if (!response.ok) {
       const errorText = await response.text();
       console.error("[Discord] Erreur lors de l'envoi:", errorText);
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Erreur lors de l'envoi du message Discord" },
         { status: 500 }
       );
@@ -136,10 +157,10 @@ export async function POST(req: Request) {
       // Ne pas faire échouer l'envoi si l'enregistrement échoue
     }
 
-    return NextResponse.json({ success: true });
+    return jsonNoStore({ success: true });
   } catch (error) {
     console.error("[Discord] Erreur:", error);
-    return NextResponse.json(
+    return jsonNoStore(
       { success: false, error: "Erreur lors de l'envoi du message" },
       { status: 500 }
     );

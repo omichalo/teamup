@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import { adminAuth } from "@/lib/firebase-admin";
 import { sendMail } from "@/lib/mailer";
 import { readFile } from "fs/promises";
@@ -8,17 +8,26 @@ import { checkRateLimit } from "@/lib/auth/rate-limit";
 
 export const runtime = "nodejs";
 
+function getAuthErrorCode(error: unknown): string {
+  if (typeof error !== "object" || error === null) {
+    return "";
+  }
+
+  const maybeCode = (error as { code?: unknown }).code;
+  return typeof maybeCode === "string" ? maybeCode : "";
+}
+
 export async function POST(req: Request) {
   try {
     const { email } = await req.json();
     if (!email || typeof email !== "string") {
-      return NextResponse.json({ error: "Email requis" }, { status: 400 });
+      return jsonNoStore({ error: "Email requis" }, { status: 400 });
     }
 
     // Validation du format email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return NextResponse.json(
+      return jsonNoStore(
         { error: "Format d'email invalide" },
         { status: 400 }
       );
@@ -27,7 +36,7 @@ export async function POST(req: Request) {
     // Rate limiting par email (3 requêtes par 15 minutes)
     const rateLimitResult = checkRateLimit(`email:${email}`, 3, 15 * 60 * 1000);
     if (!rateLimitResult.allowed) {
-      return NextResponse.json(
+      return jsonNoStore(
         {
           error: "Trop de requêtes",
           message: `Veuillez patienter avant de renvoyer un email. Prochaine tentative possible dans ${Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000 / 60)} minutes.`,
@@ -91,17 +100,27 @@ export async function POST(req: Request) {
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const authCode = getAuthErrorCode(error);
       
       // Erreurs Firebase spécifiques
-      if (errorMessage.includes("user-not-found") || errorMessage.includes("USER_NOT_FOUND")) {
-        return NextResponse.json(
+      if (
+        authCode === "auth/user-not-found" ||
+        errorMessage.includes("user-not-found") ||
+        errorMessage.includes("USER_NOT_FOUND") ||
+        errorMessage.includes("no user record")
+      ) {
+        return jsonNoStore(
           { error: "Utilisateur non trouvé", message: "Aucun compte n'est associé à cet email" },
           { status: 404 }
         );
       }
       
-      if (errorMessage.includes("invalid-email") || errorMessage.includes("INVALID_EMAIL")) {
-        return NextResponse.json(
+      if (
+        authCode === "auth/invalid-email" ||
+        errorMessage.includes("invalid-email") ||
+        errorMessage.includes("INVALID_EMAIL")
+      ) {
+        return jsonNoStore(
           { error: "Email invalide", message: "L'adresse email n'est pas valide" },
           { status: 400 }
         );
@@ -109,7 +128,7 @@ export async function POST(req: Request) {
 
       // Autres erreurs Firebase
       console.error("[send-verification] Erreur Firebase:", error);
-      return NextResponse.json(
+      return jsonNoStore(
         { error: "Erreur lors de la génération du lien", message: getFirebaseErrorMessage(error) },
         { status: 500 }
       );
@@ -155,18 +174,13 @@ export async function POST(req: Request) {
       });
     } catch (error) {
       console.error("[send-verification] Erreur lors de l'envoi de l'email:", error);
-      return NextResponse.json(
+      return jsonNoStore(
         { error: "Erreur lors de l'envoi de l'email", message: "Impossible d'envoyer l'email de vérification" },
         { status: 500 }
       );
     }
 
-    const res = NextResponse.json({ ok: true });
-    // Ajouter Cache-Control pour éviter la mise en cache
-    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    res.headers.set("Pragma", "no-cache");
-    res.headers.set("Expires", "0");
-    return res;
+    return jsonNoStore({ ok: true });
   } catch (error) {
     // Logger l'erreur complète côté serveur pour le débogage
     console.error("[send-verification] error", error);
@@ -185,11 +199,9 @@ export async function POST(req: Request) {
       statusCode = 429;
     }
 
-    const res = NextResponse.json(
+    return jsonNoStore(
       { error: errorMessage },
       { status: statusCode }
     );
-    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-    return res;
   }
 }

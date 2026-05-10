@@ -1,4 +1,6 @@
-import { NextResponse } from "next/server";
+export const runtime = "nodejs";
+
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase-admin";
 
@@ -12,7 +14,7 @@ export async function GET() {
     const sessionCookie = cookieStore.get("__session")?.value;
     
     if (!sessionCookie) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Non authentifié" },
         { status: 401 }
       );
@@ -21,7 +23,7 @@ export async function GET() {
     await adminAuth.verifySessionCookie(sessionCookie, true);
 
     if (!DISCORD_TOKEN || !DISCORD_SERVER_ID) {
-      return NextResponse.json(
+      return jsonNoStore(
         { success: false, error: "Configuration Discord manquante" },
         { status: 500 }
       );
@@ -66,7 +68,7 @@ export async function GET() {
           // Si l'erreur n'est pas du JSON, utiliser le message d'erreur tel quel
         }
         
-        return NextResponse.json(
+        return jsonNoStore(
           { success: false, error: errorMessage, details: errorText },
           { status: response.status }
         );
@@ -102,10 +104,10 @@ export async function GET() {
     // Trier par nom d'affichage
     members.sort((a, b) => a.displayName.localeCompare(b.displayName));
 
-    return NextResponse.json({ success: true, members });
+    return jsonNoStore({ success: true, members });
   } catch (error) {
     console.error("[Discord] Erreur:", error);
-    return NextResponse.json(
+    return jsonNoStore(
       { success: false, error: "Erreur lors de la récupération des membres" },
       { status: 500 }
     );

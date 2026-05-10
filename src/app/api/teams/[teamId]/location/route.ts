@@ -1,4 +1,6 @@
-import { NextResponse } from "next/server";
+export const runtime = "nodejs";
+
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import { NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import {
@@ -7,16 +9,26 @@ import {
   adminAuth,
 } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
+import { logAuditAction, AUDIT_ACTIONS } from "@/lib/auth/audit-logger";
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ teamId: string }> }
 ) {
   try {
+    // CSRF Protection
+    if (!validateOrigin(request)) {
+      return jsonNoStore(
+        { success: false, error: "Invalid origin" },
+        { status: 403 }
+      );
+    }
+
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
     if (!sessionCookie) {
-      return NextResponse.json(
+      return jsonNoStore(
         {
           error: "Token d'authentification requis",
           message: "Cette API nécessite une authentification valide",
@@ -29,7 +41,7 @@ export async function PATCH(
     const role = resolveRole(decoded.role as string | undefined);
 
     if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
-      return NextResponse.json(
+      return jsonNoStore(
         {
           error: "Accès refusé",
           message:
@@ -43,7 +55,7 @@ export async function PATCH(
     const { location } = await request.json();
 
     if (location !== null && location !== undefined && typeof location !== "string") {
-      return NextResponse.json(
+      return jsonNoStore(
         {
           error: "Le lieu doit être une chaîne de caractères ou null",
         },
@@ -58,7 +70,7 @@ export async function PATCH(
     const teamDoc = await teamRef.get();
 
     if (!teamDoc.exists) {
-      return NextResponse.json(
+      return jsonNoStore(
         {
           error: "Équipe introuvable",
         },
@@ -71,7 +83,7 @@ export async function PATCH(
       const locationRef = db.collection("locations").doc(location.trim());
       const locationDoc = await locationRef.get();
       if (!locationDoc.exists) {
-        return NextResponse.json(
+        return jsonNoStore(
           {
             error: "Lieu introuvable",
           },
@@ -93,7 +105,15 @@ export async function PATCH(
 
     await teamRef.update(updateData);
 
-    return NextResponse.json({
+    // Audit logging
+    logAuditAction(AUDIT_ACTIONS.TEAM_UPDATED, decoded.uid, {
+      resource: "team",
+      resourceId: teamId,
+      details: { location: updateData.location },
+      success: true,
+    });
+
+    return jsonNoStore({
       success: true,
       data: {
         teamId,
@@ -102,7 +122,7 @@ export async function PATCH(
     });
   } catch (error) {
     console.error("[app/api/teams/[teamId]/location] PATCH error", error);
-    return NextResponse.json(
+    return jsonNoStore(
       {
         success: false,
         error: "Erreur lors de la mise à jour du lieu",
