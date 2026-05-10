@@ -1,25 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Box,
   Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Typography,
   Alert,
   CircularProgress,
   Chip,
   Tooltip,
-  TextField,
-  Popper,
-  Paper,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -28,34 +16,23 @@ import {
   Cancel as CancelIcon,
   OpenInNew as OpenInNewIcon,
 } from "@mui/icons-material";
-import { ChampionshipType } from "@/types";
 import { useDiscordMembers } from "@/hooks/useDiscordMembers";
-
-interface DiscordPoll {
-  id: string;
-  messageId: string;
-  channelId: string;
-  journee: number;
-  phase: "aller" | "retour";
-  championshipType: ChampionshipType;
-  idEpreuve?: number;
-  date?: string;
-  isActive: boolean;
-  closedAt?: string | null;
-  createdAt?: string | null;
-  createdBy: string;
-}
-
-interface DiscordPollManagerProps {
-  journee: number | null;
-  phase: "aller" | "retour" | null;
-  championshipType: ChampionshipType | null;
-  idEpreuve?: number;
-  date?: string;
-  epreuveType?: "championnat_equipes" | "championnat_paris" | null;
-  fridayDate?: string;
-  saturdayDate?: string;
-}
+import { DEFAULT_CLOSE_MESSAGE, JSON_HEADERS } from "@/components/disponibilites/discord-poll-manager/constants";
+import type {
+  DiscordConfigState,
+  DiscordPoll,
+  DiscordPollManagerProps,
+  DiscordRole,
+  MentionAnchorState,
+  MentionableItem,
+} from "@/components/disponibilites/discord-poll-manager/types";
+import {
+  buildDefaultPollMessage,
+  filterMentionItems,
+} from "@/components/disponibilites/discord-poll-manager/utils";
+import { CreatePollDialog } from "@/components/disponibilites/discord-poll-manager/CreatePollDialog";
+import { ClosePollDialog } from "@/components/disponibilites/discord-poll-manager/ClosePollDialog";
+import { MentionMessageField } from "@/components/disponibilites/discord-poll-manager/MentionMessageField";
 
 export function DiscordPollManager({
   journee,
@@ -83,30 +60,21 @@ export function DiscordPollManager({
   );
   const [loadingPoll, setLoadingPoll] = useState(false);
   const [hasActivePoll, setHasActivePoll] = useState(false);
-  const [discordConfig, setDiscordConfig] = useState<{
-    channelId: string | null;
-    mention: string | null;
-    channelName?: string | null;
-    mentionLabel?: string | null;
-  } | null>(null);
-  const [discordRoles, setDiscordRoles] = useState<
-    Array<{ id: string; name: string; color: number }>
-  >([]);
+  const [discordConfig, setDiscordConfig] = useState<DiscordConfigState | null>(
+    null
+  );
+  const [discordRoles, setDiscordRoles] = useState<DiscordRole[]>([]);
   const { members: discordMembers } = useDiscordMembers();
 
   // États pour l'autocomplete @ dans le message
-  const [mentionMenuAnchor, setMentionMenuAnchor] = useState<{
-    anchorEl: HTMLElement;
-    position: number;
-  } | null>(null);
+  const [mentionMenuAnchor, setMentionMenuAnchor] =
+    useState<MentionAnchorState | null>(null);
   const [mentionQuery, setMentionQuery] = useState("");
   const [messageTextareaRef, setMessageTextareaRef] =
     useState<HTMLTextAreaElement | null>(null);
   // États pour l'autocomplete @ dans le message de fermeture
-  const [closeMentionMenuAnchor, setCloseMentionMenuAnchor] = useState<{
-    anchorEl: HTMLElement;
-    position: number;
-  } | null>(null);
+  const [closeMentionMenuAnchor, setCloseMentionMenuAnchor] =
+    useState<MentionAnchorState | null>(null);
   const [closeMentionQuery, setCloseMentionQuery] = useState("");
   const [closeMessageTextareaRef, setCloseMessageTextareaRef] =
     useState<HTMLTextAreaElement | null>(null);
@@ -117,9 +85,7 @@ export function DiscordPollManager({
       const response = await fetch("/api/discord/roles", {
         method: "GET",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: JSON_HEADERS,
       });
       const result = await response.json();
 
@@ -139,23 +105,17 @@ export function DiscordPollManager({
           fetch("/api/admin/discord-availability-config", {
             method: "GET",
             credentials: "include",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: JSON_HEADERS,
           }),
           fetch("/api/discord/channels", {
             method: "GET",
             credentials: "include",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: JSON_HEADERS,
           }),
           fetch("/api/discord/roles", {
             method: "GET",
             credentials: "include",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: JSON_HEADERS,
           }),
         ]);
 
@@ -193,9 +153,7 @@ export function DiscordPollManager({
             mentionLabel = member ? member.displayName : null;
           } else if (roleMatch && rolesResponse.ok && rolesResult.success) {
             const roleId = roleMatch[1];
-            const role = rolesResult.roles?.find(
-              (r: { id: string; name: string }) => r.id === roleId
-            );
+            const role = rolesResult.roles?.find((r: DiscordRole) => r.id === roleId);
             mentionLabel = role ? `@${role.name}` : null;
           }
         }
@@ -227,77 +185,18 @@ export function DiscordPollManager({
   }, [createDialogOpen, fetchDiscordConfig, fetchDiscordRoles]);
 
   // Calculer le message par défaut pour la fermeture (sans la mention, elle sera ajoutée automatiquement)
-  const getDefaultCloseMessage = useCallback(() => {
-    return `Les inscriptions sont terminées pour cette journée.\n\nSi vous voulez vous ajoutez, il faut envoyer un message à Joffrey en privé.`;
-  }, []);
+  const getDefaultCloseMessage = useCallback(() => DEFAULT_CLOSE_MESSAGE, []);
 
-  // Calculer le message par défaut (sans la mention, elle sera ajoutée automatiquement)
   const getDefaultMessage = useCallback(() => {
-    if (epreuveType === "championnat_equipes") {
-      // Utiliser les dates passées en props si disponibles (déjà formatées correctement)
-      const fridayLabel = propFridayDate
-        ? (() => {
-            // Parser la date en évitant les problèmes de timezone
-            const [year, month, day] = propFridayDate.split("-").map(Number);
-            const date = new Date(year, month - 1, day);
-            return date.toLocaleDateString("fr-FR", {
-              weekday: "long",
-              day: "numeric",
-              month: "numeric",
-            });
-          })()
-        : fridayDate
-        ? (() => {
-            const [year, month, day] = fridayDate.split("-").map(Number);
-            const date = new Date(year, month - 1, day);
-            return date.toLocaleDateString("fr-FR", {
-              weekday: "long",
-              day: "numeric",
-              month: "numeric",
-            });
-          })()
-        : "{fridayDate}";
-      const saturdayLabel = propSaturdayDate
-        ? (() => {
-            const [year, month, day] = propSaturdayDate.split("-").map(Number);
-            const date = new Date(year, month - 1, day);
-            return date.toLocaleDateString("fr-FR", {
-              weekday: "long",
-              day: "numeric",
-              month: "numeric",
-            });
-          })()
-        : saturdayDate
-        ? (() => {
-            const [year, month, day] = saturdayDate.split("-").map(Number);
-            const date = new Date(year, month - 1, day);
-            return date.toLocaleDateString("fr-FR", {
-              weekday: "long",
-              day: "numeric",
-              month: "numeric",
-            });
-          })()
-        : "{saturdayDate}";
-      return `Bonjour,\n\nProchaine journée de championnat par équipes le ${fridayLabel} (${saturdayLabel} pour les rég et équipes filles).\n\nMerci de me dire si vous êtes disponibles!\n\nPour les filles, merci de préciser vendredi et/ou samedi.`;
-    } else {
-      // Formater la date pour le championnat de Paris : "ce vendredi 24 mai"
-      const parisDateLabel = date
-        ? (() => {
-            const dateObj = new Date(date);
-            const weekday = dateObj.toLocaleDateString("fr-FR", {
-              weekday: "long",
-            });
-            const day = dateObj.getDate();
-            const month = dateObj.toLocaleDateString("fr-FR", {
-              month: "long",
-            });
-            return `ce ${weekday} ${day} ${month}`;
-          })()
-        : "{date}";
-      return `Bonjour,\n\nProchaine journée de championnat de Paris - Journée ${
-        journee || "{journee}"
-      }${date ? ` ${parisDateLabel}` : ""}.\n\nMerci de me dire si vous êtes disponibles!`;
-    }
+    return buildDefaultPollMessage({
+      epreuveType,
+      propFridayDate,
+      propSaturdayDate,
+      fridayDate,
+      saturdayDate,
+      journee,
+      date,
+    });
   }, [
     epreuveType,
     propFridayDate,
@@ -356,13 +255,7 @@ export function DiscordPollManager({
   const insertMention = useCallback(
     (
       startPos: number,
-      member: {
-        id: string;
-        username?: string;
-        displayName: string;
-        name?: string;
-        type: "user" | "role";
-      },
+      member: MentionableItem,
       isCloseMessage = false
     ) => {
       const mention =
@@ -402,127 +295,49 @@ export function DiscordPollManager({
     ]
   );
 
-  // Composant pour les suggestions de mentions
-  const MentionSuggestions = ({
-    query,
-    anchorEl,
-    position,
-    isCloseMessage = false,
-  }: {
-    query: string;
-    anchorEl: HTMLElement;
-    position: number;
-    isCloseMessage?: boolean;
-  }) => {
-    // Combiner utilisateurs et rôles
-    const allMentions = [
-      ...(discordMembers || []).map((m) => ({ ...m, type: "user" as const })),
-      ...(discordRoles || []).map((r) => ({
-        ...r,
-        type: "role" as const,
-        displayName: r.name,
-      })),
-    ];
+  const updateMentionAutocomplete = useCallback(
+    (
+      value: string,
+      cursorPos: number,
+      target: HTMLInputElement | HTMLTextAreaElement,
+      setQuery: (query: string) => void,
+      setAnchor: (anchor: MentionAnchorState | null) => void
+    ) => {
+      const textBeforeCursor = value.substring(0, cursorPos);
+      const lastAtIndex = textBeforeCursor.lastIndexOf("@");
 
-    const filtered = allMentions
-      .filter((item) => {
-        const searchQuery = query.toLowerCase();
-        return (
-          item.displayName.toLowerCase().includes(searchQuery) ||
-          ("username" in item &&
-            item.username.toLowerCase().includes(searchQuery))
-        );
-      })
-      .slice(0, 10);
+      if (lastAtIndex === -1) {
+        setAnchor(null);
+        return;
+      }
 
-    if (filtered.length === 0) {
-      return null;
-    }
+      const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+      if (!textAfterAt.includes(" ") && !textAfterAt.includes("\n")) {
+        setQuery(textAfterAt.toLowerCase());
+        setAnchor({
+          anchorEl: target,
+          position: lastAtIndex,
+        });
+      } else {
+        setAnchor(null);
+      }
+    },
+    []
+  );
 
-    return (
-      <Popper
-        open={true}
-        anchorEl={anchorEl}
-        placement="bottom-start"
-        sx={{ zIndex: 1300, mt: 0.5 }}
-      >
-        <Paper
-          elevation={8}
-          sx={{
-            maxHeight: 300,
-            overflow: "auto",
-            minWidth: 280,
-            borderRadius: 2,
-            border: "1px solid",
-            borderColor: "divider",
-            boxShadow: "0 4px 20px rgba(0, 0, 0, 0.15)",
-          }}
-        >
-          <List dense sx={{ py: 0.5 }}>
-            {filtered.map((item) => (
-              <ListItem key={`${item.type}-${item.id}`} disablePadding>
-                <ListItemButton
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                  }}
-                  onClick={() => {
-                    insertMention(position, item, isCloseMessage);
-                  }}
-                  sx={{
-                    borderRadius: 1,
-                    mx: 0.5,
-                    my: 0.25,
-                    "&:hover": {
-                      backgroundColor: "action.hover",
-                    },
-                  }}
-                >
-                  <Box
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      width: 32,
-                      height: 32,
-                      borderRadius: "50%",
-                      backgroundColor:
-                        item.type === "user"
-                          ? "primary.main"
-                          : "secondary.main",
-                      color: "primary.contrastText",
-                      mr: 1.5,
-                      fontSize: "0.875rem",
-                      fontWeight: 600,
-                    }}
-                  >
-                    {item.type === "user"
-                      ? item.displayName.charAt(0).toUpperCase()
-                      : "@"}
-                  </Box>
-                  <ListItemText
-                    primary={
-                      <Typography variant="body2" fontWeight={500}>
-                        {item.type === "user"
-                          ? item.displayName
-                          : `@${item.displayName}`}
-                      </Typography>
-                    }
-                    secondary={
-                      <Typography variant="caption" color="text.secondary">
-                        {item.type === "user"
-                          ? `@${"username" in item ? item.username : ""}`
-                          : "Rôle"}
-                      </Typography>
-                    }
-                  />
-                </ListItemButton>
-              </ListItem>
-            ))}
-          </List>
-        </Paper>
-      </Popper>
-    );
-  };
+  const selectFirstMention = useCallback(
+    (query: string, position: number, isCloseMessage = false) => {
+      const filtered = filterMentionItems({
+        discordMembers: discordMembers || [],
+        discordRoles,
+        query,
+      });
+      if (filtered.length > 0) {
+        insertMention(position, filtered[0], isCloseMessage);
+      }
+    },
+    [discordMembers, discordRoles, insertMention]
+  );
 
   // Mettre à jour les dates quand les props changent
   useEffect(() => {
@@ -548,9 +363,7 @@ export function DiscordPollManager({
       const response = await fetch("/api/discord/availability-polls", {
         method: "GET",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: JSON_HEADERS,
       });
 
       const result = await response.json();
@@ -621,9 +434,7 @@ export function DiscordPollManager({
         {
           method: "GET",
           credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: JSON_HEADERS,
         }
       );
 
@@ -694,9 +505,7 @@ export function DiscordPollManager({
       const response = await fetch("/api/discord/availability-polls/create", {
         method: "POST",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: JSON_HEADERS,
         body: JSON.stringify({
           journee,
           phase,
@@ -779,9 +588,7 @@ export function DiscordPollManager({
         {
           method: "POST",
           credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: JSON_HEADERS,
           body: JSON.stringify({
             messageTemplate: finalCloseMessageTemplate,
           }),
@@ -910,522 +717,130 @@ export function DiscordPollManager({
         ) : null}
       </Box>
 
-      <Dialog
+      <CreatePollDialog
         open={createDialogOpen}
-        onClose={() => !creating && setCreateDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Créer un sondage Discord</DialogTitle>
-        <DialogContent>
-          <Alert severity="info" sx={{ mb: 2 }}>
-            Un sondage sera créé dans le channel Discord configuré pour{" "}
-            {epreuveType === "championnat_equipes"
-              ? "le championnat par équipes"
-              : "le championnat de Paris"}
-            . Tous les utilisateurs ayant accès à ce channel pourront répondre.
-            {discordConfig?.channelId && (
-              <Typography variant="caption" display="block" sx={{ mt: 1 }}>
-                Channel:{" "}
-                {discordConfig.channelName
-                  ? `#${discordConfig.channelName}`
-                  : `ID: ${discordConfig.channelId}`}
-          </Typography>
-            )}
-            {!discordConfig?.channelId && (
-              <Typography
-                variant="caption"
-                display="block"
-                sx={{ mt: 1, color: "warning.main" }}
-              >
-                ⚠️ Aucun channel Discord configuré. Configurez-le dans
-                l&apos;administration.
-              </Typography>
-            )}
-          </Alert>
-
-          <Box
-            sx={{
-              mb: 2,
-              p: 1.5,
-              bgcolor: "background.default",
-              borderRadius: 1,
+        creating={creating}
+        canCreatePoll={canCreatePoll}
+        epreuveType={epreuveType}
+        discordConfig={discordConfig}
+        journee={journee}
+        phase={phase}
+        date={date}
+        propFridayDate={propFridayDate}
+        propSaturdayDate={propSaturdayDate}
+        fridayDate={fridayDate}
+        saturdayDate={saturdayDate}
+        setFridayDate={setFridayDate}
+        setSaturdayDate={setSaturdayDate}
+        messageField={
+          <MentionMessageField
+            label="Message qui sera envoyé"
+            value={messageTemplate || getDefaultMessage()}
+            textareaRef={messageTextareaRef}
+            setTextareaRef={setMessageTextareaRef}
+            mentionAnchor={mentionMenuAnchor}
+            mentionQuery={mentionQuery}
+            discordMembers={discordMembers || []}
+            discordRoles={discordRoles}
+            onValueChange={(value, cursorPos, target) => {
+              setMessageTemplate(value);
+              updateMentionAutocomplete(
+                value,
+                cursorPos,
+                target,
+                setMentionQuery,
+                setMentionMenuAnchor
+              );
             }}
-          >
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Informations du sondage
-            </Typography>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-            <Typography variant="body2">
-              <strong>Journée :</strong> {journee || "—"}
-            </Typography>
-            <Typography variant="body2">
-              <strong>Phase :</strong> {phase || "—"}
-            </Typography>
-            {date && (
-              <Typography variant="body2">
-                <strong>Date :</strong>{" "}
-                {new Date(date).toLocaleDateString("fr-FR", {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </Typography>
-            )}
-              {discordConfig?.mention && (
-                <Typography variant="body2" sx={{ mt: 0.5 }}>
-                  <strong>Mention :</strong>{" "}
-                  {discordConfig.mentionLabel || discordConfig.mention}
-              </Typography>
-            )}
-            </Box>
-          </Box>
-
-          {epreuveType === "championnat_equipes" && (
-            <Box sx={{ mt: 3 }}>
-              {propFridayDate || propSaturdayDate ? (
-                <Box>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                    sx={{ mb: 1 }}
-                >
-                  Dates extraites automatiquement depuis les matchs :
-                  </Typography>
-                  <Box
-                    sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}
-                  >
-                  {propFridayDate && (
-                      <Typography variant="body2">
-                        <strong>Vendredi :</strong>{" "}
-                      {(() => {
-                        // Parser la date en évitant les problèmes de timezone
-                        const [year, month, day] = propFridayDate
-                          .split("-")
-                          .map(Number);
-                        const date = new Date(year, month - 1, day);
-                        const dayOfWeek = date.getDay();
-                        const dayName = date.toLocaleDateString("fr-FR", {
-                          weekday: "long",
-                        });
-                        // Vérifier que c'est bien un vendredi (jour 5)
-                        if (dayOfWeek !== 5) {
-                          console.warn(
-                            `[DiscordPollManager] Date identifiée comme vendredi mais jour de la semaine réel: ${dayName} (${dayOfWeek})`,
-                            { date: propFridayDate }
-                          );
-                        }
-                        return `${dayName} ${day}/${month}/${year}`;
-                      })()}
-                      </Typography>
-                  )}
-                  {propSaturdayDate && (
-                      <Typography variant="body2">
-                        <strong>Samedi :</strong>{" "}
-                      {(() => {
-                        const [year, month, day] = propSaturdayDate
-                          .split("-")
-                          .map(Number);
-                        const date = new Date(year, month - 1, day);
-                        const dayOfWeek = date.getDay();
-                        const dayName = date.toLocaleDateString("fr-FR", {
-                          weekday: "long",
-                        });
-                        // Vérifier que c'est bien un samedi (jour 6)
-                        if (dayOfWeek !== 6) {
-                          console.warn(
-                            `[DiscordPollManager] Date identifiée comme samedi mais jour de la semaine réel: ${dayName} (${dayOfWeek})`,
-                            { date: propSaturdayDate }
-                          );
-                        }
-                        return `${dayName} ${day}/${month}/${year}`;
-                      })()}
-                </Typography>
-                    )}
-                  </Box>
-                </Box>
-              ) : (
-                <>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                    Dates spécifiques (optionnel)
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    label="Date vendredi"
-                    type="date"
-                    value={fridayDate}
-                    onChange={(e) => setFridayDate(e.target.value)}
-                    InputLabelProps={{ shrink: true }}
-                    sx={{ mb: 2 }}
-                    helperText="Date du vendredi pour le championnat par équipes"
-                  />
-                  <TextField
-                    fullWidth
-                    label="Date samedi"
-                    type="date"
-                    value={saturdayDate}
-                    onChange={(e) => setSaturdayDate(e.target.value)}
-                    InputLabelProps={{ shrink: true }}
-                    helperText="Date du samedi pour les rég et équipes filles"
-                  />
-                </>
-              )}
-            </Box>
-          )}
-
-          <Box sx={{ mt: 3, position: "relative" }}>
-            <TextField
-              fullWidth
-              multiline
-              rows={8}
-              label="Message qui sera envoyé"
-              value={messageTemplate || getDefaultMessage()}
-              inputRef={(ref) => {
-                if (ref) {
-                  setMessageTextareaRef(ref);
-                }
-              }}
-              onChange={(e) => {
-                const value = e.target.value;
-                const cursorPos = e.target.selectionStart || 0;
-                setMessageTemplate(value);
-
-                // Détecter si on tape "@" ou si on est en train de taper après "@"
-                const textBeforeCursor = value.substring(0, cursorPos);
-                const lastAtIndex = textBeforeCursor.lastIndexOf("@");
-
-                if (lastAtIndex !== -1) {
-                  // Vérifier qu'il n'y a pas d'espace entre "@" et le curseur
-                  const textAfterAt = textBeforeCursor.substring(
-                    lastAtIndex + 1
-                  );
-                  if (
-                    !textAfterAt.includes(" ") &&
-                    !textAfterAt.includes("\n")
-                  ) {
-                    // On est en train de taper une mention
-                    const query = textAfterAt.toLowerCase();
-                    setMentionQuery(query);
-                    setMentionMenuAnchor({
-                      anchorEl: e.target,
-                      position: lastAtIndex,
-                    });
-                  } else {
-                    setMentionMenuAnchor(null);
-                  }
-                } else {
-                  setMentionMenuAnchor(null);
-                }
-              }}
-              onKeyDown={(e) => {
-                if (mentionMenuAnchor) {
-                  const allMentions = [
-                    ...(discordMembers || []).map((m) => ({
-                      ...m,
-                      type: "user" as const,
-                    })),
-                    ...(discordRoles || []).map((r) => ({
-                      ...r,
-                      type: "role" as const,
-                      displayName: r.name,
-                    })),
-                  ];
-
-                  const filtered = allMentions
-                    .filter((item) => {
-                      const searchQuery = mentionQuery.toLowerCase();
-                      return (
-                        item.displayName.toLowerCase().includes(searchQuery) ||
-                        ("username" in item &&
-                          item.username.toLowerCase().includes(searchQuery))
-                      );
-                    })
-                    .slice(0, 10);
-
-                  if (
-                    e.key === "ArrowDown" ||
-                    e.key === "ArrowUp" ||
-                    e.key === "Enter" ||
-                    e.key === "Escape"
-                  ) {
-                    e.preventDefault();
-                    if (e.key === "Escape") {
-                      setMentionMenuAnchor(null);
-                    } else if (e.key === "Enter" && filtered.length > 0) {
-                      // Insérer la première mention
-                      const selectedMention = filtered[0];
-                      insertMention(
-                        mentionMenuAnchor.position,
-                        selectedMention
-                      );
-                    }
-                  }
-                }
-              }}
-              onBlur={(e) => {
-                // Ne pas fermer si on clique sur une suggestion
-                const relatedTarget = e.relatedTarget as HTMLElement | null;
-                if (
-                  relatedTarget &&
-                  relatedTarget.closest('[role="listbox"]')
-                ) {
-                  return;
-                }
-                // Délai pour permettre le clic sur une suggestion
-                setTimeout(() => {
-                  setMentionMenuAnchor(null);
-                }, 200);
-              }}
-              helperText={
-                <>
-                  Vous pouvez modifier ce message.
-                  <br />
-                  Tapez <strong>@</strong> pour mentionner un utilisateur ou un
-                  rôle Discord.
-                  {discordConfig?.mention && (
-                    <>
-                      <br />
-                      <strong>Note :</strong> La mention{" "}
-                      {discordConfig.mentionLabel || discordConfig.mention} sera
-                      automatiquement ajoutée au début du message envoyé sur
-                      Discord.
-                    </>
-                  )}
-                </>
-              }
-              placeholder="Le message par défaut sera utilisé si ce champ est vide"
-            />
-            {mentionMenuAnchor && messageTextareaRef && (
-              <MentionSuggestions
-                query={mentionQuery}
-                anchorEl={mentionMenuAnchor.anchorEl}
-                position={mentionMenuAnchor.position}
-              />
-            )}
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => {
-              setCreateDialogOpen(false);
-              setMessageTemplate("");
-              setFridayDate("");
-              setSaturdayDate("");
+            onEnterMention={(position) => {
+              selectFirstMention(mentionQuery, position);
             }}
-            disabled={creating}
-          >
-            Annuler
-          </Button>
-          <Button
-            onClick={() => void handleCreatePoll()}
-            variant="contained"
-            disabled={creating || !canCreatePoll}
-            startIcon={creating ? <CircularProgress size={20} /> : <AddIcon />}
-          >
-            {creating ? "Création..." : "Créer le sondage"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+            onDismissMentions={() => {
+              setMentionMenuAnchor(null);
+            }}
+            onSelectMention={(position, item) => {
+              insertMention(position, item);
+            }}
+            helperText={
+              <>
+                Vous pouvez modifier ce message.
+                <br />
+                Tapez <strong>@</strong> pour mentionner un utilisateur ou un
+                rôle Discord.
+                {discordConfig?.mention && (
+                  <>
+                    <br />
+                    <strong>Note :</strong> La mention{" "}
+                    {discordConfig.mentionLabel || discordConfig.mention} sera
+                    automatiquement ajoutée au début du message envoyé sur
+                    Discord.
+                  </>
+                )}
+              </>
+            }
+            placeholder="Le message par défaut sera utilisé si ce champ est vide"
+          />
+        }
+        onCancel={() => {
+          setCreateDialogOpen(false);
+          setMessageTemplate("");
+          setFridayDate("");
+          setSaturdayDate("");
+        }}
+        onCreate={() => void handleCreatePoll()}
+      />
 
-      {/* Dialog de fermeture */}
-      <Dialog
+      <ClosePollDialog
         open={closeDialogOpen}
-        onClose={() => !closing && setCloseDialogOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Fermer le sondage Discord</DialogTitle>
-        <DialogContent>
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            Le sondage sera fermé et les utilisateurs ne pourront plus répondre.
-            {currentPoll?.channelId && (
-              <Typography variant="caption" display="block" sx={{ mt: 1 }}>
-                Channel:{" "}
-                {discordConfig?.channelName
-                  ? `#${discordConfig.channelName}`
-                  : `ID: ${currentPoll.channelId}`}
-              </Typography>
-            )}
-          </Alert>
-
-          <Box
-            sx={{
-              mb: 2,
-              p: 1.5,
-              bgcolor: "background.default",
-              borderRadius: 1,
+        closing={closing}
+        currentPoll={currentPoll}
+        discordConfig={discordConfig}
+        messageField={
+          <MentionMessageField
+            label="Message qui sera envoyé"
+            value={closeMessageTemplate || getDefaultCloseMessage()}
+            textareaRef={closeMessageTextareaRef}
+            setTextareaRef={setCloseMessageTextareaRef}
+            mentionAnchor={closeMentionMenuAnchor}
+            mentionQuery={closeMentionQuery}
+            discordMembers={discordMembers || []}
+            discordRoles={discordRoles}
+            onValueChange={(value, cursorPos, target) => {
+              setCloseMessageTemplate(value);
+              updateMentionAutocomplete(
+                value,
+                cursorPos,
+                target,
+                setCloseMentionQuery,
+                setCloseMentionMenuAnchor
+              );
             }}
-          >
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Informations du sondage
-            </Typography>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-              <Typography variant="body2">
-                <strong>Journée :</strong> {currentPoll?.journee || "—"}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Phase :</strong> {currentPoll?.phase || "—"}
-              </Typography>
-              {currentPoll?.date && (
-                <Typography variant="body2">
-                  <strong>Date :</strong>{" "}
-                  {new Date(currentPoll.date).toLocaleDateString("fr-FR", {
-                    weekday: "long",
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </Typography>
-              )}
-    </Box>
-          </Box>
-
-          <Box sx={{ mt: 3, position: "relative" }}>
-            <TextField
-              fullWidth
-              multiline
-              rows={8}
-              label="Message qui sera envoyé"
-              value={closeMessageTemplate || getDefaultCloseMessage()}
-              inputRef={(ref) => {
-                if (ref) {
-                  setCloseMessageTextareaRef(ref);
-                }
-              }}
-              onChange={(e) => {
-                const value = e.target.value;
-                const cursorPos = e.target.selectionStart || 0;
-                setCloseMessageTemplate(value);
-
-                // Détecter si on tape "@" ou si on est en train de taper après "@"
-                const textBeforeCursor = value.substring(0, cursorPos);
-                const lastAtIndex = textBeforeCursor.lastIndexOf("@");
-
-                if (lastAtIndex !== -1) {
-                  // Vérifier qu'il n'y a pas d'espace entre "@" et le curseur
-                  const textAfterAt = textBeforeCursor.substring(
-                    lastAtIndex + 1
-                  );
-                  if (
-                    !textAfterAt.includes(" ") &&
-                    !textAfterAt.includes("\n")
-                  ) {
-                    // On est en train de taper une mention
-                    const query = textAfterAt.toLowerCase();
-                    setCloseMentionQuery(query);
-                    setCloseMentionMenuAnchor({
-                      anchorEl: e.target,
-                      position: lastAtIndex,
-                    });
-                  } else {
-                    setCloseMentionMenuAnchor(null);
-                  }
-                } else {
-                  setCloseMentionMenuAnchor(null);
-                }
-              }}
-              onKeyDown={(e) => {
-                if (closeMentionMenuAnchor) {
-                  const allMentions = [
-                    ...(discordMembers || []).map((m) => ({
-                      ...m,
-                      type: "user" as const,
-                    })),
-                    ...(discordRoles || []).map((r) => ({
-                      ...r,
-                      type: "role" as const,
-                      displayName: r.name,
-                    })),
-                  ];
-
-                  const filtered = allMentions
-                    .filter((item) => {
-                      const searchQuery = closeMentionQuery.toLowerCase();
-                      return (
-                        item.displayName.toLowerCase().includes(searchQuery) ||
-                        ("username" in item &&
-                          item.username.toLowerCase().includes(searchQuery))
-                      );
-                    })
-                    .slice(0, 10);
-
-                  if (
-                    e.key === "ArrowDown" ||
-                    e.key === "ArrowUp" ||
-                    e.key === "Enter" ||
-                    e.key === "Escape"
-                  ) {
-                    e.preventDefault();
-                    if (e.key === "Escape") {
-                      setCloseMentionMenuAnchor(null);
-                    } else if (e.key === "Enter" && filtered.length > 0) {
-                      // Insérer la première mention
-                      const selectedMention = filtered[0];
-                      insertMention(
-                        closeMentionMenuAnchor.position,
-                        selectedMention,
-                        true
-                      );
-                    }
-                  }
-                }
-              }}
-              onBlur={(e) => {
-                // Ne pas fermer si on clique sur une suggestion
-                const relatedTarget = e.relatedTarget as HTMLElement | null;
-                if (
-                  relatedTarget &&
-                  relatedTarget.closest('[role="listbox"]')
-                ) {
-                  return;
-                }
-                // Délai pour permettre le clic sur une suggestion
-                setTimeout(() => {
-                  setCloseMentionMenuAnchor(null);
-                }, 200);
-              }}
-              helperText={
-                <>
-                  Vous pouvez modifier ce message.
-                  <br />
-                  Tapez <strong>@</strong> pour mentionner un utilisateur ou un
-                  rôle Discord.
-                </>
-              }
-              placeholder="Le message par défaut sera utilisé si ce champ est vide"
-            />
-            {closeMentionMenuAnchor && closeMessageTextareaRef && (
-              <MentionSuggestions
-                query={closeMentionQuery}
-                anchorEl={closeMentionMenuAnchor.anchorEl}
-                position={closeMentionMenuAnchor.position}
-                isCloseMessage={true}
-              />
-            )}
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => {
-              setCloseDialogOpen(false);
-              setCloseMessageTemplate("");
+            onEnterMention={(position) => {
+              selectFirstMention(closeMentionQuery, position, true);
             }}
-            disabled={closing}
-          >
-            Annuler
-          </Button>
-          <Button
-            onClick={() => void handleConfirmClosePoll()}
-            variant="contained"
-            color="error"
-            disabled={closing}
-            startIcon={closing ? <CircularProgress size={20} /> : <CloseIcon />}
-          >
-            {closing ? "Fermeture..." : "Fermer le sondage"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+            onDismissMentions={() => {
+              setCloseMentionMenuAnchor(null);
+            }}
+            onSelectMention={(position, item) => {
+              insertMention(position, item, true);
+            }}
+            helperText={
+              <>
+                Vous pouvez modifier ce message.
+                <br />
+                Tapez <strong>@</strong> pour mentionner un utilisateur ou un
+                rôle Discord.
+              </>
+            }
+            placeholder="Le message par défaut sera utilisé si ce champ est vide"
+          />
+        }
+        onCancel={() => {
+          setCloseDialogOpen(false);
+          setCloseMessageTemplate("");
+        }}
+        onConfirm={() => void handleConfirmClosePoll()}
+      />
     </Box>
   );
 }

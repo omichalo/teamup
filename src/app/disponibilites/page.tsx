@@ -12,28 +12,11 @@ import {
   CardContent,
   Button,
   CircularProgress,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Switch,
-  FormControlLabel,
-  TextField,
   Chip,
-  Tabs,
-  Tab,
   Alert,
   Snackbar,
-  Tooltip,
 } from "@mui/material";
 import {
-  CheckCircle,
-  Cancel,
-  HourglassEmpty,
-  Group as GroupIcon,
-  Comment as CommentIcon,
-  DoneAll,
-  Accessible as AccessibleIcon,
   LinkOff as LinkOffIcon,
 } from "@mui/icons-material";
 import { useTeamData } from "@/hooks/useTeamData";
@@ -56,13 +39,13 @@ import {
 } from "@/lib/availability/utils";
 import { useAvailabilityStore } from "@/stores/availabilityStore";
 import { usePhasePreselect } from "@/hooks/usePhasePreselect";
-import { EpreuveSelect } from "@/components/compositions/Filters/EpreuveSelect";
-import { PhaseSelect } from "@/components/compositions/Filters/PhaseSelect";
-import { SearchInput } from "@/components/compositions/Filters/SearchInput";
-import { AvailabilityStatusChip } from "@/components/disponibilites/AvailabilityStatusChip";
+import { DisponibilitesAvailabilityTabs } from "@/components/disponibilites/DisponibilitesAvailabilityTabs";
+import { DisponibilitesFiltersCard } from "@/components/disponibilites/DisponibilitesFiltersCard";
+import { PlayerAvailabilityList } from "@/components/disponibilites/PlayerAvailabilityList";
 import { DiscordPollManager } from "@/components/disponibilites/DiscordPollManager";
+import { getDiscordPollDates } from "@/lib/availability/discord-poll-dates";
 
-import { EpreuveType, getIdEpreuve, isParisEpreuve } from "@/lib/shared/epreuve-utils";
+import { getIdEpreuve } from "@/lib/shared/epreuve-utils";
 import { useJourneesData } from "@/hooks/useJourneesData";
 
 export default function DisponibilitesPage() {
@@ -778,103 +761,26 @@ export default function DisponibilitesPage() {
           sont affichés.
         </Typography>
 
-        <Card sx={{ mb: 1 }}>
-          <CardContent sx={{ pt: 2.5, pb: 1.5 }}>
-            <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
-              <EpreuveSelect
-                value={selectedEpreuve}
-                onChange={(epreuve) => {
-                  setSelectedEpreuve(epreuve);
-                  setSelectedPhase(null);
-                  setSelectedJournee(null);
-                }}
-              />
-              {!isParisEpreuve(selectedEpreuve) && (
-                <PhaseSelect
-                  value={selectedPhase}
-                  onChange={(phase) => {
-                    setSelectedPhase(phase);
-                    setSelectedJournee(null);
-                  }}
-                  disabled={selectedEpreuve === null}
-                />
-              )}
-              <FormControl size="small" sx={{ minWidth: 150 }}>
-                <InputLabel id="journee-select-label">Journée</InputLabel>
-                <Select
-                  labelId="journee-select-label"
-                  id="journee-select"
-                  value={selectedJournee || ""}
-                  label="Journée"
-                  onChange={(e) =>
-                    setSelectedJournee(
-                      e.target.value ? Number(e.target.value) : null
-                    )
-                  }
-                  disabled={
-                    (selectedEpreuve === "championnat_paris"
-                      ? false
-                      : selectedPhase === null) || selectedEpreuve === null
-                  }
-                >
-                  {(() => {
-                    const phaseToUse =
-                      selectedEpreuve === "championnat_paris"
-                        ? "aller"
-                        : selectedPhase;
-
-                    if (!phaseToUse) return null;
-
-                    const journeesArray = Array.from(
-                      journeesByPhase.get(phaseToUse)?.values() || []
-                    ) as Array<{
-                      journee: number;
-                      phase: "aller" | "retour";
-                      dates: Date[];
-                    }>;
-
-                    return journeesArray
-                      .sort((a, b) => a.journee - b.journee)
-                      .map(({ journee, dates }) => {
-                        const datesFormatted = dates
-                          .map((date: Date) => {
-                            return new Intl.DateTimeFormat("fr-FR", {
-                              day: "2-digit",
-                              month: "2-digit",
-                            }).format(date);
-                          })
-                          .join(", ");
-                        return (
-                          <MenuItem key={journee} value={journee}>
-                            Journée {journee} - {datesFormatted}
-                          </MenuItem>
-                        );
-                      });
-                  })()}
-                </Select>
-              </FormControl>
-
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={showAllPlayers}
-                    onChange={(e) => setShowAllPlayers(e.target.checked)}
-                  />
-                }
-                label="Afficher tous les joueurs"
-              />
-            </Box>
-
-            {selectedJournee && (
-              <SearchInput
-                value={searchQuery}
-                onChange={setSearchQuery}
-                placeholder="Rechercher un joueur..."
-                sx={{ mt: 2.5, mb: 0.75 }}
-              />
-            )}
-          </CardContent>
-        </Card>
+        <DisponibilitesFiltersCard
+          selectedEpreuve={selectedEpreuve}
+          selectedPhase={selectedPhase}
+          selectedJournee={selectedJournee}
+          showAllPlayers={showAllPlayers}
+          searchQuery={searchQuery}
+          journeesByPhase={journeesByPhase}
+          onEpreuveChange={(epreuve) => {
+            setSelectedEpreuve(epreuve);
+            setSelectedPhase(null);
+            setSelectedJournee(null);
+          }}
+          onPhaseChange={(phase) => {
+            setSelectedPhase(phase);
+            setSelectedJournee(null);
+          }}
+          onJourneeChange={setSelectedJournee}
+          onShowAllPlayersChange={setShowAllPlayers}
+          onSearchQueryChange={setSearchQuery}
+        />
 
         {selectedJournee !== null && selectedPhase !== null && (
           <Card sx={{ mb: 2 }}>
@@ -890,84 +796,12 @@ export default function DisponibilitesPage() {
                   ? { idEpreuve: getIdEpreuve(selectedEpreuve) as number }
                   : {})}
                 epreuveType={selectedEpreuve}
-                {...(() => {
-                  const phaseToUse =
-                    selectedEpreuve === "championnat_paris"
-                      ? "aller"
-                      : selectedPhase;
-                  const journeeData =
-                    phaseToUse && selectedJournee !== null
-                      ? journeesByPhase.get(phaseToUse)?.get(selectedJournee)
-                      : undefined;
-
-                  if (
-                    selectedJournee !== null &&
-                    journeeData &&
-                    journeeData.dates.length > 0
-                  ) {
-                    const sortedDates = [...journeeData.dates].sort(
-                      (a, b) => a.getTime() - b.getTime()
-                    );
-
-                    if (selectedEpreuve === "championnat_paris") {
-                      const firstDate = sortedDates[0];
-                      const year = firstDate.getFullYear();
-                      const month = String(
-                        firstDate.getMonth() + 1
-                      ).padStart(2, "0");
-                      const day = String(firstDate.getDate()).padStart(2, "0");
-                      return { date: `${year}-${month}-${day}` };
-                    }
-
-                    // Championnat par équipes : vendredi/samedi
-                    let fridayDate: Date | null = null;
-                    let saturdayDate: Date | null = null;
-
-                    for (const date of sortedDates) {
-                      const normalizedDate = new Date(
-                        date.getFullYear(),
-                        date.getMonth(),
-                        date.getDate()
-                      );
-                      const dayOfWeek = normalizedDate.getDay();
-                      if (dayOfWeek === 5 && !fridayDate) {
-                        fridayDate = normalizedDate;
-                      } else if (dayOfWeek === 6 && !saturdayDate) {
-                        saturdayDate = normalizedDate;
-                      }
-                    }
-
-                    const result: {
-                      fridayDate?: string;
-                      saturdayDate?: string;
-                    } = {};
-
-                    if (fridayDate) {
-                      const year = fridayDate.getFullYear();
-                      const month = String(
-                        fridayDate.getMonth() + 1
-                      ).padStart(2, "0");
-                      const day = String(fridayDate.getDate()).padStart(2, "0");
-                      result.fridayDate = `${year}-${month}-${day}`;
-                    }
-                    if (saturdayDate) {
-                      const year = saturdayDate.getFullYear();
-                      const month = String(
-                        saturdayDate.getMonth() + 1
-                      ).padStart(2, "0");
-                      const day = String(saturdayDate.getDate()).padStart(
-                        2,
-                        "0"
-                      );
-                      result.saturdayDate = `${year}-${month}-${day}`;
-                    }
-
-                    if (Object.keys(result).length > 0) {
-                      return result;
-                    }
-                  }
-                  return {};
-                })()}
+                {...getDiscordPollDates({
+                  selectedEpreuve,
+                  selectedPhase,
+                  selectedJournee,
+                  journeesByPhase,
+                })}
               />
             </CardContent>
           </Card>
@@ -979,72 +813,23 @@ export default function DisponibilitesPage() {
           </Alert>
         ) : (
           <>
-            <Box
-              sx={{
-                position: "sticky",
-                top: 0,
-                zIndex: 5,
-                backgroundColor: "background.paper",
-                borderBottom: 1,
-                borderColor: "divider",
-                mb: 2,
-                pt: 1,
-                pb: 1,
+            <DisponibilitesAvailabilityTabs
+              tabValue={tabValue}
+              onTabChange={setTabValue}
+              counts={{
+                all: filteredPlayers.length,
+                responded: respondedPlayers.length,
+                pending: pendingPlayers.length,
+                comments: playersWithComment.length,
+                ok: playersWithOK.length,
+                ko: playersWithKO.length,
+                withoutDiscord: playersWithoutDiscord.length,
               }}
-            >
-              <Tabs
-                value={tabValue}
-                onChange={(_, v) => setTabValue(v)}
-                sx={{
-                  minHeight: 40,
-                  "& .MuiTab-root": {
-                    minHeight: 38,
-                    paddingTop: 0.5,
-                    paddingBottom: 0.5,
-                  },
-                }}
-              >
-                <Tab
-                  label={`Tous (${filteredPlayers.length})`}
-                  icon={<GroupIcon fontSize="small" />}
-                  iconPosition="start"
-                />
-                <Tab
-                  label={`Réponses (${respondedPlayers.length})`}
-                  icon={<DoneAll fontSize="small" color="primary" />}
-                  iconPosition="start"
-                />
-                <Tab
-                  label={`En attente (${pendingPlayers.length})`}
-                  icon={<HourglassEmpty fontSize="small" color="warning" />}
-                  iconPosition="start"
-                />
-                <Tab
-                  label={`Commentaires (${playersWithComment.length})`}
-                  icon={<CommentIcon fontSize="small" color="info" />}
-                  iconPosition="start"
-                />
-                <Tab
-                  label={`OK (${playersWithOK.length})`}
-                  icon={<CheckCircle fontSize="small" color="success" />}
-                  iconPosition="start"
-                />
-                <Tab
-                  label={`KO (${playersWithKO.length})`}
-                  icon={<Cancel fontSize="small" color="error" />}
-                  iconPosition="start"
-                />
-                <Tab
-                  label={`Sans Discord (${playersWithoutDiscord.length})`}
-                  icon={<LinkOffIcon fontSize="small" color="action" />}
-                  iconPosition="start"
-                />
-              </Tabs>
-            </Box>
+            />
 
             {tabValue === 0 && (
               <Box>
-                <PlayerList
+                <PlayerAvailabilityList
                   players={filteredPlayers}
                   availabilities={availabilities}
                   onAvailabilityChange={handleAvailabilityChange}
@@ -1059,7 +844,7 @@ export default function DisponibilitesPage() {
                 <Typography variant="h6" gutterBottom>
                   Joueurs ayant répondu
                 </Typography>
-                <PlayerList
+                <PlayerAvailabilityList
                   players={respondedPlayers}
                   availabilities={availabilities}
                   onAvailabilityChange={handleAvailabilityChange}
@@ -1104,7 +889,7 @@ export default function DisponibilitesPage() {
                         size="small"
                       />
                     </Box>
-                    <PlayerList
+                    <PlayerAvailabilityList
                       players={
                         pendingDiscordFilter === "with_discord"
                           ? pendingWithDiscord
@@ -1132,7 +917,7 @@ export default function DisponibilitesPage() {
                     Aucun joueur n&apos;a fait de commentaire.
                   </Alert>
                 ) : (
-                  <PlayerList
+                  <PlayerAvailabilityList
                     players={playersWithComment}
                     availabilities={availabilities}
                     onAvailabilityChange={handleAvailabilityChange}
@@ -1153,7 +938,7 @@ export default function DisponibilitesPage() {
                     Aucun joueur n&apos;a répondu disponible.
                   </Alert>
                 ) : (
-                  <PlayerList
+                  <PlayerAvailabilityList
                     players={playersWithOK}
                     availabilities={availabilities}
                     onAvailabilityChange={handleAvailabilityChange}
@@ -1174,7 +959,7 @@ export default function DisponibilitesPage() {
                     Aucun joueur n&apos;a répondu indisponible.
                   </Alert>
                 ) : (
-                  <PlayerList
+                  <PlayerAvailabilityList
                     players={playersWithKO}
                     availabilities={availabilities}
                     onAvailabilityChange={handleAvailabilityChange}
@@ -1195,7 +980,7 @@ export default function DisponibilitesPage() {
                     Tous les joueurs sont associés à un compte Discord.
                   </Alert>
                 ) : (
-                  <PlayerList
+                  <PlayerAvailabilityList
                     players={playersWithoutDiscord}
                     availabilities={availabilities}
                     onAvailabilityChange={handleAvailabilityChange}
@@ -1228,626 +1013,3 @@ export default function DisponibilitesPage() {
   );
 }
 
-/** Vérifie si un joueur est inscrit au championnat sélectionné */
-function isPlayerRegistered(player: Player, selectedEpreuve: EpreuveType | null | undefined): boolean {
-  if (!selectedEpreuve) return false;
-  if (selectedEpreuve === "championnat_paris") {
-    return player.participation?.championnatParis === true;
-  }
-  return player.participation?.championnat === true;
-}
-
-interface PlayerListProps {
-  players: Player[];
-  availabilities: Record<
-    string,
-    {
-      masculin?: AvailabilityResponse;
-      feminin?: AvailabilityResponse;
-    }
-  >;
-  onAvailabilityChange: (
-    playerId: string,
-    championshipType: ChampionshipType,
-    available: boolean
-  ) => void;
-  onCommentChange: (
-    playerId: string,
-    championshipType: ChampionshipType,
-    comment: string
-  ) => void;
-  selectedEpreuve?: EpreuveType | null;
-}
-
-function PlayerList({
-  players,
-  availabilities,
-  onAvailabilityChange,
-  onCommentChange,
-  selectedEpreuve,
-}: PlayerListProps) {
-  const isParisChampionship = selectedEpreuve === "championnat_paris";
-  const [expandedPlayer, setExpandedPlayer] = useState<{
-    id: string;
-    type: ChampionshipType;
-  } | null>(null);
-
-  return (
-    <Box>
-      {players.map((player) => {
-        const playerAvailabilities = availabilities[player.id] || {};
-        const masculinAvailability = playerAvailabilities.masculin;
-        const femininAvailability = playerAvailabilities.feminin;
-        const isFemale = player.gender === "F";
-
-        // Pour le championnat de Paris : un seul sondage, tous répondent une seule fois
-        // Pour le championnat par équipes : les hommes répondent masculin, les femmes peuvent répondre masculin ET féminin
-        const hasRespondedMasculin =
-          typeof masculinAvailability?.available === "boolean";
-        const hasRespondedFeminin =
-          typeof femininAvailability?.available === "boolean";
-
-        let hasResponded: boolean;
-        if (isParisChampionship) {
-          hasResponded = hasRespondedMasculin;
-        } else {
-          if (isFemale) {
-            hasResponded = hasRespondedMasculin && hasRespondedFeminin;
-          } else {
-            hasResponded = hasRespondedMasculin;
-          }
-        }
-
-        const isExpanded = expandedPlayer?.id === player.id;
-
-        return (
-          <Card
-            key={player.id}
-            sx={{
-              mb: 1,
-              borderLeft: hasResponded
-                ? `4px solid ${
-                    masculinAvailability?.available ? "#4caf50" : "#f44336"
-                  }`
-                : "4px solid transparent",
-            }}
-          >
-            <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
-              <Box display="flex" alignItems="flex-start" gap={2}>
-                <Box
-                  display="flex"
-                  alignItems="center"
-                  gap={1}
-                  flexGrow={1}
-                  minWidth={0}
-                  sx={{
-                    flexDirection: { xs: "column", sm: "row" },
-                    alignItems: { xs: "flex-start", sm: "center" },
-                  }}
-                >
-                  <Typography
-                    variant="body1"
-                    fontWeight="medium"
-                    sx={{
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {player.firstName} {player.name}
-                  </Typography>
-                  {player.isWheelchair && (
-                    <Tooltip title="Joueur en fauteuil">
-                      <AccessibleIcon
-                        fontSize="small"
-                        sx={{ color: "primary.main", ml: 0.5 }}
-                      />
-                    </Tooltip>
-                  )}
-                  {!isPlayerRegistered(player, selectedEpreuve) && (
-                    <Tooltip title="Joueur non inscrit au championnat">
-                      <Chip
-                        label="Non inscrit"
-                        size="small"
-                        variant="outlined"
-                        color="warning"
-                        sx={{ height: 22, fontSize: "0.7rem", fontWeight: 600 }}
-                      />
-                    </Tooltip>
-                  )}
-                  {!player.discordMentions?.length && (
-                    <Tooltip title="Non associé à un compte Discord">
-                      <Chip
-                        icon={<LinkOffIcon sx={{ fontSize: 14 }} />}
-                        label="Sans Discord"
-                        size="small"
-                        variant="outlined"
-                        color="default"
-                        sx={{ height: 22, fontSize: "0.7rem" }}
-                      />
-                    </Tooltip>
-                  )}
-                  <Chip
-                    label={player.gender === "M" ? "M" : "F"}
-                    size="small"
-                    color={player.gender === "M" ? "primary" : "secondary"}
-                    sx={{ height: 20, fontSize: "0.7rem" }}
-                  />
-                  {player.license && (
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ whiteSpace: "nowrap" }}
-                    >
-                      {player.license}
-                    </Typography>
-                  )}
-                  <Box
-                    display="flex"
-                    gap={1}
-                    alignItems="center"
-                    flexWrap="wrap"
-                  >
-                    {isParisChampionship ? (
-                      <AvailabilityStatusChip
-                        status={
-                          masculinAvailability?.available === true
-                            ? "available"
-                            : masculinAvailability?.available === false
-                            ? "unavailable"
-                            : masculinAvailability?.comment
-                            ? "pending"
-                            : "unknown"
-                        }
-                      />
-                    ) : (
-                      <AvailabilityStatusChip
-                        status={
-                          masculinAvailability?.available === true
-                            ? "available"
-                            : masculinAvailability?.available === false
-                            ? "unavailable"
-                            : masculinAvailability?.comment
-                            ? "pending"
-                            : "unknown"
-                        }
-                        label="Masculin"
-                      />
-                    )}
-                    {isFemale && !isParisChampionship && (
-                      <>
-                        <AvailabilityStatusChip
-                          status={
-                            femininAvailability?.available === true
-                              ? "available"
-                              : femininAvailability?.available === false
-                              ? "unavailable"
-                              : femininAvailability?.comment
-                              ? "pending"
-                              : "unknown"
-                          }
-                          label="Féminin"
-                        />
-                        {typeof femininAvailability?.fridayAvailable ===
-                          "boolean" && (
-                          <AvailabilityStatusChip
-                            status={
-                              femininAvailability.fridayAvailable === true
-                                ? "available"
-                                : "unavailable"
-                            }
-                            label="Vendredi"
-                          />
-                        )}
-                        {typeof femininAvailability?.saturdayAvailable ===
-                          "boolean" && (
-                          <AvailabilityStatusChip
-                            status={
-                              femininAvailability.saturdayAvailable === true
-                                ? "available"
-                                : "unavailable"
-                            }
-                            label="Samedi"
-                          />
-                        )}
-                      </>
-                    )}
-                  </Box>
-                </Box>
-
-                <Box
-                  display="flex"
-                  flexDirection="column"
-                  gap={1}
-                  sx={{ minWidth: { xs: "100%", sm: 280 } }}
-                >
-                  {/* Disponibilité - Pour le championnat de Paris : un seul sondage */}
-                  {/* Pour le championnat par équipes : les femmes ont deux champs (masculin et féminin) */}
-                  {isParisChampionship ? (
-                    <Box
-                      display="flex"
-                      alignItems="center"
-                      gap={1}
-                      sx={{ flexWrap: "wrap" }}
-                    >
-                      <Button
-                        variant={
-                          masculinAvailability?.available === true
-                            ? "contained"
-                            : "outlined"
-                        }
-                        color="success"
-                        size="small"
-                        onClick={() =>
-                          onAvailabilityChange(player.id, "masculin", true)
-                        }
-                        sx={{ minWidth: 70, flexGrow: { xs: 1, sm: 0 } }}
-                      >
-                        <CheckCircle fontSize="small" sx={{ mr: 0.5 }} />
-                        Oui
-                      </Button>
-                      <Button
-                        variant={
-                          masculinAvailability?.available === false
-                            ? "contained"
-                            : "outlined"
-                        }
-                        color="error"
-                        size="small"
-                        onClick={() =>
-                          onAvailabilityChange(player.id, "masculin", false)
-                        }
-                        sx={{ minWidth: 70, flexGrow: { xs: 1, sm: 0 } }}
-                      >
-                        <Cancel fontSize="small" sx={{ mr: 0.5 }} />
-                        Non
-                      </Button>
-                      <Button
-                        size="small"
-                        onClick={() =>
-                          setExpandedPlayer(
-                            isExpanded && expandedPlayer?.type === "masculin"
-                              ? null
-                              : { id: player.id, type: "masculin" }
-                          )
-                        }
-                        sx={{
-                          minWidth: 40,
-                          position: masculinAvailability?.comment
-                            ? "relative"
-                            : undefined,
-                          ...(masculinAvailability?.comment
-                            ? {
-                                "&::after": {
-                                  content: "''",
-                                  position: "absolute",
-                                  top: 4,
-                                  right: 6,
-                                  width: 6,
-                                  height: 6,
-                                  borderRadius: "50%",
-                                  bgcolor: "info.main",
-                                },
-                              }
-                            : {}),
-                        }}
-                      >
-                        💬
-                      </Button>
-                    </Box>
-                  ) : (
-                    <>
-                      {/* Disponibilité Masculine */}
-                      <Box
-                        display="flex"
-                        alignItems="center"
-                        gap={1}
-                        sx={{ flexWrap: "wrap" }}
-                      >
-                        <Typography
-                          variant="caption"
-                          sx={{ minWidth: 80, fontWeight: "medium" }}
-                        >
-                          Masculin:
-                        </Typography>
-                        <Button
-                          variant={
-                            masculinAvailability?.available === true
-                              ? "contained"
-                              : "outlined"
-                          }
-                          color="success"
-                          size="small"
-                          onClick={() =>
-                            onAvailabilityChange(player.id, "masculin", true)
-                          }
-                          sx={{ minWidth: 70, flexGrow: { xs: 1, sm: 0 } }}
-                        >
-                          <CheckCircle fontSize="small" sx={{ mr: 0.5 }} />
-                          Oui
-                        </Button>
-                        <Button
-                          variant={
-                            masculinAvailability?.available === false
-                              ? "contained"
-                              : "outlined"
-                          }
-                          color="error"
-                          size="small"
-                          onClick={() =>
-                            onAvailabilityChange(player.id, "masculin", false)
-                          }
-                          sx={{ minWidth: 70, flexGrow: { xs: 1, sm: 0 } }}
-                        >
-                          <Cancel fontSize="small" sx={{ mr: 0.5 }} />
-                          Non
-                        </Button>
-                        <Button
-                          size="small"
-                          onClick={() =>
-                            setExpandedPlayer(
-                              isExpanded && expandedPlayer?.type === "masculin"
-                                ? null
-                                : { id: player.id, type: "masculin" }
-                            )
-                          }
-                          sx={{
-                            minWidth: 40,
-                            position: masculinAvailability?.comment
-                              ? "relative"
-                              : undefined,
-                            ...(masculinAvailability?.comment
-                              ? {
-                                  "&::after": {
-                                    content: "''",
-                                    position: "absolute",
-                                    top: 4,
-                                    right: 6,
-                                    width: 6,
-                                    height: 6,
-                                    borderRadius: "50%",
-                                    bgcolor: "info.main",
-                                  },
-                                }
-                              : {}),
-                          }}
-                        >
-                          💬
-                        </Button>
-                      </Box>
-
-                      {/* Disponibilité Féminine (uniquement pour les femmes en championnat par équipes) */}
-                      {isFemale && (
-                        <Box
-                          display="flex"
-                          alignItems="center"
-                          gap={1}
-                          sx={{ flexWrap: "wrap" }}
-                        >
-                          <Typography
-                            variant="caption"
-                            sx={{ minWidth: 80, fontWeight: "medium" }}
-                          >
-                            Féminin:
-                          </Typography>
-                          <Button
-                            variant={
-                              femininAvailability?.available === true
-                                ? "contained"
-                                : "outlined"
-                            }
-                            color="success"
-                            size="small"
-                            onClick={() =>
-                              onAvailabilityChange(player.id, "feminin", true)
-                            }
-                            sx={{ minWidth: 70, flexGrow: { xs: 1, sm: 0 } }}
-                          >
-                            <CheckCircle fontSize="small" sx={{ mr: 0.5 }} />
-                            Oui
-                          </Button>
-                          <Button
-                            variant={
-                              femininAvailability?.available === false
-                                ? "contained"
-                                : "outlined"
-                            }
-                            color="error"
-                            size="small"
-                            onClick={() =>
-                              onAvailabilityChange(player.id, "feminin", false)
-                            }
-                            sx={{ minWidth: 70, flexGrow: { xs: 1, sm: 0 } }}
-                          >
-                            <Cancel fontSize="small" sx={{ mr: 0.5 }} />
-                            Non
-                          </Button>
-                          <Button
-                            size="small"
-                            onClick={() =>
-                              setExpandedPlayer(
-                                isExpanded && expandedPlayer?.type === "feminin"
-                                  ? null
-                                  : { id: player.id, type: "feminin" }
-                              )
-                            }
-                            sx={{
-                              minWidth: 40,
-                              position: femininAvailability?.comment
-                                ? "relative"
-                                : undefined,
-                              ...(femininAvailability?.comment
-                                ? {
-                                    "&::after": {
-                                      content: "''",
-                                      position: "absolute",
-                                      top: 4,
-                                      right: 6,
-                                      width: 6,
-                                      height: 6,
-                                      borderRadius: "50%",
-                                      bgcolor: "info.main",
-                                    },
-                                  }
-                                : {}),
-                            }}
-                          >
-                            💬
-                          </Button>
-                        </Box>
-                      )}
-                    </>
-                  )}
-                </Box>
-              </Box>
-
-              {/* Commentaires */}
-              {isExpanded && (
-                <Box
-                  sx={{
-                    mt: 2,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 1,
-                  }}
-                >
-                  {isParisChampionship ? (
-                    <TextField
-                      fullWidth
-                      size="small"
-                      placeholder="Commentaire (optionnel)"
-                      id={`comment-${player.id}-masculin`}
-                      name={`comment-${player.id}-masculin`}
-                      value={masculinAvailability?.comment || ""}
-                      onChange={(e) =>
-                        onCommentChange(player.id, "masculin", e.target.value)
-                      }
-                      multiline
-                      rows={2}
-                    />
-                  ) : (
-                    <>
-                      {/* Commentaire Masculin */}
-                      <Box>
-                        <Typography
-                          id={`comment-label-${player.id}-masculin`}
-                          variant="caption"
-                          sx={{ mb: 0.5, display: "block" }}
-                        >
-                          Commentaire Masculin:
-                        </Typography>
-                        <TextField
-                          fullWidth
-                          size="small"
-                          placeholder="Commentaire (optionnel)"
-                          id={`comment-${player.id}-masculin`}
-                          name={`comment-${player.id}-masculin`}
-                          value={masculinAvailability?.comment || ""}
-                          onChange={(e) =>
-                            onCommentChange(
-                              player.id,
-                              "masculin",
-                              e.target.value
-                            )
-                          }
-                          multiline
-                          rows={2}
-                          inputProps={{
-                            "aria-labelledby": `comment-label-${player.id}-masculin`,
-                          }}
-                        />
-                      </Box>
-
-                      {/* Commentaire Féminin (uniquement pour les femmes en championnat par équipes) */}
-                      {isFemale && (
-                        <Box>
-                          <Typography
-                            id={`comment-label-${player.id}-feminin`}
-                            variant="caption"
-                            sx={{ mb: 0.5, display: "block" }}
-                          >
-                            Commentaire Féminin:
-                          </Typography>
-                          <TextField
-                            fullWidth
-                            size="small"
-                            placeholder="Commentaire (optionnel)"
-                            id={`comment-${player.id}-feminin`}
-                            name={`comment-${player.id}-feminin`}
-                            value={femininAvailability?.comment || ""}
-                            onChange={(e) =>
-                              onCommentChange(
-                                player.id,
-                                "feminin",
-                                e.target.value
-                              )
-                            }
-                            multiline
-                            rows={2}
-                            inputProps={{
-                              "aria-labelledby": `comment-label-${player.id}-feminin`,
-                            }}
-                          />
-                        </Box>
-                      )}
-                    </>
-                  )}
-                </Box>
-              )}
-
-              {/* Afficher les commentaires existants s'il y en a (même si pas expanded) */}
-              {(masculinAvailability?.comment ||
-                (isFemale &&
-                  !isParisChampionship &&
-                  femininAvailability?.comment)) &&
-                !isExpanded && (
-                  <Box
-                    sx={{
-                      mt: 1,
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 0.5,
-                    }}
-                  >
-                    {isParisChampionship ? (
-                      masculinAvailability?.comment && (
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          sx={{ fontStyle: "italic" }}
-                        >
-                          {masculinAvailability.comment}
-                        </Typography>
-                      )
-                    ) : (
-                      <>
-                        {masculinAvailability?.comment && (
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ fontStyle: "italic" }}
-                          >
-                            <strong>Masc:</strong>{" "}
-                            {masculinAvailability.comment}
-                          </Typography>
-                        )}
-                        {isFemale && femininAvailability?.comment && (
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ fontStyle: "italic" }}
-                          >
-                            <strong>Fém:</strong> {femininAvailability.comment}
-                          </Typography>
-                        )}
-                      </>
-                    )}
-                  </Box>
-                )}
-            </CardContent>
-          </Card>
-        );
-      })}
-    </Box>
-  );
-}
