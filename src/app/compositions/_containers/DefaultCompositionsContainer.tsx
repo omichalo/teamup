@@ -10,10 +10,6 @@ import {
   Alert,
   CircularProgress,
   Chip,
-  ListItem,
-  ListItemButton,
-  ListItemText,
-  IconButton,
   FormControlLabel,
   Switch,
   Tooltip,
@@ -21,10 +17,8 @@ import {
   CardContent,
 } from "@mui/material";
 import {
-  DragIndicator,
   AlternateEmail,
   Warning,
-  Accessible as AccessibleIcon,
 } from "@mui/icons-material";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
@@ -36,9 +30,7 @@ import { EpreuveType, getMatchEpreuve, isParisEpreuve } from "@/lib/shared/epreu
 import { ChampionshipType } from "@/types";
 import {
   JOURNEE_CONCERNEE_PAR_REGLE,
-  canAssignPlayerToTeam,
   validateTeamCompositionState,
-  AssignmentValidationResult,
   getParisTeamStructure,
   isParisChampionship,
 } from "@/lib/compositions/validators";
@@ -49,12 +41,14 @@ import {
 import { divisionIndicatesPhase2 } from "@/lib/shared/fftt-utils";
 import type { Player } from "@/types/team-management";
 import { AvailablePlayersPanel } from "@/components/compositions/AvailablePlayersPanel";
+import { AvailablePlayerListItem } from "@/components/compositions/AvailablePlayerListItem";
 import { TeamCompositionCard } from "@/components/compositions/TeamCompositionCard";
 import { CompositionsSummary } from "@/components/compositions/CompositionsSummary";
 import { CompositionRulesHelp, type CompositionRuleItem } from "@/components/compositions/CompositionRulesHelp";
 import { usePhasePreselect } from "@/hooks/usePhasePreselect";
 import { useJourneesData } from "@/hooks/useJourneesData";
-import { usePlayerDrag } from "@/hooks/usePlayerDrag";
+import { useDefaultCompositions } from "@/hooks/useDefaultCompositions";
+import { useDefaultCompositionAssignments } from "@/hooks/useDefaultCompositionAssignments";
 import { EpreuveSelect } from "@/components/compositions/Filters/EpreuveSelect";
 import { PhaseSelect } from "@/components/compositions/Filters/PhaseSelect";
 import { TeamPicker } from "@/components/compositions/Filters/TeamPicker";
@@ -76,15 +70,6 @@ export function DefaultCompositionsContainer() {
   const [selectedPhase, setSelectedPhase] = useState<"aller" | "retour" | null>(
     null
   );
-  const [defaultCompositions, setDefaultCompositions] = useState<{
-    masculin: Record<string, string[]>;
-    feminin: Record<string, string[]>;
-  }>({
-    masculin: {},
-    feminin: {},
-  });
-  const [defaultCompositionsLoaded, setDefaultCompositionsLoaded] =
-    useState(false);
   const [defaultCompositionErrors, setDefaultCompositionErrors] = useState<
     Record<string, string | undefined>
   >({});
@@ -101,6 +86,14 @@ export function DefaultCompositionsContainer() {
     () => new CompositionDefaultsService(),
     []
   );
+  const {
+    defaultCompositions,
+    setDefaultCompositions,
+    defaultCompositionsLoaded,
+  } = useDefaultCompositions({
+    selectedPhase,
+    compositionDefaultsService,
+  });
 
   const {
     defaultEpreuve,
@@ -133,57 +126,6 @@ export function DefaultCompositionsContainer() {
     const hasInvalidMention = player.discordMentions.some(mentionId => !validMemberIds.has(mentionId));
     return hasInvalidMention ? "invalid" : "valid";
   }, [discordMembers]);
-
-  useEffect(() => {
-    if (!selectedPhase) {
-      setDefaultCompositions({ masculin: {}, feminin: {} });
-      setDefaultCompositionsLoaded(false);
-      console.log("[DefaultCompositions] Phase non sélectionnée, réinitialisation des compositions");
-      return;
-    }
-
-    setDefaultCompositionsLoaded(false);
-
-    const loadDefaults = async () => {
-      try {
-        console.log(
-          "[DefaultCompositions] Chargement des compositions par défaut",
-          { phase: selectedPhase }
-        );
-        const [masculineDefaults, feminineDefaults] = await Promise.all([
-          compositionDefaultsService.getDefaults(selectedPhase, "masculin"),
-          compositionDefaultsService.getDefaults(selectedPhase, "feminin"),
-        ]);
-
-        setDefaultCompositions({
-          masculin: masculineDefaults?.teams || {},
-          feminin: feminineDefaults?.teams || {},
-        });
-        setDefaultCompositionMessage(null);
-        console.log("[DefaultCompositions] Compositions chargées", {
-          phase: selectedPhase,
-          masculinTeams: Object.keys(masculineDefaults?.teams ?? {}),
-          femininTeams: Object.keys(feminineDefaults?.teams ?? {}),
-        });
-      } catch (error) {
-        console.error(
-          "Erreur lors du chargement des compositions par défaut:",
-          error
-        );
-        setDefaultCompositions({ masculin: {}, feminin: {} });
-        console.log("[DefaultCompositions] Échec du chargement des compositions, réinitialisation", {
-          phase: selectedPhase,
-        });
-      } finally {
-        setDefaultCompositionsLoaded(true);
-        console.log("[DefaultCompositions] Chargement terminé", {
-          phase: selectedPhase,
-        });
-      }
-    };
-
-    loadDefaults();
-  }, [selectedPhase, compositionDefaultsService]);
 
   // Filtrer les équipes selon l'épreuve et la phase (même logique que CompositionsPageContainer)
   // Championnat Paris : pas de filtre par phase (une seule phase)
@@ -320,37 +262,6 @@ export function DefaultCompositionsContainer() {
     []
   );
 
-  const canDropPlayer = useCallback(
-    (playerId: string, teamId: string): AssignmentValidationResult => {
-      const equipe = equipes.find((e) => e.team.id === teamId);
-      const maxPlayers = equipe ? getMaxPlayersForTeam(equipe) : MAX_PLAYERS_PER_DEFAULT_TEAM;
-      const championshipType: ChampionshipType = equipe &&
-        equipe.matches.some((match) => match.isFemale)
-          ? "feminin"
-          : "masculin";
-
-      return canAssignPlayerToTeam({
-        playerId,
-        teamId,
-        players,
-        equipes,
-        compositions: mergedDefaultCompositions,
-        selectedPhase,
-        selectedJournee: null,
-        championshipType,
-        journeeRule: JOURNEE_CONCERNEE_PAR_REGLE,
-        maxPlayersPerTeam: maxPlayers,
-      });
-    },
-    [
-      players,
-      equipes,
-      mergedDefaultCompositions,
-      selectedPhase,
-      getMaxPlayersForTeam,
-    ]
-  );
-
   useEffect(() => {
     if (!defaultCompositionsLoaded || selectedPhase === null) {
       setDefaultCompositionErrors({});
@@ -394,355 +305,6 @@ export function DefaultCompositionsContainer() {
     getMaxPlayersForTeam,
   ]);
 
-  const assignPlayerToTeam = useCallback(
-    async (teamId: string, playerId: string): Promise<boolean> => {
-      console.log("[DefaultCompositions] assignPlayerToTeam called", {
-        teamId,
-        playerId,
-        phase: selectedPhase,
-      });
-
-      if (selectedPhase === null) {
-        setDefaultCompositionMessage(
-          "Veuillez sélectionner une phase pour gérer les compositions."
-        );
-        console.log(
-          "[DefaultCompositions] assignPlayerToTeam aborted: no phase selected"
-        );
-        return false;
-      }
-
-      const equipe = equipes.find((eq) => eq.team.id === teamId);
-      const player = players.find((p) => p.id === playerId);
-
-      if (!equipe || !player) {
-        setDefaultCompositionMessage("Équipe ou joueur introuvable.");
-        console.log(
-          "[DefaultCompositions] assignPlayerToTeam aborted: missing data",
-          {
-            hasEquipe: Boolean(equipe),
-            hasPlayer: Boolean(player),
-          }
-        );
-        return false;
-      }
-
-      const validation = canDropPlayer(playerId, teamId);
-
-      if (!validation.canAssign) {
-        setDefaultCompositionMessage(
-          validation.reason || "Composition invalide."
-        );
-        console.log(
-          "[DefaultCompositions] assignPlayerToTeam validation blocked",
-          {
-            teamId,
-            playerId,
-            reason: validation.reason,
-          }
-        );
-        return false;
-      }
-
-      // Pour le championnat de Paris, utiliser "masculin" comme type par défaut (mixte)
-      const championshipType =
-        isParisEpreuve(selectedEpreuve)
-          ? "masculin"
-          : equipe.matches.some((match) => match.isFemale === true)
-            ? "feminin"
-            : "masculin";
-
-      const sameTypeTeams = (
-        championshipType === "feminin"
-          ? equipesByType.feminin
-          : equipesByType.masculin
-      ).map((eq) => eq.team.id);
-
-      const previousAssignments = defaultCompositions[championshipType] || {};
-      const updatedForType: Record<string, string[]> = Object.fromEntries(
-        Object.entries(previousAssignments).map(([key, value]) => [key, [...value]])
-      );
-
-      let removedFromOtherTeams = false;
-      sameTypeTeams.forEach((sameTeamId) => {
-        const playersForTeam = updatedForType[sameTeamId];
-        if (playersForTeam?.includes(playerId)) {
-          updatedForType[sameTeamId] = playersForTeam.filter(
-            (id) => id !== playerId
-          );
-          if (sameTeamId !== teamId) {
-            removedFromOtherTeams = true;
-          }
-        }
-      });
-
-      const currentTeamPlayers = [...(updatedForType[teamId] ?? [])];
-
-      if (currentTeamPlayers.includes(playerId)) {
-        console.log("[DefaultCompositions] Player already present in team", {
-          teamId,
-          playerId,
-          removedFromOtherTeams,
-        });
-
-        if (removedFromOtherTeams) {
-          const nextState = {
-            ...defaultCompositions,
-            [championshipType]: updatedForType,
-          };
-          setDefaultCompositions(nextState);
-          try {
-            console.log(
-              "[DefaultCompositions] Persisting removal from other teams",
-              {
-                teamId,
-                playerId,
-                championshipType,
-                phase: selectedPhase,
-              }
-            );
-            await compositionDefaultsService.saveDefaults({
-              phase: selectedPhase,
-              championshipType,
-              teams: updatedForType,
-            });
-            console.log(
-              "[DefaultCompositions] Removal persisted successfully",
-              {
-                teamId,
-                playerId,
-                championshipType,
-                phase: selectedPhase,
-              }
-            );
-            setDefaultCompositionMessage(null);
-            return true;
-          } catch (error) {
-            console.error(
-              "Erreur lors de la sauvegarde de la composition par défaut:",
-              error
-            );
-            console.log(
-              "[DefaultCompositions] Persisting removal failed",
-              {
-                teamId,
-                playerId,
-                championshipType,
-                phase: selectedPhase,
-                error,
-              }
-            );
-            setDefaultCompositionMessage(
-              "Erreur lors de la sauvegarde de la composition par défaut."
-            );
-            return false;
-          }
-        }
-
-        setDefaultCompositionMessage(null);
-        return true;
-      }
-
-      // equipe est déjà déclaré plus haut dans la fonction
-      const maxPlayers = equipe ? getMaxPlayersForTeam(equipe) : MAX_PLAYERS_PER_DEFAULT_TEAM;
-      
-      if (currentTeamPlayers.length >= maxPlayers) {
-        setDefaultCompositionMessage(
-          `Cette équipe est déjà complète (${maxPlayers} joueurs).`
-        );
-        console.log("[DefaultCompositions] Ajout refusé : équipe pleine", {
-          teamId,
-          playerId,
-          currentPlayerCount: currentTeamPlayers.length,
-          maxPlayers,
-        });
-        return false;
-      }
-
-      const nextPlayers = [...currentTeamPlayers, playerId];
-      updatedForType[teamId] = nextPlayers;
-
-      const nextState = {
-        ...defaultCompositions,
-        [championshipType]: updatedForType,
-      };
-
-      setDefaultCompositions(nextState);
-      console.log("[DefaultCompositions] Player added and state updated", {
-        teamId,
-        playerId,
-        previousPlayers: currentTeamPlayers,
-        nextPlayers,
-      });
-
-      try {
-      console.log("[DefaultCompositions] Sauvegarde d'une composition par défaut", {
-        teamId,
-        playerId,
-        championshipType,
-        phase: selectedPhase,
-          teams: updatedForType,
-      });
-        await compositionDefaultsService.saveDefaults({
-          phase: selectedPhase,
-          championshipType,
-          teams: updatedForType,
-        });
-      console.log("[DefaultCompositions] Sauvegarde réussie", {
-        teamId,
-        playerId,
-        championshipType,
-        phase: selectedPhase,
-      });
-        setDefaultCompositionMessage(null);
-        return true;
-      } catch (error) {
-        console.error(
-          "Erreur lors de la sauvegarde de la composition par défaut:",
-          error
-        );
-      console.log("[DefaultCompositions] Sauvegarde échouée", {
-        teamId,
-        playerId,
-        championshipType,
-        phase: selectedPhase,
-        error,
-      });
-        setDefaultCompositionMessage(
-          "Erreur lors de la sauvegarde de la composition par défaut."
-        );
-        return false;
-      }
-    },
-    [
-      selectedPhase,
-      equipes,
-      players,
-      canDropPlayer,
-      defaultCompositions,
-      compositionDefaultsService,
-      equipesByType,
-      getMaxPlayersForTeam,
-      selectedEpreuve,
-    ]
-  );
-
-  const handleRemoveDefaultPlayer = useCallback(
-    async (teamId: string, playerId: string) => {
-      if (selectedPhase === null) {
-        return;
-      }
-
-      const equipe = equipes.find((eq) => eq.team.id === teamId);
-      if (!equipe) {
-        return;
-      }
-
-      // Pour le championnat de Paris, utiliser "masculin" comme type par défaut (mixte)
-      const championshipType =
-        isParisEpreuve(selectedEpreuve)
-          ? "masculin"
-          : equipe.matches.some((match) => match.isFemale === true)
-            ? "feminin"
-            : "masculin";
-
-      let nextTeamsForType: Record<string, string[]> | null = null;
-
-      setDefaultCompositions((prev) => {
-        const updatedForType = { ...prev[championshipType] };
-        const currentPlayers = updatedForType[teamId] || [];
-
-        if (!currentPlayers.includes(playerId)) {
-          nextTeamsForType = updatedForType;
-          return prev;
-        }
-
-        updatedForType[teamId] = currentPlayers.filter((id) => id !== playerId);
-    console.log("[DefaultCompositions] Suppression d'un joueur de la composition", {
-      teamId,
-      playerId,
-      championshipType,
-      phase: selectedPhase,
-      remainingPlayers: updatedForType[teamId],
-    });
-        nextTeamsForType = updatedForType;
-
-        return {
-          ...prev,
-          [championshipType]: updatedForType,
-        };
-      });
-
-      if (!nextTeamsForType) {
-        return;
-      }
-
-      try {
-    console.log("[DefaultCompositions] Sauvegarde après suppression d'un joueur", {
-      teamId,
-      playerId,
-      championshipType,
-      phase: selectedPhase,
-      teams: nextTeamsForType,
-    });
-        await compositionDefaultsService.saveDefaults({
-          phase: selectedPhase,
-          championshipType,
-          teams: nextTeamsForType,
-        });
-    console.log("[DefaultCompositions] Sauvegarde réussie après suppression", {
-      teamId,
-      playerId,
-      championshipType,
-      phase: selectedPhase,
-    });
-      } catch (error) {
-        console.error(
-          "Erreur lors de la sauvegarde de la composition par défaut:",
-          error
-        );
-    console.log("[DefaultCompositions] Échec de la sauvegarde après suppression", {
-      teamId,
-      playerId,
-      championshipType,
-      phase: selectedPhase,
-      error,
-    });
-        setDefaultCompositionMessage(
-          "Erreur lors de la sauvegarde de la composition par défaut."
-        );
-      }
-    },
-    [selectedPhase, equipes, compositionDefaultsService, selectedEpreuve]
-  );
-
-  const getDragPreviewOptions = useCallback(
-    (playerId: string) => {
-      let championshipType: ChampionshipType = defaultCompositionTab;
-      const assignmentsByType = defaultCompositions;
-
-      (["masculin", "feminin"] as const).forEach((type) => {
-        const assignment = assignmentsByType[type];
-        if (Object.values(assignment).some((ids) => ids?.includes(playerId))) {
-          championshipType = type;
-        }
-      });
-
-      return {
-        championshipType,
-        phase: (selectedPhase || "aller") as "aller" | "retour",
-      };
-    },
-    [defaultCompositionTab, defaultCompositions, selectedPhase]
-  );
-
-  const handleInvalidDrop = useCallback(
-    (validation: AssignmentValidationResult) => {
-      setDefaultCompositionMessage(validation.reason || "Composition invalide.");
-    },
-    []
-  );
-
   const {
     draggedPlayerId,
     dragOverTeamId,
@@ -751,14 +313,21 @@ export function DefaultCompositionsContainer() {
     handleDragOver,
     handleDragLeave,
     handleDrop,
-  } = usePlayerDrag({
-    players,
     canDropPlayer,
-    getPreviewOptions: getDragPreviewOptions,
-    onDrop: async (teamId, playerId) => {
-      await assignPlayerToTeam(teamId, playerId);
-    },
-    onInvalidDrop: handleInvalidDrop,
+    handleRemoveDefaultPlayer,
+  } = useDefaultCompositionAssignments({
+    players,
+    equipes,
+    equipesByType,
+    defaultCompositions,
+    setDefaultCompositions,
+    selectedEpreuve,
+    selectedPhase,
+    defaultCompositionTab,
+    mergedDefaultCompositions,
+    getMaxPlayersForTeam,
+    compositionDefaultsService,
+    setDefaultCompositionMessage,
   });
 
   const compositionSummary = useMemo(() => {
@@ -1002,169 +571,20 @@ export function DefaultCompositionsContainer() {
                   noResultMessage={(query) => `Aucun joueur trouvé pour “${query}”`}
                   renderPlayerItem={(player) => {
                     const phase = (selectedPhase || "aller") as "aller" | "retour";
-                    const championshipType = defaultCompositionTab;
-                    // Pour les compositions par défaut, on ne peut pas déterminer directement le championnat
-                    // On utilise les propriétés par défaut (championnat par équipes)
-                    // Note: Si besoin, on pourrait passer l'équipe en paramètre pour utiliser isParisChampionship
                     const burnedTeam =
-                      championshipType === "masculin"
+                      defaultCompositionTab === "masculin"
                         ? player.highestMasculineTeamNumberByPhase?.[phase]
                         : player.highestFeminineTeamNumberByPhase?.[phase];
-                    const isForeign = player.nationality === "ETR";
-                    const isEuropean = player.nationality === "C";
-
                     return (
-                      <ListItem
-                        disablePadding
-                        sx={{ mb: 1 }}
-                        secondaryAction={null}
-                      >
-                        <ListItemButton
-                          draggable
-                          onDragStart={(event) => handleDragStart(event, player.id)}
-                          onDragEnd={handleDragEnd}
-                          sx={{
-                            cursor: "grab",
-                            border: "1px solid",
-                            borderColor: "divider",
-                            borderRadius: 1,
-                            backgroundColor: "background.paper",
-                            "&:hover": {
-                              backgroundColor: "action.hover",
-                              borderColor: "primary.main",
-                              boxShadow: 1,
-                              cursor: "grab",
-                            },
-                            "&:active": {
-                              cursor: "grabbing",
-                              opacity: 0.6,
-                            },
-                          }}
-                        >
-                          <IconButton
-                            edge="start"
-                            size="small"
-                            sx={{
-                              mr: 1,
-                              color: "text.secondary",
-                              cursor:
-                                draggedPlayerId === player.id ? "grabbing" : "grab",
-                              "&:hover": {
-                                cursor: "grab",
-                              },
-                              "&:active": {
-                                cursor: "grabbing",
-                              },
-                            }}
-                            disabled
-                          >
-                            <DragIndicator fontSize="small" />
-                          </IconButton>
-                          <ListItemText
-                            primary={
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 1,
-                                  flexWrap: "wrap",
-                                }}
-                              >
-                                <Typography variant="body2" component="span">
-                                  {player.firstName} {player.name}
-                                </Typography>
-                                {player.isWheelchair && (
-                                  <Tooltip title="Joueur en fauteuil">
-                                    <AccessibleIcon
-                                      fontSize="small"
-                                      sx={{ color: "primary.main", ml: 0.5 }}
-                                    />
-                                  </Tooltip>
-                                )}
-                                {isEuropean && (
-                                  <Chip
-                                    label="EUR"
-                                    size="small"
-                                    color="info"
-                                    variant="outlined"
-                                    sx={{
-                                      height: 20,
-                                      fontSize: "0.7rem",
-                                    }}
-                                  />
-                                )}
-                                {isForeign && (
-                                  <Chip
-                                    label="ETR"
-                                    size="small"
-                                    color="warning"
-                                    variant="outlined"
-                                    sx={{
-                                      height: 20,
-                                      fontSize: "0.7rem",
-                                    }}
-                                  />
-                                )}
-                                {burnedTeam !== undefined && burnedTeam !== null && (
-                                  <Chip
-                                    label={`Brûlé Éq. ${burnedTeam}`}
-                                    size="small"
-                                    color="error"
-                                    variant="outlined"
-                                    sx={{
-                                      height: 20,
-                                      fontSize: "0.7rem",
-                                    }}
-                                  />
-                                )}
-                                {!player.participation?.championnat && (
-                                  <Chip
-                                    label="Hors championnat"
-                                    size="small"
-                                    color="default"
-                                    variant="outlined"
-                                    sx={{
-                                      height: 20,
-                                      fontSize: "0.7rem",
-                                    }}
-                                  />
-                                )}
-                                {!player.isActive && !player.isTemporary && (
-                                  <Chip
-                                    label="Sans licence"
-                                    size="small"
-                                    color="default"
-                                    variant="outlined"
-                                    sx={{
-                                      height: 20,
-                                      fontSize: "0.7rem",
-                                    }}
-                                  />
-                                )}
-                                {player.isTemporary && (
-                                  <Chip
-                                    label="Temporaire"
-                                    size="small"
-                                    color="error"
-                                    variant="outlined"
-                                    sx={{
-                                      height: 20,
-                                      fontSize: "0.7rem",
-                                    }}
-                                  />
-                                )}
-                              </Box>
-                            }
-                            secondary={
-                              <Typography variant="caption" color="text.secondary">
-                                {player.points !== undefined && player.points !== null
-                                  ? `${player.points} points`
-                                  : "Points non disponibles"}
-                              </Typography>
-                            }
-                          />
-                        </ListItemButton>
-                      </ListItem>
+                      <AvailablePlayerListItem
+                        player={player}
+                        burnedTeam={burnedTeam}
+                        draggedPlayerId={draggedPlayerId}
+                        discordStatus={getDiscordStatus(player)}
+                        onDragStart={handleDragStart}
+                        onDragEnd={handleDragEnd}
+                        showEligibilityChips
+                      />
                     );
                   }}
                   actions={
