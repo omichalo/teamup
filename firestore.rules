@@ -17,14 +17,24 @@ service cloud.firestore {
         : "player";
     }
     
-    // Vérifie si l'utilisateur est admin
+    // Vérifie si l'utilisateur est authentifié et a son email vérifié
+    function isVerified() {
+      return isAuthenticated() && request.auth.token.email_verified == true;
+    }
+
+    // Vérifie si l'utilisateur est admin et a son email vérifié
     function isAdmin() {
-      return authRole() == "admin";
+      return isVerified() && authRole() == "admin";
     }
     
-    // Vérifie si l'utilisateur est coach ou admin
+    // Vérifie si l'utilisateur est coach ou admin, et a son email vérifié
     function isCoach() {
-      return isAdmin() || authRole() == "coach";
+      return isVerified() && (authRole() == "admin" || authRole() == "coach");
+    }
+
+    // Récupère le playerId de l'utilisateur depuis son document user
+    function getPlayerId() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('playerId', null);
     }
     
     // ============================================
@@ -65,7 +75,7 @@ service cloud.firestore {
     // Lecture pour tous les utilisateurs authentifiés (documents individuels et list queries)
     // Écriture uniquement pour les admins/coaches (synchronisation FFTT)
     match /players/{playerId} {
-      allow read: if isAuthenticated();
+      allow read: if isVerified();
       allow write: if isCoach();
     }
     
@@ -73,7 +83,7 @@ service cloud.firestore {
     // Note: allow read dans match /players/{playerId} couvre les documents individuels,
     // mais les list queries nécessitent une règle explicite au niveau de la collection
     match /players/{document=**} {
-      allow list: if isAuthenticated();
+      allow list: if isVerified();
     }
     
     // ============================================
@@ -82,13 +92,13 @@ service cloud.firestore {
     // Lecture pour tous les utilisateurs authentifiés
     // Écriture uniquement pour les admins/coaches
     match /teams/{teamId} {
-      allow read: if isAuthenticated();
+      allow read: if isVerified();
       allow write: if isCoach();
       
       // Sous-collection: teams/{teamId}/matches
       // Même règles que la collection parente
       match /matches/{matchId} {
-        allow read: if isAuthenticated();
+        allow read: if isVerified();
         allow write: if isCoach();
       }
     }
@@ -99,7 +109,7 @@ service cloud.firestore {
     // Lecture pour tous les utilisateurs authentifiés
     // Écriture uniquement pour les admins/coaches
     match /matches/{matchId} {
-      allow read: if isAuthenticated();
+      allow read: if isVerified();
       allow write: if isCoach();
     }
     
@@ -109,7 +119,7 @@ service cloud.firestore {
     // Lecture pour tous les utilisateurs authentifiés
     // Écriture uniquement pour les admins/coaches
     match /compositions/{compositionId} {
-      allow read: if isAuthenticated();
+      allow read: if isVerified();
       allow write: if isCoach();
     }
     
@@ -119,18 +129,40 @@ service cloud.firestore {
     // Lecture pour tous les utilisateurs authentifiés
     // Écriture uniquement pour les admins/coaches
     match /compositionDefaults/{defaultsId} {
-      allow read: if isAuthenticated();
+      allow read: if isVerified();
       allow write: if isCoach();
     }
     
     // ============================================
     // Collection: availabilities
     // ============================================
-    // Lecture pour tous les utilisateurs authentifiés
-    // Écriture pour tous les utilisateurs authentifiés (les joueurs peuvent mettre à jour leurs disponibilités)
+    // Lecture pour tous les utilisateurs authentifiés avec email vérifié
+    // Écriture pour les admins/coachs ou pour les joueurs (uniquement leur propre entrée)
     match /availabilities/{availabilityId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read: if isVerified();
+
+      // Seuls les admins et coachs peuvent créer un document de disponibilité (initialisation de la journée)
+      allow create: if isCoach() && isVerified();
+
+      // Mise à jour : admins/coachs (tout) ou joueurs (uniquement leur propre entrée)
+      allow update: if isVerified() && (
+        isCoach() || (
+          // Un joueur ne peut modifier QUE son entrée dans la map 'players'
+          // On vérifie que les métadonnées du document ne changent pas
+          !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['journee', 'phase', 'championshipType', 'idEpreuve', 'date', 'createdAt'])
+          && (
+            let pid = getPlayerId();
+            pid != null && (
+              // On vérifie que seule la clé correspondant au playerId de l'utilisateur a changé dans la map 'players'
+              request.resource.data.players.diff(resource.data.players).affectedKeys().hasOnly([pid])
+            )
+          )
+        )
+      );
+
+      // Suppression : uniquement admin
+      allow delete: if isAdmin() && isVerified();
     }
     
     // ============================================
@@ -139,7 +171,7 @@ service cloud.firestore {
     // Lecture pour tous les utilisateurs authentifiés
     // Écriture uniquement pour les admins/coaches
     match /burnRecords/{burnRecordId} {
-      allow read: if isAuthenticated();
+      allow read: if isVerified();
       allow write: if isCoach();
     }
     
@@ -149,13 +181,13 @@ service cloud.firestore {
     // Lecture pour tous les utilisateurs authentifiés
     // Écriture uniquement pour les admins
     match /clubSettings/{settingsId} {
-      allow read: if isAuthenticated();
+      allow read: if isVerified();
       allow write: if isAdmin();
     }
     
     // Alias pour club_settings (si utilisé)
     match /club_settings/{settingsId} {
-      allow read: if isAuthenticated();
+      allow read: if isVerified();
       allow write: if isAdmin();
     }
     
@@ -165,7 +197,7 @@ service cloud.firestore {
     // Lecture pour tous les utilisateurs authentifiés
     // Écriture uniquement pour les admins
     match /locations/{locationId} {
-      allow read: if isAuthenticated();
+      allow read: if isVerified();
       allow write: if isAdmin();
     }
     
@@ -181,10 +213,10 @@ service cloud.firestore {
     // Collection: discordMessages
     // ============================================
     // Messages Discord envoyés pour les matchs
-    // Lecture pour tous les utilisateurs authentifiés
+    // Lecture pour tous les utilisateurs authentifiés avec email vérifié
     // Écriture uniquement pour les admins/coaches
     match /discordMessages/{messageId} {
-      allow read: if isAuthenticated();
+      allow read: if isVerified();
       allow write: if isCoach();
     }
     

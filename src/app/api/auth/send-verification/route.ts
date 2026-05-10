@@ -109,10 +109,9 @@ export async function POST(req: Request) {
         errorMessage.includes("USER_NOT_FOUND") ||
         errorMessage.includes("no user record")
       ) {
-        return jsonNoStore(
-          { error: "Utilisateur non trouvé", message: "Aucun compte n'est associé à cet email" },
-          { status: 404 }
-        );
+        // Pour des raisons de sécurité, on ne révèle pas si l'utilisateur existe
+        // Cela prévient l'énumération d'adresses email
+        return jsonNoStore({ ok: true });
       }
       
       if (
@@ -192,7 +191,8 @@ export async function POST(req: Request) {
     // Déterminer le code HTTP approprié
     let statusCode = 500;
     if (errorString.includes("user-not-found") || errorString.includes("USER_NOT_FOUND")) {
-      statusCode = 404;
+      // Pour des raisons de sécurité, on ne révèle pas si l'utilisateur existe
+      return jsonNoStore({ ok: true });
     } else if (errorString.includes("invalid-email") || errorString.includes("INVALID_EMAIL")) {
       statusCode = 400;
     } else if (errorString.includes("too-many-requests") || errorString.includes("TOO_MANY_REQUESTS")) {
