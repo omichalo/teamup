@@ -83,6 +83,8 @@ Le script `scripts/setup-functions-config.js` lit les variables d'environnement 
 
 Les variables préfixées par `NEXT_PUBLIC_` sont **publiques** et incluses dans le bundle JavaScript côté client. C'est normal pour la configuration Firebase (clés API, domaines, etc.) car elles sont sécurisées par des restrictions de domaine dans Firebase Console.
 
+Elles doivent être définies dans l’environnement au **build** (`.env.local`, CI, `apphosting.yaml`) : **`next.config.ts` ne duplique plus de valeurs par défaut** pour éviter la divergence entre environnements et les faux positifs « tout marche sans .env » en local.
+
 ## En cas d'exposition de secrets
 
 Si un secret a été commité par erreur :
@@ -119,6 +121,54 @@ Ce projet utilise les secrets suivants (stockés dans Firebase Secret Manager en
 - `FB_PRIVATE_KEY` / `FB_CLIENT_EMAIL` : Credentials Firebase Admin (alternative au service account)
 
 **Note** : Cette liste est fournie à titre informatif. Les valeurs réelles ne doivent jamais être exposées.
+
+## API : CSRF (`validateOrigin`) et rate limiting
+
+Les mutations exposées au navigateur sur la même origine passent par **`validateOrigin`** (`src/lib/auth/csrf-utils.ts`), qui vérifie `Origin` / `Referer` / `Host` par rapport à `APP_URL` ou `NEXT_PUBLIC_APP_URL`. En développement, `localhost` est autorisé.
+
+### Politique par type de route
+
+| Type | CSRF (`validateOrigin`) | Rate limiting |
+|------|-------------------------|---------------|
+| Formulaires / fetch same-origin avec cookie de session | **Oui** sur POST/PATCH/DELETE concernés | Identifiants stables (IP ou `uid`) via `checkRateLimit` / `enforceRateLimit` |
+| Webhooks Discord (`discord/interactions`) | **N/A** — signature Ed25519 | N/A (Discord applique ses propres limites) |
+| Webhooks / secrets serveur (`discord/link-license`, etc.) | **N/A** — secret partagé ou équivalent | Optionnel selon la route |
+| Envoi d’emails anonymes (`auth/send-password-reset`, `auth/send-verification`) | **N/A** — pas de session cookie | **Oui** — limite par email (voir routes) |
+| Lecture OpenAPI (`openapi`) | **N/A** — GET public | N/A |
+| Health (`health`) | **N/A** | N/A |
+
+### Inventaire des mutations (référence maintenance)
+
+**Session & auth navigateur**
+
+- `POST /api/session` — CSRF oui ; rate limit **par IP** (`session:post:<ip>`).
+- `POST /api/session/firebase-token` — CSRF oui ; rate limit **par uid** (`session:firebase-token:<uid>`).
+
+**Discord (proxy HTTP avec cookie)**
+
+- `POST /api/discord/send-message` — CSRF oui ; rate limit par uid.
+- `POST /api/discord/update-custom-message` — CSRF oui ; rate limit par uid.
+- `POST /api/discord/availability-polls/create` — CSRF oui ; rate limit par uid (sondages).
+- `POST /api/discord/availability-polls/[pollId]/close` — CSRF oui ; rate limit par uid.
+
+**Admin**
+
+- `POST /api/admin/discord-availability-config` — CSRF oui ; rate limit par uid (admin).
+- `POST /api/admin/sync-teams` — CSRF déjà présent ; rate limit par uid (sync).
+- `POST /api/admin/sync-players` — idem.
+- `POST /api/admin/sync-team-matches` — idem.
+
+Les autres routes admin / coach déjà couvertes par l’audit (ex. `brulage/validate`, `coach/request`, `teams/.../location`) conservent leur `validateOrigin` existant.
+
+**Limitation** : le rate limiting en mémoire n’est pas distribué ; pour plusieurs instances, prévoir Redis ou équivalent.
+
+## API : en-têtes anti-cache (`Cache-Control`)
+
+Les réponses JSON des route handlers passent par **`jsonNoStore`** ou **`applyNoStoreHeaders`** (`src/lib/http/cache-headers.ts`) : `Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate`, `Pragma: no-cache`, `Expires: 0` (aligné sur les règles projet).
+
+- Le wrapper **`withAuth`** (`src/lib/auth/api-utils.ts`) applique `applyNoStoreHeaders` sur la réponse du handler et renvoie les erreurs d’authentification via **`jsonNoStore`**.
+- **`POST` / `DELETE` `/api/session`** : construction d’une `NextResponse` avec cookies, puis **`applyNoStoreHeaders`** (seul cas courant de `NextResponse.json` direct hors helper).
+- **`GET` `/api/openapi`** et **`GET` `/api/health`** : `jsonNoStore` pour une politique homogène (le contenu reste public, sans cache intermédiaire sur le JSON).
 
 ## Audit de sécurité automatisé
 
