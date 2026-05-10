@@ -17,6 +17,22 @@ import {
 
 export const runtime = "nodejs";
 
+async function createInitializedFFTTApi(retries = 1) {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const api = createFFTTAPI();
+    try {
+      await api.initialize();
+      return api;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError;
+}
+
 /** Normalise un nom d'équipe pour la comparaison (majuscules, trim, espaces réduits). */
 function normalizeTeamName(name: string): string {
   return (name || "").trim().replace(/\s+/g, " ").toUpperCase();
@@ -237,8 +253,7 @@ export async function GET(req: NextRequest) {
     }
 
     const { clubCode } = getFFTTConfig();
-    const api = createFFTTAPI();
-    await api.initialize();
+    const api = await createInitializedFFTTApi();
 
     const equipes = (await api.getEquipesByClub(clubCode)) as Array<{
       idEquipe: number;

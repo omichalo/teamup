@@ -70,15 +70,55 @@ function ourSideIsA(match: Match): boolean {
   return countA >= countB;
 }
 
+type CompositionPlayer = {
+  licence?: string;
+  nom?: string;
+  prenom?: string;
+  points?: number | null;
+};
+
+function hasNamedPlayers(players: CompositionPlayer[]): boolean {
+  return players.some(
+    (p) => ((p.nom ?? "").trim().length > 0 || (p.prenom ?? "").trim().length > 0)
+  );
+}
+
+function getSQYCompositionPlayers(match: Match): CompositionPlayer[] {
+  const joueursSQY = (match.joueursSQY ?? []) as CompositionPlayer[];
+  if (joueursSQY.length > 0 && hasNamedPlayers(joueursSQY)) {
+    return joueursSQY;
+  }
+
+  const resultats = match.resultatsIndividuels;
+  if (!resultats) return [];
+
+  const joueursA = Object.values(resultats.joueursA ?? {});
+  const joueursB = Object.values(resultats.joueursB ?? {});
+  if (joueursA.length === 0 && joueursB.length === 0) {
+    return [];
+  }
+
+  const nomEquipeA = (resultats.nomEquipeA ?? "").toUpperCase();
+  const nomEquipeB = (resultats.nomEquipeB ?? "").toUpperCase();
+  const sqyInA = nomEquipeA.includes("SQY PING");
+  const sqyInB = nomEquipeB.includes("SQY PING");
+
+  if (sqyInA && !sqyInB) return joueursA;
+  if (sqyInB && !sqyInA) return joueursB;
+
+  // Fallback défensif si les noms d'équipe sont absents/incohérents.
+  return ourSideIsA(match) ? joueursA : joueursB;
+}
+
 /**
  * Calcule victoires/défaites par joueur pour un match (simples uniquement, logique partagée avec l'API).
  */
 function computeVictoiresDefaitesForMatch(
-  match: Match
+  match: Match,
+  compositionPlayers: CompositionPlayer[]
 ): Map<string, { victoires: number; defaites: number }> {
   const parties = match.resultatsIndividuels?.parties;
-  const joueursSQY = match.joueursSQY ?? [];
-  if (!parties || parties.length === 0 || joueursSQY.length === 0) {
+  if (!parties || parties.length === 0 || compositionPlayers.length === 0) {
     return new Map();
   }
   const partieLike = parties.map((p) => ({
@@ -89,7 +129,7 @@ function computeVictoiresDefaitesForMatch(
   }));
   const sideACountsAsOurs = ourSideIsA(match);
   const getPlayerKey = (playerName: string): string | null => {
-    const joueur = joueursSQY.find((j) =>
+    const joueur = compositionPlayers.find((j) =>
       playerNameMatches(playerName, j.nom ?? "", j.prenom ?? "")
     );
     if (!joueur) return null;
@@ -128,7 +168,8 @@ export function EquipeAccordion({
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
     return sorted.map((m) => {
-      const vdByPlayer = computeVictoiresDefaitesForMatch(m);
+      const compositionPlayers = getSQYCompositionPlayers(m);
+      const vdByPlayer = computeVictoiresDefaitesForMatch(m, compositionPlayers);
       return {
         date:
           typeof m.date === "string"
@@ -137,7 +178,7 @@ export function EquipeAccordion({
         journee: m.journee,
         otherTeamName: m.opponent || "Adversaire",
         ...(m.score ? { score: m.score } : {}),
-        composition: (m.joueursSQY || []).map((j) => {
+        composition: compositionPlayers.map((j) => {
           const key =
             (j.licence ?? "").trim() ||
             `${(j.nom ?? "").trim()}|${(j.prenom ?? "").trim()}`;

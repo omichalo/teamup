@@ -1,5 +1,5 @@
 import { FFTTAPI } from "@omichalo/ffttapi-node";
-import { getFFTTConfig } from "./fftt-utils";
+import { createFFTTAPI, getFFTTConfig } from "./fftt-utils";
 import { FFTTJoueurDetails } from "./fftt-types";
 import type { Firestore, DocumentReference } from "firebase-admin/firestore";
 import { Timestamp } from "firebase-admin/firestore";
@@ -31,7 +31,7 @@ export class PlayerSyncService {
 
   constructor() {
     const config = getFFTTConfig();
-    this.ffttApi = new FFTTAPI(config.id, config.pwd);
+    this.ffttApi = createFFTTAPI();
     this.clubCode = config.clubCode;
   }
 

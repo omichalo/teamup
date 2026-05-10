@@ -1,4 +1,5 @@
 import { FFTTAPI } from "@omichalo/ffttapi-node";
+import xml2js from "xml2js";
 import {
   FFTTEquipe,
   FFTTJoueur,
@@ -6,6 +7,45 @@ import {
   FFTTDetailsRencontre,
 } from "./fftt-types";
 import { Player } from "@/types/team-management";
+
+let xml2jsPatched = false;
+
+function normalizeXmlObjectPrototypes(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeXmlObjectPrototypes(item));
+  }
+
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    if (Object.getPrototypeOf(record) === null) {
+      Object.setPrototypeOf(record, Object.prototype);
+    }
+
+    Object.keys(record).forEach((key) => {
+      record[key] = normalizeXmlObjectPrototypes(record[key]);
+    });
+  }
+
+  return value;
+}
+
+function patchXml2jsParseStringPromise(): void {
+  if (xml2jsPatched) {
+    return;
+  }
+
+  const originalParseStringPromise = xml2js.parseStringPromise.bind(xml2js);
+  xml2js.parseStringPromise = async (
+    ...args: Parameters<typeof originalParseStringPromise>
+  ): ReturnType<typeof originalParseStringPromise> => {
+    const parsed = await originalParseStringPromise(...args);
+    return normalizeXmlObjectPrototypes(parsed) as Awaited<
+      ReturnType<typeof originalParseStringPromise>
+    >;
+  };
+
+  xml2jsPatched = true;
+}
 
 // Configuration FFTT partagée
 export const getFFTTConfig = () => {
@@ -24,6 +64,7 @@ export const getFFTTConfig = () => {
 
 // Instance FFTT API partagée
 export const createFFTTAPI = () => {
+  patchXml2jsParseStringPromise();
   const config = getFFTTConfig();
   return new FFTTAPI(config.id, config.pwd);
 };

@@ -13,6 +13,22 @@ import {
 
 export const runtime = "nodejs";
 
+async function createInitializedFFTTApi(retries = 1) {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const api = createFFTTAPI();
+    try {
+      await api.initialize();
+      return api;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError;
+}
+
 export interface PoolRankingEntry {
   classement: number;
   nomEquipe: string;
@@ -79,8 +95,7 @@ export async function GET(req: NextRequest) {
       phaseParam === "retour" || phaseParam === "aller" ? phaseParam : null;
 
     const { clubCode } = getFFTTConfig();
-    const api = createFFTTAPI();
-    await api.initialize();
+    const api = await createInitializedFFTTApi();
 
     const equipes = (await api.getEquipesByClub(clubCode)) as FFTTEquipeLike[];
     const teamIdTrim = teamId.trim();
@@ -197,10 +212,8 @@ export async function GET(req: NextRequest) {
     );
   } catch (error) {
     console.error("[api/fftt/pool-ranking]", error);
-    const message =
-      error instanceof Error ? error.message : "Erreur lors du chargement du classement";
     return jsonNoStore(
-      { error: message },
+      { error: "Impossible de charger le classement pour le moment" },
       { status: 500 }
     );
   }
