@@ -1,3 +1,8 @@
+---
+description: Rôles AuthGuard vs API, routes admin, cohérence client/serveur
+alwaysApply: true
+---
+
 # Authentication & Authorization
 
 ## Sécurité et contrôle d'accès - Cohérence Client/Serveur

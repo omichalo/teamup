@@ -1,3 +1,8 @@
+---
+description: Git branches, Conventional Commits, PR, tests, déploiement
+alwaysApply: true
+---
+
 # Pull Requests & Release
 
 ## Workflow Git/GitHub - Branches et commits
