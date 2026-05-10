@@ -6,70 +6,47 @@ export const runtime = "nodejs";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
-  Avatar,
   Box,
   Button,
   Card,
   CardContent,
   Chip,
   CircularProgress,
-  FormControl,
   InputAdornment,
-  MenuItem,
-  Select,
   Stack,
   Tab,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   Tabs,
   TextField,
   Typography,
-  TableContainer,
-  Paper,
-  Autocomplete,
-  InputLabel,
 } from "@mui/material";
 import {
   Check as CheckIcon,
-  Close as CloseIcon,
   Group as GroupIcon,
   Groups as GroupsIcon,
-  ManageAccounts as ManageAccountsIcon,
   Refresh as RefreshIcon,
   Schedule as ScheduleIcon,
   Search as SearchIcon,
   Sports as SportsIcon,
-  Add as AddIcon,
-  Delete as DeleteIcon,
-  Settings as SettingsIcon,
 } from "@mui/icons-material";
 import { AuthGuard } from "@/components/AuthGuard";
 import { useAuth } from "@/hooks/useAuth";
 import { COACH_REQUEST_STATUS, USER_ROLES } from "@/lib/auth/roles";
 import { User, UserRole } from "@/types";
 import { useDiscordMembers } from "@/hooks/useDiscordMembers";
+import {
+  DiscordAvailabilitySection,
+  type DiscordMentionOption,
+} from "@/components/admin/DiscordAvailabilitySection";
+import { LocationsManagementSection } from "@/components/admin/LocationsManagementSection";
+import { SyncOperationCard } from "@/components/admin/SyncOperationCard";
+import { CoachRequestsSection } from "@/components/admin/CoachRequestsSection";
+import { UsersManagementTable } from "@/components/admin/UsersManagementTable";
+import { TabPanel } from "@/components/ui/TabPanel";
 
-interface TabPanelProps {
-  children: React.ReactNode;
-  value: number;
-  index: number;
-}
-
-function TabPanel({ children, value, index }: TabPanelProps) {
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`admin-tabpanel-${index}`}
-      aria-labelledby={`admin-tab-${index}`}
-    >
-      {value === index ? <Box sx={{ mt: 3 }}>{children}</Box> : null}
-    </div>
-  );
-}
+const ADMIN_TAB_PANEL_PROPS = {
+  baseId: "admin",
+  contentSx: { mt: 3 },
+} as const;
 
 interface SyncStatus {
   players: {
@@ -686,7 +663,7 @@ export default function AdminPage() {
             />
           </Tabs>
 
-          <TabPanel value={tabValue} index={0}>
+          <TabPanel {...ADMIN_TAB_PANEL_PROPS} value={tabValue} index={0}>
             {syncError && (
               <Alert severity="error" sx={{ mb: 3 }}>
                 {syncError}
@@ -719,206 +696,56 @@ export default function AdminPage() {
               </Box>
             ) : (
               <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-                <Card>
-                  <CardContent>
-                    <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                      <GroupIcon sx={{ mr: 1, color: "primary.main" }} />
-                      <Typography variant="h6">
-                        Synchronisation des joueurs
-                      </Typography>
-                    </Box>
+                <SyncOperationCard
+                  title="Synchronisation des joueurs"
+                  description="Synchronise la liste des joueurs du club depuis l'API FFTT."
+                  lastSync={formatLastSync(syncStatus.players.lastSync)}
+                  duration={formatDuration(syncStatus.players.duration)}
+                  countLabel="Nombre de joueurs"
+                  count={syncStatus.players.count}
+                  statusChip={getStatusChip(syncStatus.players.status)}
+                  error={syncStatus.players.error}
+                  isSyncing={syncStatus.players.status === "syncing"}
+                  syncingLabel="Synchronisation en cours..."
+                  idleLabel="Synchroniser les joueurs"
+                  idleIcon={<RefreshIcon />}
+                  headerIcon={<GroupIcon sx={{ mr: 1, color: "primary.main" }} />}
+                  onSync={() => handleSyncPlayers()}
+                />
 
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mb: 2 }}
-                    >
-                      Synchronise la liste des joueurs du club depuis l&apos;API
-                      FFTT.
-                    </Typography>
+                <SyncOperationCard
+                  title="Synchronisation des équipes"
+                  description="Synchronise la liste des équipes du club depuis l'API FFTT."
+                  lastSync={formatLastSync(syncStatus.teams.lastSync)}
+                  duration={formatDuration(syncStatus.teams.duration)}
+                  countLabel="Nombre d'équipes"
+                  count={syncStatus.teams.count}
+                  statusChip={getStatusChip(syncStatus.teams.status)}
+                  error={syncStatus.teams.error}
+                  isSyncing={syncStatus.teams.status === "syncing"}
+                  syncingLabel="Synchronisation en cours..."
+                  idleLabel="Synchroniser les équipes"
+                  idleIcon={<GroupsIcon />}
+                  headerIcon={<GroupsIcon sx={{ mr: 1, color: "primary.main" }} />}
+                  onSync={() => handleSyncTeams()}
+                />
 
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="body2">
-                        <strong>Dernière synchronisation :</strong>{" "}
-                        {formatLastSync(syncStatus.players.lastSync)}
-                      </Typography>
-                      <Typography variant="body2">
-                        <strong>Durée :</strong>{" "}
-                        {formatDuration(syncStatus.players.duration)}
-                      </Typography>
-                      <Typography variant="body2">
-                        <strong>Nombre de joueurs :</strong>{" "}
-                        {syncStatus.players.count}
-                      </Typography>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <Typography variant="body2" component="span">
-                          <strong>Statut :</strong>
-                        </Typography>
-                        {getStatusChip(syncStatus.players.status)}
-                      </Box>
-                    </Box>
-
-                    {syncStatus.players.error && (
-                      <Alert severity="error" sx={{ mb: 2 }}>
-                        {syncStatus.players.error}
-                      </Alert>
-                    )}
-
-                    <Button
-                      variant="contained"
-                      startIcon={
-                        syncStatus.players.status === "syncing" ? (
-                          <CircularProgress size={20} color="inherit" />
-                        ) : (
-                          <RefreshIcon />
-                        )
-                      }
-                      onClick={() => handleSyncPlayers()}
-                      disabled={syncStatus.players.status === "syncing"}
-                      fullWidth
-                    >
-                      {syncStatus.players.status === "syncing"
-                        ? "Synchronisation en cours..."
-                        : "Synchroniser les joueurs"}
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent>
-                    <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                      <GroupsIcon sx={{ mr: 1, color: "primary.main" }} />
-                      <Typography variant="h6">
-                        Synchronisation des équipes
-                      </Typography>
-                    </Box>
-
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mb: 2 }}
-                    >
-                      Synchronise la liste des équipes du club depuis l&apos;API
-                      FFTT.
-                    </Typography>
-
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="body2">
-                        <strong>Dernière synchronisation :</strong>{" "}
-                        {formatLastSync(syncStatus.teams.lastSync)}
-                      </Typography>
-                      <Typography variant="body2">
-                        <strong>Durée :</strong>{" "}
-                        {formatDuration(syncStatus.teams.duration)}
-                      </Typography>
-                      <Typography variant="body2">
-                        <strong>Nombre d&apos;équipes :</strong>{" "}
-                        {syncStatus.teams.count}
-                      </Typography>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <Typography variant="body2" component="span">
-                          <strong>Statut :</strong>
-                        </Typography>
-                        {getStatusChip(syncStatus.teams.status)}
-                      </Box>
-                    </Box>
-
-                    {syncStatus.teams.error && (
-                      <Alert severity="error" sx={{ mb: 2 }}>
-                        {syncStatus.teams.error}
-                      </Alert>
-                    )}
-
-                    <Button
-                      variant="contained"
-                      startIcon={
-                        syncStatus.teams.status === "syncing" ? (
-                          <CircularProgress size={20} color="inherit" />
-                        ) : (
-                          <GroupsIcon />
-                        )
-                      }
-                      onClick={() => handleSyncTeams()}
-                      disabled={syncStatus.teams.status === "syncing"}
-                      fullWidth
-                    >
-                      {syncStatus.teams.status === "syncing"
-                        ? "Synchronisation en cours..."
-                        : "Synchroniser les équipes"}
-                    </Button>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent>
-                    <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                      <SportsIcon sx={{ mr: 1, color: "primary.main" }} />
-                      <Typography variant="h6">
-                        Synchronisation des matchs par équipe
-                      </Typography>
-                    </Box>
-
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ mb: 2 }}
-                    >
-                      Synchronise les rencontres et résultats dans des
-                      collections dédiées.
-                    </Typography>
-
-                    <Box sx={{ mb: 2 }}>
-                      <Typography variant="body2">
-                        <strong>Dernière synchronisation :</strong>{" "}
-                        {formatLastSync(syncStatus.teamMatches.lastSync)}
-                      </Typography>
-                      <Typography variant="body2">
-                        <strong>Durée :</strong>{" "}
-                        {formatDuration(syncStatus.teamMatches.duration)}
-                      </Typography>
-                      <Typography variant="body2">
-                        <strong>Nombre de matchs :</strong>{" "}
-                        {syncStatus.teamMatches.count}
-                      </Typography>
-                      <Box
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <Typography variant="body2" component="span">
-                          <strong>Statut :</strong>
-                        </Typography>
-                        {getStatusChip(syncStatus.teamMatches.status)}
-                      </Box>
-                    </Box>
-
-                    {syncStatus.teamMatches.error && (
-                      <Alert severity="error" sx={{ mb: 2 }}>
-                        {syncStatus.teamMatches.error}
-                      </Alert>
-                    )}
-
-                    <Button
-                      variant="contained"
-                      startIcon={
-                        syncStatus.teamMatches.status === "syncing" ? (
-                          <CircularProgress size={20} color="inherit" />
-                        ) : (
-                          <SportsIcon />
-                        )
-                      }
-                      onClick={() => handleSyncTeamMatches()}
-                      disabled={syncStatus.teamMatches.status === "syncing"}
-                      fullWidth
-                    >
-                      {syncStatus.teamMatches.status === "syncing"
-                        ? "Synchronisation en cours..."
-                        : "Synchroniser les matchs par équipe"}
-                    </Button>
-                  </CardContent>
-                </Card>
+                <SyncOperationCard
+                  title="Synchronisation des matchs par équipe"
+                  description="Synchronise les rencontres et résultats dans des collections dédiées."
+                  lastSync={formatLastSync(syncStatus.teamMatches.lastSync)}
+                  duration={formatDuration(syncStatus.teamMatches.duration)}
+                  countLabel="Nombre de matchs"
+                  count={syncStatus.teamMatches.count}
+                  statusChip={getStatusChip(syncStatus.teamMatches.status)}
+                  error={syncStatus.teamMatches.error}
+                  isSyncing={syncStatus.teamMatches.status === "syncing"}
+                  syncingLabel="Synchronisation en cours..."
+                  idleLabel="Synchroniser les matchs par équipe"
+                  idleIcon={<SportsIcon />}
+                  headerIcon={<SportsIcon sx={{ mr: 1, color: "primary.main" }} />}
+                  onSync={() => handleSyncTeamMatches()}
+                />
 
                 <Card>
                   <CardContent>
@@ -972,7 +799,7 @@ export default function AdminPage() {
             )}
           </TabPanel>
 
-          <TabPanel value={tabValue} index={1}>
+          <TabPanel {...ADMIN_TAB_PANEL_PROPS} value={tabValue} index={1}>
             {usersError && (
               <Alert
                 severity="error"
@@ -991,81 +818,12 @@ export default function AdminPage() {
                 {userActionSuccess}
               </Alert>
             )}
-            <Card sx={{ mb: 3 }}>
-              <CardContent>
-                <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-                  <ManageAccountsIcon sx={{ mr: 1, color: "primary.main" }} />
-                  <Typography variant="h6">Demandes de droits coach</Typography>
-                </Box>
-                {loadingUsers ? (
-                  <Box display="flex" alignItems="center" gap={2}>
-                    <CircularProgress size={24} />
-                    <Typography variant="body2">
-                      Chargement des demandes…
-                    </Typography>
-                  </Box>
-                ) : pendingRequests.length === 0 ? (
-                  <Alert severity="info">
-                    Aucune demande coach en attente.
-                  </Alert>
-                ) : (
-                  <Stack spacing={2}>
-                    {pendingRequests.map((pendingUser) => (
-                      <Card key={pendingUser.id} variant="outlined">
-                        <CardContent>
-                          <Stack spacing={1}>
-                            <Typography variant="subtitle1" fontWeight={600}>
-                              {pendingUser.displayName || pendingUser.email}
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary">
-                              Email : {pendingUser.email}
-                            </Typography>
-                            {pendingUser.coachRequestMessage ? (
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                              >
-                                Message : {pendingUser.coachRequestMessage}
-                              </Typography>
-                            ) : null}
-                            <Stack direction="row" spacing={2}>
-                              <Button
-                                variant="contained"
-                                color="success"
-                                startIcon={<CheckIcon />}
-                                onClick={() =>
-                                  handleCoachRequestAction(
-                                    pendingUser.id,
-                                    "approve"
-                                  )
-                                }
-                                disabled={processingUserId === pendingUser.id}
-                              >
-                                Approuver
-                              </Button>
-                              <Button
-                                variant="outlined"
-                                color="inherit"
-                                startIcon={<CloseIcon />}
-                                onClick={() =>
-                                  handleCoachRequestAction(
-                                    pendingUser.id,
-                                    "reject"
-                                  )
-                                }
-                                disabled={processingUserId === pendingUser.id}
-                              >
-                                Rejeter
-                              </Button>
-                            </Stack>
-                          </Stack>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </Stack>
-                )}
-              </CardContent>
-            </Card>
+            <CoachRequestsSection
+              loading={loadingUsers}
+              pendingRequests={pendingRequests}
+              processingUserId={processingUserId}
+              onCoachRequestAction={handleCoachRequestAction}
+            />
 
             <Card>
               <CardContent>
@@ -1126,446 +884,32 @@ export default function AdminPage() {
                   </Alert>
                 ) : (
                   <Card variant="outlined">
-                    <Table>
-                      <TableHead>
-                        <TableRow sx={{ backgroundColor: "action.hover" }}>
-                          <TableCell sx={{ fontWeight: 700, minWidth: 280 }}>
-                            Utilisateur
-                          </TableCell>
-                          <TableCell sx={{ fontWeight: 700, minWidth: 180 }}>
-                            Rôle
-                          </TableCell>
-                          <TableCell sx={{ fontWeight: 700, minWidth: 140 }}>
-                            Email vérifié
-                          </TableCell>
-                          <TableCell sx={{ fontWeight: 700 }}>
-                            Demande coach
-                          </TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {filteredUsers.map((targetUser) => {
-                          const hasDisplayName =
-                            targetUser.displayName &&
-                            targetUser.displayName.trim().length > 0;
-                          const isCurrentUser = targetUser.id === user?.id;
-                          const isLastAdmin =
-                            targetUser.role === USER_ROLES.ADMIN &&
-                            adminCount <= 1;
-
-                          return (
-                            <TableRow
-                              key={targetUser.id}
-                              sx={{
-                                "&:hover": {
-                                  backgroundColor: "action.hover",
-                                },
-                              }}
-                            >
-                              {/* Colonne Utilisateur */}
-                              <TableCell>
-                                <Stack
-                                  direction="row"
-                                  spacing={2}
-                                  alignItems="center"
-                                >
-                                  <Avatar
-                                    {...(targetUser.photoURL && {
-                                      src: targetUser.photoURL,
-                                    })}
-                                    alt={targetUser.displayName}
-                                    sx={{ width: 48, height: 48 }}
-                                  >
-                                    {targetUser.displayName?.charAt(0) ||
-                                      targetUser.email.charAt(0)}
-                                  </Avatar>
-                                  <Box sx={{ minWidth: 0, flex: 1 }}>
-                                    <Typography
-                                      variant="subtitle1"
-                                      fontWeight={600}
-                                      sx={{
-                                        lineHeight: 1.2,
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis",
-                                        whiteSpace: "nowrap",
-                                      }}
-                                    >
-                                      {hasDisplayName
-                                        ? targetUser.displayName
-                                        : targetUser.email}
-                                    </Typography>
-                                    {hasDisplayName && (
-                                      <Typography
-                                        variant="body2"
-                                        color="text.secondary"
-                                        sx={{
-                                          overflow: "hidden",
-                                          textOverflow: "ellipsis",
-                                          whiteSpace: "nowrap",
-                                        }}
-                                      >
-                                        {targetUser.email}
-                                      </Typography>
-                                    )}
-                                  </Box>
-                                </Stack>
-                              </TableCell>
-
-                              {/* Colonne Rôle */}
-                              <TableCell>
-                                <Box
-                                  sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 1,
-                                  }}
-                                >
-                                  <Select
-                                    value={targetUser.role}
-                                    onChange={(e) => {
-                                      const newRole = e.target
-                                        .value as UserRole;
-                                      if (newRole !== targetUser.role) {
-                                        handleRoleChange(targetUser, newRole);
-                                      }
-                                    }}
-                                    disabled={
-                                      (roleUpdateTarget !== null &&
-                                        roleUpdateTarget.startsWith(
-                                          `${targetUser.id}-`
-                                        )) ||
-                                      isLastAdmin ||
-                                      isCurrentUser
-                                    }
-                                    size="small"
-                                    sx={{
-                                      minWidth: 150,
-                                      textTransform: "none",
-                                      "& .MuiSelect-select": {
-                                        fontWeight: 600,
-                                      },
-                                    }}
-                                  >
-                                    <MenuItem value={USER_ROLES.PLAYER}>
-                                      {getRoleLabel(USER_ROLES.PLAYER)}
-                                    </MenuItem>
-                                    <MenuItem value={USER_ROLES.COACH}>
-                                      {getRoleLabel(USER_ROLES.COACH)}
-                                    </MenuItem>
-                                    <MenuItem
-                                      value={USER_ROLES.ADMIN}
-                                      disabled={
-                                        targetUser.role === USER_ROLES.ADMIN &&
-                                        adminCount <= 1
-                                      }
-                                    >
-                                      {getRoleLabel(USER_ROLES.ADMIN)}
-                                    </MenuItem>
-                                  </Select>
-                                  {roleUpdateTarget !== null &&
-                                    roleUpdateTarget.startsWith(
-                                      `${targetUser.id}-`
-                                    ) && <CircularProgress size={20} />}
-                                </Box>
-                              </TableCell>
-
-                              {/* Colonne Email vérifié */}
-                              <TableCell>
-                                <Chip
-                                  label={
-                                    targetUser.emailVerified
-                                      ? "Vérifié"
-                                      : "Non vérifié"
-                                  }
-                                  color={
-                                    targetUser.emailVerified
-                                      ? "success"
-                                      : "warning"
-                                  }
-                                  variant="outlined"
-                                  size="small"
-                                  sx={{
-                                    fontWeight: 500,
-                                    textTransform: "none",
-                                  }}
-                                />
-                              </TableCell>
-
-                              {/* Colonne Demande coach */}
-                              <TableCell>
-                                {targetUser.coachRequestStatus !==
-                                COACH_REQUEST_STATUS.NONE ? (
-                                  <Chip
-                                    label={getCoachStatusLabel(
-                                      targetUser.coachRequestStatus
-                                    )}
-                                    color={coachRequestChipColor(
-                                      targetUser.coachRequestStatus
-                                    )}
-                                    variant="outlined"
-                                    size="small"
-                                    sx={{
-                                      fontWeight: 500,
-                                      textTransform: "none",
-                                    }}
-                                  />
-                                ) : (
-                                  <Typography
-                                    variant="body2"
-                                    color="text.disabled"
-                                  >
-                                    —
-                                  </Typography>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
+                    <UsersManagementTable
+                      users={filteredUsers}
+                      currentUserId={user?.id}
+                      adminCount={adminCount}
+                      roleUpdateTarget={roleUpdateTarget}
+                      onRoleChange={handleRoleChange}
+                      getRoleLabel={getRoleLabel}
+                      getCoachStatusLabel={getCoachStatusLabel}
+                      getCoachStatusColor={coachRequestChipColor}
+                    />
                   </Card>
                 )}
               </CardContent>
             </Card>
           </TabPanel>
 
-          <TabPanel value={tabValue} index={2}>
-            <LocationsManagement />
+          <TabPanel {...ADMIN_TAB_PANEL_PROPS} value={tabValue} index={2}>
+            <LocationsManagementSection />
           </TabPanel>
 
-          <TabPanel value={tabValue} index={3}>
+          <TabPanel {...ADMIN_TAB_PANEL_PROPS} value={tabValue} index={3}>
             <DiscordAvailabilityConfig />
           </TabPanel>
         </Box>
     </AuthGuard>
   );
-}
-
-// Composant de gestion des lieux
-function LocationsManagement() {
-  const [locations, setLocations] = useState<Array<{ id: string; name: string }>>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [newLocationName, setNewLocationName] = useState("");
-  const [adding, setAdding] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
-
-  const fetchLocations = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch("/api/admin/locations", {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-      const result = await response.json();
-
-      if (response.ok && result.success) {
-        setLocations(result.locations || []);
-      } else {
-        setError(result.error || "Erreur lors de la récupération des lieux");
-      }
-    } catch (error) {
-      setError(
-        error instanceof Error ? error.message : "Erreur réseau"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void fetchLocations();
-  }, [fetchLocations]);
-
-  const handleAddLocation = useCallback(async () => {
-    if (!newLocationName.trim()) {
-      setError("Le nom du lieu est requis");
-      return;
-    }
-
-    setAdding(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      const response = await fetch("/api/admin/locations", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ name: newLocationName.trim() }),
-      });
-      const result = await response.json();
-
-      if (response.ok && result.success) {
-        setNewLocationName("");
-        setSuccess("Lieu ajouté avec succès");
-        await fetchLocations();
-      } else {
-        setError(result.error || "Erreur lors de l'ajout du lieu");
-      }
-    } catch (error) {
-      setError(
-        error instanceof Error ? error.message : "Erreur réseau"
-      );
-    } finally {
-      setAdding(false);
-    }
-  }, [newLocationName, fetchLocations]);
-
-  const handleDeleteLocation = useCallback(async (locationId: string) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce lieu ?")) {
-      return;
-    }
-
-    setDeleting(locationId);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      const response = await fetch(`/api/admin/locations?id=${locationId}`, {
-        method: "DELETE",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-      const result = await response.json();
-
-      if (response.ok && result.success) {
-        setSuccess("Lieu supprimé avec succès");
-        await fetchLocations();
-      } else {
-        setError(result.error || "Erreur lors de la suppression du lieu");
-      }
-    } catch (error) {
-      setError(
-        error instanceof Error ? error.message : "Erreur réseau"
-      );
-    } finally {
-      setDeleting(null);
-    }
-  }, [fetchLocations]);
-
-  return (
-    <Box>
-      {error && (
-        <Alert
-          severity="error"
-          sx={{ mb: 3 }}
-          onClose={() => setError(null)}
-        >
-          {error}
-        </Alert>
-      )}
-      {success && (
-        <Alert
-          severity="success"
-          sx={{ mb: 3 }}
-          onClose={() => setSuccess(null)}
-        >
-          {success}
-        </Alert>
-      )}
-
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-            <Typography variant="h6">Ajouter un lieu</Typography>
-          </Box>
-          <Stack direction="row" spacing={2} alignItems="center">
-            <TextField
-              label="Nom du lieu"
-              value={newLocationName}
-              onChange={(e) => setNewLocationName(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === "Enter" && !adding) {
-                  void handleAddLocation();
-                }
-              }}
-              fullWidth
-              size="small"
-            />
-            <Button
-              variant="contained"
-              onClick={() => void handleAddLocation()}
-              disabled={adding || !newLocationName.trim()}
-              startIcon={adding ? <CircularProgress size={20} /> : <AddIcon />}
-            >
-              {adding ? "Ajout..." : "Ajouter"}
-            </Button>
-          </Stack>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent>
-          <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
-            <Typography variant="h6">Liste des lieux</Typography>
-          </Box>
-          {loading ? (
-            <Box display="flex" alignItems="center" gap={2}>
-              <CircularProgress size={24} />
-              <Typography variant="body2">Chargement des lieux…</Typography>
-            </Box>
-          ) : locations.length === 0 ? (
-            <Alert severity="info">Aucun lieu défini. Ajoutez votre premier lieu pour commencer.</Alert>
-          ) : (
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow sx={{ backgroundColor: "action.hover" }}>
-                    <TableCell sx={{ fontWeight: 700 }}>Nom</TableCell>
-                    <TableCell sx={{ fontWeight: 700, width: 120 }}>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {locations.map((location) => (
-                    <TableRow
-                      key={location.id}
-                      sx={{
-                        "&:hover": {
-                          backgroundColor: "action.hover",
-                        },
-                      }}
-                    >
-                      <TableCell>{location.name}</TableCell>
-                      <TableCell>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          color="error"
-                          startIcon={<DeleteIcon />}
-                          onClick={() => void handleDeleteLocation(location.id)}
-                          disabled={deleting === location.id}
-                        >
-                          {deleting === location.id ? "Suppression..." : "Supprimer"}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-        </CardContent>
-      </Card>
-    </Box>
-  );
-}
-
-// Types pour les mentions Discord
-interface DiscordMentionOption {
-  id: string;
-  name: string;
-  type: "user" | "role";
-  displayName: string;
 }
 
 // Composant de configuration Discord pour les sondages de disponibilité
@@ -1823,321 +1167,67 @@ function DiscordAvailabilityConfig() {
       )}
 
       <Stack spacing={3}>
-        {/* Configuration Championnat de Paris */}
-        <Card>
-          <CardContent>
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }}>
-            <Box sx={{ display: "flex", alignItems: "center" }}>
-              <SettingsIcon sx={{ mr: 1, color: "primary.main" }} />
-              <Typography variant="h6">
-                Championnat de Paris
-              </Typography>
-            </Box>
-            <Button
-              size="small"
-              startIcon={<RefreshIcon />}
-              onClick={() => {
-                void fetchDiscordChannels();
-                void fetchDiscordRoles();
-              }}
-              disabled={loadingChannels || loadingRoles}
-            >
-              Actualiser
-            </Button>
-          </Box>
+        <DiscordAvailabilitySection
+          title="Championnat de Paris"
+          channelId={config.parisChannelId}
+          mention={config.parisMention}
+          channels={discordChannels}
+          channelsHierarchy={discordChannelsHierarchy}
+          mentionOptions={mentionOptions}
+          loadingChannels={loadingChannels}
+          loadingRoles={loadingRoles}
+          loadingMentions={discordMembers.length === 0 || loadingRoles}
+          saving={saving}
+          onRefresh={() => {
+            void fetchDiscordChannels();
+            void fetchDiscordRoles();
+          }}
+          onChannelChange={(channelId) => {
+            setConfig((prev) => ({
+              ...prev,
+              parisChannelId: channelId,
+            }));
+          }}
+          onMentionChange={(mention) => {
+            setConfig((prev) => ({
+              ...prev,
+              parisMention: mention,
+            }));
+          }}
+          parseMentionToOption={parseMentionToOption}
+          optionToMention={optionToMention}
+        />
 
-            <Stack spacing={3}>
-              <FormControl fullWidth>
-                <InputLabel>Channel Discord</InputLabel>
-                <Select
-                  value={config.parisChannelId || ""}
-                  label="Channel Discord"
-                  onChange={(e) =>
-                    setConfig((prev) => ({
-                      ...prev,
-                      parisChannelId: e.target.value || null,
-                    }))
-                  }
-                  disabled={loadingChannels || saving}
-                >
-                  <MenuItem value="">
-                    <em>Aucun channel</em>
-                  </MenuItem>
-                  {discordChannelsHierarchy.length > 0
-                    ? discordChannelsHierarchy.flatMap((group) => [
-                        ...(group.category
-                          ? [
-                              <MenuItem
-                                key={`category-${group.category.id}`}
-                                disabled
-                                sx={{ fontWeight: "bold", opacity: 1 }}
-                              >
-                                📁 {group.category.name}
-                              </MenuItem>,
-                            ]
-                          : []),
-                        ...group.channels.map((channel) => (
-                          <MenuItem
-                            key={channel.id}
-                            value={channel.id}
-                            sx={{ pl: group.category ? 4 : 2 }}
-                          >
-                            {group.category ? "  " : ""}#{channel.name}
-                          </MenuItem>
-                        )),
-                      ])
-                    : discordChannels.map((channel) => (
-                        <MenuItem key={channel.id} value={channel.id}>
-                          #{channel.name}
-                        </MenuItem>
-                      ))}
-                </Select>
-                {loadingChannels && (
-                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-                    Chargement des channels...
-                  </Typography>
-                )}
-              </FormControl>
-
-              <Autocomplete
-                options={mentionOptions}
-                getOptionKey={(option) => `${option.type}-${option.id}`}
-                getOptionLabel={(option) => 
-                  option.type === "user" 
-                    ? `${option.displayName} (@${option.name})` 
-                    : `@${option.displayName}`
-                }
-                value={parseMentionToOption(config.parisMention)}
-                onChange={(_, newValue) => {
-                  setConfig((prev) => ({
-                    ...prev,
-                    parisMention: optionToMention(newValue),
-                  }));
-                }}
-                filterOptions={(options, { inputValue }) => {
-                  const query = inputValue.toLowerCase();
-                  return options.filter((option) => {
-                    return (
-                      option.displayName.toLowerCase().includes(query) ||
-                      option.name.toLowerCase().includes(query)
-                    );
-                  });
-                }}
-                renderOption={(props, option) => {
-                  const { key, ...otherProps } = props;
-                  return (
-                    <Box component="li" key={key} {...otherProps}>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          width: 32,
-                          height: 32,
-                          borderRadius: "50%",
-                          backgroundColor: option.type === "user" ? "primary.main" : "secondary.main",
-                          color: "primary.contrastText",
-                          mr: 1.5,
-                          fontSize: "0.875rem",
-                          fontWeight: 600,
-                        }}
-                      >
-                        {option.type === "user" 
-                          ? option.displayName.charAt(0).toUpperCase()
-                          : "@"
-                        }
-                      </Box>
-                      <Box sx={{ flex: 1 }}>
-                        <Typography variant="body2" fontWeight={500}>
-                          {option.type === "user" ? option.displayName : `@${option.displayName}`}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {option.type === "user" ? `@${option.name}` : "Rôle"}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  );
-                }}
-                renderInput={(params) => {
-                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                  const { size, InputLabelProps, ...restParams } = params;
-                  return (
-                    <TextField
-                      {...restParams}
-                      // @ts-expect-error - InputLabelProps from Autocomplete has incompatible types with TextField
-                      InputLabelProps={InputLabelProps}
-                      label="Mention Discord"
-                      placeholder="Rechercher un utilisateur ou un rôle..."
-                      helperText="Sélectionnez un utilisateur ou un rôle à mentionner lors de la création d'un sondage."
-                    />
-                  );
-                }}
-                noOptionsText="Aucun utilisateur ou rôle trouvé"
-                loading={discordMembers.length === 0 || loadingRoles}
-                loadingText="Chargement des utilisateurs et rôles..."
-                disabled={saving}
-              />
-            </Stack>
-          </CardContent>
-        </Card>
-
-        {/* Configuration Championnat par équipes */}
-        <Card>
-          <CardContent>
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }}>
-            <Box sx={{ display: "flex", alignItems: "center" }}>
-              <SettingsIcon sx={{ mr: 1, color: "primary.main" }} />
-              <Typography variant="h6">
-                Championnat par équipes
-              </Typography>
-            </Box>
-            <Button
-              size="small"
-              startIcon={<RefreshIcon />}
-              onClick={() => {
-                void fetchDiscordChannels();
-                void fetchDiscordRoles();
-              }}
-              disabled={loadingChannels || loadingRoles}
-            >
-              Actualiser
-            </Button>
-          </Box>
-
-            <Stack spacing={3}>
-              <FormControl fullWidth>
-                <InputLabel>Channel Discord</InputLabel>
-                <Select
-                  value={config.equipesChannelId || ""}
-                  label="Channel Discord"
-                  onChange={(e) =>
-                    setConfig((prev) => ({
-                      ...prev,
-                      equipesChannelId: e.target.value || null,
-                    }))
-                  }
-                  disabled={loadingChannels || saving}
-                >
-                  <MenuItem value="">
-                    <em>Aucun channel</em>
-                  </MenuItem>
-                  {discordChannelsHierarchy.length > 0
-                    ? discordChannelsHierarchy.flatMap((group) => [
-                        ...(group.category
-                          ? [
-                              <MenuItem
-                                key={`category-${group.category.id}`}
-                                disabled
-                                sx={{ fontWeight: "bold", opacity: 1 }}
-                              >
-                                📁 {group.category.name}
-                              </MenuItem>,
-                            ]
-                          : []),
-                        ...group.channels.map((channel) => (
-                          <MenuItem
-                            key={channel.id}
-                            value={channel.id}
-                            sx={{ pl: group.category ? 4 : 2 }}
-                          >
-                            {group.category ? "  " : ""}#{channel.name}
-                          </MenuItem>
-                        )),
-                      ])
-                    : discordChannels.map((channel) => (
-                        <MenuItem key={channel.id} value={channel.id}>
-                          #{channel.name}
-                        </MenuItem>
-                      ))}
-                </Select>
-                {loadingChannels && (
-                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-                    Chargement des channels...
-                  </Typography>
-                )}
-              </FormControl>
-
-              <Autocomplete
-                options={mentionOptions}
-                getOptionKey={(option) => `${option.type}-${option.id}`}
-                getOptionLabel={(option) => 
-                  option.type === "user" 
-                    ? `${option.displayName} (@${option.name})` 
-                    : `@${option.displayName}`
-                }
-                value={parseMentionToOption(config.equipesMention)}
-                onChange={(_, newValue) => {
-                  setConfig((prev) => ({
-                    ...prev,
-                    equipesMention: optionToMention(newValue),
-                  }));
-                }}
-                filterOptions={(options, { inputValue }) => {
-                  const query = inputValue.toLowerCase();
-                  return options.filter((option) => {
-                    return (
-                      option.displayName.toLowerCase().includes(query) ||
-                      option.name.toLowerCase().includes(query)
-                    );
-                  });
-                }}
-                renderOption={(props, option) => {
-                  const { key, ...otherProps } = props;
-                  return (
-                    <Box component="li" key={key} {...otherProps}>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          width: 32,
-                          height: 32,
-                          borderRadius: "50%",
-                          backgroundColor: option.type === "user" ? "primary.main" : "secondary.main",
-                          color: "primary.contrastText",
-                          mr: 1.5,
-                          fontSize: "0.875rem",
-                          fontWeight: 600,
-                        }}
-                      >
-                        {option.type === "user" 
-                          ? option.displayName.charAt(0).toUpperCase()
-                          : "@"
-                        }
-                      </Box>
-                      <Box sx={{ flex: 1 }}>
-                        <Typography variant="body2" fontWeight={500}>
-                          {option.type === "user" ? option.displayName : `@${option.displayName}`}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {option.type === "user" ? `@${option.name}` : "Rôle"}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  );
-                }}
-                renderInput={(params) => {
-                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                  const { size, InputLabelProps, ...restParams } = params;
-                  return (
-                    <TextField
-                      {...restParams}
-                      // @ts-expect-error - InputLabelProps from Autocomplete has incompatible types with TextField
-                      InputLabelProps={InputLabelProps}
-                      label="Mention Discord"
-                      placeholder="Rechercher un utilisateur ou un rôle..."
-                      helperText="Sélectionnez un utilisateur ou un rôle à mentionner lors de la création d'un sondage."
-                    />
-                  );
-                }}
-                noOptionsText="Aucun utilisateur ou rôle trouvé"
-                loading={discordMembers.length === 0 || loadingRoles}
-                loadingText="Chargement des utilisateurs et rôles..."
-                disabled={saving}
-              />
-            </Stack>
-          </CardContent>
-        </Card>
+        <DiscordAvailabilitySection
+          title="Championnat par équipes"
+          channelId={config.equipesChannelId}
+          mention={config.equipesMention}
+          channels={discordChannels}
+          channelsHierarchy={discordChannelsHierarchy}
+          mentionOptions={mentionOptions}
+          loadingChannels={loadingChannels}
+          loadingRoles={loadingRoles}
+          loadingMentions={discordMembers.length === 0 || loadingRoles}
+          saving={saving}
+          onRefresh={() => {
+            void fetchDiscordChannels();
+            void fetchDiscordRoles();
+          }}
+          onChannelChange={(channelId) => {
+            setConfig((prev) => ({
+              ...prev,
+              equipesChannelId: channelId,
+            }));
+          }}
+          onMentionChange={(mention) => {
+            setConfig((prev) => ({
+              ...prev,
+              equipesMention: mention,
+            }));
+          }}
+          parseMentionToOption={parseMentionToOption}
+          optionToMention={optionToMention}
+        />
 
         {/* Boutons d'action */}
         <Box sx={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
