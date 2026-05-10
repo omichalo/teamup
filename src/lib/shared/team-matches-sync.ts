@@ -1,186 +1,29 @@
 import { FFTTAPI } from "@omichalo/ffttapi-node";
-import { getFFTTConfig } from "./fftt-utils";
-import {
-  FFTTEquipe,
-  FFTTRencontre,
-  FFTTDetailsRencontre,
-  FFTTJoueur,
-} from "./fftt-types";
+import { createFFTTAPI, getFFTTConfig } from "./fftt-utils";
+import { FFTTEquipe, FFTTRencontre } from "./fftt-types";
 import { createBaseMatch, isFemaleTeam, determinePhaseFromDivision } from "./fftt-utils";
 import type { Firestore, DocumentReference } from "firebase-admin/firestore";
 import { Timestamp, FieldValue } from "firebase-admin/firestore";
+import type {
+  MatchData,
+  TeamMatchesSyncResult,
+} from "./team-matches-sync-types";
+import {
+  convertToFFTTRencontre,
+  convertToFFTTDetailsRencontre,
+} from "./team-matches-sync-fftt-converters";
+import {
+  enrichSQYPlayersFromClub,
+  extractClubIdFromLien,
+} from "./team-matches-sync-enrichment";
+import { recalculateJourneesByDate } from "./team-matches-sync-journee";
+import { saveMatchesToTeamSubcollections } from "./team-matches-sync-save";
 
-// Type pour les joueurs dans les recherches
-interface PlayerSearch {
-  id?: string; // Optionnel car pas toujours disponible
-  nom?: string;
-  prenom?: string;
-  licence?: string;
-  points?: number;
-  sexe?: string;
-}
-
-// Fonctions de conversion de type pour la bibliothèque FFTT
-function convertToFFTTRencontre(rencontre: unknown): FFTTRencontre {
-  const r = rencontre as Record<string, unknown>;
-  return {
-    nomEquipeA: String(r.nomEquipeA || ""),
-    nomEquipeB: String(r.nomEquipeB || ""),
-    scoreEquipeA: typeof r.scoreEquipeA === "number" ? r.scoreEquipeA : null,
-    scoreEquipeB: typeof r.scoreEquipeB === "number" ? r.scoreEquipeB : null,
-    lien: String(r.lien || ""),
-    ...(r.libelle ? { libelle: String(r.libelle) } : {}),
-    ...(r.dateReelle instanceof Date ? { dateReelle: r.dateReelle } : {}),
-    ...(r.datePrevue instanceof Date ? { datePrevue: r.datePrevue } : {}),
-  };
-}
-
-function convertToFFTTDetailsRencontre(details: unknown): FFTTDetailsRencontre {
-  const d = details as Record<string, unknown>;
-
-  // Gérer joueursA : peut être un tableau ou un objet
-  let joueursA: FFTTJoueur[] = [];
-  if (d.joueursA) {
-    if (Array.isArray(d.joueursA)) {
-      joueursA = d.joueursA.map(convertToFFTTJoueur);
-    } else if (typeof d.joueursA === "object" && d.joueursA !== null) {
-      // Si c'est un objet, convertir les valeurs en tableau
-      joueursA = Object.values(d.joueursA).map(convertToFFTTJoueur);
-    }
-  }
-
-  // Gérer joueursB : peut être un tableau ou un objet
-  let joueursB: FFTTJoueur[] = [];
-  if (d.joueursB) {
-    if (Array.isArray(d.joueursB)) {
-      joueursB = d.joueursB.map(convertToFFTTJoueur);
-    } else if (typeof d.joueursB === "object" && d.joueursB !== null) {
-      // Si c'est un objet, convertir les valeurs en tableau
-      joueursB = Object.values(d.joueursB).map(convertToFFTTJoueur);
-    }
-  }
-
-  return {
-    nomEquipeA: String(d.nomEquipeA || ""),
-    nomEquipeB: String(d.nomEquipeB || ""),
-    joueursA,
-    joueursB,
-    parties: Array.isArray(d.parties) ? d.parties.map(convertToPartie) : [],
-    ...(typeof d.expectedScoreEquipeA === "number" && {
-      expectedScoreEquipeA: d.expectedScoreEquipeA,
-    }),
-    ...(typeof d.expectedScoreEquipeB === "number" && {
-      expectedScoreEquipeB: d.expectedScoreEquipeB,
-    }),
-    ...(typeof d.scoreEquipeA === "number" || d.scoreEquipeA === null
-      ? { scoreEquipeA: d.scoreEquipeA }
-      : {}),
-    ...(typeof d.scoreEquipeB === "number" || d.scoreEquipeB === null
-      ? { scoreEquipeB: d.scoreEquipeB }
-      : {}),
-  };
-}
-
-function convertToFFTTJoueur(joueur: unknown): FFTTJoueur {
-  const j = joueur as Record<string, unknown>;
-  return {
-    licence: String(j.licence || ""),
-    nom: String(j.nom || ""),
-    prenom: String(j.prenom || ""),
-    points: typeof j.points === "number" ? j.points : null,
-    sexe: j.sexe ? String(j.sexe) : "M", // Valeur par défaut si undefined
-    ...(j.club ? { club: String(j.club) } : {}),
-  };
-}
-
-function convertToPartie(partie: unknown): {
-  adversaireA: string;
-  adversaireB: string;
-  scoreA: number;
-  scoreB: number;
-  setDetails: string;
-} {
-  const p = partie as Record<string, unknown>;
-  return {
-    adversaireA: String(p.adversaireA || ""),
-    adversaireB: String(p.adversaireB || ""),
-    scoreA: typeof p.scoreA === "number" ? p.scoreA : 0,
-    scoreB: typeof p.scoreB === "number" ? p.scoreB : 0,
-    setDetails: String(p.setDetails || ""),
-  };
-}
-
-export interface TeamMatchesSyncResult {
-  success: boolean;
-  matchesCount: number;
-  message: string;
-  error?: string;
-  processedMatches?: MatchData[];
-}
-
-export interface MatchData {
-  id: string;
-  ffttId: string;
-  teamNumber: number;
-  opponent: string;
-  opponentClub: string;
-  date: Date;
-  location: string;
-  isHome: boolean;
-  isExempt: boolean;
-  isForfeit: boolean;
-  phase: string;
-  journee: number;
-  isFemale: boolean;
-  division: string;
-  teamId: string;
-  epreuve: string;
-  idEpreuve?: number; // ID de l'épreuve FFTT (15954, 15955, 15980, etc.)
-  score?: string | undefined;
-  result: string;
-  rencontreId: string;
-  equipeIds: { equipe1: string; equipe2: string };
-  lienDetails: string;
-  resultatsIndividuels?:
-    | {
-        parties?: Array<{
-          joueurA: string;
-          joueurB: string;
-          scoreA: number;
-          scoreB: number;
-          adversaireA?: string;
-          adversaireB?: string;
-          setDetails?: string[];
-        }>;
-        nomEquipeA?: string;
-        nomEquipeB?: string;
-        joueursA?: Record<string, { nom: string; prenom: string; points?: number }>;
-        joueursB?: Record<string, { nom: string; prenom: string; points?: number }>;
-      }
-    | undefined;
-  joueursSQY?:
-    | Array<{
-        id: string;
-        nom?: string;
-        prenom?: string;
-        licence?: string;
-        points?: number;
-        sexe?: string;
-      }>
-    | undefined;
-  joueursAdversaires?:
-    | Array<{
-        id: string;
-        nom?: string;
-        prenom?: string;
-        licence?: string;
-        points?: number;
-        sexe?: string;
-      }>
-    | undefined;
-  createdAt: Date;
-  updatedAt: Date;
-}
+export type {
+  TeamMatchesSyncResult,
+  MatchData,
+  PlayerSearch,
+} from "./team-matches-sync-types";
 
 /**
  * Service pour la synchronisation des matchs par équipe
@@ -191,7 +34,7 @@ export class TeamMatchesSyncService {
 
   constructor() {
     const config = getFFTTConfig();
-    this.ffttApi = new FFTTAPI(config.id, config.pwd);
+    this.ffttApi = createFFTTAPI();
     this.clubCode = config.clubCode;
   }
 
@@ -296,34 +139,18 @@ export class TeamMatchesSyncService {
 
           let clubEquipeA, clubEquipeB;
           if (clubnum1Match && clubnum2Match) {
-            // Vérifier quelle équipe est SQY PING
-            const equip1Match = rencontre.lien.match(/equip_1=([^&]+)/);
-            const equip2Match = rencontre.lien.match(/equip_2=([^&]+)/);
-
-            if (equip1Match && equip1Match[1].includes("SQY+PING")) {
-              clubEquipeA = clubnum1Match[1];
-              clubEquipeB = clubnum2Match[1];
-            } else if (equip2Match && equip2Match[1].includes("SQY+PING")) {
-              clubEquipeA = clubnum2Match[1];
-              clubEquipeB = clubnum1Match[1];
-            } else {
-              // Fallback: utiliser les IDs d&apos;équipe comme clubs
-              clubEquipeA = this.extractClubIdFromLien(
-                rencontre.lien,
-                "clubnum_1"
-              );
-              clubEquipeB = this.extractClubIdFromLien(
-                rencontre.lien,
-                "clubnum_2"
-              );
-            }
+            // clubnum_1/clubnum_2 correspondent toujours à l'ordre équipe A/B du lien FFTT.
+            // Ne pas inverser selon SQY, sinon getDetailsRencontreByLien peut retourner
+            // des détails incomplets (joueurs manquants) pour certains matchs extérieurs.
+            clubEquipeA = clubnum1Match[1];
+            clubEquipeB = clubnum2Match[1];
           } else {
             // Fallback: utiliser les IDs d&apos;équipe comme clubs
-            clubEquipeA = this.extractClubIdFromLien(
+            clubEquipeA = extractClubIdFromLien(
               rencontre.lien,
               "clubnum_1"
             );
-            clubEquipeB = this.extractClubIdFromLien(
+            clubEquipeB = extractClubIdFromLien(
               rencontre.lien,
               "clubnum_2"
             );
@@ -374,8 +201,7 @@ export class TeamMatchesSyncService {
         }
       }
 
-      const matchesWithJournees =
-        this.recalculateJourneesByDate(processedMatches);
+      const matchesWithJournees = recalculateJourneesByDate(processedMatches);
 
       return {
         success: true,
@@ -445,7 +271,7 @@ export class TeamMatchesSyncService {
 
       // Recalculer les journées basées sur la date si l'extraction depuis le libellé a échoué
       const matchesWithRecalculatedJournees =
-        this.recalculateJourneesByDate(allMatches);
+        recalculateJourneesByDate(allMatches);
 
       // Enrichir les matchs avec les licences des joueurs avant de mettre à jour la participation
       let enrichedMatches = matchesWithRecalculatedJournees;
@@ -466,7 +292,7 @@ export class TeamMatchesSyncService {
         );
         enrichedMatches = await Promise.all(
           matchesWithRecalculatedJournees.map((match) =>
-            this.enrichSQYPlayersFromClub(match, db, playersCache)
+            enrichSQYPlayersFromClub(match, db, playersCache)
           )
         );
         console.log(`✅ ${enrichedMatches.length} matchs enrichis`);
@@ -553,32 +379,16 @@ export class TeamMatchesSyncService {
 
             let clubEquipeA, clubEquipeB;
             if (clubnum1Match && clubnum2Match) {
-              // Vérifier quelle équipe est SQY PING
-              const equip1Match = rencontre.lien.match(/equip_1=([^&]+)/);
-              const equip2Match = rencontre.lien.match(/equip_2=([^&]+)/);
-
-              if (equip1Match && equip1Match[1].includes("SQY+PING")) {
-                clubEquipeA = clubnum1Match[1];
-                clubEquipeB = clubnum2Match[1];
-              } else if (equip2Match && equip2Match[1].includes("SQY+PING")) {
-                clubEquipeA = clubnum2Match[1];
-                clubEquipeB = clubnum1Match[1];
-              } else {
-                // Fallback: utiliser les IDs d&apos;équipe comme clubs
-                clubEquipeA =
-                  (rencontre as FFTTRencontre & { idClubA?: string }).idClubA ||
-                  "";
-                clubEquipeB =
-                  (rencontre as FFTTRencontre & { idClubB?: string }).idClubB ||
-                  "";
-              }
+              // clubnum_1/clubnum_2 correspondent à équipe A/B dans le lien FFTT.
+              clubEquipeA = clubnum1Match[1];
+              clubEquipeB = clubnum2Match[1];
             } else {
               // Fallback: utiliser les IDs d&apos;équipe comme clubs
-              clubEquipeA = this.extractClubIdFromLien(
+              clubEquipeA = extractClubIdFromLien(
                 rencontre.lien,
                 "clubnum_1"
               );
-              clubEquipeB = this.extractClubIdFromLien(
+              clubEquipeB = extractClubIdFromLien(
                 rencontre.lien,
                 "clubnum_2"
               );
@@ -629,166 +439,6 @@ export class TeamMatchesSyncService {
   }
 
   /**
-   * Extrait l&apos;ID du club depuis le lien de rencontre
-   */
-  private extractClubIdFromLien(lien: string, param: string): string | null {
-    const regex = new RegExp(`${param}=([^&]+)`);
-    const match = lien.match(regex);
-    return match ? match[1] : null;
-  }
-
-  /**
-   * Enrichit les données des joueurs SQY quand les licences sont vides
-   * @param match - Le match à enrichir
-   * @param db - Instance Firestore (optionnel si playersCache est fourni)
-   * @param playersCache - Cache optionnel des joueurs pour éviter les reads répétés
-   */
-  async enrichSQYPlayersFromClub(
-    match: MatchData,
-    db?: Firestore,
-    playersCache?: Array<{ id: string; [key: string]: unknown }>
-  ): Promise<MatchData> {
-    // Si pas de joueurs SQY, pas besoin d&apos;enrichir
-    if (!match.joueursSQY || match.joueursSQY.length === 0) {
-      return match;
-    }
-
-    try {
-      // Utiliser le cache si fourni, sinon charger depuis Firestore
-      let allPlayers: Array<{ id: string; [key: string]: unknown }>;
-
-      if (playersCache) {
-        allPlayers = playersCache;
-      } else if (db) {
-        // Récupérer tous les joueurs du club SQY PING (fallback si pas de cache)
-        const playersSnapshot = await db.collection("players").get();
-        allPlayers = playersSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-      } else {
-        // Pas de cache ni de db, retourner le match tel quel
-        return match;
-      }
-
-      // Enrichir chaque joueur individuellement s&apos;il a une licence vide
-      const enrichedJoueursSQY = match.joueursSQY.map((joueur) => {
-        if (!joueur.licence || joueur.licence.trim() === "") {
-          // Normaliser les noms pour la recherche (supprimer accents, espaces multiples, etc.)
-          const normalizeName = (name: string) => {
-            return name
-              .toLowerCase()
-              .normalize("NFD")
-              .replace(/[\u0300-\u036f]/g, "") // Supprimer les accents
-              .replace(/\s+/g, " ") // Remplacer les espaces multiples par un seul
-              .trim();
-          };
-
-          const joueurNomNormalized = normalizeName(
-            (joueur as { nom?: string }).nom || ""
-          );
-          const joueurPrenomNormalized = normalizeName(
-            (joueur as { prenom?: string }).prenom || ""
-          );
-
-          // Chercher un joueur par nom et prénom (recherche exacte d&apos;abord)
-          let foundPlayer = allPlayers.find(
-            (p) =>
-              (p as PlayerSearch).nom &&
-              (p as PlayerSearch).prenom &&
-              (p as PlayerSearch).nom!.toLowerCase() ===
-                (joueur as { nom?: string }).nom?.toLowerCase() &&
-              (p as PlayerSearch).prenom!.toLowerCase() ===
-                (joueur as { prenom?: string }).prenom?.toLowerCase()
-          );
-
-          // Si pas trouvé, essayer avec les noms normalisés
-          if (!foundPlayer) {
-            foundPlayer = allPlayers.find(
-              (p) =>
-                (p as PlayerSearch).nom &&
-                (p as PlayerSearch).prenom &&
-                normalizeName((p as PlayerSearch).nom!) ===
-                  joueurNomNormalized &&
-                normalizeName((p as PlayerSearch).prenom!) ===
-                  joueurPrenomNormalized
-            );
-          }
-
-          // Si toujours pas trouvé, essayer une recherche partielle (prénom + nom)
-          if (!foundPlayer) {
-            foundPlayer = allPlayers.find(
-              (p) =>
-                (p as PlayerSearch).nom &&
-                (p as PlayerSearch).prenom &&
-                (normalizeName((p as PlayerSearch).nom!).includes(
-                  joueurNomNormalized
-                ) ||
-                  joueurNomNormalized.includes(
-                    normalizeName((p as PlayerSearch).nom!)
-                  )) &&
-                (normalizeName((p as PlayerSearch).prenom!).includes(
-                  joueurPrenomNormalized
-                ) ||
-                  joueurPrenomNormalized.includes(
-                    normalizeName((p as PlayerSearch).prenom!)
-                  ))
-            );
-          }
-
-          if (foundPlayer) {
-            console.log(
-              `🔍 Joueur trouvé par nom: ${
-                (joueur as { prenom?: string }).prenom
-              } ${(joueur as { nom?: string }).nom} -> licence: ${
-                (foundPlayer as PlayerSearch).licence
-              }`
-            );
-            return {
-              ...joueur,
-              licence: (foundPlayer as PlayerSearch).licence,
-              points:
-                (foundPlayer as PlayerSearch).points ||
-                (joueur as { points?: number }).points,
-              sexe:
-                (foundPlayer as PlayerSearch).sexe ||
-                (joueur as { sexe?: string }).sexe,
-            };
-          } else {
-            console.log(
-              `⚠️  Joueur non trouvé par nom: ${
-                (joueur as { prenom?: string }).prenom
-              } ${(joueur as { nom?: string }).nom}`
-            );
-          }
-        }
-        return joueur;
-      });
-
-      // Sérialiser les joueurs pour éviter les problèmes de type
-      const serializedJoueursSQY = enrichedJoueursSQY.map((joueur) => ({
-        id: joueur.id,
-        nom: joueur.nom || "",
-        prenom: joueur.prenom || "",
-        licence: joueur.licence || "",
-        points: joueur.points || 0,
-        sexe: joueur.sexe || "M",
-      }));
-
-      return {
-        ...match,
-        joueursSQY: serializedJoueursSQY,
-      };
-    } catch (error) {
-      console.error(
-        "❌ Erreur lors de l&apos;enrichissement des joueurs SQY:",
-        error
-      );
-      return match;
-    }
-  }
-
-  /**
    * Met à jour la participation des joueurs basée sur leur participation aux matchs
    * @param matches - Les matchs à traiter
    * @param db - Instance Firestore
@@ -812,7 +462,7 @@ export class TeamMatchesSyncService {
       const enrichedMatches = playersCache
         ? matches // Déjà enrichis, pas besoin de réenrichir
         : await Promise.all(
-            matches.map((match) => this.enrichSQYPlayersFromClub(match, db))
+            matches.map((match) => enrichSQYPlayersFromClub(match, db))
           );
 
       // Séparer les matchs du championnat par équipes et du championnat de Paris
@@ -1561,447 +1211,7 @@ export class TeamMatchesSyncService {
     matches: MatchData[],
     db: Firestore
   ): Promise<{ saved: number; errors: number }> {
-    let saved = 0;
-    const errors = 0;
-
-    try {
-      console.log(
-        `💾 Sauvegarde de ${matches.length} matchs dans les sous-collections...`
-      );
-
-      // Grouper les matchs par équipe
-      const matchesByTeam = new Map<string, MatchData[]>();
-
-      // Grouper les matchs par équipe (utiliser le champ teamId du match)
-      let matchesWithTeamId = 0;
-      let matchesWithoutTeamId = 0;
-
-      matches.forEach((match) => {
-        const teamId = match.teamId;
-
-        if (teamId && teamId.trim() !== "") {
-          if (!matchesByTeam.has(teamId)) {
-            matchesByTeam.set(teamId, []);
-          }
-          matchesByTeam.get(teamId)!.push(match);
-          matchesWithTeamId++;
-        } else {
-          console.warn(
-            `⚠️ Match sans teamId: ${match.id} (teamId="${teamId}")`
-          );
-          matchesWithoutTeamId++;
-        }
-      });
-
-      console.log(
-        `📊 Matchs avec teamId: ${matchesWithTeamId}, sans teamId: ${matchesWithoutTeamId}`
-      );
-
-      console.log(`📊 ${matchesByTeam.size} équipes avec des matchs`);
-      console.log(`📊 Équipes: ${Array.from(matchesByTeam.keys()).join(", ")}`);
-
-      // Calculer le total de matchs à sauvegarder
-      const totalMatchesToSave = Array.from(matchesByTeam.values()).reduce(
-        (sum, teamMatches) => sum + teamMatches.length,
-        0
-      );
-      console.log(
-        `📊 Total de matchs à sauvegarder: ${totalMatchesToSave} (sur ${matches.length} matchs reçus)`
-      );
-
-      // Vérifier que les teamId existent dans Firestore
-      if (db && matchesByTeam.size > 0) {
-        const teamIds = Array.from(matchesByTeam.keys());
-        const teamRefs = teamIds.map((teamId) =>
-          db.collection("teams").doc(teamId)
-        );
-        const teamDocs = await db.getAll(...teamRefs);
-        const existingTeamIds = teamDocs
-          .filter((doc) => doc.exists)
-          .map((doc) => doc.id);
-        const missingTeamIds = teamIds.filter(
-          (id) => !existingTeamIds.includes(id)
-        );
-
-        if (missingTeamIds.length > 0) {
-          console.warn(
-            `⚠️ ${
-              missingTeamIds.length
-            } équipes référencées dans les matchs n'existent pas dans Firestore (exécuter d'abord la sync équipes) : ${missingTeamIds.join(
-              ", "
-            )}`
-          );
-        } else {
-          console.log(
-            `✅ Toutes les équipes référencées existent dans Firestore`
-          );
-        }
-      }
-
-      // OPTIMISATION : Paralléliser les commits de batch pour différentes équipes
-      // Sauvegarder par batch
-      const batchSize = 500;
-
-      // Préparer tous les batches pour toutes les équipes
-      const batchPromises: Array<Promise<void>> = [];
-
-      for (const [teamId, teamMatches] of matchesByTeam) {
-        // Firestore rejette les segments de chemin vides
-        if (!teamId || typeof teamId !== "string" || teamId.trim() === "") {
-          console.warn(
-            `⚠️ Équipe ignorée (teamId vide): ${teamMatches.length} matchs non sauvegardés`
-          );
-          continue;
-        }
-        const safeTeamId = teamId.trim();
-
-        console.log(
-          `💾 Préparation de ${teamMatches.length} matchs pour ${safeTeamId}...`
-        );
-
-        for (let i = 0; i < teamMatches.length; i += batchSize) {
-          const batch = db.batch();
-          const batchEnd = Math.min(i + batchSize, teamMatches.length);
-          const matchesInThisBatch = batchEnd - i;
-
-          for (let j = i; j < batchEnd; j++) {
-            const match = teamMatches[j];
-            const matchId =
-              typeof match.id === "string" ? match.id.trim() : "";
-            if (!matchId) {
-              console.warn(
-                `⚠️ Match ignoré (id vide): teamId=${safeTeamId}, lien=${match.lienDetails || match.ffttId}`
-              );
-              continue;
-            }
-            const docRef = db
-              .collection("teams")
-              .doc(safeTeamId)
-              .collection("matches")
-              .doc(matchId);
-
-            // Préparer les données pour Firestore en filtrant les valeurs undefined
-            const matchData = {
-              ...match,
-              date: Timestamp.fromDate(match.date),
-              createdAt: Timestamp.fromDate(match.createdAt),
-              updatedAt: Timestamp.fromDate(match.updatedAt),
-            };
-
-            // Supprimer les propriétés undefined pour éviter les erreurs Firestore
-            Object.keys(matchData).forEach((key) => {
-              if ((matchData as Record<string, unknown>)[key] === undefined) {
-                delete (matchData as Record<string, unknown>)[key];
-              }
-            });
-
-            // Fonction helper pour nettoyer un objet joueur (supprimer les propriétés undefined)
-            const cleanPlayer = (joueur: {
-              licence?: string | undefined;
-              nom?: string | undefined;
-              prenom?: string | undefined;
-              points?: number | undefined;
-              sexe?: string | undefined;
-            }): Record<string, unknown> => {
-              const cleaned: Record<string, unknown> = {};
-              if (joueur.licence !== undefined && joueur.licence !== null) {
-                cleaned.licence = joueur.licence;
-              }
-              if (joueur.nom !== undefined && joueur.nom !== null) {
-                cleaned.nom = joueur.nom;
-              }
-              if (joueur.prenom !== undefined && joueur.prenom !== null) {
-                cleaned.prenom = joueur.prenom;
-              }
-              if (joueur.points !== undefined && joueur.points !== null) {
-                cleaned.points = joueur.points;
-              }
-              if (joueur.sexe !== undefined && joueur.sexe !== null) {
-                cleaned.sexe = joueur.sexe;
-              }
-              return cleaned;
-            };
-
-            // Convertir les objets JoueurRencontre en objets simples pour Firestore
-            const serializableMatchData = {
-              ...matchData,
-              joueursSQY:
-                matchData.joueursSQY?.map((joueur) =>
-                  cleanPlayer({
-                    licence: joueur.licence,
-                    nom: (joueur as { nom?: string }).nom,
-                    prenom: (joueur as { prenom?: string }).prenom,
-                    points: joueur.points,
-                    sexe: joueur.sexe,
-                  })
-                ) || [],
-              joueursAdversaires:
-                matchData.joueursAdversaires?.map((joueur) =>
-                  cleanPlayer({
-                    licence: joueur.licence,
-                    nom: (joueur as { nom?: string }).nom,
-                    prenom: (joueur as { prenom?: string }).prenom,
-                    points: joueur.points,
-                    sexe: joueur.sexe,
-                  })
-                ) || [],
-            };
-
-            // Forcer la mise à jour des champs importants même s'ils étaient vides avant
-            const updateDataRaw = {
-              ...serializableMatchData,
-              // Toujours mettre à jour ces champs même s'ils étaient vides
-              joueursSQY: serializableMatchData.joueursSQY || [],
-              joueursAdversaires:
-                serializableMatchData.joueursAdversaires || [],
-              score: serializableMatchData.score || null,
-              resultatsIndividuels:
-                serializableMatchData.resultatsIndividuels || null,
-            };
-
-            // Fonction récursive pour supprimer toutes les propriétés undefined
-            const removeUndefined = (
-              obj: Record<string, unknown>
-            ): Record<string, unknown> => {
-              const cleaned: Record<string, unknown> = {};
-              for (const [key, value] of Object.entries(obj)) {
-                if (value === undefined) {
-                  continue; // Ignorer les valeurs undefined
-                }
-                if (value === null) {
-                  cleaned[key] = null; // Garder null
-                } else if (Array.isArray(value)) {
-                  // Nettoyer les tableaux
-                  cleaned[key] = value.map((item) =>
-                    typeof item === "object" && item !== null
-                      ? removeUndefined(item as Record<string, unknown>)
-                      : item
-                  );
-                } else if (typeof value === "object" && value !== null) {
-                  // Nettoyer les objets imbriqués
-                  cleaned[key] = removeUndefined(
-                    value as Record<string, unknown>
-                  );
-                } else {
-                  cleaned[key] = value;
-                }
-              }
-              return cleaned;
-            };
-
-            const updateData = removeUndefined(
-              updateDataRaw as Record<string, unknown>
-            );
-
-            // ——— Traces pour analyse de l'erreur Firestore "Element at index 0 should not be an empty string" ———
-            // Pour activer les traces path en prod : dans .env.local ajouter DEBUG_SYNC_TEAM_MATCHES=true
-            const traceSync =
-              process.env.NODE_ENV === "development" ||
-              process.env.DEBUG_SYNC_TEAM_MATCHES === "true";
-
-            const collectFirestoreDiagnostics = (
-              obj: unknown,
-              path = "updateData"
-            ): string[] => {
-              const issues: string[] = [];
-              if (obj === null || obj === undefined) return issues;
-              if (typeof obj === "string") {
-                if (obj === "" || obj.trim() === "")
-                  issues.push(`${path} = chaîne vide`);
-                return issues;
-              }
-              if (Array.isArray(obj)) {
-                obj.forEach((item, index) => {
-                  if (
-                    item === "" ||
-                    (typeof item === "string" && item.trim() === "")
-                  ) {
-                    issues.push(`${path}[${index}] = chaîne vide`);
-                  } else if (
-                    typeof item === "object" &&
-                    item !== null &&
-                    !(item instanceof Timestamp)
-                  ) {
-                    issues.push(
-                      ...collectFirestoreDiagnostics(
-                        item,
-                        `${path}[${index}]`
-                      )
-                    );
-                  }
-                });
-                return issues;
-              }
-              if (typeof obj === "object" && !(obj instanceof Timestamp)) {
-                for (const [key, value] of Object.entries(obj)) {
-                  if (
-                    key === "" ||
-                    (typeof key === "string" && key.trim() === "")
-                  ) {
-                    issues.push(`${path} a une clé vide`);
-                  }
-                  issues.push(
-                    ...collectFirestoreDiagnostics(value, `${path}.${key || '""'}`)
-                  );
-                }
-              }
-              return issues;
-            };
-
-            const pathStr = docRef.path;
-            const pathSegments = pathStr.split("/");
-            const hasEmptySegment = pathSegments.some(
-              (s) => s === "" || s.trim() === ""
-            );
-            if (traceSync) {
-              console.log(
-                `[sync-trace] path=${pathStr} segments=${pathSegments.length} hasEmptySegment=${hasEmptySegment}`
-              );
-            }
-            const diagnostics = collectFirestoreDiagnostics(updateData);
-            if (diagnostics.length > 0) {
-              console.warn(
-                `[sync-trace] Données problématiques pour matchId=${matchId} teamId=${safeTeamId}:`,
-                diagnostics
-              );
-            }
-            if (hasEmptySegment) {
-              console.warn(
-                `[sync-trace] Chemin avec segment vide: path=${pathStr} teamId=${safeTeamId} matchId=${matchId}`
-              );
-            }
-
-            // Firestore rejette les noms de champs vides et les chaînes vides dans les tableaux
-            const sanitizeForFirestore = (
-              obj: Record<string, unknown>
-            ): Record<string, unknown> => {
-              const out: Record<string, unknown> = {};
-              for (const [key, value] of Object.entries(obj)) {
-                if (key === "" || (typeof key === "string" && key.trim() === "")) {
-                  continue;
-                }
-                if (Array.isArray(value)) {
-                  out[key] = value.map((item) =>
-                    item === "" || (typeof item === "string" && item.trim() === "")
-                      ? null
-                      : typeof item === "object" && item !== null && !Array.isArray(item)
-                        ? sanitizeForFirestore(item as Record<string, unknown>)
-                        : item
-                  );
-                } else if (
-                  typeof value === "object" &&
-                  value !== null &&
-                  !(value instanceof Timestamp)
-                ) {
-                  out[key] = sanitizeForFirestore(value as Record<string, unknown>);
-                } else {
-                  out[key] = value;
-                }
-              }
-              return out;
-            };
-
-            const sanitizedData = sanitizeForFirestore(
-              updateData as Record<string, unknown>
-            );
-
-            batch.set(docRef, sanitizedData, { merge: true });
-            saved++;
-          }
-
-          console.log(
-            `  📝 Batch préparé: ${matchesInThisBatch} matchs ajoutés au batch (saved=${saved})`
-          );
-
-          // Ajouter la promesse de commit au tableau pour parallélisation
-          // Capturer les valeurs dans une closure pour éviter les problèmes de référence
-          const currentTeamId = safeTeamId;
-          const currentBatchSize = batchEnd - i;
-
-          batchPromises.push(
-            batch
-              .commit()
-              .then(() => {
-                console.log(
-                  `✅ Batch sauvegardé pour ${currentTeamId} (${currentBatchSize} matchs)`
-                );
-              })
-              .catch((error) => {
-                console.error(
-                  `❌ Erreur lors du commit du batch pour ${currentTeamId}:`,
-                  error
-                );
-                console.error(
-                  `[sync-trace] Batch en échec: teamId=${currentTeamId} nbMatchs=${currentBatchSize}. Vérifier les traces [sync-trace] ci-dessus pour les chemins et données problématiques.`
-                );
-                throw error;
-              })
-          );
-        }
-      }
-
-      // Attendre que tous les batches soient committés en parallèle
-      await Promise.all(batchPromises);
-
-      console.log(
-        `✅ Synchronisation terminée: ${saved} matchs sauvegardés sur ${matches.length} matchs reçus`
-      );
-      if (saved !== matches.length) {
-        console.warn(
-          `⚠️ Attention: ${
-            matches.length - saved
-          } matchs n'ont pas été sauvegardés (probablement sans teamId)`
-        );
-      }
-      return { saved, errors };
-    } catch (error) {
-      console.error("❌ Erreur lors de la sauvegarde:", error);
-      return { saved, errors: matches.length - saved };
-    }
+    return saveMatchesToTeamSubcollections(matches, db);
   }
 
-  /**
-   * Assigne le numéro de journée d'après la position du match (1er, 2e, 3e...)
-   * dans l'ordre chronologique, par équipe ET par phase.
-   * Grouper par (teamId, phase) évite de mélanger Phase 1 (aller) et Phase 2 (retour)
-   * pour une même équipe (ex. team_1 fallback ou équipes partageant un identifiant).
-   */
-  private recalculateJourneesByDate(matches: MatchData[]): MatchData[] {
-    const matchesByTeamAndPhase = new Map<string, MatchData[]>();
-
-    matches.forEach((match) => {
-      const teamId =
-        match.teamId?.trim() ||
-        `team_${match.teamNumber}_${match.isFemale ? "F" : "M"}`;
-      const rawPhase = (match.phase || "aller").toLowerCase();
-      // Normaliser "phase 2" / "phase2" → retour pour grouper correctement
-      const phase =
-        rawPhase === "retour" || rawPhase.includes("phase 2") || rawPhase.includes("phase2")
-          ? "retour"
-          : "aller";
-      const teamPhaseKey = `${teamId}|${phase}`;
-      if (!matchesByTeamAndPhase.has(teamPhaseKey)) {
-        matchesByTeamAndPhase.set(teamPhaseKey, []);
-      }
-      matchesByTeamAndPhase.get(teamPhaseKey)!.push(match);
-    });
-
-    const recalculatedMatches: MatchData[] = [];
-
-    matchesByTeamAndPhase.forEach((teamMatches) => {
-      const sortedMatches = [...teamMatches].sort((a, b) => {
-        const dateA = new Date(a.date).getTime();
-        const dateB = new Date(b.date).getTime();
-        return dateA - dateB;
-      });
-
-      sortedMatches.forEach((match, index) => {
-        match.journee = index + 1;
-      });
-
-      recalculatedMatches.push(...sortedMatches);
-    });
-
-    return recalculatedMatches;
-  }
 }

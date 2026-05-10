@@ -1,5 +1,10 @@
 import { FFTTAPI } from "@omichalo/ffttapi-node";
-import { getFFTTConfig, isFemaleTeam, determinePhaseFromDivision } from "./fftt-utils";
+import {
+  createFFTTAPI,
+  getFFTTConfig,
+  isFemaleTeam,
+  determinePhaseFromDivision,
+} from "./fftt-utils";
 import type { Firestore } from "firebase-admin/firestore";
 import { Timestamp } from "firebase-admin/firestore";
 import type { FFTTEquipe } from "./fftt-types";
@@ -71,7 +76,7 @@ export class TeamSyncService {
 
   constructor() {
     const config = getFFTTConfig();
-    this.ffttApi = new FFTTAPI(config.id, config.pwd);
+    this.ffttApi = createFFTTAPI();
     this.clubCode = config.clubCode;
   }
 

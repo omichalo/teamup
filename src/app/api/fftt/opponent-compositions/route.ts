@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import type { NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase-admin";
@@ -16,6 +16,22 @@ import {
 } from "@/lib/shared/victoires-defaites";
 
 export const runtime = "nodejs";
+
+async function createInitializedFFTTApi(retries = 1) {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const api = createFFTTAPI();
+    try {
+      await api.initialize();
+      return api;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError;
+}
 
 /** Normalise un nom d'équipe pour la comparaison (majuscules, trim, espaces réduits). */
 function normalizeTeamName(name: string): string {
@@ -207,7 +223,7 @@ export async function GET(req: NextRequest) {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
     if (!sessionCookie) {
-      return NextResponse.json(
+      return jsonNoStore(
         { error: "Authentification requise" },
         { status: 401 }
       );
@@ -217,7 +233,7 @@ export async function GET(req: NextRequest) {
     const role = resolveRole(decoded.role as string | undefined);
 
     if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
-      return NextResponse.json(
+      return jsonNoStore(
         { error: "Accès refusé" },
         { status: 403 }
       );
@@ -230,15 +246,14 @@ export async function GET(req: NextRequest) {
     const opponentName = req.nextUrl.searchParams.get("opponentName")?.trim();
 
     if (!teamId || !phase || !opponentName) {
-      return NextResponse.json(
+      return jsonNoStore(
         { error: "Paramètres teamId, phase et opponentName requis" },
         { status: 400 }
       );
     }
 
     const { clubCode } = getFFTTConfig();
-    const api = createFFTTAPI();
-    await api.initialize();
+    const api = await createInitializedFFTTApi();
 
     const equipes = (await api.getEquipesByClub(clubCode)) as Array<{
       idEquipe: number;
@@ -265,7 +280,7 @@ export async function GET(req: NextRequest) {
     });
 
     if (!ourEquipe?.lienDivision) {
-      return NextResponse.json(
+      return jsonNoStore(
         { error: "Équipe ou division non trouvée" },
         { status: 404 }
       );
@@ -448,13 +463,13 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ matches: results });
+    return jsonNoStore({ matches: results });
   } catch (error) {
     console.error(
       "Erreur API opponent-compositions:",
       error instanceof Error ? error.message : error
     );
-    return NextResponse.json(
+    return jsonNoStore(
       { error: "Erreur lors de la récupération des compositions adverses" },
       { status: 500 }
     );

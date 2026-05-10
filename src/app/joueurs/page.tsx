@@ -6,26 +6,15 @@ import {
   Typography,
   Card,
   CardContent,
-  Chip,
   TextField,
   FormControl,
   FormLabel,
   Switch,
   Alert,
   CircularProgress,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
   Tabs,
   Tab,
-  Tooltip,
   Button,
-  Badge,
-  IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -33,17 +22,10 @@ import {
   MenuItem,
   Select,
   InputLabel,
-  Autocomplete,
 } from "@mui/material";
 import {
   Search as SearchIcon,
-  SportsTennis as SportsTennisIcon,
   Add as AddIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  AlternateEmail as AlternateEmailIcon,
-  Warning as WarningIcon,
-  Accessible as AccessibleIcon,
 } from "@mui/icons-material";
 import { Player } from "@/types/team-management";
 import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
@@ -51,9 +33,17 @@ import { AuthGuard } from "@/components/AuthGuard";
 import { useTeamData } from "@/hooks/useTeamData";
 import { useDiscordMembers } from "@/hooks/useDiscordMembers";
 import { USER_ROLES } from "@/lib/auth/roles";
-import { doc, getDoc } from "firebase/firestore";
-import { getDbInstanceDirect } from "@/lib/firebase";
 import { useTeamManagementStore } from "@/stores/teamManagementStore";
+import { getPhaseOfNextChampionnatEquipesMatch } from "@/lib/shared/phase-utils";
+import {
+  applyJoueursFilters,
+  getPlayersForTab,
+  type JoueursFilters,
+} from "@/lib/players/player-filters";
+import { useJoueursCrud } from "@/hooks/useJoueursCrud";
+import { PlayersBasicTable } from "@/components/players/PlayersBasicTable";
+import { PlayersActiveTable } from "@/components/players/PlayersActiveTable";
+import { DiscordMentionsAutocomplete } from "@/components/players/DiscordMentionsAutocomplete";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -80,15 +70,12 @@ function TabPanel(props: TabPanelProps) {
 // Composant pour afficher les suggestions de mentions Discord
 
 export default function JoueursPage() {
-  const { currentPhase } = useTeamData();
+  const { equipes, currentPhase } = useTeamData();
   const updatePlayerInStore = useTeamManagementStore(
     (state) => state.updatePlayer
   );
   const removePlayerFromStore = useTeamManagementStore(
     (state) => state.removePlayer
-  );
-  const loadPlayersInStore = useTeamManagementStore(
-    (state) => state.loadPlayers
   );
   const [players, setPlayers] = useState<Player[]>([]);
   const [playersWithoutLicense, setPlayersWithoutLicense] = useState<Player[]>(
@@ -100,7 +87,7 @@ export default function JoueursPage() {
   const [searching, setSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTab, setSelectedTab] = useState(0);
-  const [filters, setFilters] = useState({
+  const [filters, setFilters] = useState<JoueursFilters>({
     gender: "",
     nationality: "",
     isActive: true,
@@ -109,31 +96,14 @@ export default function JoueursPage() {
     inChampionshipParis: "", // "" = tous, "true" = inscrit, "false" = pas inscrit
     hasDiscord: "", // "" = tous, "true" = avec Discord valide, "false" = sans Discord
   });
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [updating, setUpdating] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
-  const [newPlayer, setNewPlayer] = useState({
-    firstName: "",
-    name: "",
-    license: "",
-    gender: "M" as "M" | "F",
-    nationality: "FR" as "FR" | "C" | "ETR",
-    points: 500,
-    inChampionship: true,
-    isWheelchair: false,
-  });
-  const [licenseExists, setLicenseExists] = useState(false);
-  const [licenseExistsForOther, setLicenseExistsForOther] = useState(false);
   const { members: discordMembers } = useDiscordMembers();
-  const [discordMentions, setDiscordMentions] = useState<string[]>([]); // IDs des membres Discord sélectionnés
-  const [discordMentionError, setDiscordMentionError] = useState<string | null>(
-    null
-  );
 
   const playerService = useMemo(() => new FirestorePlayerService(), []);
+
+  const burnoutPhase = useMemo<"aller" | "retour">(() => {
+    const phaseOfNextMatch = getPhaseOfNextChampionnatEquipesMatch(equipes);
+    return phaseOfNextMatch ?? currentPhase ?? "aller";
+  }, [currentPhase, equipes]);
 
   const loadPlayers = useCallback(async () => {
     try {
@@ -218,84 +188,18 @@ export default function JoueursPage() {
   // Calculer les joueurs filtrés pour chaque onglet (pour afficher les compteurs)
   const getFilteredCountForTab = useCallback(
     (tabIndex: number) => {
-      let sourcePlayers: Player[] = [];
-
-      switch (tabIndex) {
-        case 0: // Joueurs actifs
-          sourcePlayers = players;
-          break;
-        case 1: // Sans licence
-          sourcePlayers = playersWithoutLicense;
-          break;
-        case 2: // Temporaires
-          sourcePlayers = temporaryPlayers;
-          break;
-        default:
-          sourcePlayers = players;
-      }
-
-      let filtered = sourcePlayers;
-
-      // Filtre par recherche
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        filtered = filtered.filter(
-          (player) =>
-            player.name.toLowerCase().includes(query) ||
-            player.firstName.toLowerCase().includes(query) ||
-            player.license.includes(query)
-        );
-      }
-
-      // Filtres par critères
-      if (filters.gender) {
-        filtered = filtered.filter(
-          (player) => player.gender === filters.gender
-        );
-      }
-
-      if (filters.nationality) {
-        filtered = filtered.filter(
-          (player) => player.nationality === filters.nationality
-        );
-      }
-
-      // Filtre par "a déjà joué un match"
-      if (filters.hasPlayedMatch !== "") {
-        const hasPlayed = filters.hasPlayedMatch === "true";
-        filtered = filtered.filter(
-          (player) => (player.hasPlayedAtLeastOneMatch || false) === hasPlayed
-        );
-      }
-
-      // Filtre par "inscrit en championnat"
-      if (filters.inChampionship !== "") {
-        const inChampionship = filters.inChampionship === "true";
-        filtered = filtered.filter(
-          (player) =>
-            (player.participation?.championnat || false) === inChampionship
-        );
-      }
-
-      // Filtre par "inscrit en championnat de Paris"
-      if (filters.inChampionshipParis !== "") {
-        const inChampionshipParis = filters.inChampionshipParis === "true";
-        filtered = filtered.filter(
-          (player) =>
-            (player.participation?.championnatParis || false) ===
-            inChampionshipParis
-        );
-      }
-
-      // Filtre par Discord
-      if (filters.hasDiscord !== "") {
-        const hasDiscord = filters.hasDiscord === "true";
-        filtered = filtered.filter(
-          (player) => hasValidDiscord(player) === hasDiscord
-        );
-      }
-
-      return filtered.length;
+      const sourcePlayers = getPlayersForTab(
+        tabIndex,
+        players,
+        playersWithoutLicense,
+        temporaryPlayers
+      );
+      return applyJoueursFilters({
+        sourcePlayers,
+        searchQuery,
+        filters,
+        hasValidDiscord,
+      }).length;
     },
     [
       players,
@@ -310,84 +214,18 @@ export default function JoueursPage() {
   const filterPlayers = useCallback(async () => {
     try {
       setSearching(true);
-      let sourcePlayers: Player[] = [];
-
-      // Sélectionner la source selon l&apos;onglet
-      switch (selectedTab) {
-        case 0: // Joueurs actifs
-          sourcePlayers = players;
-          break;
-        case 1: // Sans licence
-          sourcePlayers = playersWithoutLicense;
-          break;
-        case 2: // Temporaires
-          sourcePlayers = temporaryPlayers;
-          break;
-        default:
-          sourcePlayers = players;
-      }
-
-      let filtered = sourcePlayers;
-
-      // Filtre par recherche
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        filtered = filtered.filter(
-          (player) =>
-            player.name.toLowerCase().includes(query) ||
-            player.firstName.toLowerCase().includes(query) ||
-            player.license.includes(query)
-        );
-      }
-
-      // Filtres par critères
-      if (filters.gender) {
-        filtered = filtered.filter(
-          (player) => player.gender === filters.gender
-        );
-      }
-
-      if (filters.nationality) {
-        filtered = filtered.filter(
-          (player) => player.nationality === filters.nationality
-        );
-      }
-
-      // Filtre par "a déjà joué un match"
-      if (filters.hasPlayedMatch !== "") {
-        const hasPlayed = filters.hasPlayedMatch === "true";
-        filtered = filtered.filter(
-          (player) => (player.hasPlayedAtLeastOneMatch || false) === hasPlayed
-        );
-      }
-
-      // Filtre par "inscrit en championnat"
-      if (filters.inChampionship !== "") {
-        const inChampionship = filters.inChampionship === "true";
-        filtered = filtered.filter(
-          (player) =>
-            (player.participation?.championnat || false) === inChampionship
-        );
-      }
-
-      // Filtre par "inscrit en championnat de Paris"
-      if (filters.inChampionshipParis !== "") {
-        const inChampionshipParis = filters.inChampionshipParis === "true";
-        filtered = filtered.filter(
-          (player) =>
-            (player.participation?.championnatParis || false) ===
-            inChampionshipParis
-        );
-      }
-
-      // Filtre par Discord
-      if (filters.hasDiscord !== "") {
-        const hasDiscord = filters.hasDiscord === "true";
-        filtered = filtered.filter(
-          (player) => hasValidDiscord(player) === hasDiscord
-        );
-      }
-
+      const sourcePlayers = getPlayersForTab(
+        selectedTab,
+        players,
+        playersWithoutLicense,
+        temporaryPlayers
+      );
+      const filtered = applyJoueursFilters({
+        sourcePlayers,
+        searchQuery,
+        filters,
+        hasValidDiscord,
+      });
       setFilteredPlayers(filtered);
     } catch (error) {
       console.error("Erreur lors du filtrage des joueurs:", error);
@@ -412,365 +250,67 @@ export default function JoueursPage() {
     filterPlayers();
   }, [filterPlayers]);
 
-  const checkLicenseExists = useCallback(
-    async (license: string, excludePlayerId?: string) => {
-      if (!license.trim()) {
-        setLicenseExists(false);
-        setLicenseExistsForOther(false);
-        return;
-      }
-      try {
-        const exists = await playerService.checkPlayerExists(license.trim());
-        // Si on est en mode édition et que la licence existe mais correspond au joueur en cours d'édition, ce n'est pas une erreur
-        if (excludePlayerId && exists) {
-          const playerRef = doc(
-            getDbInstanceDirect(),
-            "players",
-            license.trim()
-          );
-          const playerSnap = await getDoc(playerRef);
-          if (playerSnap.exists() && playerSnap.id === excludePlayerId) {
-            setLicenseExists(false);
-            setLicenseExistsForOther(false);
-            return;
-          }
-        }
-        setLicenseExists(exists);
-        setLicenseExistsForOther(exists && excludePlayerId ? exists : false);
-      } catch (error) {
-        console.error("Erreur lors de la vérification de la licence:", error);
-        setLicenseExists(false);
-        setLicenseExistsForOther(false);
-      }
+  const recomputeFilteredPlayersFromLists = useCallback(
+    (
+      nextPlayers: Player[],
+      nextPlayersWithoutLicense: Player[],
+      nextTemporaryPlayers: Player[]
+    ) => {
+      const sourcePlayers = getPlayersForTab(
+        selectedTab,
+        nextPlayers,
+        nextPlayersWithoutLicense,
+        nextTemporaryPlayers
+      );
+      const filtered = applyJoueursFilters({
+        sourcePlayers,
+        searchQuery,
+        filters,
+        hasValidDiscord,
+      });
+      setFilteredPlayers(filtered);
     },
-    [playerService]
+    [selectedTab, searchQuery, filters, hasValidDiscord]
   );
 
-  const handleCreateTemporaryPlayer = async () => {
-    if (!newPlayer.firstName.trim() || !newPlayer.name.trim()) {
-      alert("Le prénom et le nom sont obligatoires");
-      return;
-    }
-
-    if (newPlayer.license.trim() && licenseExists) {
-      alert("Un joueur avec ce numéro de licence existe déjà");
-      return;
-    }
-
-    try {
-      setCreating(true);
-
-      // Normaliser les noms : nom en majuscules, prénom avec première lettre en majuscule
-      const normalizedName = newPlayer.name.trim().toUpperCase();
-      const normalizedFirstName =
-        newPlayer.firstName.trim().charAt(0).toUpperCase() +
-        newPlayer.firstName.trim().slice(1).toLowerCase();
-
-      await playerService.createTemporaryPlayer({
-        firstName: normalizedFirstName,
-        name: normalizedName,
-        license: newPlayer.license.trim() || "",
-        gender: newPlayer.gender,
-        nationality: newPlayer.nationality,
-        isActive: false,
-        isTemporary: true,
-        isWheelchair: newPlayer.isWheelchair,
-        typeLicence: "",
-        points: newPlayer.points || 500,
-        preferredTeams: {
-          masculine: [],
-          feminine: [],
-        },
-        participation: {
-          championnat: newPlayer.inChampionship,
-          championnatParis: false,
-        },
-        hasPlayedAtLeastOneMatch: false,
-        hasPlayedAtLeastOneMatchParis: false,
-        ...(discordMentions.length > 0 ? { discordMentions } : {}),
-      });
-
-      // Réinitialiser le formulaire
-      setNewPlayer({
-        firstName: "",
-        name: "",
-        license: "",
-        gender: "M",
-        nationality: "FR",
-        points: 500,
-        inChampionship: true,
-        isWheelchair: false,
-      });
-      setLicenseExists(false);
-      setCreateDialogOpen(false);
-
-      // Recharger les joueurs
-      await loadPlayers();
-      // Recharger le store pour synchroniser avec les autres pages
-      await loadPlayersInStore();
-    } catch (error) {
-      console.error("Erreur lors de la création du joueur temporaire:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Erreur inconnue";
-      if (errorMessage.includes("existe déjà")) {
-        alert("Un joueur avec ce numéro de licence existe déjà");
-      } else {
-        alert("Erreur lors de la création du joueur temporaire");
-      }
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const handleEditPlayer = (player: Player) => {
-    setEditingPlayer(player);
-    setNewPlayer({
-      firstName: player.firstName,
-      name: player.name,
-      license: player.license || "",
-      gender: player.gender,
-      nationality: player.nationality,
-      points: player.points || 500,
-      inChampionship: player.participation?.championnat || false,
-      isWheelchair: player.isWheelchair || false,
-    });
-    setDiscordMentions(player.discordMentions || []);
-    setDiscordMentionError(null);
-    setLicenseExists(false);
-    setLicenseExistsForOther(false);
-    setEditDialogOpen(true);
-  };
-
-  const handleUpdatePlayer = async () => {
-    if (!editingPlayer) return;
-
-    // Vérifier qu'il n'y a pas d'erreur de login Discord déjà utilisé
-    if (discordMentionError) {
-      return;
-    }
-
-    // Pour les joueurs temporaires, vérifier les champs obligatoires
-    if (editingPlayer.isTemporary) {
-      if (!newPlayer.firstName.trim() || !newPlayer.name.trim()) {
-        alert("Le prénom et le nom sont obligatoires");
-        return;
-      }
-
-      if (newPlayer.license.trim() && licenseExistsForOther) {
-        alert(
-          "Un joueur avec ce numéro de licence existe déjà. Un joueur temporaire ne peut pas correspondre à un joueur existant."
-        );
-        return;
-      }
-    }
-
-    try {
-      setUpdating(true);
-
-      // Normaliser les noms
-      const normalizedName = newPlayer.name.trim().toUpperCase();
-      const normalizedFirstName =
-        newPlayer.firstName.trim().charAt(0).toUpperCase() +
-        newPlayer.firstName.trim().slice(1).toLowerCase();
-
-      // Si c'est un joueur temporaire, utiliser updateTemporaryPlayer
-      if (editingPlayer.isTemporary) {
-        await playerService.updateTemporaryPlayer(editingPlayer.id, {
-          firstName: normalizedFirstName,
-          name: normalizedName,
-          license: newPlayer.license.trim() || "",
-          gender: newPlayer.gender,
-          nationality: newPlayer.nationality,
-          isActive: false,
-          isTemporary: true,
-          isWheelchair: newPlayer.isWheelchair,
-          typeLicence: editingPlayer.typeLicence || "",
-          points: newPlayer.points || 500,
-          preferredTeams: editingPlayer.preferredTeams || {
-            masculine: [],
-            feminine: [],
-          },
-          participation: {
-            championnat: newPlayer.inChampionship,
-            championnatParis: false,
-          },
-          hasPlayedAtLeastOneMatch:
-            editingPlayer.hasPlayedAtLeastOneMatch || false,
-          hasPlayedAtLeastOneMatchParis:
-            editingPlayer.hasPlayedAtLeastOneMatchParis || false,
-          ...(discordMentions.length > 0 ? { discordMentions } : {}),
-        });
-      } else {
-        // Pour les joueurs non-temporaires, utiliser updatePlayer (seulement pour les mentions Discord)
-        console.log(
-          `[JoueursPage] Mise à jour des mentions Discord pour le joueur ${editingPlayer.id}`
-        );
-        console.log(
-          `[JoueursPage] État actuel de discordMentions:`,
-          discordMentions
-        );
-        // Toujours passer le tableau, même s'il est vide, pour que updatePlayer puisse le gérer
-        await playerService.updatePlayer(editingPlayer.id, {
-          discordMentions: discordMentions,
-          isWheelchair: newPlayer.isWheelchair,
-        });
-      }
-
-      // Mettre à jour l'état local sans recharger tous les joueurs
-      const updatePlayerInLists = (p: Player): Player => {
-        if (p.id === editingPlayer.id) {
-          const updatedPlayer: Player = {
-            ...p,
-            // Toujours mettre à jour discordMentions, même s'il est vide (pour refléter la suppression)
-            discordMentions: discordMentions.length > 0 ? discordMentions : [],
-            isWheelchair: newPlayer.isWheelchair,
-          };
-          return updatedPlayer;
-        }
-        return p;
-      };
-
-      const updatedPlayers = players.map(updatePlayerInLists);
-      const updatedPlayersWithoutLicense =
-        playersWithoutLicense.map(updatePlayerInLists);
-      const updatedTemporaryPlayers = temporaryPlayers.map(updatePlayerInLists);
-
-      setPlayers(updatedPlayers);
-      setPlayersWithoutLicense(updatedPlayersWithoutLicense);
-      setTemporaryPlayers(updatedTemporaryPlayers);
-
-      // Mettre à jour le store Zustand pour synchroniser avec les autres pages
-      if (!editingPlayer.isTemporary) {
-        // Pour les joueurs non-temporaires, mettre à jour le store
-        updatePlayerInStore(editingPlayer.id, {
-          discordMentions: discordMentions.length > 0 ? discordMentions : [],
-          isWheelchair: newPlayer.isWheelchair,
-        });
-      } else {
-        // Pour les joueurs temporaires, mettre à jour la participation si elle a changé
-        const updatedPlayer = updatedPlayers.find(
-          (p) => p.id === editingPlayer.id
-        );
-        if (updatedPlayer && updatedPlayer.participation) {
-          updatePlayerInStore(editingPlayer.id, {
-            participation: updatedPlayer.participation,
-            isWheelchair: newPlayer.isWheelchair,
-          });
-        }
-      }
-
-      // Recalculer les joueurs filtrés selon l'onglet actif
-      // Utiliser les listes déjà mises à jour
-      let sourcePlayers: Player[] = [];
-      switch (selectedTab) {
-        case 0:
-          sourcePlayers = updatedPlayers;
-          break;
-        case 1:
-          sourcePlayers = updatedPlayersWithoutLicense;
-          break;
-        case 2:
-          sourcePlayers = updatedTemporaryPlayers;
-          break;
-        default:
-          sourcePlayers = updatedPlayers;
-      }
-
-      // Appliquer les filtres
-      let filtered = sourcePlayers;
-      if (searchQuery.trim()) {
-        const normalized = searchQuery.trim().toLowerCase();
-        filtered = filtered.filter(
-          (p) =>
-            `${p.firstName} ${p.name}`.toLowerCase().includes(normalized) ||
-            p.license.toLowerCase().includes(normalized)
-        );
-      }
-
-      if (filters.gender) {
-        filtered = filtered.filter((p) => p.gender === filters.gender);
-      }
-
-      if (filters.nationality) {
-        filtered = filtered.filter(
-          (p) => p.nationality === filters.nationality
-        );
-      }
-
-      if (filters.hasPlayedMatch !== "") {
-        const hasPlayed = filters.hasPlayedMatch === "true";
-        filtered = filtered.filter(
-          (p) => (p.hasPlayedAtLeastOneMatch || false) === hasPlayed
-        );
-      }
-
-      if (filters.inChampionship !== "") {
-        const inChampionship = filters.inChampionship === "true";
-        filtered = filtered.filter(
-          (p) => (p.participation?.championnat || false) === inChampionship
-        );
-      }
-
-      if (filters.hasDiscord !== "") {
-        const hasDiscord = filters.hasDiscord === "true";
-        filtered = filtered.filter((p) => hasValidDiscord(p) === hasDiscord);
-      }
-
-      setFilteredPlayers(filtered);
-
-      // Réinitialiser le formulaire
-      setNewPlayer({
-        firstName: "",
-        name: "",
-        license: "",
-        gender: "M",
-        nationality: "FR",
-        points: 500,
-        inChampionship: true,
-        isWheelchair: false,
-      });
-      setDiscordMentions([]);
-      setEditingPlayer(null);
-      setLicenseExists(false);
-      setLicenseExistsForOther(false);
-      setEditDialogOpen(false);
-    } catch (error) {
-      console.error("Erreur lors de la mise à jour du joueur:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Erreur inconnue";
-      if (errorMessage.includes("existe déjà")) {
-        alert("Un joueur avec ce numéro de licence existe déjà");
-      } else {
-        alert(
-          `Erreur lors de la mise à jour du joueur${
-            editingPlayer?.isTemporary ? " temporaire" : ""
-          }`
-        );
-      }
-    } finally {
-      setUpdating(false);
-    }
-  };
-
-  const handleDeletePlayer = async (player: Player) => {
-    const confirmDelete = confirm(
-      `Êtes-vous sûr de vouloir supprimer le joueur temporaire ${player.firstName} ${player.name} ?`
-    );
-    if (!confirmDelete) return;
-
-    try {
-      setDeleting(player.id);
-      await playerService.deletePlayer(player.id);
-      // Retirer le joueur du store pour synchroniser avec les autres pages
-      removePlayerFromStore(player.id);
-      await loadPlayers();
-    } catch (error) {
-      console.error("Erreur lors de la suppression du joueur:", error);
-      alert("Erreur lors de la suppression du joueur");
-    } finally {
-      setDeleting(null);
-    }
-  };
+  const {
+    createDialogOpen,
+    setCreateDialogOpen,
+    editDialogOpen,
+    setEditDialogOpen,
+    editingPlayer,
+    setEditingPlayer,
+    creating,
+    updating,
+    deleting,
+    newPlayer,
+    setNewPlayer,
+    licenseExists,
+    setLicenseExists,
+    licenseExistsForOther,
+    setLicenseExistsForOther,
+    discordMentions,
+    setDiscordMentions,
+    discordMentionError,
+    setDiscordMentionError,
+    checkLicenseExists,
+    handleCreateTemporaryPlayer,
+    handleEditPlayer,
+    handleUpdatePlayer,
+    handleDeletePlayer,
+  } = useJoueursCrud({
+    playerService,
+    players,
+    playersWithoutLicense,
+    temporaryPlayers,
+    setPlayers,
+    setPlayersWithoutLicense,
+    setTemporaryPlayers,
+    updatePlayerInStore,
+    removePlayerFromStore,
+    loadPlayers,
+    recomputeFilteredPlayersFromLists,
+  });
 
   const handleToggleParticipationParis = async (
     player: Player,
@@ -857,63 +397,11 @@ export default function JoueursPage() {
         },
       });
 
-      // Recalculer les joueurs filtrés selon l'onglet actif
-      let sourcePlayers: Player[] = [];
-      switch (selectedTab) {
-        case 0:
-          sourcePlayers = updatedPlayers;
-          break;
-        case 1:
-          sourcePlayers = updatedPlayersWithoutLicense;
-          break;
-        case 2:
-          sourcePlayers = updatedTemporaryPlayers;
-          break;
-        default:
-          sourcePlayers = updatedPlayers;
-      }
-
-      // Appliquer les filtres
-      let filtered = sourcePlayers;
-      if (searchQuery.trim()) {
-        const normalized = searchQuery.trim().toLowerCase();
-        filtered = filtered.filter(
-          (p) =>
-            `${p.firstName} ${p.name}`.toLowerCase().includes(normalized) ||
-            p.license.toLowerCase().includes(normalized)
-        );
-      }
-
-      if (filters.gender) {
-        filtered = filtered.filter((p) => p.gender === filters.gender);
-      }
-
-      if (filters.nationality) {
-        filtered = filtered.filter(
-          (p) => p.nationality === filters.nationality
-        );
-      }
-
-      if (filters.hasPlayedMatch !== "") {
-        const hasPlayed = filters.hasPlayedMatch === "true";
-        filtered = filtered.filter(
-          (p) => (p.hasPlayedAtLeastOneMatch || false) === hasPlayed
-        );
-      }
-
-      if (filters.inChampionship !== "") {
-        const inChampionship = filters.inChampionship === "true";
-        filtered = filtered.filter(
-          (p) => (p.participation?.championnat || false) === inChampionship
-        );
-      }
-
-      if (filters.hasDiscord !== "") {
-        const hasDiscord = filters.hasDiscord === "true";
-        filtered = filtered.filter((p) => hasValidDiscord(p) === hasDiscord);
-      }
-
-      setFilteredPlayers(filtered);
+      recomputeFilteredPlayersFromLists(
+        updatedPlayers,
+        updatedPlayersWithoutLicense,
+        updatedTemporaryPlayers
+      );
     } catch (error) {
       console.error(
         "Erreur lors de la mise à jour de la participation:",
@@ -921,6 +409,46 @@ export default function JoueursPage() {
       );
     }
   };
+
+  const handleToggleWheelchair = useCallback(
+    async (player: Player) => {
+      const newValue = !player.isWheelchair;
+      const oldValue = player.isWheelchair;
+
+      const applyWheelchairState = (value: boolean) => {
+        setPlayers((prev) =>
+          prev.map((p) =>
+            p.id === player.id ? { ...p, isWheelchair: value } : p
+          )
+        );
+        setPlayersWithoutLicense((prev) =>
+          prev.map((p) =>
+            p.id === player.id ? { ...p, isWheelchair: value } : p
+          )
+        );
+        setTemporaryPlayers((prev) =>
+          prev.map((p) =>
+            p.id === player.id ? { ...p, isWheelchair: value } : p
+          )
+        );
+        setFilteredPlayers((prev) =>
+          prev.map((p) =>
+            p.id === player.id ? { ...p, isWheelchair: value } : p
+          )
+        );
+      };
+
+      applyWheelchairState(newValue ?? false);
+      try {
+        await playerService.updatePlayer(player.id, { isWheelchair: newValue });
+        updatePlayerInStore(player.id, { isWheelchair: newValue });
+      } catch (error) {
+        console.error("Erreur lors de la mise à jour du flag fauteuil:", error);
+        applyWheelchairState(oldValue ?? false);
+      }
+    },
+    [playerService, updatePlayerInStore]
+  );
 
   return (
     <AuthGuard
@@ -1106,599 +634,15 @@ export default function JoueursPage() {
               </Typography>
             </Box>
           ) : (
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Nom</TableCell>
-                    <TableCell>Licence</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Points</TableCell>
-                    <TableCell>Numéroté</TableCell>
-                    <TableCell>Genre</TableCell>
-                    <TableCell>Nationalité</TableCell>
-                    <TableCell>Participation</TableCell>
-                    <TableCell>Brûlage Masculin</TableCell>
-                    <TableCell>Brûlage Féminin</TableCell>
-                    <TableCell>Brûlage (Paris)</TableCell>
-                    <TableCell>Fauteuil</TableCell>
-                    <TableCell>Discord</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredPlayers.map((player) => (
-                    <TableRow key={player.id}>
-                      <TableCell>
-                        <Box display="flex" alignItems="center" gap={1}>
-                          <Typography variant="body2" fontWeight="medium">
-                            {player.firstName} {player.name}
-                          </Typography>
-                          {player.hasPlayedAtLeastOneMatch && (
-                            <Chip
-                              icon={<SportsTennisIcon />}
-                              label="A joué"
-                              size="small"
-                              color="success"
-                              variant="outlined"
-                              title="Ce joueur a participé à au moins un match"
-                            />
-                          )}
-                          {player.hasPlayedAtLeastOneMatchParis && (
-                            <Chip
-                              icon={<SportsTennisIcon />}
-                              label="A joué Paris"
-                              size="small"
-                              color="secondary"
-                              variant="outlined"
-                              title="Ce joueur a participé à au moins un match au championnat de Paris"
-                            />
-                          )}
-                        </Box>
-                      </TableCell>
-                      <TableCell>{player.license}</TableCell>
-                      <TableCell>
-                        <Chip
-                          label={player.typeLicence || "N/A"}
-                          color={
-                            player.typeLicence === "T"
-                              ? "success"
-                              : player.typeLicence === "P"
-                              ? "info"
-                              : player.typeLicence === "A"
-                              ? "warning"
-                              : "default"
-                          }
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" fontWeight="medium">
-                          {player.points || 0}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        {player.place ? (
-                          <Chip
-                            label={`N°${player.place}`}
-                            color="primary"
-                            size="small"
-                          />
-                        ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            -
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={player.gender === "M" ? "Masculin" : "Féminin"}
-                          color={
-                            player.gender === "M" ? "primary" : "secondary"
-                          }
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={
-                            player.nationality === "FR"
-                              ? "Française"
-                              : player.nationality === "C"
-                              ? "Européenne"
-                              : "Étrangère"
-                          }
-                          variant="outlined"
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Box display="flex" flexDirection="column" gap={1}>
-                          <Box display="flex" alignItems="center" gap={1}>
-                            <Switch
-                              size="small"
-                              checked={
-                                player.participation?.championnat || false
-                              }
-                              onChange={(e) =>
-                                handleToggleParticipation(
-                                  player,
-                                  e.target.checked
-                                )
-                              }
-                              title={
-                                player.participation?.championnat
-                                  ? "Participe au championnat"
-                                  : "Ne participe pas au championnat"
-                              }
-                            />
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              {player.participation?.championnat
-                                ? "Oui"
-                                : "Non"}
-                            </Typography>
-                          </Box>
-                          <Box display="flex" alignItems="center" gap={1}>
-                            <Switch
-                              size="small"
-                              checked={
-                                player.participation?.championnatParis || false
-                              }
-                              onChange={(e) =>
-                                handleToggleParticipationParis(
-                                  player,
-                                  e.target.checked
-                                )
-                              }
-                              title={
-                                player.participation?.championnatParis
-                                  ? "Participe au championnat de Paris"
-                                  : "Ne participe pas au championnat de Paris"
-                              }
-                            />
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              Paris:{" "}
-                              {player.participation?.championnatParis
-                                ? "Oui"
-                                : "Non"}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        {(() => {
-                          const burnedTeam =
-                            player.highestMasculineTeamNumberByPhase?.[
-                              currentPhase
-                            ];
-                          const matchesByTeam =
-                            player.masculineMatchesByTeamByPhase?.[
-                              currentPhase
-                            ];
-                          const hasData =
-                            burnedTeam !== undefined ||
-                            (matchesByTeam &&
-                              Object.keys(matchesByTeam).length > 0);
-
-                          return hasData ? (
-                            <Tooltip
-                              title={
-                                <Box>
-                                  {burnedTeam ? (
-                                    <>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{ mb: 1, fontWeight: "bold" }}
-                                      >
-                                        Brûlé dans l&apos;équipe {burnedTeam}{" "}
-                                        (Masculin - Phase {currentPhase})
-                                      </Typography>
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ display: "block", mb: 1 }}
-                                      >
-                                        Ne peut pas jouer dans les équipes
-                                        inférieures
-                                      </Typography>
-                                    </>
-                                  ) : null}
-                                  {matchesByTeam &&
-                                  Object.keys(matchesByTeam).length > 0 ? (
-                                    <>
-                                      <Typography
-                                        variant="caption"
-                                        sx={{
-                                          display: "block",
-                                          mb: 0.5,
-                                          fontWeight: "bold",
-                                        }}
-                                      >
-                                        Matchs joués par équipe (Masculin -
-                                        Phase {currentPhase}):
-                                      </Typography>
-                                      <Box component="ul" sx={{ m: 0, pl: 2 }}>
-                                        {Object.entries(matchesByTeam)
-                                          .sort(
-                                            ([a], [b]) => Number(a) - Number(b)
-                                          )
-                                          .map(([team, count]) => (
-                                            <Typography
-                                              key={team}
-                                              component="li"
-                                              variant="caption"
-                                              sx={{ display: "list-item" }}
-                                            >
-                                              Équipe {team}: {count} match
-                                              {count > 1 ? "s" : ""}
-                                            </Typography>
-                                          ))}
-                                      </Box>
-                                    </>
-                                  ) : null}
-                                </Box>
-                              }
-                              arrow
-                              placement="top"
-                            >
-                              <Chip
-                                label={
-                                  burnedTeam
-                                    ? `Équipe ${burnedTeam}`
-                                    : "Voir stats"
-                                }
-                                color="warning"
-                                size="small"
-                                variant="outlined"
-                              />
-                            </Tooltip>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">
-                              -
-                            </Typography>
-                          );
-                        })()}
-                      </TableCell>
-                      <TableCell>
-                        {(() => {
-                          const burnedTeam =
-                            player.highestFeminineTeamNumberByPhase?.[
-                              currentPhase
-                            ];
-                          const matchesByTeam =
-                            player.feminineMatchesByTeamByPhase?.[currentPhase];
-                          const hasData =
-                            burnedTeam !== undefined ||
-                            (matchesByTeam &&
-                              Object.keys(matchesByTeam).length > 0);
-
-                          return hasData ? (
-                            <Tooltip
-                              title={
-                                <Box>
-                                  {burnedTeam ? (
-                                    <>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{ mb: 1, fontWeight: "bold" }}
-                                      >
-                                        Brûlé dans l&apos;équipe {burnedTeam}{" "}
-                                        (Féminin - Phase {currentPhase})
-                                      </Typography>
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ display: "block", mb: 1 }}
-                                      >
-                                        Ne peut pas jouer dans les équipes
-                                        inférieures
-                                      </Typography>
-                                    </>
-                                  ) : null}
-                                  {matchesByTeam &&
-                                  Object.keys(matchesByTeam).length > 0 ? (
-                                    <>
-                                      <Typography
-                                        variant="caption"
-                                        sx={{
-                                          display: "block",
-                                          mb: 0.5,
-                                          fontWeight: "bold",
-                                        }}
-                                      >
-                                        Matchs joués par équipe (Féminin - Phase{" "}
-                                        {currentPhase}):
-                                      </Typography>
-                                      <Box component="ul" sx={{ m: 0, pl: 2 }}>
-                                        {Object.entries(matchesByTeam)
-                                          .sort(
-                                            ([a], [b]) => Number(a) - Number(b)
-                                          )
-                                          .map(([team, count]) => (
-                                            <Typography
-                                              key={team}
-                                              component="li"
-                                              variant="caption"
-                                              sx={{ display: "list-item" }}
-                                            >
-                                              Équipe {team}: {count} match
-                                              {count > 1 ? "s" : ""}
-                                            </Typography>
-                                          ))}
-                                      </Box>
-                                    </>
-                                  ) : null}
-                                </Box>
-                              }
-                              arrow
-                              placement="top"
-                            >
-                              <Chip
-                                label={
-                                  burnedTeam
-                                    ? `Équipe ${burnedTeam}`
-                                    : "Voir stats"
-                                }
-                                color="secondary"
-                                size="small"
-                                variant="outlined"
-                              />
-                            </Tooltip>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">
-                              -
-                            </Typography>
-                          );
-                        })()}
-                      </TableCell>
-                      <TableCell>
-                        {(() => {
-                          const burnedTeam =
-                            player.highestTeamNumberByPhaseParis?.[
-                              currentPhase
-                            ];
-                          const matchesByTeam =
-                            player.matchesByTeamByPhaseParis?.[currentPhase];
-                          const hasData =
-                            burnedTeam !== undefined ||
-                            (matchesByTeam &&
-                              Object.keys(matchesByTeam).length > 0);
-
-                          return hasData ? (
-                            <Tooltip
-                              title={
-                                <Box>
-                                  {burnedTeam ? (
-                                    <>
-                                      <Typography
-                                        variant="body2"
-                                        sx={{ mb: 1, fontWeight: "bold" }}
-                                      >
-                                        Brûlé dans l&apos;équipe {burnedTeam}{" "}
-                                        (Paris - Phase {currentPhase})
-                                      </Typography>
-                                      <Typography
-                                        variant="caption"
-                                        sx={{ display: "block", mb: 1 }}
-                                      >
-                                        Ne peut pas jouer dans les équipes
-                                        inférieures
-                                      </Typography>
-                                    </>
-                                  ) : null}
-                                  {matchesByTeam &&
-                                  Object.keys(matchesByTeam).length > 0 ? (
-                                    <>
-                                      <Typography
-                                        variant="caption"
-                                        sx={{
-                                          display: "block",
-                                          mb: 0.5,
-                                          fontWeight: "bold",
-                                        }}
-                                      >
-                                        Matchs joués par équipe (Paris - Phase{" "}
-                                        {currentPhase}):
-                                      </Typography>
-                                      <Box component="ul" sx={{ m: 0, pl: 2 }}>
-                                        {Object.entries(matchesByTeam)
-                                          .sort(
-                                            ([a], [b]) => Number(a) - Number(b)
-                                          )
-                                          .map(([team, count]) => (
-                                            <Typography
-                                              key={team}
-                                              component="li"
-                                              variant="caption"
-                                              sx={{ display: "list-item" }}
-                                            >
-                                              Équipe {team}: {count} match
-                                              {count > 1 ? "s" : ""}
-                                            </Typography>
-                                          ))}
-                                      </Box>
-                                    </>
-                                  ) : null}
-                                </Box>
-                              }
-                              arrow
-                              placement="top"
-                            >
-                              <Chip
-                                label={
-                                  burnedTeam
-                                    ? `Équipe ${burnedTeam}`
-                                    : "Voir stats"
-                                }
-                                color="secondary"
-                                size="small"
-                                variant="outlined"
-                              />
-                            </Tooltip>
-                          ) : (
-                            <Typography variant="body2" color="text.secondary">
-                              -
-                            </Typography>
-                          );
-                        })()}
-                      </TableCell>
-                      <TableCell>
-                        <Tooltip
-                          title={
-                            player.isWheelchair
-                              ? "Joueur en fauteuil"
-                              : "Cliquer pour indiquer que le joueur est en fauteuil"
-                          }
-                        >
-                          <IconButton
-                            onClick={async () => {
-                              const newValue = !player.isWheelchair;
-                              const oldValue = player.isWheelchair;
-                              // Mise à jour optimiste : mettre à jour l'état local immédiatement
-                              const updateLocalState = () => {
-                                setPlayers((prev) =>
-                                  prev.map((p) =>
-                                    p.id === player.id
-                                      ? {
-                                          ...p,
-                                          isWheelchair: newValue ?? false,
-                                        }
-                                      : p
-                                  )
-                                );
-                                setPlayersWithoutLicense((prev) =>
-                                  prev.map((p) =>
-                                    p.id === player.id
-                                      ? {
-                                          ...p,
-                                          isWheelchair: newValue ?? false,
-                                        }
-                                      : p
-                                  )
-                                );
-                                setTemporaryPlayers((prev) =>
-                                  prev.map((p) =>
-                                    p.id === player.id
-                                      ? {
-                                          ...p,
-                                          isWheelchair: newValue ?? false,
-                                        }
-                                      : p
-                                  )
-                                );
-                                // Mettre à jour filteredPlayers immédiatement
-                                setFilteredPlayers((prev) =>
-                                  prev.map((p) =>
-                                    p.id === player.id
-                                      ? {
-                                          ...p,
-                                          isWheelchair: newValue ?? false,
-                                        }
-                                      : p
-                                  )
-                                );
-                              };
-                              // Mettre à jour l'état local immédiatement
-                              updateLocalState();
-                              try {
-                                await playerService.updatePlayer(player.id, {
-                                  isWheelchair: newValue,
-                                });
-                                // Mettre à jour le store Zustand après succès
-                                updatePlayerInStore(player.id, {
-                                  isWheelchair: newValue,
-                                });
-                              } catch (error) {
-                                // En cas d'erreur, restaurer l'ancienne valeur
-                                console.error(
-                                  "Erreur lors de la mise à jour du flag fauteuil:",
-                                  error
-                                );
-                                setPlayers((prev) =>
-                                  prev.map((p) =>
-                                    p.id === player.id
-                                      ? {
-                                          ...p,
-                                          isWheelchair: oldValue ?? false,
-                                        }
-                                      : p
-                                  )
-                                );
-                                setPlayersWithoutLicense((prev) =>
-                                  prev.map((p) =>
-                                    p.id === player.id
-                                      ? {
-                                          ...p,
-                                          isWheelchair: oldValue ?? false,
-                                        }
-                                      : p
-                                  )
-                                );
-                                setTemporaryPlayers((prev) =>
-                                  prev.map((p) =>
-                                    p.id === player.id
-                                      ? {
-                                          ...p,
-                                          isWheelchair: oldValue ?? false,
-                                        }
-                                      : p
-                                  )
-                                );
-                                setFilteredPlayers((prev) =>
-                                  prev.map((p) =>
-                                    p.id === player.id
-                                      ? {
-                                          ...p,
-                                          isWheelchair: oldValue ?? false,
-                                        }
-                                      : p
-                                  )
-                                );
-                              }
-                            }}
-                            size="small"
-                            sx={{
-                              color: player.isWheelchair
-                                ? "primary.main"
-                                : "action.disabled",
-                            }}
-                          >
-                            <AccessibleIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          badgeContent={player.discordMentions?.length || 0}
-                          color={
-                            hasInvalidDiscordMentions(player)
-                              ? "warning"
-                              : "primary"
-                          }
-                          overlap="rectangular"
-                          anchorOrigin={{
-                            vertical: "top",
-                            horizontal: "right",
-                          }}
-                        >
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            startIcon={<AlternateEmailIcon />}
-                            onClick={() => handleEditPlayer(player)}
-                          >
-                            Discord
-                          </Button>
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+            <PlayersActiveTable
+              players={filteredPlayers}
+              currentPhase={burnoutPhase}
+              hasInvalidDiscordMentions={hasInvalidDiscordMentions}
+              onEditPlayer={handleEditPlayer}
+              onToggleParticipation={handleToggleParticipation}
+              onToggleParticipationParis={handleToggleParticipationParis}
+              onToggleWheelchair={handleToggleWheelchair}
+            />
           )}
         </TabPanel>
 
@@ -1721,327 +665,15 @@ export default function JoueursPage() {
               </Typography>
             </Box>
           ) : (
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Nom</TableCell>
-                    <TableCell>Licence</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Points</TableCell>
-                    <TableCell>Numéroté</TableCell>
-                    <TableCell>Genre</TableCell>
-                    <TableCell>Nationalité</TableCell>
-                    <TableCell>Participation</TableCell>
-                    <TableCell>Fauteuil</TableCell>
-                    <TableCell>Discord</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredPlayers.map((player) => (
-                    <TableRow key={player.id}>
-                      <TableCell>
-                        <Box display="flex" alignItems="center" gap={1}>
-                          <Typography variant="body2" fontWeight="medium">
-                            {player.firstName} {player.name}
-                          </Typography>
-                          {player.hasPlayedAtLeastOneMatch && (
-                            <Chip
-                              icon={<SportsTennisIcon />}
-                              label="A joué"
-                              size="small"
-                              color="success"
-                              variant="outlined"
-                              title="Ce joueur a participé à au moins un match"
-                            />
-                          )}
-                          {player.hasPlayedAtLeastOneMatchParis && (
-                            <Chip
-                              icon={<SportsTennisIcon />}
-                              label="A joué Paris"
-                              size="small"
-                              color="secondary"
-                              variant="outlined"
-                              title="Ce joueur a participé à au moins un match au championnat de Paris"
-                            />
-                          )}
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label="Sans licence"
-                          color="warning"
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={player.typeLicence || "N/A"}
-                          color={
-                            player.typeLicence === "T"
-                              ? "success"
-                              : player.typeLicence === "P"
-                              ? "info"
-                              : player.typeLicence === "A"
-                              ? "warning"
-                              : "default"
-                          }
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" fontWeight="medium">
-                          {player.points || 0}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        {player.place ? (
-                          <Chip
-                            label={`N°${player.place}`}
-                            color="primary"
-                            size="small"
-                          />
-                        ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            -
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={player.gender === "M" ? "Masculin" : "Féminin"}
-                          color={
-                            player.gender === "M" ? "primary" : "secondary"
-                          }
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={
-                            player.nationality === "FR"
-                              ? "Française"
-                              : player.nationality === "C"
-                              ? "Européenne"
-                              : "Étrangère"
-                          }
-                          variant="outlined"
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Box display="flex" flexDirection="column" gap={1}>
-                          <Box display="flex" alignItems="center" gap={1}>
-                            <Switch
-                              size="small"
-                              checked={
-                                player.participation?.championnat || false
-                              }
-                              onChange={(e) =>
-                                handleToggleParticipation(
-                                  player,
-                                  e.target.checked
-                                )
-                              }
-                              title={
-                                player.participation?.championnat
-                                  ? "Participe au championnat"
-                                  : "Ne participe pas au championnat"
-                              }
-                            />
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              {player.participation?.championnat
-                                ? "Oui"
-                                : "Non"}
-                            </Typography>
-                          </Box>
-                          <Box display="flex" alignItems="center" gap={1}>
-                            <Switch
-                              size="small"
-                              checked={
-                                player.participation?.championnatParis || false
-                              }
-                              onChange={(e) =>
-                                handleToggleParticipationParis(
-                                  player,
-                                  e.target.checked
-                                )
-                              }
-                              title={
-                                player.participation?.championnatParis
-                                  ? "Participe au championnat de Paris"
-                                  : "Ne participe pas au championnat de Paris"
-                              }
-                            />
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              Paris:{" "}
-                              {player.participation?.championnatParis
-                                ? "Oui"
-                                : "Non"}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Tooltip
-                          title={
-                            player.isWheelchair
-                              ? "Joueur en fauteuil"
-                              : "Cliquer pour indiquer que le joueur est en fauteuil"
-                          }
-                        >
-                          <IconButton
-                            onClick={async () => {
-                              const newValue = !player.isWheelchair;
-                              const oldValue = player.isWheelchair;
-                              // Mise à jour optimiste : mettre à jour l'état local immédiatement
-                              const updateLocalState = () => {
-                                setPlayers((prev) =>
-                                  prev.map((p) =>
-                                    p.id === player.id
-                                      ? {
-                                          ...p,
-                                          isWheelchair: newValue ?? false,
-                                        }
-                                      : p
-                                  )
-                                );
-                                setPlayersWithoutLicense((prev) =>
-                                  prev.map((p) =>
-                                    p.id === player.id
-                                      ? {
-                                          ...p,
-                                          isWheelchair: newValue ?? false,
-                                        }
-                                      : p
-                                  )
-                                );
-                                setTemporaryPlayers((prev) =>
-                                  prev.map((p) =>
-                                    p.id === player.id
-                                      ? {
-                                          ...p,
-                                          isWheelchair: newValue ?? false,
-                                        }
-                                      : p
-                                  )
-                                );
-                                // Mettre à jour filteredPlayers immédiatement
-                                setFilteredPlayers((prev) =>
-                                  prev.map((p) =>
-                                    p.id === player.id
-                                      ? {
-                                          ...p,
-                                          isWheelchair: newValue ?? false,
-                                        }
-                                      : p
-                                  )
-                                );
-                              };
-                              // Mettre à jour l'état local immédiatement
-                              updateLocalState();
-                              try {
-                                await playerService.updatePlayer(player.id, {
-                                  isWheelchair: newValue,
-                                });
-                                // Mettre à jour le store Zustand après succès
-                                updatePlayerInStore(player.id, {
-                                  isWheelchair: newValue,
-                                });
-                              } catch (error) {
-                                // En cas d'erreur, restaurer l'ancienne valeur
-                                console.error(
-                                  "Erreur lors de la mise à jour du flag fauteuil:",
-                                  error
-                                );
-                                setPlayers((prev) =>
-                                  prev.map((p) =>
-                                    p.id === player.id
-                                      ? {
-                                          ...p,
-                                          isWheelchair: oldValue ?? false,
-                                        }
-                                      : p
-                                  )
-                                );
-                                setPlayersWithoutLicense((prev) =>
-                                  prev.map((p) =>
-                                    p.id === player.id
-                                      ? {
-                                          ...p,
-                                          isWheelchair: oldValue ?? false,
-                                        }
-                                      : p
-                                  )
-                                );
-                                setTemporaryPlayers((prev) =>
-                                  prev.map((p) =>
-                                    p.id === player.id
-                                      ? {
-                                          ...p,
-                                          isWheelchair: oldValue ?? false,
-                                        }
-                                      : p
-                                  )
-                                );
-                                setFilteredPlayers((prev) =>
-                                  prev.map((p) =>
-                                    p.id === player.id
-                                      ? {
-                                          ...p,
-                                          isWheelchair: oldValue ?? false,
-                                        }
-                                      : p
-                                  )
-                                );
-                              }
-                            }}
-                            size="small"
-                            sx={{
-                              color: player.isWheelchair
-                                ? "primary.main"
-                                : "action.disabled",
-                            }}
-                          >
-                            <AccessibleIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          badgeContent={player.discordMentions?.length || 0}
-                          color={
-                            hasInvalidDiscordMentions(player)
-                              ? "warning"
-                              : "primary"
-                          }
-                          overlap="rectangular"
-                          anchorOrigin={{
-                            vertical: "top",
-                            horizontal: "right",
-                          }}
-                        >
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            startIcon={<AlternateEmailIcon />}
-                            onClick={() => handleEditPlayer(player)}
-                          >
-                            Discord
-                          </Button>
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+            <PlayersBasicTable
+              players={filteredPlayers}
+              licenseMode="withoutLicense"
+              hasInvalidDiscordMentions={hasInvalidDiscordMentions}
+              onEditPlayer={handleEditPlayer}
+              onToggleParticipation={handleToggleParticipation}
+              onToggleParticipationParis={handleToggleParticipationParis}
+              onToggleWheelchair={handleToggleWheelchair}
+            />
           )}
         </TabPanel>
 
@@ -2092,348 +724,18 @@ export default function JoueursPage() {
               </Typography>
             </Box>
           ) : (
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Nom</TableCell>
-                    <TableCell>Licence</TableCell>
-                    <TableCell>Type</TableCell>
-                    <TableCell>Points</TableCell>
-                    <TableCell>Numéroté</TableCell>
-                    <TableCell>Genre</TableCell>
-                    <TableCell>Nationalité</TableCell>
-                    <TableCell>Participation</TableCell>
-                    <TableCell>Fauteuil</TableCell>
-                    <TableCell>Discord</TableCell>
-                    <TableCell>Actions</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredPlayers.map((player) => (
-                    <TableRow key={player.id}>
-                      <TableCell>
-                        <Box display="flex" alignItems="center" gap={1}>
-                          <Typography variant="body2" fontWeight="medium">
-                            {player.firstName} {player.name}
-                          </Typography>
-                          {player.hasPlayedAtLeastOneMatch && (
-                            <Chip
-                              icon={<SportsTennisIcon />}
-                              label="A joué"
-                              size="small"
-                              color="success"
-                              variant="outlined"
-                              title="Ce joueur a participé à au moins un match"
-                            />
-                          )}
-                          {player.hasPlayedAtLeastOneMatchParis && (
-                            <Chip
-                              icon={<SportsTennisIcon />}
-                              label="A joué Paris"
-                              size="small"
-                              color="secondary"
-                              variant="outlined"
-                              title="Ce joueur a participé à au moins un match au championnat de Paris"
-                            />
-                          )}
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Chip label="Temporaire" color="error" size="small" />
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={player.typeLicence || "N/A"}
-                          color={
-                            player.typeLicence === "T"
-                              ? "success"
-                              : player.typeLicence === "P"
-                              ? "info"
-                              : player.typeLicence === "A"
-                              ? "warning"
-                              : "default"
-                          }
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" fontWeight="medium">
-                          {player.points || 0}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        {player.place ? (
-                          <Chip
-                            label={`N°${player.place}`}
-                            color="primary"
-                            size="small"
-                          />
-                        ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            -
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={player.gender === "M" ? "Masculin" : "Féminin"}
-                          color={
-                            player.gender === "M" ? "primary" : "secondary"
-                          }
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={
-                            player.nationality === "FR"
-                              ? "Française"
-                              : player.nationality === "C"
-                              ? "Européenne"
-                              : "Étrangère"
-                          }
-                          variant="outlined"
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Box display="flex" flexDirection="column" gap={1}>
-                          <Box display="flex" alignItems="center" gap={1}>
-                            <Switch
-                              size="small"
-                              checked={
-                                player.participation?.championnat || false
-                              }
-                              onChange={(e) =>
-                                handleToggleParticipation(
-                                  player,
-                                  e.target.checked
-                                )
-                              }
-                              title={
-                                player.participation?.championnat
-                                  ? "Participe au championnat"
-                                  : "Ne participe pas au championnat"
-                              }
-                            />
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              {player.participation?.championnat
-                                ? "Oui"
-                                : "Non"}
-                            </Typography>
-                          </Box>
-                          <Box display="flex" alignItems="center" gap={1}>
-                            <Switch
-                              size="small"
-                              checked={
-                                player.participation?.championnatParis || false
-                              }
-                              onChange={(e) =>
-                                handleToggleParticipationParis(
-                                  player,
-                                  e.target.checked
-                                )
-                              }
-                              title={
-                                player.participation?.championnatParis
-                                  ? "Participe au championnat de Paris"
-                                  : "Ne participe pas au championnat de Paris"
-                              }
-                            />
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              Paris:{" "}
-                              {player.participation?.championnatParis
-                                ? "Oui"
-                                : "Non"}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Tooltip
-                          title={
-                            player.isWheelchair
-                              ? "Joueur en fauteuil"
-                              : "Cliquer pour indiquer que le joueur est en fauteuil"
-                          }
-                        >
-                          <IconButton
-                            onClick={async () => {
-                              const newValue = !player.isWheelchair;
-                              const oldValue = player.isWheelchair;
-                              // Mise à jour optimiste : mettre à jour l'état local immédiatement
-                              const updateLocalState = () => {
-                                setPlayers((prev) =>
-                                  prev.map((p) =>
-                                    p.id === player.id
-                                      ? {
-                                          ...p,
-                                          isWheelchair: newValue ?? false,
-                                        }
-                                      : p
-                                  )
-                                );
-                                setPlayersWithoutLicense((prev) =>
-                                  prev.map((p) =>
-                                    p.id === player.id
-                                      ? {
-                                          ...p,
-                                          isWheelchair: newValue ?? false,
-                                        }
-                                      : p
-                                  )
-                                );
-                                setTemporaryPlayers((prev) =>
-                                  prev.map((p) =>
-                                    p.id === player.id
-                                      ? {
-                                          ...p,
-                                          isWheelchair: newValue ?? false,
-                                        }
-                                      : p
-                                  )
-                                );
-                                // Mettre à jour filteredPlayers immédiatement
-                                setFilteredPlayers((prev) =>
-                                  prev.map((p) =>
-                                    p.id === player.id
-                                      ? {
-                                          ...p,
-                                          isWheelchair: newValue ?? false,
-                                        }
-                                      : p
-                                  )
-                                );
-                              };
-                              // Mettre à jour l'état local immédiatement
-                              updateLocalState();
-                              try {
-                                await playerService.updatePlayer(player.id, {
-                                  isWheelchair: newValue,
-                                });
-                                // Mettre à jour le store Zustand après succès
-                                updatePlayerInStore(player.id, {
-                                  isWheelchair: newValue,
-                                });
-                              } catch (error) {
-                                // En cas d'erreur, restaurer l'ancienne valeur
-                                console.error(
-                                  "Erreur lors de la mise à jour du flag fauteuil:",
-                                  error
-                                );
-                                setPlayers((prev) =>
-                                  prev.map((p) =>
-                                    p.id === player.id
-                                      ? {
-                                          ...p,
-                                          isWheelchair: oldValue ?? false,
-                                        }
-                                      : p
-                                  )
-                                );
-                                setPlayersWithoutLicense((prev) =>
-                                  prev.map((p) =>
-                                    p.id === player.id
-                                      ? {
-                                          ...p,
-                                          isWheelchair: oldValue ?? false,
-                                        }
-                                      : p
-                                  )
-                                );
-                                setTemporaryPlayers((prev) =>
-                                  prev.map((p) =>
-                                    p.id === player.id
-                                      ? {
-                                          ...p,
-                                          isWheelchair: oldValue ?? false,
-                                        }
-                                      : p
-                                  )
-                                );
-                                setFilteredPlayers((prev) =>
-                                  prev.map((p) =>
-                                    p.id === player.id
-                                      ? {
-                                          ...p,
-                                          isWheelchair: oldValue ?? false,
-                                        }
-                                      : p
-                                  )
-                                );
-                              }
-                            }}
-                            size="small"
-                            sx={{
-                              color: player.isWheelchair
-                                ? "primary.main"
-                                : "action.disabled",
-                            }}
-                          >
-                            <AccessibleIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          badgeContent={player.discordMentions?.length || 0}
-                          color={
-                            hasInvalidDiscordMentions(player)
-                              ? "warning"
-                              : "primary"
-                          }
-                          overlap="rectangular"
-                          anchorOrigin={{
-                            vertical: "top",
-                            horizontal: "right",
-                          }}
-                        >
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            startIcon={<AlternateEmailIcon />}
-                            onClick={() => handleEditPlayer(player)}
-                          >
-                            Discord
-                          </Button>
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Box display="flex" gap={1}>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            startIcon={<EditIcon />}
-                            onClick={() => handleEditPlayer(player)}
-                          >
-                            Modifier
-                          </Button>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            color="error"
-                            startIcon={<DeleteIcon />}
-                            onClick={() => handleDeletePlayer(player)}
-                            disabled={deleting === player.id}
-                          >
-                            {deleting === player.id
-                              ? "Suppression..."
-                              : "Supprimer"}
-                          </Button>
-                        </Box>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+            <PlayersBasicTable
+              players={filteredPlayers}
+              licenseMode="temporary"
+              showActions
+              deletingPlayerId={deleting}
+              hasInvalidDiscordMentions={hasInvalidDiscordMentions}
+              onEditPlayer={handleEditPlayer}
+              onDeletePlayer={handleDeletePlayer}
+              onToggleParticipation={handleToggleParticipation}
+              onToggleParticipationParis={handleToggleParticipationParis}
+              onToggleWheelchair={handleToggleWheelchair}
+            />
           )}
         </TabPanel>
 
@@ -2577,140 +879,13 @@ export default function JoueursPage() {
                   <FormLabel>Participation au championnat</FormLabel>
                 </Box>
               </FormControl>
-              <Autocomplete
-                multiple
-                options={discordMembers}
-                getOptionLabel={(option) => option.displayName}
-                value={discordMentions
-                  .map((id) => discordMembers.find((m) => m.id === id))
-                  .filter(
-                    (
-                      m
-                    ): m is {
-                      id: string;
-                      username: string;
-                      displayName: string;
-                    } => m !== undefined
-                  )}
-                onChange={(_, newValue) => {
-                  setDiscordMentionError(null);
-                  const newIds = newValue.map((m) => m.id);
-                  // Vérifier si un des nouveaux membres est déjà utilisé
-                  for (const member of newValue) {
-                    if (!discordMentions.includes(member.id)) {
-                      const check = isDiscordIdUsedByOtherPlayer(member.id);
-                      if (check.used) {
-                        setDiscordMentionError(
-                          `Le login Discord "${member.displayName}" est déjà associé au joueur "${check.playerName}".`
-                        );
-                        return;
-                      }
-                    }
-                  }
-                  setDiscordMentions(newIds);
-                }}
-                filterOptions={(options, { inputValue }) => {
-                  const query = inputValue.toLowerCase();
-                  return options.filter((member) => {
-                    // Exclure les membres déjà sélectionnés
-                    if (discordMentions.includes(member.id)) {
-                      return false;
-                    }
-                    // Filtrer par nom d'affichage ou username
-                    return (
-                      member.displayName.toLowerCase().includes(query) ||
-                      member.username.toLowerCase().includes(query)
-                    );
-                  });
-                }}
-                renderOption={(props, option) => {
-                  const check = isDiscordIdUsedByOtherPlayer(option.id);
-                  const isUsed = check.used;
-                  return (
-                    <Box component="li" {...props} key={option.id}>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          width: 32,
-                          height: 32,
-                          borderRadius: "50%",
-                          backgroundColor: isUsed
-                            ? "error.main"
-                            : "primary.main",
-                          color: "primary.contrastText",
-                          mr: 1.5,
-                          fontSize: "0.875rem",
-                          fontWeight: 600,
-                        }}
-                      >
-                        {option.displayName.charAt(0).toUpperCase()}
-                      </Box>
-                      <Box sx={{ flex: 1 }}>
-                        <Typography variant="body2" fontWeight={500}>
-                          {option.displayName}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          @{option.username}
-                          {isUsed && ` - Déjà utilisé par ${check.playerName}`}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  );
-                }}
-                renderInput={(params) => {
-                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                  const { size, InputLabelProps, ...restParams } = params;
-                  return (
-                    <TextField
-                      {...restParams}
-                      // @ts-expect-error - InputLabelProps from Autocomplete has incompatible types with TextField
-                      InputLabelProps={InputLabelProps}
-                      label="Discord (optionnel)"
-                      placeholder="Rechercher un membre Discord..."
-                      helperText={
-                        discordMentionError ||
-                        (discordMentions.some(
-                          (id) => !discordMembers.find((m) => m.id === id)
-                        )
-                          ? "Certains IDs Discord ne correspondent plus à un utilisateur du serveur (indiqués en rouge ci-dessous)"
-                          : "Recherchez et sélectionnez les membres Discord à associer à ce joueur")
-                      }
-                      error={!!discordMentionError}
-                    />
-                  );
-                }}
-                renderTags={(value, getTagProps) => (
-                  <Box
-                    sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 1 }}
-                  >
-                    {value.map((member, index) => {
-                      const isInvalid = !discordMembers.find(
-                        (m) => m.id === member.id
-                      );
-                      return (
-                        <Chip
-                          {...getTagProps({ index })}
-                          key={member.id}
-                          label={member.displayName}
-                          {...(isInvalid ? { icon: <WarningIcon /> } : {})}
-                          color={isInvalid ? "error" : "default"}
-                          variant={isInvalid ? "outlined" : "filled"}
-                          size="small"
-                          {...(isInvalid
-                            ? {
-                                title:
-                                  "Cet ID Discord ne correspond plus à un utilisateur du serveur",
-                              }
-                            : {})}
-                        />
-                      );
-                    })}
-                  </Box>
-                )}
-                noOptionsText="Aucun membre trouvé"
-                loading={discordMembers.length === 0}
+              <DiscordMentionsAutocomplete
+                members={discordMembers}
+                selectedIds={discordMentions}
+                onSelectedIdsChange={setDiscordMentions}
+                error={discordMentionError}
+                onErrorChange={setDiscordMentionError}
+                findUsage={isDiscordIdUsedByOtherPlayer}
               />
             </Box>
           </DialogContent>
@@ -2879,146 +1054,14 @@ export default function JoueursPage() {
                   {editingPlayer?.license})
                 </Typography>
               )}
-              <Autocomplete
-                multiple
-                options={discordMembers}
-                getOptionLabel={(option) => option.displayName}
-                value={discordMentions
-                  .map((id) => discordMembers.find((m) => m.id === id))
-                  .filter(
-                    (
-                      m
-                    ): m is {
-                      id: string;
-                      username: string;
-                      displayName: string;
-                    } => m !== undefined
-                  )}
-                onChange={(_, newValue) => {
-                  setDiscordMentionError(null);
-                  const newIds = newValue.map((m) => m.id);
-                  // Vérifier si un des nouveaux membres est déjà utilisé
-                  for (const member of newValue) {
-                    if (!discordMentions.includes(member.id)) {
-                      const check = isDiscordIdUsedByOtherPlayer(
-                        member.id,
-                        editingPlayer?.id
-                      );
-                      if (check.used) {
-                        setDiscordMentionError(
-                          `Le login Discord "${member.displayName}" est déjà associé au joueur "${check.playerName}".`
-                        );
-                        return;
-                      }
-                    }
-                  }
-                  setDiscordMentions(newIds);
-                }}
-                filterOptions={(options, { inputValue }) => {
-                  const query = inputValue.toLowerCase();
-                  return options.filter((member) => {
-                    // Exclure les membres déjà sélectionnés
-                    if (discordMentions.includes(member.id)) {
-                      return false;
-                    }
-                    // Filtrer par nom d'affichage ou username
-                    return (
-                      member.displayName.toLowerCase().includes(query) ||
-                      member.username.toLowerCase().includes(query)
-                    );
-                  });
-                }}
-                renderOption={(props, option) => {
-                  const check = isDiscordIdUsedByOtherPlayer(
-                    option.id,
-                    editingPlayer?.id
-                  );
-                  const isUsed = check.used;
-                  return (
-                    <Box component="li" {...props} key={option.id}>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          width: 32,
-                          height: 32,
-                          borderRadius: "50%",
-                          backgroundColor: isUsed
-                            ? "error.main"
-                            : "primary.main",
-                          color: "primary.contrastText",
-                          mr: 1.5,
-                          fontSize: "0.875rem",
-                          fontWeight: 600,
-                        }}
-                      >
-                        {option.displayName.charAt(0).toUpperCase()}
-                      </Box>
-                      <Box sx={{ flex: 1 }}>
-                        <Typography variant="body2" fontWeight={500}>
-                          {option.displayName}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          @{option.username}
-                          {isUsed && ` - Déjà utilisé par ${check.playerName}`}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  );
-                }}
-                renderInput={(params) => {
-                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                  const { size, InputLabelProps, ...restParams } = params;
-                  return (
-                    <TextField
-                      {...restParams}
-                      // @ts-expect-error - InputLabelProps from Autocomplete has incompatible types with TextField
-                      InputLabelProps={InputLabelProps}
-                      label="Discord (optionnel)"
-                      placeholder="Rechercher un membre Discord..."
-                      helperText={
-                        discordMentionError ||
-                        (discordMentions.some(
-                          (id) => !discordMembers.find((m) => m.id === id)
-                        )
-                          ? "Certains IDs Discord ne correspondent plus à un utilisateur du serveur (indiqués en rouge ci-dessous)"
-                          : "Recherchez et sélectionnez les membres Discord à associer à ce joueur")
-                      }
-                      error={!!discordMentionError}
-                    />
-                  );
-                }}
-                renderTags={(value, getTagProps) => (
-                  <Box
-                    sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 1 }}
-                  >
-                    {value.map((member, index) => {
-                      const isInvalid = !discordMembers.find(
-                        (m) => m.id === member.id
-                      );
-                      return (
-                        <Chip
-                          {...getTagProps({ index })}
-                          key={member.id}
-                          label={member.displayName}
-                          {...(isInvalid ? { icon: <WarningIcon /> } : {})}
-                          color={isInvalid ? "error" : "default"}
-                          variant={isInvalid ? "outlined" : "filled"}
-                          size="small"
-                          {...(isInvalid
-                            ? {
-                                title:
-                                  "Cet ID Discord ne correspond plus à un utilisateur du serveur",
-                              }
-                            : {})}
-                        />
-                      );
-                    })}
-                  </Box>
-                )}
-                noOptionsText="Aucun membre trouvé"
-                loading={discordMembers.length === 0}
+              <DiscordMentionsAutocomplete
+                members={discordMembers}
+                selectedIds={discordMentions}
+                onSelectedIdsChange={setDiscordMentions}
+                error={discordMentionError}
+                onErrorChange={setDiscordMentionError}
+                findUsage={isDiscordIdUsedByOtherPlayer}
+                excludePlayerId={editingPlayer?.id}
               />
             </Box>
           </DialogContent>

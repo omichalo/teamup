@@ -42,15 +42,15 @@
     "discord.js": "^14.25.0",
     "firebase": "^12.2.1",
     "firebase-admin": "^12.0.0",
-    "next": "^15.5.9",
+    "next": "^15.5.15",
     "node-cron": "^3.0.3",
-    "nodemailer": "^7.0.11",
+    "nodemailer": "^8.0.5",
     "react": "19.1.0",
     "react-beautiful-dnd": "^13.1.1",
     "react-dom": "19.1.0",
     "react-hook-form": "^7.62.0",
     "swagger-ui-dist": "^5.30.2",
-    "swagger-ui-react": "^5.30.2",
+    "swagger-ui-react": "^5.32.5",
     "tweetnacl": "^1.0.3",
     "yup": "^1.7.0",
     "zod": "^4.1.12"
@@ -66,6 +66,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/swagger-ui-react": "^5.18.0",
+    "@types/xml2js": "^0.4.14",
     "dotenv": "^17.2.3",
     "eslint": "^9",
     "eslint-config-next": "15.5.3",
@@ -76,5 +77,29 @@
     "ts-node": "^10.9.2",
     "tsx": "^4.20.6",
     "typescript": "^5"
+  },
+  "overrides": {
+    "axios": "^0.31.1",
+    "undici": "^6.24.0",
+    "qs": "^6.14.2",
+    "xml2js": "^0.5.0",
+    "postcss": "^8.5.10",
+    "@tootallnate/once": "^3.0.1",
+    "micromatch": {
+      "picomatch": "2.3.2"
+    },
+    "anymatch": {
+      "picomatch": "2.3.2"
+    },
+    "fdir": {
+      "picomatch": "4.0.4"
+    },
+    "jest-util": {
+      "picomatch": "4.0.4"
+    },
+    "tinyglobby": {
+      "picomatch": "4.0.4"
+    },
+    "ajv": "^6.14.0"
   }
 }

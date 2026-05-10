@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { jsonNoStore } from "@/lib/http/cache-headers";
 import type { NextRequest } from "next/server";
 import { cookies } from "next/headers";
 import { adminAuth } from "@/lib/firebase-admin";
@@ -12,6 +12,22 @@ import {
 } from "@/lib/shared/fftt-utils";
 
 export const runtime = "nodejs";
+
+async function createInitializedFFTTApi(retries = 1) {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const api = createFFTTAPI();
+    try {
+      await api.initialize();
+      return api;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError;
+}
 
 export interface PoolRankingEntry {
   classement: number;
@@ -50,7 +66,7 @@ export async function GET(req: NextRequest) {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("__session")?.value;
     if (!sessionCookie) {
-      return NextResponse.json(
+      return jsonNoStore(
         { error: "Authentification requise" },
         { status: 401 }
       );
@@ -60,7 +76,7 @@ export async function GET(req: NextRequest) {
     const role = resolveRole(decoded.role as string | undefined);
 
     if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
-      return NextResponse.json(
+      return jsonNoStore(
         { error: "Accès refusé" },
         { status: 403 }
       );
@@ -68,7 +84,7 @@ export async function GET(req: NextRequest) {
 
     const teamId = req.nextUrl.searchParams.get("teamId");
     if (!teamId || !teamId.trim()) {
-      return NextResponse.json(
+      return jsonNoStore(
         { error: "Paramètre teamId requis" },
         { status: 400 }
       );
@@ -79,8 +95,7 @@ export async function GET(req: NextRequest) {
       phaseParam === "retour" || phaseParam === "aller" ? phaseParam : null;
 
     const { clubCode } = getFFTTConfig();
-    const api = createFFTTAPI();
-    await api.initialize();
+    const api = await createInitializedFFTTApi();
 
     const equipes = (await api.getEquipesByClub(clubCode)) as FFTTEquipeLike[];
     const teamIdTrim = teamId.trim();
@@ -102,7 +117,7 @@ export async function GET(req: NextRequest) {
     });
 
     if (!equipe || !equipe.lienDivision) {
-      return NextResponse.json(
+      return jsonNoStore(
         { error: "Équipe ou division non trouvée" },
         { status: 404 }
       );
@@ -150,7 +165,7 @@ export async function GET(req: NextRequest) {
     );
 
     if (!Array.isArray(raw)) {
-      return NextResponse.json(
+      return jsonNoStore(
         { error: "Classement non disponible" },
         { status: 404 }
       );
@@ -191,21 +206,14 @@ export async function GET(req: NextRequest) {
       return out;
     });
 
-    const res = NextResponse.json(
+    return jsonNoStore(
       { ranking: entries, division: equipe.division },
       { status: 200 }
     );
-    res.headers.set(
-      "Cache-Control",
-      "no-store, no-cache, must-revalidate, max-age=0"
-    );
-    return res;
   } catch (error) {
     console.error("[api/fftt/pool-ranking]", error);
-    const message =
-      error instanceof Error ? error.message : "Erreur lors du chargement du classement";
-    return NextResponse.json(
-      { error: message },
+    return jsonNoStore(
+      { error: "Impossible de charger le classement pour le moment" },
       { status: 500 }
     );
   }
