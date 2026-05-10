@@ -1,5 +1,5 @@
 import { FFTTAPI } from "@omichalo/ffttapi-node";
-import { getFFTTConfig } from "./fftt-utils";
+import { createFFTTAPI, getFFTTConfig } from "./fftt-utils";
 import { FFTTEquipe, FFTTRencontre } from "./fftt-types";
 import { createBaseMatch, isFemaleTeam, determinePhaseFromDivision } from "./fftt-utils";
 import type { Firestore, DocumentReference } from "firebase-admin/firestore";
@@ -34,7 +34,7 @@ export class TeamMatchesSyncService {
 
   constructor() {
     const config = getFFTTConfig();
-    this.ffttApi = new FFTTAPI(config.id, config.pwd);
+    this.ffttApi = createFFTTAPI();
     this.clubCode = config.clubCode;
   }
 
@@ -139,27 +139,11 @@ export class TeamMatchesSyncService {
 
           let clubEquipeA, clubEquipeB;
           if (clubnum1Match && clubnum2Match) {
-            // Vérifier quelle équipe est SQY PING
-            const equip1Match = rencontre.lien.match(/equip_1=([^&]+)/);
-            const equip2Match = rencontre.lien.match(/equip_2=([^&]+)/);
-
-            if (equip1Match && equip1Match[1].includes("SQY+PING")) {
-              clubEquipeA = clubnum1Match[1];
-              clubEquipeB = clubnum2Match[1];
-            } else if (equip2Match && equip2Match[1].includes("SQY+PING")) {
-              clubEquipeA = clubnum2Match[1];
-              clubEquipeB = clubnum1Match[1];
-            } else {
-              // Fallback: utiliser les IDs d&apos;équipe comme clubs
-              clubEquipeA = extractClubIdFromLien(
-                rencontre.lien,
-                "clubnum_1"
-              );
-              clubEquipeB = extractClubIdFromLien(
-                rencontre.lien,
-                "clubnum_2"
-              );
-            }
+            // clubnum_1/clubnum_2 correspondent toujours à l'ordre équipe A/B du lien FFTT.
+            // Ne pas inverser selon SQY, sinon getDetailsRencontreByLien peut retourner
+            // des détails incomplets (joueurs manquants) pour certains matchs extérieurs.
+            clubEquipeA = clubnum1Match[1];
+            clubEquipeB = clubnum2Match[1];
           } else {
             // Fallback: utiliser les IDs d&apos;équipe comme clubs
             clubEquipeA = extractClubIdFromLien(
@@ -395,25 +379,9 @@ export class TeamMatchesSyncService {
 
             let clubEquipeA, clubEquipeB;
             if (clubnum1Match && clubnum2Match) {
-              // Vérifier quelle équipe est SQY PING
-              const equip1Match = rencontre.lien.match(/equip_1=([^&]+)/);
-              const equip2Match = rencontre.lien.match(/equip_2=([^&]+)/);
-
-              if (equip1Match && equip1Match[1].includes("SQY+PING")) {
-                clubEquipeA = clubnum1Match[1];
-                clubEquipeB = clubnum2Match[1];
-              } else if (equip2Match && equip2Match[1].includes("SQY+PING")) {
-                clubEquipeA = clubnum2Match[1];
-                clubEquipeB = clubnum1Match[1];
-              } else {
-                // Fallback: utiliser les IDs d&apos;équipe comme clubs
-                clubEquipeA =
-                  (rencontre as FFTTRencontre & { idClubA?: string }).idClubA ||
-                  "";
-                clubEquipeB =
-                  (rencontre as FFTTRencontre & { idClubB?: string }).idClubB ||
-                  "";
-              }
+              // clubnum_1/clubnum_2 correspondent à équipe A/B dans le lien FFTT.
+              clubEquipeA = clubnum1Match[1];
+              clubEquipeB = clubnum2Match[1];
             } else {
               // Fallback: utiliser les IDs d&apos;équipe comme clubs
               clubEquipeA = extractClubIdFromLien(

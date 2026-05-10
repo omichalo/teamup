@@ -2,6 +2,70 @@ import type { Firestore } from "firebase-admin/firestore";
 import { Timestamp } from "firebase-admin/firestore";
 import type { MatchData } from "./team-matches-sync-types";
 
+type SyncPlayer = NonNullable<MatchData["joueursSQY"]>[number];
+type ResultPlayer = { nom: string; prenom: string; points?: number };
+
+function normalizeName(value: string | undefined): string {
+  return (value ?? "").trim().toUpperCase().replace(/\s+/g, " ");
+}
+
+function playerNameKey(player: { nom?: string; prenom?: string }): string {
+  return `${normalizeName(player.prenom)}|${normalizeName(player.nom)}`;
+}
+
+function buildPlayersFromResults(match: MatchData): ResultPlayer[] {
+  const details = match.resultatsIndividuels;
+  if (!details) return [];
+
+  const joueursA = Object.values(details.joueursA ?? {});
+  const joueursB = Object.values(details.joueursB ?? {});
+  if (joueursA.length === 0 && joueursB.length === 0) return [];
+
+  const nomEquipeA = normalizeName(details.nomEquipeA);
+  const nomEquipeB = normalizeName(details.nomEquipeB);
+
+  if (nomEquipeA.includes("SQY PING") && !nomEquipeB.includes("SQY PING")) {
+    return joueursA;
+  }
+  if (nomEquipeB.includes("SQY PING") && !nomEquipeA.includes("SQY PING")) {
+    return joueursB;
+  }
+
+  // Fallback défensif si les noms équipes sont absents/incohérents.
+  return joueursA.length >= joueursB.length ? joueursA : joueursB;
+}
+
+function reconcileJoueursSQY(match: MatchData): SyncPlayer[] {
+  const existingPlayers = (match.joueursSQY ?? []) as SyncPlayer[];
+  const resultPlayers = buildPlayersFromResults(match);
+  if (resultPlayers.length === 0) {
+    return existingPlayers;
+  }
+
+  const existingByName = new Map<string, SyncPlayer>();
+  existingPlayers.forEach((player, index) => {
+    const key = playerNameKey(player);
+    if (!existingByName.has(key)) {
+      existingByName.set(key, {
+        ...player,
+        id: player.id || `${key || "unknown"}_${index + 1}`,
+      });
+    }
+  });
+
+  return resultPlayers.map((player, index) => {
+    const key = playerNameKey(player);
+    const existing = existingByName.get(key);
+    return {
+      id: existing?.id || `${key || "unknown"}_${index + 1}`,
+      nom: player.nom || existing?.nom || "",
+      prenom: player.prenom || existing?.prenom || "",
+      licence: existing?.licence || "",
+      points: typeof existing?.points === "number" ? existing.points : (player.points ?? 0),
+      sexe: existing?.sexe || "M",
+    };
+  });
+}
 export async function saveMatchesToTeamSubcollections(
   matches: MatchData[],
   db: Firestore
@@ -104,6 +168,7 @@ export async function saveMatchesToTeamSubcollections(
             .collection("matches")
             .doc(matchId);
 
+          const reconciledJoueursSQY = reconcileJoueursSQY(match);
           const matchData = {
             ...match,
             date: Timestamp.fromDate(match.date),
@@ -146,7 +211,7 @@ export async function saveMatchesToTeamSubcollections(
           const serializableMatchData = {
             ...matchData,
             joueursSQY:
-              matchData.joueursSQY?.map((joueur) =>
+              reconciledJoueursSQY.map((joueur) =>
                 cleanPlayer({
                   licence: joueur.licence,
                   nom: (joueur as { nom?: string }).nom,

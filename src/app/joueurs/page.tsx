@@ -34,6 +34,7 @@ import { useTeamData } from "@/hooks/useTeamData";
 import { useDiscordMembers } from "@/hooks/useDiscordMembers";
 import { USER_ROLES } from "@/lib/auth/roles";
 import { useTeamManagementStore } from "@/stores/teamManagementStore";
+import { getPhaseOfNextChampionnatEquipesMatch } from "@/lib/shared/phase-utils";
 import {
   applyJoueursFilters,
   getPlayersForTab,
@@ -69,7 +70,7 @@ function TabPanel(props: TabPanelProps) {
 // Composant pour afficher les suggestions de mentions Discord
 
 export default function JoueursPage() {
-  const { currentPhase } = useTeamData();
+  const { equipes, currentPhase } = useTeamData();
   const updatePlayerInStore = useTeamManagementStore(
     (state) => state.updatePlayer
   );
@@ -98,6 +99,11 @@ export default function JoueursPage() {
   const { members: discordMembers } = useDiscordMembers();
 
   const playerService = useMemo(() => new FirestorePlayerService(), []);
+
+  const burnoutPhase = useMemo<"aller" | "retour">(() => {
+    const phaseOfNextMatch = getPhaseOfNextChampionnatEquipesMatch(equipes);
+    return phaseOfNextMatch ?? currentPhase ?? "aller";
+  }, [currentPhase, equipes]);
 
   const loadPlayers = useCallback(async () => {
     try {
@@ -630,7 +636,7 @@ export default function JoueursPage() {
           ) : (
             <PlayersActiveTable
               players={filteredPlayers}
-              currentPhase={currentPhase}
+              currentPhase={burnoutPhase}
               hasInvalidDiscordMentions={hasInvalidDiscordMentions}
               onEditPlayer={handleEditPlayer}
               onToggleParticipation={handleToggleParticipation}
