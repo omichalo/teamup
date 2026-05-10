@@ -160,7 +160,7 @@ teams/
 ### Processus de synchronisation
 
 1. **Déclenchement** : Via l'API `/api/admin/sync-team-matches`
-2. **Service** : `TeamMatchesSyncService` (`src/lib/shared/team-matches-sync.ts`)
+2. **Service** : `TeamMatchesSyncService` (`src/lib/shared/team-matches-sync.ts`, types `team-matches-sync-types.ts`, convertisseurs FFTT `team-matches-sync-fftt-converters.ts`)
 3. **Source** : API FFTT (`getRencontrePouleByLienDivision`)
 4. **Transformation** : `createBaseMatch` (`src/lib/shared/fftt-utils.ts`)
 5. **Calcul du résultat** : `determineMatchResult` avec les scores de l'API FFTT
