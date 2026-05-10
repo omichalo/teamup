@@ -4,19 +4,22 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - "**.md"
-      - ".github/workflows/*.md"
-      - "docs/**"
-      - "README.md"
 
 jobs:
   deploy:
     name: Deploy to Firebase App Hosting
     runs-on: ubuntu-latest
-    # Ne déployer que si ce n'est pas un commit de merge automatique
-    if: github.event_name == 'push' && !contains(github.event.head_commit.message, 'Merge pull request')
-
+    env:
+      NEXT_PUBLIC_FIREBASE_API_KEY: ${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ vars.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+      NEXT_PUBLIC_FIREBASE_APP_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}
+      NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
+      APP_URL: ${{ vars.APP_URL }}
+    # Tout push sur main déclenche un déploiement (merges de PR inclus,
+    # y compris changements uniquement docs / markdown).
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -35,6 +38,9 @@ jobs:
 
       - name: Run type-check
         run: npm run type-check
+
+      - name: Run tests
+        run: npm test -- --ci
 
       - name: Build application
         run: npm run build
