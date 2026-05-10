@@ -41,25 +41,12 @@ import { LocationsManagementSection } from "@/components/admin/LocationsManageme
 import { SyncOperationCard } from "@/components/admin/SyncOperationCard";
 import { CoachRequestsSection } from "@/components/admin/CoachRequestsSection";
 import { UsersManagementTable } from "@/components/admin/UsersManagementTable";
+import { TabPanel } from "@/components/ui/TabPanel";
 
-interface TabPanelProps {
-  children: React.ReactNode;
-  value: number;
-  index: number;
-}
-
-function TabPanel({ children, value, index }: TabPanelProps) {
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`admin-tabpanel-${index}`}
-      aria-labelledby={`admin-tab-${index}`}
-    >
-      {value === index ? <Box sx={{ mt: 3 }}>{children}</Box> : null}
-    </div>
-  );
-}
+const ADMIN_TAB_PANEL_PROPS = {
+  baseId: "admin",
+  contentSx: { mt: 3 },
+} as const;
 
 interface SyncStatus {
   players: {
@@ -676,7 +663,7 @@ export default function AdminPage() {
             />
           </Tabs>
 
-          <TabPanel value={tabValue} index={0}>
+          <TabPanel {...ADMIN_TAB_PANEL_PROPS} value={tabValue} index={0}>
             {syncError && (
               <Alert severity="error" sx={{ mb: 3 }}>
                 {syncError}
@@ -812,7 +799,7 @@ export default function AdminPage() {
             )}
           </TabPanel>
 
-          <TabPanel value={tabValue} index={1}>
+          <TabPanel {...ADMIN_TAB_PANEL_PROPS} value={tabValue} index={1}>
             {usersError && (
               <Alert
                 severity="error"
@@ -913,11 +900,11 @@ export default function AdminPage() {
             </Card>
           </TabPanel>
 
-          <TabPanel value={tabValue} index={2}>
+          <TabPanel {...ADMIN_TAB_PANEL_PROPS} value={tabValue} index={2}>
             <LocationsManagementSection />
           </TabPanel>
 
-          <TabPanel value={tabValue} index={3}>
+          <TabPanel {...ADMIN_TAB_PANEL_PROPS} value={tabValue} index={3}>
             <DiscordAvailabilityConfig />
           </TabPanel>
         </Box>

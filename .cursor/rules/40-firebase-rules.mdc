@@ -1,3 +1,8 @@
+---
+description: Règles de sécurité Firestore et moindre privilège
+alwaysApply: true
+---
+
 # Firebase Firestore Rules
 
 ## Firestore Rules

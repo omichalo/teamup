@@ -1,31 +1,20 @@
 "use client";
 
-import React from "react";
-import { Box } from "@mui/material";
+import {
+  TabPanel as UiTabPanel,
+  type TabPanelProps as UiTabPanelProps,
+} from "@/components/ui/TabPanel";
 
-export interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-  baseId?: string;
-}
+export type TabPanelProps = Omit<UiTabPanelProps, "baseId" | "contentSx"> &
+  Partial<Pick<UiTabPanelProps, "baseId" | "contentSx">>;
 
-export const TabPanel: React.FC<TabPanelProps> = ({
-  children,
-  value,
-  index,
+/** Tab panels compositions : ids par défaut `compositions-tab-*`, padding panneau `p: 5`. */
+export function TabPanel({
   baseId = "compositions",
-  ...other
-}) => {
+  contentSx = { p: 5 },
+  ...rest
+}: TabPanelProps) {
   return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`${baseId}-tabpanel-${index}`}
-      aria-labelledby={`${baseId}-tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box sx={{ p: 5 }}>{children}</Box>}
-    </div>
+    <UiTabPanel baseId={baseId} contentSx={contentSx} {...rest} />
   );
-};
+}

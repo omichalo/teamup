@@ -108,6 +108,7 @@ Ce document mappe chaque section et règle de `.cursorrules` vers les fichiers `
 8. `.cursor/rules/70-auth-and-roles.mdc` - 1 section migrée
 9. `.cursor/rules/90-pr-and-release.mdc` - 2 sections migrées (Workflow Git + Tests)
 10. `.cursor/rules/99-legacy-cursorrules.mdc` - Fichier de référence
+11. `.cursor/rules/80-club-platform-extension.mdc` - Plateforme club & nouvelles features (bounded contexts, Firestore, paiements, extraction UI)
 
 ### Modifications apportées
 - **Clarification**: Section Firestore (ligne 69) clarifiée dans `40-firebase-rules.mdc` avec ajout du principe du moindre privilège
@@ -119,12 +120,24 @@ Ce document mappe chaque section et règle de `.cursorrules` vers les fichiers `
 ✅ **Contenu préservé**: Le contenu exact a été préservé, sauf la clarification mentionnée ci-dessus
 ✅ **Structure améliorée**: Les règles sont maintenant organisées par thème pour faciliter la navigation
 
+### Fichier : Extension plateforme club & nouvelles features
+
+**Source** : principes produit/technique (plan extension club, extraction UI sans refactor obligatoire).
+
+**Destination** : `.cursor/rules/80-club-platform-extension.mdc`
+
+**Statut** : Ajouté pour compléter les règles historiques ; ne remplace pas la sécurité ou l’auth décrites dans `60`, `70`, `90`.
+
+---
+
 ## Confirmation finale
 
 **Date de migration**: [Date actuelle]
-**Fichier source**: `.cursorrules` (302 lignes)
-**Fichiers de destination**: 10 fichiers `.mdc` dans `.cursor/rules/`
+**Fichier source historique**: `.cursorrules` (anciennement copie intégrale, ~300 lignes)
+**Fichiers de destination**: fichiers `.mdc` dans `.cursor/rules/` (frontmatter `alwaysApply` pour chargement Cursor)
 **Statut**: ✅ Migration complète et validée
+
+**Évolution** : le fichier racine `.cursorrules` est désormais un **pointeur court** vers `.cursor/rules/*.mdc` ; le détail des règles ne doit plus y être dupliqué.
 
 Toutes les règles de `.cursorrules` ont été migrées vers `.cursor/rules/` avec préservation du contenu et amélioration de l'organisation.
 

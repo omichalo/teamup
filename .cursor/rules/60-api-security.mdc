@@ -1,3 +1,8 @@
+---
+description: API routes, CSRF, rate limit, cache headers, cookies, audit logs
+alwaysApply: true
+---
+
 # API Security
 
 ## Sécurité des routes API

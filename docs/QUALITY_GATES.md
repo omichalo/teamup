@@ -18,6 +18,7 @@ npm run check
 ```
 - Lint (ESLint)
 - Type-check (TypeScript)
+- Tests unitaires Jest (`jest --ci`, aligné sur la CI)
 - Build (Next.js), avec **ESLint exécuté pendant `next build`** (`eslint.ignoreDuringBuilds: false` dans `next.config.ts`). Une divergence entre lint CLI et build est donc impossible si `npm run check` passe.
 
 ### Variables `NEXT_PUBLIC_*` au build
@@ -48,15 +49,25 @@ npm run emulators:smoke
 - Arrête les emulators
 - **Utilisation**: Avant de déployer des Functions
 
+## Règles Cursor et skills projet
+
+- **Règles modulaires** : `.cursor/rules/*.mdc` contiennent le détail des standards (frontmatter `alwaysApply: true` sauf `99-legacy`). C’est la **source de vérité**.
+- **`.cursorrules` (racine)** : court pointeur vers `.cursor/rules/` — ne pas y réintroduire de longues copies ; modifier les `.mdc` concernés.
+- **Extension club / nouvelles features** : `.cursor/rules/80-club-platform-extension.mdc` regroupe les principes pour bounded contexts, Firestore, paiements, extraction UI (**sans** imposer le refactor des écrans existants).
+- **Skill projet** : `.cursor/skills/teamup-feature-slice/SKILL.md` — checklist pour une livraison verticale (API, rôles, Firestore, qualité). À invoquer ou à associer aux agents Cursor lors du développement des parcours adhésion, présences, tarifs, etc.
+
 ## Quality Gates CI
 
 La CI GitHub Actions exécute automatiquement:
 
 1. **Lint**: Vérifie le code avec ESLint (`eslint` en ligne de commande)
 2. **Type-check**: Vérifie les types TypeScript
-3. **Build**: Compile l'application Next.js (**inclut ESLint** comme ci-dessus, doublon acceptable pour une détection précoce dans les logs de job)
-4. **TODO Check**: Vérifie qu'il n'y a pas de TODO dans le code
-5. **Security Audit**: Audit npm des dépendances
+3. **Tests**: `npm test -- --ci` (Jest, sans collecte de coverage — rapidité ; seuils coverage pour `npm run test:coverage` en local ou job dédié si besoin)
+4. **Build**: Compile l'application Next.js (**inclut ESLint** comme ci-dessus, doublon acceptable pour une détection précoce dans les logs de job)
+5. **TODO Check**: Vérifie qu'il n'y a pas de TODO dans le code
+6. **Security Audit**: Audit npm des dépendances (`continue-on-error` — signal sans bloquer le merge)
+
+Le déploiement production ([`.github/workflows/deploy-production.yml`](../.github/workflows/deploy-production.yml)) enchaîne les mêmes étapes **lint → type-check → tests → build** avant `firebase deploy`.
 
 Voir [.github/workflows/ci.yml](../.github/workflows/ci.yml) pour les détails.
 

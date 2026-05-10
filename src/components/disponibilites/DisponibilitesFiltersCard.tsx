@@ -3,8 +3,6 @@
 import React from "react";
 import {
   Box,
-  Card,
-  CardContent,
   FormControl,
   FormControlLabel,
   InputLabel,
@@ -12,6 +10,7 @@ import {
   Select,
   Switch,
 } from "@mui/material";
+import { FilterCard } from "@/components/ui/FilterCard";
 import { EpreuveSelect } from "@/components/compositions/Filters/EpreuveSelect";
 import { PhaseSelect } from "@/components/compositions/Filters/PhaseSelect";
 import { SearchInput } from "@/components/compositions/Filters/SearchInput";
@@ -74,57 +73,55 @@ export function DisponibilitesFiltersCard({
   }, [journeesByPhase, phaseToUse]);
 
   return (
-    <Card sx={{ mb: 1 }}>
-      <CardContent sx={{ pt: 2.5, pb: 1.5 }}>
-        <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
-          <EpreuveSelect value={selectedEpreuve} onChange={onEpreuveChange} />
-          {!isParisEpreuve(selectedEpreuve) && (
-            <PhaseSelect
-              value={selectedPhase}
-              onChange={onPhaseChange}
-              disabled={selectedEpreuve === null}
-            />
-          )}
-          <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel id="journee-select-label">Journée</InputLabel>
-            <Select
-              labelId="journee-select-label"
-              id="journee-select"
-              value={selectedJournee ?? ""}
-              label="Journée"
-              onChange={(e) =>
-                onJourneeChange(e.target.value ? Number(e.target.value) : null)
-              }
-              disabled={
-                (selectedEpreuve === "championnat_paris"
-                  ? false
-                  : selectedPhase === null) || selectedEpreuve === null
-              }
-            >
-              {journeeMenuItems}
-            </Select>
-          </FormControl>
-
-          <FormControlLabel
-            control={
-              <Switch
-                checked={showAllPlayers}
-                onChange={(e) => onShowAllPlayersChange(e.target.checked)}
-              />
+    <FilterCard marginBottom={1}>
+      <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
+        <EpreuveSelect value={selectedEpreuve} onChange={onEpreuveChange} />
+        {!isParisEpreuve(selectedEpreuve) && (
+          <PhaseSelect
+            value={selectedPhase}
+            onChange={onPhaseChange}
+            disabled={selectedEpreuve === null}
+          />
+        )}
+        <FormControl size="small" sx={{ minWidth: 150 }}>
+          <InputLabel id="journee-select-label">Journée</InputLabel>
+          <Select
+            labelId="journee-select-label"
+            id="journee-select"
+            value={selectedJournee ?? ""}
+            label="Journée"
+            onChange={(e) =>
+              onJourneeChange(e.target.value ? Number(e.target.value) : null)
             }
-            label="Afficher tous les joueurs"
-          />
-        </Box>
+            disabled={
+              (selectedEpreuve === "championnat_paris"
+                ? false
+                : selectedPhase === null) || selectedEpreuve === null
+            }
+          >
+            {journeeMenuItems}
+          </Select>
+        </FormControl>
 
-        {selectedJournee ? (
-          <SearchInput
-            value={searchQuery}
-            onChange={onSearchQueryChange}
-            placeholder="Rechercher un joueur..."
-            sx={{ mt: 2.5, mb: 0.75 }}
-          />
-        ) : null}
-      </CardContent>
-    </Card>
+        <FormControlLabel
+          control={
+            <Switch
+              checked={showAllPlayers}
+              onChange={(e) => onShowAllPlayersChange(e.target.checked)}
+            />
+          }
+          label="Afficher tous les joueurs"
+        />
+      </Box>
+
+      {selectedJournee ? (
+        <SearchInput
+          value={searchQuery}
+          onChange={onSearchQueryChange}
+          placeholder="Rechercher un joueur..."
+          sx={{ mt: 2.5, mb: 0.75 }}
+        />
+      ) : null}
+    </FilterCard>
   );
 }

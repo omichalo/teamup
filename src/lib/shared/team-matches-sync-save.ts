@@ -66,6 +66,7 @@ function reconcileJoueursSQY(match: MatchData): SyncPlayer[] {
     };
   });
 }
+
 export async function saveMatchesToTeamSubcollections(
   matches: MatchData[],
   db: Firestore
@@ -169,6 +170,7 @@ export async function saveMatchesToTeamSubcollections(
             .doc(matchId);
 
           const reconciledJoueursSQY = reconcileJoueursSQY(match);
+
           const matchData = {
             ...match,
             date: Timestamp.fromDate(match.date),
