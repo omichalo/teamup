@@ -71,6 +71,9 @@ backend-service-account.json
 *.key
 !*.pub
 
+# Cursor / agents locaux
+.jules/
+
 # IDE
 .vscode/
 .idea/
