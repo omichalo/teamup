@@ -16,7 +16,7 @@ import {
 import { isValidFrenchPhoneSurface } from "@/lib/club-registration/phone-fr";
 import type { ClubRegistrationPayload } from "@/lib/club-registration/schema";
 import { clubRegistrationPayloadSchema } from "@/lib/club-registration/schema";
-import { isMinorAt } from "@/lib/club-registration/age";
+import { isAtLeast40At, isMinorAt } from "@/lib/club-registration/age";
 import { submitRegistration } from "@/lib/club-registration/submit";
 import type { RegistrationDraft } from "./registration-defaults";
 import { IdentityStep } from "./IdentityStep";
@@ -127,9 +127,36 @@ function validateStep(activeStep: number, draft: RegistrationDraft): string | nu
   if (activeStep === 1) {
     if (draft.slotIds.length === 0) return "Sélectionnez au moins un créneau.";
   }
+  if (activeStep === 2) {
+    /* Cohérence âge ↔ déclaration médicale : on guide le choix dès l'UI mais on
+       garde un filet ici si l'utilisateur change sa date de naissance après coup. */
+    const atLeast40 = isAtLeast40At(draft.birthDate);
+    const decl = draft.medicalCertificateDeclaration;
+    if (!decl) {
+      return "Choisissez une déclaration sur le questionnaire médical.";
+    }
+    if (
+      !atLeast40 &&
+      (decl === "over_40_cert_unchanged_all_no" ||
+        decl === "over_40_first_or_changed_certificate_required")
+    ) {
+      return "La déclaration médicale sélectionnée est réservée aux 40 ans et plus.";
+    }
+    if (atLeast40 && decl === "under_40_all_no") {
+      return "La déclaration médicale « moins de 40 ans » n’est pas applicable à votre date de naissance.";
+    }
+  }
   if (activeStep === 3) {
     if (!draft.photoConsent) {
       return "Indiquez votre choix sur la diffusion d’images (acte de consentement explicite).";
+    }
+    if (isMinorAt(draft.birthDate)) {
+      if (draft.emergencyMedicalAuthorization !== "yes") {
+        return "Cochez l’autorisation d’actes médicaux d’urgence (obligatoire pour un mineur).";
+      }
+      if (draft.supervisionAcknowledgement !== "yes") {
+        return "Cochez l’engagement de prise en charge à l’heure des cours (obligatoire pour un mineur).";
+      }
     }
     if (!draft.rulesAccepted) return "Vous devez accepter le règlement intérieur pour continuer.";
     if (draft.wantsCompetitorExtras && !draft.competitionJerseySize) {
@@ -246,10 +273,22 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
       draft.mainSectionId === "handisport" || draft.mainSectionId === "sport-adapte";
     const effectiveCompetitorExtras =
       !isAdaptedMainSection && draft.wantsCompetitorExtras;
+    /* Les autorisations légales mineurs sont forcées à `not_applicable_adult` côté
+       majeur (l'UI les masque). Côté mineur l'UI exige la case cochée donc la valeur
+       est déjà `yes` dans le draft. On garde une cohérence ceinture/bretelles. */
+    const minor = isMinorAt(draft.birthDate);
+    const emergencyMedicalAuthorization = minor
+      ? draft.emergencyMedicalAuthorization
+      : ("not_applicable_adult" as const);
+    const supervisionAcknowledgement = minor
+      ? draft.supervisionAcknowledgement
+      : ("not_applicable_adult" as const);
     return {
       ...rest,
       sex,
       photoConsent,
+      emergencyMedicalAuthorization,
+      supervisionAcknowledgement,
       internalRulesAccepted: true as const,
       wantsCompetitorExtras: effectiveCompetitorExtras,
       competitionJerseySize:

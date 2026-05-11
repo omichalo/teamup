@@ -7,7 +7,7 @@ import {
   SECTION_PRINCIPALE_OPTIONS,
 } from "./constants";
 import { isValidFrenchPhoneSurface, normalizeFrenchPhoneInput } from "./phone-fr";
-import { isMinorAt } from "./age";
+import { isAtLeast40At, isMinorAt } from "./age";
 
 const sectionIds = SECTION_PRINCIPALE_OPTIONS.map((s) => s.id) as [
   string,
@@ -102,6 +102,7 @@ export const clubRegistrationPayloadSchema = z
     medicalCertificateDeclaration: z.enum([
       "under_40_all_no",
       "over_40_cert_unchanged_all_no",
+      "over_40_first_or_changed_certificate_required",
       "questionnaire_yes_certificate_required",
     ]),
     wantsRegistrationCertificate: z.boolean(),
@@ -208,8 +209,74 @@ export const clubRegistrationPayloadSchema = z
       });
     }
 
-    /* Cohérence âge / rôle */
+    /* Cohérence âge / déclaration médicale : on ne propose pas les options « 40+ »
+       à un adhérent qui a moins de 40 ans, et inversement. Le questionnaire « Oui »
+       (certificat médical requis) reste disponible quel que soit l'âge. */
+    const atLeast40 = isAtLeast40At(data.birthDate);
+    const decl = data.medicalCertificateDeclaration;
+    if (
+      !atLeast40 &&
+      (decl === "over_40_cert_unchanged_all_no" ||
+        decl === "over_40_first_or_changed_certificate_required")
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "Cette option est réservée aux adhérents de 40 ans et plus ; choisissez l'option < 40 ans appropriée.",
+        path: ["medicalCertificateDeclaration"],
+      });
+    }
+    if (atLeast40 && decl === "under_40_all_no") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "L'option « moins de 40 ans » n'est pas applicable à votre date de naissance.",
+        path: ["medicalCertificateDeclaration"],
+      });
+    }
+
+    /* Cohérence âge / autorisations légales : seuls les mineurs sont concernés par
+       les autorisations « actes médicaux d'urgence » et « prise en charge à l'heure
+       des cours ». L'UI les masque pour les majeurs et les exige (case cochée) pour
+       les mineurs. Côté serveur on refuse les combinaisons incohérentes. */
     const minor = isMinorAt(data.birthDate);
+    if (minor) {
+      if (data.emergencyMedicalAuthorization !== "yes") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "L'autorisation d'actes médicaux d'urgence est obligatoire pour un mineur.",
+          path: ["emergencyMedicalAuthorization"],
+        });
+      }
+      if (data.supervisionAcknowledgement !== "yes") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "L'engagement de prise en charge à l'heure des cours est obligatoire pour un mineur.",
+          path: ["supervisionAcknowledgement"],
+        });
+      }
+    } else {
+      if (data.emergencyMedicalAuthorization !== "not_applicable_adult") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "L'autorisation d'actes médicaux d'urgence ne s'applique pas à un adhérent majeur.",
+          path: ["emergencyMedicalAuthorization"],
+        });
+      }
+      if (data.supervisionAcknowledgement !== "not_applicable_adult") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "L'engagement de prise en charge à l'heure des cours ne s'applique pas à un adhérent majeur.",
+          path: ["supervisionAcknowledgement"],
+        });
+      }
+    }
+
+    /* Cohérence âge / rôle */
     if (minor && data.adherentRole === "self") {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

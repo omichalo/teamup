@@ -1,9 +1,13 @@
 /**
  * Helpers d'âge pour le formulaire d'inscription club.
  *
- * - `isAdultAt` : retourne true si la personne née à `birthDate` (format ISO YYYY-MM-DD)
- *   est majeure (>= 18 ans) à la date `at`. Anniversaire le jour J = majeur.
- * - `isMinorAt` : inverse de `isAdultAt`, false si `birthDate` est invalide ou vide.
+ * - `computeAgeAt` : âge en années révolues à la date `at`, ou `null` si la date est
+ *   vide / invalide. Anniversaire le jour J = âge incrémenté.
+ * - `isAdultAt` : true si la personne est majeure (>= 18 ans) à la date `at`.
+ * - `isMinorAt` : inverse de `isAdultAt`. False si `birthDate` est vide ou invalide
+ *   (pas de présomption de minorité).
+ * - `isAtLeast40At` : true si la personne a 40 ans ou plus à la date `at`. Utilisé
+ *   pour orienter le choix du questionnaire médical.
  *
  * La référence `at` est paramétrable pour faciliter les tests et garantir la stabilité
  * (ne pas dépendre directement de `Date.now()`).
@@ -22,10 +26,10 @@ function parseIsoDate(s: string): { y: number; m: number; d: number } | null {
   return { y, m, d };
 }
 
-/** Renvoie true si `birthDate` (ISO) correspond à une personne majeure (>=18 ans) à la date `at`. */
-export function isAdultAt(birthDate: string, at: Date = new Date()): boolean {
+/** Âge en années révolues à la date `at`, ou null si `birthDate` est vide/invalide. */
+export function computeAgeAt(birthDate: string, at: Date = new Date()): number | null {
   const birth = parseIsoDate(birthDate);
-  if (!birth) return false;
+  if (!birth) return null;
 
   const refY = at.getFullYear();
   const refM = at.getMonth() + 1;
@@ -35,13 +39,23 @@ export function isAdultAt(birthDate: string, at: Date = new Date()): boolean {
   if (refM < birth.m || (refM === birth.m && refD < birth.d)) {
     years -= 1;
   }
-  return years >= 18;
+  return years;
+}
+
+/** Renvoie true si `birthDate` (ISO) correspond à une personne majeure (>=18 ans) à la date `at`. */
+export function isAdultAt(birthDate: string, at: Date = new Date()): boolean {
+  const years = computeAgeAt(birthDate, at);
+  return years !== null && years >= 18;
 }
 
 /** Inverse pratique : false si `birthDate` est vide / invalide (pas de présomption de minorité). */
 export function isMinorAt(birthDate: string, at: Date = new Date()): boolean {
-  if (!birthDate) return false;
-  const birth = parseIsoDate(birthDate);
-  if (!birth) return false;
-  return !isAdultAt(birthDate, at);
+  const years = computeAgeAt(birthDate, at);
+  return years !== null && years < 18;
+}
+
+/** True si la personne a 40 ans ou plus (questionnaire médical : seuil FFTT). */
+export function isAtLeast40At(birthDate: string, at: Date = new Date()): boolean {
+  const years = computeAgeAt(birthDate, at);
+  return years !== null && years >= 40;
 }

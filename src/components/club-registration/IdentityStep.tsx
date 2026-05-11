@@ -172,6 +172,24 @@ export function IdentityStep({
         </Select>
       </FormControl>
 
+      {draft.sex === "female" ? (
+        <FormControl component="fieldset" required>
+          <Typography variant="subtitle2" gutterBottom id="first-female-label">
+            Première inscription féminine au club SQY PING ?
+          </Typography>
+          <RadioGroup
+            aria-labelledby="first-female-label"
+            value={draft.firstFemaleRegistrationSqy ? "yes" : "no"}
+            onChange={(e) =>
+              onPatch({ firstFemaleRegistrationSqy: e.target.value === "yes" })
+            }
+          >
+            <FormControlLabel value="yes" control={<Radio />} label="Oui" />
+            <FormControlLabel value="no" control={<Radio />} label="Non" />
+          </RadioGroup>
+        </FormControl>
+      ) : null}
+
       <TextField
         required
         label="Ville de naissance"
