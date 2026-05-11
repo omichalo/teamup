@@ -23,6 +23,7 @@ import {
   PlaylistAddCheck,
   Home,
   HowToReg,
+  FactCheck,
 } from "@mui/icons-material";
 import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
@@ -62,6 +63,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           href: "/club/inscription",
           icon: <HowToReg />,
         },
+        {
+          label: "Mes inscriptions",
+          href: "/club/mes-inscriptions",
+          icon: <FactCheck />,
+        },
       ];
     }
 
@@ -70,6 +76,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         label: "Inscription club",
         href: "/club/inscription",
         icon: <HowToReg />,
+      },
+      {
+        label: "Mes inscriptions",
+        href: "/club/mes-inscriptions",
+        icon: <FactCheck />,
       },
       { label: "Joueurs", href: "/joueurs", icon: <Person /> },
       { label: "Équipes", href: "/equipes", icon: <Groups /> },
