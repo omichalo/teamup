@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, CircularProgress } from "@mui/material";
+import { Box, CircularProgress, Container } from "@mui/material";
 import { ClubRegistrationWizard } from "@/components/club-registration/ClubRegistrationWizard";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -26,8 +26,8 @@ export default function ClubInscriptionPage() {
   }
 
   return (
-    <Box sx={{ p: { xs: 2, sm: 3 }, maxWidth: 960, mx: "auto" }}>
+    <Container maxWidth="md" sx={{ py: { xs: 3, sm: 5 } }}>
       <ClubRegistrationWizard accountEmail={user?.email ?? null} />
-    </Box>
+    </Container>
   );
 }

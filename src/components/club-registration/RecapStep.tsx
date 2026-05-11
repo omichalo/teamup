@@ -3,13 +3,13 @@
 import {
   Box,
   Button,
-  Card,
-  CardContent,
   Chip,
+  Divider,
   Stack,
   Typography,
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
+import { SectionCard } from "@/components/ui";
 import {
   CLUB_REGISTRATION_SITES,
   COMPETITION_OPTIONS,
@@ -104,6 +104,14 @@ function findCompetitionLabel(id: string): string {
 
 type Field = { label: string; value: React.ReactNode };
 
+/**
+ * Bloc de récapitulatif : titre + bouton « Modifier » + paires libellé/valeur.
+ *
+ * Sur mobile (`xs`), libellé et valeur sont empilés verticalement avec un
+ * libellé en `caption` discret. À partir de `md`, on bascule sur une grille
+ * en deux colonnes avec une largeur fixe pour le libellé, ce qui donne un
+ * rendu type « definition list » plus rapide à scanner sur grand écran.
+ */
 function RecapBlock({
   title,
   onEdit,
@@ -116,53 +124,62 @@ function RecapBlock({
   emptyMessage?: string;
 }) {
   return (
-    <Card variant="outlined">
-      <CardContent>
-        <Stack spacing={2}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
-            <Typography variant="subtitle1" component="h3">
-              {title}
-            </Typography>
-            <Button
-              size="small"
-              startIcon={<EditIcon fontSize="small" />}
-              onClick={onEdit}
-              aria-label={`Modifier ${title.toLowerCase()}`}
+    <SectionCard
+      title={title}
+      padding="compact"
+      action={
+        <Button
+          size="small"
+          startIcon={<EditIcon fontSize="small" />}
+          onClick={onEdit}
+          aria-label={`Modifier ${title.toLowerCase()}`}
+        >
+          Modifier
+        </Button>
+      }
+    >
+      {fields.length === 0 && emptyMessage ? (
+        <Typography variant="body2" color="text.secondary">
+          {emptyMessage}
+        </Typography>
+      ) : (
+        <Stack
+          divider={<Divider flexItem sx={{ borderColor: "divider" }} />}
+          spacing={1.25}
+        >
+          {fields.map((f, i) => (
+            <Stack
+              key={i}
+              direction={{ xs: "column", md: "row" }}
+              spacing={{ xs: 0.25, md: 2 }}
+              alignItems={{ xs: "stretch", md: "baseline" }}
             >
-              Modifier
-            </Button>
-          </Stack>
-
-          {fields.length === 0 && emptyMessage ? (
-            <Typography variant="body2" color="text.secondary">
-              {emptyMessage}
-            </Typography>
-          ) : (
-            <Stack spacing={1}>
-              {fields.map((f, i) => (
-                <Stack
-                  key={i}
-                  direction={{ xs: "column", sm: "row" }}
-                  spacing={{ xs: 0, sm: 2 }}
-                  alignItems={{ sm: "baseline" }}
-                >
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ minWidth: { sm: 200 } }}
-                  >
-                    {f.label}
-                  </Typography>
-                  <Typography variant="body2" component="div">
-                    {f.value || "—"}
-                  </Typography>
-                </Stack>
-              ))}
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{
+                  fontWeight: 600,
+                  letterSpacing: "0.02em",
+                  textTransform: { xs: "uppercase", md: "none" },
+                  fontSize: { xs: "0.7rem", md: "0.8125rem" },
+                  flexShrink: 0,
+                  width: { md: 200 },
+                }}
+              >
+                {f.label}
+              </Typography>
+              <Typography
+                variant="body2"
+                component="div"
+                sx={{ wordBreak: "break-word", flex: 1, minWidth: 0 }}
+              >
+                {f.value || "—"}
+              </Typography>
             </Stack>
-          )}
+          ))}
         </Stack>
-      </CardContent>
-    </Card>
+      )}
+    </SectionCard>
   );
 }
 
@@ -377,69 +394,79 @@ export function RecapStep({ draft, accountEmail, onEditStep }: Props) {
         />
       ) : null}
 
-      <Card variant="outlined">
-        <CardContent>
-          <Stack spacing={1.5}>
-            <Typography variant="subtitle1" component="h3">
-              Adresses e-mail enregistrées dans le dossier
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {accountEmail
-                ? "L’adresse de votre compte est conservée comme adresse du soumettant et sert au club pour le suivi de cette inscription. Elle est distincte des adresses de l’adhérent et des représentants légaux."
-                : "L’adresse du compte que vous utiliserez pour vous connecter au moment de l’envoi sera conservée comme adresse du soumettant. Elle est distincte des adresses de l’adhérent et des représentants légaux."}
-            </Typography>
-
-            <Stack spacing={1}>
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={{ xs: 0, sm: 2 }}>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ minWidth: { sm: 200 } }}
-                >
-                  Soumettant (votre compte)
-                </Typography>
-                <Typography variant="body2">
-                  {accountEmail ? (
-                    <strong>{accountEmail}</strong>
-                  ) : (
-                    <em>(à confirmer à la connexion)</em>
-                  )}
-                </Typography>
-              </Stack>
-
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={{ xs: 0, sm: 2 }}>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ minWidth: { sm: 200 } }}
-                >
-                  Adhérent
-                </Typography>
-                <Typography variant="body2">{draft.adherentEmail || "—"}</Typography>
-              </Stack>
-
-              {draft.representatives.map((rep, i) => (
-                <Stack
-                  key={i}
-                  direction={{ xs: "column", sm: "row" }}
-                  spacing={{ xs: 0, sm: 2 }}
-                >
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ minWidth: { sm: 200 } }}
-                  >
-                    Représentant {i + 1} ({ROLE_LABELS[rep.role]})
-                  </Typography>
-                  <Typography variant="body2">{rep.email || "—"}</Typography>
-                </Stack>
-              ))}
-            </Stack>
-          </Stack>
-        </CardContent>
-      </Card>
+      <SectionCard
+        title="Adresses e-mail enregistrées dans le dossier"
+        padding="compact"
+        description={
+          accountEmail
+            ? "L’adresse de votre compte est conservée comme adresse du soumettant et sert au club pour le suivi de cette inscription. Elle est distincte des adresses de l’adhérent et des représentants légaux."
+            : "L’adresse du compte que vous utiliserez pour vous connecter au moment de l’envoi sera conservée comme adresse du soumettant. Elle est distincte des adresses de l’adhérent et des représentants légaux."
+        }
+      >
+        <Stack
+          spacing={1.25}
+          divider={<Divider flexItem sx={{ borderColor: "divider" }} />}
+        >
+          <EmailRow
+            label="Soumettant (votre compte)"
+            value={
+              accountEmail ? (
+                <strong>{accountEmail}</strong>
+              ) : (
+                <em>(à confirmer à la connexion)</em>
+              )
+            }
+          />
+          <EmailRow label="Adhérent" value={draft.adherentEmail || "—"} />
+          {draft.representatives.map((rep, i) => (
+            <EmailRow
+              key={i}
+              label={`Représentant ${i + 1} (${ROLE_LABELS[rep.role]})`}
+              value={rep.email || "—"}
+            />
+          ))}
+        </Stack>
+      </SectionCard>
 
       <Box />
+    </Stack>
+  );
+}
+
+function EmailRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: React.ReactNode;
+}) {
+  return (
+    <Stack
+      direction={{ xs: "column", md: "row" }}
+      spacing={{ xs: 0.25, md: 2 }}
+      alignItems={{ xs: "stretch", md: "baseline" }}
+    >
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{
+          fontWeight: 600,
+          letterSpacing: "0.02em",
+          textTransform: { xs: "uppercase", md: "none" },
+          fontSize: { xs: "0.7rem", md: "0.8125rem" },
+          flexShrink: 0,
+          width: { md: 200 },
+        }}
+      >
+        {label}
+      </Typography>
+      <Typography
+        variant="body2"
+        component="div"
+        sx={{ wordBreak: "break-word", flex: 1, minWidth: 0 }}
+      >
+        {value}
+      </Typography>
     </Stack>
   );
 }

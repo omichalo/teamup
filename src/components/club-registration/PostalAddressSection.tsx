@@ -77,7 +77,12 @@ export function PostalAddressSection({
 
   return (
     <Stack component="section" spacing={2} aria-labelledby="club-registration-postal-heading">
-      <Typography id="club-registration-postal-heading" variant="subtitle1" component="h3">
+      <Typography
+        id="club-registration-postal-heading"
+        variant="subtitle1"
+        component="h3"
+        sx={{ color: "primary.main", fontWeight: 700, pt: 1 }}
+      >
         Adresse postale
       </Typography>
 

@@ -92,7 +92,11 @@ export function MedicalFamilyStep({ draft, onChange }: Props) {
 
   return (
     <Stack spacing={2}>
-      <Typography variant="subtitle1" id="medical-certificate-label">
+      <Typography
+        variant="subtitle1"
+        id="medical-certificate-label"
+        sx={{ color: "primary.main", fontWeight: 700 }}
+      >
         Certificat médical
       </Typography>
       <Typography variant="body2" color="text.secondary">

@@ -89,74 +89,99 @@ export function DraftStorageDisclosure({
       }}
     >
       <Stack
-        direction="row"
-        spacing={1.5}
-        flexWrap="wrap"
-        useFlexGap
-        alignItems="center"
+        spacing={{ xs: 0.5, sm: 0 }}
         sx={{ fontSize: "0.8rem" }}
       >
         <Typography variant="caption" component="span">
           {statusLabel}
         </Typography>
-        <Typography variant="caption" component="span" aria-hidden>
-          ·
-        </Typography>
-        <MuiLink
-          ref={infoButtonRef}
-          component="button"
-          type="button"
-          variant="caption"
-          onClick={openPopover}
-          underline="hover"
-        >
-          En savoir plus
-        </MuiLink>
 
-        {isDisabled ? (
-          <>
-            <Typography variant="caption" component="span" aria-hidden>
-              ·
-            </Typography>
-            <MuiLink
-              component="button"
-              type="button"
-              variant="caption"
-              onClick={onEnable}
-              underline="hover"
-            >
-              Réactiver la sauvegarde
-            </MuiLink>
-          </>
-        ) : (
-          <>
-            <Typography variant="caption" component="span" aria-hidden>
-              ·
-            </Typography>
-            <MuiLink
-              component="button"
-              type="button"
-              variant="caption"
-              onClick={() => setConfirmClearOpen(true)}
-              underline="hover"
-            >
-              Effacer mon brouillon
-            </MuiLink>
-            <Typography variant="caption" component="span" aria-hidden>
-              ·
-            </Typography>
-            <MuiLink
-              component="button"
-              type="button"
-              variant="caption"
-              color="warning.main"
-              onClick={onDisable}
-              underline="hover"
-            >
-              Désactiver
-            </MuiLink>
-          </>
-        )}
+        {/* Liens d'action : empilés sur mobile (xs), en ligne avec séparateurs
+            à partir de sm. Les séparateurs `·` sont masqués sous sm pour éviter
+            qu'ils se retrouvent isolés en début ou fin de ligne après wrap. */}
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={{ xs: 0.5, sm: 1.5 }}
+          flexWrap="wrap"
+          useFlexGap
+          alignItems={{ xs: "flex-start", sm: "center" }}
+          sx={{ mt: { xs: 0.5, sm: 0 } }}
+        >
+          <MuiLink
+            ref={infoButtonRef}
+            component="button"
+            type="button"
+            variant="caption"
+            onClick={openPopover}
+            underline="hover"
+            sx={{ textAlign: "left" }}
+          >
+            En savoir plus
+          </MuiLink>
+
+          {isDisabled ? (
+            <>
+              <Typography
+                variant="caption"
+                component="span"
+                aria-hidden
+                sx={{ display: { xs: "none", sm: "inline" } }}
+              >
+                ·
+              </Typography>
+              <MuiLink
+                component="button"
+                type="button"
+                variant="caption"
+                onClick={onEnable}
+                underline="hover"
+                sx={{ textAlign: "left" }}
+              >
+                Réactiver la sauvegarde
+              </MuiLink>
+            </>
+          ) : (
+            <>
+              <Typography
+                variant="caption"
+                component="span"
+                aria-hidden
+                sx={{ display: { xs: "none", sm: "inline" } }}
+              >
+                ·
+              </Typography>
+              <MuiLink
+                component="button"
+                type="button"
+                variant="caption"
+                onClick={() => setConfirmClearOpen(true)}
+                underline="hover"
+                sx={{ textAlign: "left" }}
+              >
+                Effacer mon brouillon
+              </MuiLink>
+              <Typography
+                variant="caption"
+                component="span"
+                aria-hidden
+                sx={{ display: { xs: "none", sm: "inline" } }}
+              >
+                ·
+              </Typography>
+              <MuiLink
+                component="button"
+                type="button"
+                variant="caption"
+                color="warning.main"
+                onClick={onDisable}
+                underline="hover"
+                sx={{ textAlign: "left" }}
+              >
+                Désactiver
+              </MuiLink>
+            </>
+          )}
+        </Stack>
       </Stack>
 
       <Popover

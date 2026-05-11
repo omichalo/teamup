@@ -50,7 +50,12 @@ export function LegalCompetitorStep({ draft, onChange }: Props) {
 
   return (
     <Stack spacing={2}>
-      <Typography variant="subtitle1">Image et communication</Typography>
+      <Typography
+        variant="subtitle1"
+        sx={{ color: "primary.main", fontWeight: 700 }}
+      >
+        Image et communication
+      </Typography>
       <Typography variant="body2" color="text.secondary">
         Le club diffuse informations et photos sur{" "}
         <a href={CLUB_REGISTRATION_EXTERNAL_LINKS.siteClub} target="_blank" rel="noreferrer">
@@ -80,7 +85,12 @@ export function LegalCompetitorStep({ draft, onChange }: Props) {
 
       {isMinor ? (
         <>
-          <Typography variant="subtitle1">Autorisations pour l’adhérent mineur</Typography>
+          <Typography
+            variant="subtitle1"
+            sx={{ color: "primary.main", fontWeight: 700, pt: 1 }}
+          >
+            Autorisations pour l’adhérent mineur
+          </Typography>
           <Typography variant="body2" color="text.secondary">
             Ces deux autorisations sont obligatoires pour l’inscription d’un mineur. Elles ne
             sont pas affichées si l’adhérent est majeur.

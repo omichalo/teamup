@@ -14,8 +14,10 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
 import NextLink from "next/link";
 import { useSearchParams } from "next/navigation";
+import { PageHeader } from "@/components/ui";
 import { SECTION_PRINCIPALE_OPTIONS } from "@/lib/club-registration/constants";
 
 type RegistrationSummary = {
@@ -111,21 +113,24 @@ export function MesInscriptionsClient() {
   );
 
   return (
-    <Container maxWidth="md" sx={{ py: { xs: 2, sm: 4 } }}>
+    <Container maxWidth="md" sx={{ py: { xs: 3, sm: 5 } }}>
       <Stack spacing={3}>
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          alignItems={{ xs: "flex-start", sm: "center" }}
-          justifyContent="space-between"
-          spacing={2}
-        >
-          <Typography variant="h4" component="h1">
-            Mes inscriptions
-          </Typography>
-          <Button component={NextLink} href="/club/inscription" variant="contained">
-            Nouvelle inscription
-          </Button>
-        </Stack>
+        <PageHeader
+          eyebrow="Mon espace"
+          title="Mes inscriptions"
+          subtitle="Retrouvez l’historique de vos demandes au club et leur statut."
+          actions={
+            <Button
+              component={NextLink}
+              href="/club/inscription"
+              variant="contained"
+              color="secondary"
+              startIcon={<AddIcon fontSize="small" />}
+            >
+              Nouvelle inscription
+            </Button>
+          }
+        />
 
         {justCreated ? (
           <Alert severity="success">
@@ -153,28 +158,47 @@ export function MesInscriptionsClient() {
         ) : (
           <Stack spacing={2}>
             {registrations.map((r) => (
-              <Card key={r.id} variant="outlined">
-                <CardContent>
+              <Card key={r.id}>
+                <CardContent sx={{ pb: 1.5 }}>
                   <Stack
                     direction={{ xs: "column", sm: "row" }}
-                    alignItems={{ xs: "flex-start", sm: "center" }}
+                    alignItems={{ xs: "stretch", sm: "flex-start" }}
                     justifyContent="space-between"
-                    spacing={1}
+                    spacing={{ xs: 1.5, sm: 2 }}
                   >
-                    <Box>
-                      <Typography variant="h6">
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography
+                        variant="h6"
+                        sx={{
+                          color: "primary.main",
+                          wordBreak: "break-word",
+                          lineHeight: 1.3,
+                        }}
+                      >
                         {r.firstName ?? "—"} {r.lastName ?? ""}
                       </Typography>
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ wordBreak: "break-word" }}
+                      >
                         {r.adherentRole ? ROLE_LABEL[r.adherentRole] : ""}
                         {r.mainSectionId ? ` • ${findSectionLabel(r.mainSectionId)}` : ""}
                       </Typography>
                     </Box>
-                    <Stack alignItems={{ xs: "flex-start", sm: "flex-end" }} spacing={0.5}>
+                    <Stack
+                      direction={{ xs: "row", sm: "column" }}
+                      alignItems={{ xs: "center", sm: "flex-end" }}
+                      justifyContent={{ xs: "space-between", sm: "flex-start" }}
+                      spacing={{ xs: 1, sm: 0.5 }}
+                      flexWrap="wrap"
+                      useFlexGap
+                    >
                       <Chip
                         size="small"
                         label={STATUS_LABEL[r.status ?? ""] ?? r.status ?? "—"}
                         color={STATUS_COLOR[r.status ?? ""] ?? "default"}
+                        sx={{ flexShrink: 0 }}
                       />
                       <Typography variant="caption" color="text.secondary">
                         Envoyé le {formatDate(r.submittedAt)}
@@ -182,9 +206,20 @@ export function MesInscriptionsClient() {
                     </Stack>
                   </Stack>
                 </CardContent>
-                <CardActions sx={{ justifyContent: "flex-end", pt: 0 }}>
-                  <Typography variant="caption" color="text.secondary">
-                    Référence : {r.id}
+                <CardActions
+                  sx={{
+                    justifyContent: { xs: "flex-start", sm: "flex-end" },
+                    pt: 0,
+                    px: { xs: 2, sm: 3 },
+                    pb: 2,
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ wordBreak: "break-all" }}
+                  >
+                    Référence&nbsp;: {r.id}
                   </Typography>
                 </CardActions>
               </Card>

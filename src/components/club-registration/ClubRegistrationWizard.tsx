@@ -6,9 +6,8 @@ import {
   AlertTitle,
   Box,
   Button,
-  Card,
-  CardContent,
   CircularProgress,
+  Paper,
   Stack,
   Step,
   StepButton,
@@ -17,9 +16,13 @@ import {
 } from "@mui/material";
 import { visuallyHidden } from "@mui/utils";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import SendIcon from "@mui/icons-material/Send";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import "dayjs/locale/fr";
+import { PageHeader, SectionCard, StepProgressBar } from "@/components/ui";
 import { isValidFrenchPhoneSurface } from "@/lib/club-registration/phone-fr";
 import type { ClubRegistrationPayload } from "@/lib/club-registration/schema";
 import { clubRegistrationPayloadSchema } from "@/lib/club-registration/schema";
@@ -50,6 +53,14 @@ const STEPS = [
 ];
 
 const STEPS_SHORT = ["Identité", "Sections", "Médical", "Autorisations", "Récap"];
+
+const STEP_DESCRIPTIONS: ReadonlyArray<string> = [
+  "Adhérent, contact et adresse postale.",
+  "Section principale, sections complémentaires et créneaux d’entraînement.",
+  "Déclaration médicale, attestations et réductions éventuelles.",
+  "Diffusion d’images, autorisations légales et section compétiteur.",
+  "Vérifiez votre dossier avant envoi au club.",
+];
 
 function validateStep(activeStep: number, draft: RegistrationDraft): string | null {
   if (activeStep === 0) {
@@ -536,218 +547,316 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
     await performSubmit(payload);
   }, [performSubmit]);
 
+  const totalSteps = STEPS.length;
+  const stepLabel = STEPS[activeStep] ?? "";
+  const stepShortLabel = STEPS_SHORT[activeStep] ?? stepLabel;
+  const stepDescription = STEP_DESCRIPTIONS[activeStep] ?? "";
+  const isRecap = activeStep === totalSteps - 1;
+  /* Le bouton final porte deux variantes : un libellé court (mobile) et un
+     libellé long (≥ sm) pour éviter le débord sur smartphone. */
+  const submitLabelShort = accountEmail
+    ? submitting
+      ? "Envoi…"
+      : "Envoyer"
+    : "Se connecter";
+  const submitLabelLong = accountEmail
+    ? submitting
+      ? "Envoi en cours…"
+      : "Envoyer ma demande au club"
+    : "Se connecter pour envoyer";
+
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="fr">
-    <Stack spacing={3}>
-      <Typography variant="h4" component="h1">
-        Inscription au club
-      </Typography>
-      <Typography variant="body1" color="text.secondary">
-        Préparez votre dossier d’inscription en quelques étapes. Vous pourrez vous connecter
-        ou créer un compte juste avant l’envoi.
-      </Typography>
+      <Stack spacing={3}>
+        <PageHeader
+          eyebrow="Inscription au club"
+          title="Préparez votre dossier"
+          subtitle="En quelques étapes, renseignez les informations nécessaires. Votre brouillon est enregistré localement et vous pourrez vous connecter ou créer un compte juste avant l’envoi."
+        />
 
-      <Typography
-        variant="caption"
-        component="p"
-        color="text.secondary"
-        aria-live="polite"
-      >
-        Progression&nbsp;: {completedStepsCount} étape
-        {completedStepsCount > 1 ? "s" : ""} sur {STEPS.length - 1} validée
-        {completedStepsCount > 1 ? "s" : ""}.
-      </Typography>
+        <SectionCard
+          padding="compact"
+          contentSx={{ py: 2 }}
+        >
+          <Stack spacing={2}>
+            <StepProgressBar
+              activeStep={activeStep}
+              totalSteps={totalSteps}
+              activeLabel={stepShortLabel}
+              value={Math.round(
+                (completedStepsCount / Math.max(1, totalSteps - 1)) * 100
+              )}
+              ariaLabel={`Progression : ${completedStepsCount} étape${
+                completedStepsCount > 1 ? "s" : ""
+              } sur ${totalSteps - 1} validée${completedStepsCount > 1 ? "s" : ""}`}
+            />
 
-      {submitError && <Alert severity="error">{submitError}</Alert>}
-      {fieldErrors && Object.keys(fieldErrors).length > 0 ? (
-        <Alert severity="error">
-          <AlertTitle>Des informations doivent être corrigées</AlertTitle>
-          <Stack spacing={0.5}>
-            {stepsWithError(fieldErrors).map((idx) => (
-              <Button
-                key={idx}
-                size="small"
-                variant="text"
-                color="error"
-                onClick={() => handleGoToStep(idx)}
-                sx={{
-                  justifyContent: "flex-start",
-                  textTransform: "none",
-                  px: 0,
-                  minHeight: 0,
-                }}
-              >
-                Étape {idx + 1} — {STEPS_SHORT[idx] ?? STEPS[idx]}
-              </Button>
-            ))}
+            {/* Desktop : stepper MUI alignant accessibilité (navigation au
+                clavier, lecteurs d'écran) et lisibilité. On attend `lg` pour
+                l'afficher : à `md` (900–1199 px) certains libellés longs
+                (« Consentements et compétition ») se chevauchaient en mode
+                `alternativeLabel`. */}
+            <Stepper
+              activeStep={activeStep}
+              nonLinear
+              alternativeLabel
+              sx={{
+                display: { xs: "none", lg: "flex" },
+                pt: 1,
+                "& .MuiStepLabel-label": { mt: 0.5 },
+              }}
+            >
+              {STEPS.map((label, index) => {
+                const isPast = index < activeStep;
+                const stepInvalid = stepValidity[index] !== null;
+                const completed = isPast && !stepInvalid;
+                return (
+                  <Step key={label} completed={completed}>
+                    <StepButton
+                      color="inherit"
+                      disabled={!canNavigateToStep(index, activeStep, draft)}
+                      onClick={() => handleGoToStep(index)}
+                      icon={
+                        isPast && stepInvalid ? (
+                          <ErrorOutlineIcon color="error" fontSize="small" />
+                        ) : undefined
+                      }
+                      optional={
+                        isPast && stepInvalid ? (
+                          <Typography variant="caption" color="error">
+                            À corriger
+                          </Typography>
+                        ) : undefined
+                      }
+                    >
+                      {label}
+                    </StepButton>
+                  </Step>
+                );
+              })}
+            </Stepper>
+
+            {/* Mobile + tablette : pastilles d'étapes — plus compact qu'un
+                stepper vertical et garantit le wrap propre sur petites largeurs. */}
+            <Stack
+              direction="row"
+              flexWrap="wrap"
+              useFlexGap
+              sx={{ gap: 1, display: { lg: "none" } }}
+            >
+              {STEPS.map((label, index) => {
+                const isPast = index < activeStep;
+                const stepInvalid = stepValidity[index] !== null;
+                return (
+                  <Button
+                    key={label}
+                    size="small"
+                    color={isPast && stepInvalid ? "error" : "primary"}
+                    variant={activeStep === index ? "contained" : "outlined"}
+                    disabled={!canNavigateToStep(index, activeStep, draft)}
+                    onClick={() => handleGoToStep(index)}
+                    aria-current={activeStep === index ? "step" : undefined}
+                    startIcon={
+                      isPast && stepInvalid ? (
+                        <ErrorOutlineIcon fontSize="small" />
+                      ) : undefined
+                    }
+                    sx={{ minWidth: 0 }}
+                  >
+                    {index + 1}. {STEPS_SHORT[index] ?? label}
+                  </Button>
+                );
+              })}
+            </Stack>
           </Stack>
-        </Alert>
-      ) : null}
+        </SectionCard>
 
-      <Stepper
-        activeStep={activeStep}
-        nonLinear
-        alternativeLabel
-        sx={{ display: { xs: "none", md: "flex" } }}
-      >
-        {STEPS.map((label, index) => {
-          const isPast = index < activeStep;
-          const stepInvalid = stepValidity[index] !== null;
-          /* `completed` ne reflète plus uniquement la position de l'étape :
-             elle exige que validateStep retourne null. Si l'utilisateur est
-             passé sur une étape ultérieure puis a invalidé une étape précédente,
-             celle-ci affiche désormais un état erreur (icône + texte) au lieu
-             d'apparaître à tort comme « cochée ». */
-          const completed = isPast && !stepInvalid;
-          return (
-            <Step key={label} completed={completed}>
-              <StepButton
-                color="inherit"
-                disabled={!canNavigateToStep(index, activeStep, draft)}
-                onClick={() => handleGoToStep(index)}
-                icon={
-                  isPast && stepInvalid ? (
-                    <ErrorOutlineIcon color="error" fontSize="small" />
-                  ) : undefined
-                }
-                optional={
-                  isPast && stepInvalid ? (
-                    <Typography variant="caption" color="error">
-                      À corriger
-                    </Typography>
-                  ) : undefined
-                }
-              >
-                {label}
-              </StepButton>
-            </Step>
-          );
-        })}
-      </Stepper>
-
-      <Stack spacing={1} sx={{ display: { md: "none" } }}>
-        <Typography variant="subtitle2" color="text.secondary">
-          Étape {activeStep + 1} / {STEPS.length} — {STEPS[activeStep]}
-        </Typography>
-        <Stack direction="row" flexWrap="wrap" useFlexGap sx={{ gap: 1 }}>
-          {STEPS.map((label, index) => {
-            const isPast = index < activeStep;
-            const stepInvalid = stepValidity[index] !== null;
-            return (
-              <Button
-                key={label}
-                size="small"
-                color={isPast && stepInvalid ? "error" : "primary"}
-                variant={activeStep === index ? "contained" : "outlined"}
-                disabled={!canNavigateToStep(index, activeStep, draft)}
-                onClick={() => handleGoToStep(index)}
-                aria-current={activeStep === index ? "step" : undefined}
-                startIcon={
-                  isPast && stepInvalid ? (
-                    <ErrorOutlineIcon fontSize="small" />
-                  ) : undefined
-                }
-              >
-                {index + 1}. {STEPS_SHORT[index] ?? label}
-              </Button>
-            );
-          })}
-        </Stack>
-      </Stack>
-
-      <Card variant="outlined" ref={cardRef}>
-        <CardContent>
-          {/* Titre invisible mais focusable : annonce l'étape courante aux
-              lecteurs d'écran et reçoit le focus à chaque changement d'étape.
-              On utilise `style` plutôt que `sx` car `visuallyHidden` retourne
-              du CSSProperties brut, incompatible avec le typage `SxProps`. */}
-          <Box
-            component="h2"
-            ref={stepHeadingRef}
-            tabIndex={-1}
-            style={visuallyHidden}
-          >
-            Étape {activeStep + 1} sur {STEPS.length} : {STEPS[activeStep]}
-          </Box>
-          {activeStep === 0 && (
-            <IdentityStep
-              draft={draft}
-              onPatch={actions.patchFields}
-              onSetAdherentRole={actions.setAdherentRole}
-              onSetSex={actions.setSex}
-              onAddRepresentative={actions.addRepresentative}
-              onUpdateRepresentative={actions.updateRepresentative}
-              onRemoveRepresentative={actions.removeRepresentative}
-            />
-          )}
-          {activeStep === 1 && <SectionSlotsStep draft={draft} onChange={actions.patchFields} />}
-          {activeStep === 2 && <MedicalFamilyStep draft={draft} onChange={actions.patchFields} />}
-          {activeStep === 3 && <LegalCompetitorStep draft={draft} onChange={actions.patchFields} />}
-          {activeStep === 4 && (
-            <RecapStep
-              draft={draft}
-              accountEmail={accountEmail}
-              onEditStep={(idx) => setActiveStep(idx)}
-            />
-          )}
-        </CardContent>
-      </Card>
-
-      <Stack
-        direction="row"
-        spacing={2}
-        justifyContent={activeStep === 0 ? "flex-end" : "space-between"}
-      >
-        {activeStep > 0 ? (
-          <Button onClick={handleBack} disabled={submitting}>
-            Retour
-          </Button>
+        {submitError && <Alert severity="error">{submitError}</Alert>}
+        {fieldErrors && Object.keys(fieldErrors).length > 0 ? (
+          <Alert severity="error">
+            <AlertTitle>Des informations doivent être corrigées</AlertTitle>
+            <Stack spacing={0.5}>
+              {stepsWithError(fieldErrors).map((idx) => (
+                <Button
+                  key={idx}
+                  size="small"
+                  variant="text"
+                  color="error"
+                  onClick={() => handleGoToStep(idx)}
+                  sx={{
+                    justifyContent: "flex-start",
+                    textTransform: "none",
+                    px: 0,
+                    minHeight: 0,
+                  }}
+                >
+                  Étape {idx + 1} — {STEPS_SHORT[idx] ?? STEPS[idx]}
+                </Button>
+              ))}
+            </Stack>
+          </Alert>
         ) : null}
-        {activeStep < STEPS.length - 1 ? (
-          <Button variant="contained" onClick={handleNext}>
-            Continuer
-          </Button>
-        ) : (
-          <Button
-            variant="contained"
-            onClick={handleSubmit}
-            disabled={submitting}
-            startIcon={submitting ? <CircularProgress size={16} /> : undefined}
+
+        <Box ref={cardRef}>
+          <SectionCard
+            eyebrow={`Étape ${activeStep + 1} sur ${totalSteps}`}
+            title={stepLabel}
+            description={stepDescription}
           >
-            {accountEmail
-              ? submitting
-                ? "Envoi en cours…"
-                : "Envoyer ma demande au club"
-              : "Se connecter pour envoyer"}
-          </Button>
-        )}
+            {/* Titre invisible mais focusable : annonce l'étape courante aux
+                lecteurs d'écran et reçoit le focus à chaque changement d'étape.
+                On utilise `style` plutôt que `sx` car `visuallyHidden` retourne
+                du CSSProperties brut, incompatible avec le typage `SxProps`. */}
+            <Box
+              component="h2"
+              ref={stepHeadingRef}
+              tabIndex={-1}
+              style={visuallyHidden}
+            >
+              Étape {activeStep + 1} sur {totalSteps} : {stepLabel}
+            </Box>
+            {activeStep === 0 && (
+              <IdentityStep
+                draft={draft}
+                onPatch={actions.patchFields}
+                onSetAdherentRole={actions.setAdherentRole}
+                onSetSex={actions.setSex}
+                onAddRepresentative={actions.addRepresentative}
+                onUpdateRepresentative={actions.updateRepresentative}
+                onRemoveRepresentative={actions.removeRepresentative}
+              />
+            )}
+            {activeStep === 1 && (
+              <SectionSlotsStep draft={draft} onChange={actions.patchFields} />
+            )}
+            {activeStep === 2 && (
+              <MedicalFamilyStep draft={draft} onChange={actions.patchFields} />
+            )}
+            {activeStep === 3 && (
+              <LegalCompetitorStep draft={draft} onChange={actions.patchFields} />
+            )}
+            {activeStep === 4 && (
+              <RecapStep
+                draft={draft}
+                accountEmail={accountEmail}
+                onEditStep={(idx) => setActiveStep(idx)}
+              />
+            )}
+          </SectionCard>
+        </Box>
+
+        {/* Barre d'actions : sticky en bas de viewport sur mobile / tablette
+            pour rester accessible lors du scroll dans les longs formulaires
+            (étape Sections notamment), statique sur grand écran pour respecter
+            l'ordre de lecture. On ajoute `env(safe-area-inset-bottom)` pour
+            iOS Safari (notch / barre de navigation home). */}
+        <Paper
+          elevation={0}
+          sx={{
+            position: { xs: "sticky", md: "static" },
+            bottom: { xs: 0, md: "auto" },
+            zIndex: { xs: 5, md: "auto" },
+            borderRadius: 2,
+            border: 1,
+            borderColor: "divider",
+            backgroundColor: "background.paper",
+            px: { xs: 1.5, sm: 2 },
+            pt: { xs: 1.25, sm: 1.5 },
+            pb: {
+              xs: "calc(env(safe-area-inset-bottom, 0px) + 12px)",
+              sm: 2,
+            },
+            boxShadow: {
+              xs: "0 -6px 18px rgba(15, 23, 42, 0.08)",
+              md: "none",
+            },
+          }}
+        >
+          <Stack
+            direction="row"
+            spacing={1.5}
+            justifyContent={activeStep === 0 ? "flex-end" : "space-between"}
+            alignItems="center"
+            sx={{ flexWrap: "nowrap" }}
+          >
+            {activeStep > 0 ? (
+              <Button
+                onClick={handleBack}
+                disabled={submitting}
+                startIcon={<ArrowBackIcon fontSize="small" />}
+                variant="text"
+                color="inherit"
+                sx={{ flexShrink: 0 }}
+              >
+                Retour
+              </Button>
+            ) : null}
+            {!isRecap ? (
+              <Button
+                variant="contained"
+                onClick={handleNext}
+                endIcon={<ArrowForwardIcon fontSize="small" />}
+                sx={{ flexShrink: 0 }}
+              >
+                Continuer
+              </Button>
+            ) : (
+              <Button
+                variant="contained"
+                color="secondary"
+                onClick={handleSubmit}
+                disabled={submitting}
+                startIcon={
+                  submitting ? (
+                    <CircularProgress size={16} color="inherit" />
+                  ) : (
+                    <SendIcon fontSize="small" />
+                  )
+                }
+                sx={{ flexShrink: 0, minWidth: 0 }}
+              >
+                <Box
+                  component="span"
+                  sx={{ display: { xs: "inline", sm: "none" } }}
+                >
+                  {submitLabelShort}
+                </Box>
+                <Box
+                  component="span"
+                  sx={{ display: { xs: "none", sm: "inline" } }}
+                >
+                  {submitLabelLong}
+                </Box>
+              </Button>
+            )}
+          </Stack>
+        </Paper>
+
+        <AuthDialog
+          open={authDialogOpen}
+          onClose={() => {
+            if (submitting) return;
+            setAuthDialogOpen(false);
+            pendingPayloadRef.current = null;
+          }}
+          defaultMode="login"
+          onSuccess={handleAuthSuccess}
+          headerSlot={<AccountEmailTransparencyBanner accountEmail={null} />}
+        />
+
+        <DraftStorageDisclosure
+          status={storage.status}
+          isDisabled={storage.isDisabled}
+          lastSavedAt={storage.lastSavedAt}
+          onDisable={storage.disable}
+          onEnable={storage.enable}
+          onClear={() => {
+            storage.clear();
+            actions.reset();
+            setActiveStep(0);
+          }}
+        />
       </Stack>
-
-      <AuthDialog
-        open={authDialogOpen}
-        onClose={() => {
-          if (submitting) return;
-          setAuthDialogOpen(false);
-          pendingPayloadRef.current = null;
-        }}
-        defaultMode="login"
-        onSuccess={handleAuthSuccess}
-        headerSlot={<AccountEmailTransparencyBanner accountEmail={null} />}
-      />
-
-      <DraftStorageDisclosure
-        status={storage.status}
-        isDisabled={storage.isDisabled}
-        lastSavedAt={storage.lastSavedAt}
-        onDisable={storage.disable}
-        onEnable={storage.enable}
-        onClear={() => {
-          storage.clear();
-          actions.reset();
-          setActiveStep(0);
-        }}
-      />
-    </Stack>
     </LocalizationProvider>
   );
 }
