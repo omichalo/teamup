@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Alert,
   Box,
   Button,
   Card,
@@ -163,8 +162,6 @@ function RecapBlock({
 }
 
 export function RecapStep({ draft, accountEmail, onEditStep }: Props) {
-  const submitEnabled = process.env.NEXT_PUBLIC_HYBRID_SUBMIT_ENABLED === "true";
-
   const additionalSections = draft.additionalSectionIds.map(findSectionLabel);
   const slotLabels = draft.slotIds.map(findSlotLabel);
   const reductions = draft.reductionTypes.map(findReductionLabel);
@@ -431,14 +428,6 @@ export function RecapStep({ draft, accountEmail, onEditStep }: Props) {
           </Stack>
         </CardContent>
       </Card>
-
-      {!submitEnabled ? (
-        <Alert severity="info">
-          La soumission en ligne sera disponible prochainement. Cette page vous permet
-          dès aujourd’hui de préparer votre dossier ; il sera enregistré localement sur
-          cet appareil.
-        </Alert>
-      ) : null}
 
       <Box />
     </Stack>

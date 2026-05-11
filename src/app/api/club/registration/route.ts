@@ -13,13 +13,6 @@ import { checkRateLimit } from "@/lib/auth/rate-limit";
 
 const COLLECTION = "clubRegistrations";
 
-/**
- * Feature flag : tant que `HYBRID_SUBMIT_ENABLED !== "true"`, la route POST renvoie 503.
- * La PR 2 du parcours hybride activera réellement la soumission. La route GET reste utilisable
- * pour récupérer un dossier existant par son `id` (lecture/édition future).
- */
-const HYBRID_SUBMIT_ENABLED = process.env.HYBRID_SUBMIT_ENABLED === "true";
-
 /** Champs métier renvoyés au client (hors Timestamps bruts). */
 const REGISTRATION_CLIENT_FIELDS = [
   "adherentRole",
@@ -123,17 +116,14 @@ export async function GET(req: Request) {
 
 /**
  * POST /api/club/registration — création d'un nouveau dossier (auto-id Firestore).
- * Désactivé tant que `HYBRID_SUBMIT_ENABLED !== "true"`.
+ *
+ * Auth requise (cookie de session, email vérifié). Le rôle minimum accepté est
+ * `PLAYER` car un visiteur qui s'inscrit pour lui-même ou pour un mineur passe
+ * forcément par un compte dont le rôle par défaut est `PLAYER`. Les `COACH` et
+ * `ADMIN` sont également autorisés (ex. inscription par un encadrant).
  */
 export async function POST(req: Request) {
   try {
-    if (!HYBRID_SUBMIT_ENABLED) {
-      return jsonNoStore(
-        { error: "Soumission temporairement désactivée" },
-        { status: 503 }
-      );
-    }
-
     if (!validateOrigin(req)) {
       return jsonNoStore({ error: "Invalid origin" }, { status: 403 });
     }
