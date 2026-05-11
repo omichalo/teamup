@@ -39,7 +39,9 @@ export function MedicalFamilyStep({ draft, onChange }: Props) {
 
   return (
     <Stack spacing={2}>
-      <Typography variant="subtitle1">Certificat médical</Typography>
+      <Typography variant="subtitle1" id="medical-certificate-label">
+        Certificat médical
+      </Typography>
       <Typography variant="body2" color="text.secondary">
         Téléchargez le questionnaire adapté si besoin :{" "}
         <a href={CLUB_REGISTRATION_EXTERNAL_LINKS.questionnaireMajeur} target="_blank" rel="noreferrer">
@@ -55,6 +57,7 @@ export function MedicalFamilyStep({ draft, onChange }: Props) {
 
       <FormControl component="fieldset">
         <RadioGroup
+          aria-labelledby="medical-certificate-label"
           value={draft.medicalCertificateDeclaration}
           onChange={(e) =>
             onChange({
@@ -97,10 +100,11 @@ export function MedicalFamilyStep({ draft, onChange }: Props) {
       </FormControl>
 
       <FormControl component="fieldset">
-        <Typography variant="subtitle2" gutterBottom>
+        <Typography variant="subtitle2" gutterBottom id="family-order-label">
           Deuxième ou troisième inscription (ou plus) dans la même famille ?
         </Typography>
         <RadioGroup
+          aria-labelledby="family-order-label"
           value={draft.familyRegistrationOrder}
           onChange={(e) =>
             onChange({
@@ -146,10 +150,11 @@ export function MedicalFamilyStep({ draft, onChange }: Props) {
 
       {draft.sex === "female" && (
         <FormControl component="fieldset" required>
-          <Typography variant="subtitle2" gutterBottom>
+          <Typography variant="subtitle2" gutterBottom id="first-female-label">
             Première inscription féminine au club SQY PING ?
           </Typography>
           <RadioGroup
+            aria-labelledby="first-female-label"
             value={draft.firstFemaleRegistrationSqy ? "yes" : "no"}
             onChange={(e) =>
               onChange({ firstFemaleRegistrationSqy: e.target.value === "yes" })

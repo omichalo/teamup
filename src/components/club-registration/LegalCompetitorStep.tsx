@@ -68,11 +68,12 @@ export function LegalCompetitorStep({ draft, onChange }: Props) {
 
       <Typography variant="subtitle1">Mineurs — autorisations</Typography>
       <FormControl component="fieldset">
-        <Typography variant="subtitle2" gutterBottom>
+        <Typography variant="subtitle2" gutterBottom id="emergency-medical-label">
           Autorisation d&apos;actes médicaux ou chirurgicaux en urgence pour mon enfant mineur (à
           défaut : adhérent majeur non concerné).
         </Typography>
         <RadioGroup
+          aria-labelledby="emergency-medical-label"
           value={draft.emergencyMedicalAuthorization}
           onChange={(e) =>
             onChange({
@@ -91,11 +92,12 @@ export function LegalCompetitorStep({ draft, onChange }: Props) {
       </FormControl>
 
       <FormControl component="fieldset">
-        <Typography variant="subtitle2" gutterBottom>
+        <Typography variant="subtitle2" gutterBottom id="supervision-label">
           Je m&apos;engage à ce que mon enfant soit pris en charge par le responsable à l&apos;heure
           des cours (sinon : adhérent majeur non concerné).
         </Typography>
         <RadioGroup
+          aria-labelledby="supervision-label"
           value={draft.supervisionAcknowledgement}
           onChange={(e) =>
             onChange({
