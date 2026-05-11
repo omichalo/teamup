@@ -36,25 +36,36 @@ export async function GET() {
     }
 
     const db = getFirestoreAdmin();
+    /* Tri en mémoire (un soumettant a typiquement <10 dossiers, on évite ainsi
+       la dépendance à l'index composite `submitterUid + submittedAt desc`
+       déclaré dans firestore.indexes.json mais qui peut ne pas être encore
+       déployé sur l'environnement courant). Limite serveur volontairement
+       plus large que la limite finale pour conserver les plus récents même
+       en cas de borderline. */
     const snap = await db
       .collection(COLLECTION)
       .where("submitterUid", "==", decoded.uid)
-      .orderBy("submittedAt", "desc")
-      .limit(20)
+      .limit(50)
       .get();
 
-    const registrations = snap.docs.map((doc) => {
-      const data = doc.data();
-      const summary: Record<string, unknown> = { id: doc.id };
-      for (const key of LIST_FIELDS) {
-        if (data[key] !== undefined) {
-          summary[key] = data[key];
+    const registrations = snap.docs
+      .map((doc) => {
+        const data = doc.data();
+        const summary: Record<string, unknown> = { id: doc.id };
+        for (const key of LIST_FIELDS) {
+          if (data[key] !== undefined) {
+            summary[key] = data[key];
+          }
         }
-      }
-      summary.submittedAt = data.submittedAt?.toDate?.()?.toISOString?.() ?? null;
-      summary.updatedAt = data.updatedAt?.toDate?.()?.toISOString?.() ?? null;
-      return summary;
-    });
+        const submittedAtMs: number = data.submittedAt?.toMillis?.() ?? 0;
+        summary.submittedAt =
+          data.submittedAt?.toDate?.()?.toISOString?.() ?? null;
+        summary.updatedAt = data.updatedAt?.toDate?.()?.toISOString?.() ?? null;
+        return { summary, submittedAtMs };
+      })
+      .sort((a, b) => b.submittedAtMs - a.submittedAtMs)
+      .slice(0, 20)
+      .map((entry) => entry.summary);
 
     return jsonNoStore({ registrations }, { status: 200 });
   } catch (error) {

@@ -6,6 +6,7 @@ import {
   Button,
   Card,
   CardContent,
+  CircularProgress,
   Stack,
   Step,
   StepButton,
@@ -16,6 +17,7 @@ import { isValidFrenchPhoneSurface } from "@/lib/club-registration/phone-fr";
 import type { ClubRegistrationPayload } from "@/lib/club-registration/schema";
 import { clubRegistrationPayloadSchema } from "@/lib/club-registration/schema";
 import { isMinorAt } from "@/lib/club-registration/age";
+import { submitRegistration } from "@/lib/club-registration/submit";
 import type { RegistrationDraft } from "./registration-defaults";
 import { IdentityStep } from "./IdentityStep";
 import { SectionSlotsStep } from "./SectionSlotsStep";
@@ -25,6 +27,8 @@ import { RecapStep } from "./RecapStep";
 import { useRegistrationDraft } from "./useRegistrationDraft";
 import { useRegistrationDraftStorage } from "./useRegistrationDraftStorage";
 import { DraftStorageDisclosure } from "./DraftStorageDisclosure";
+import { AccountEmailTransparencyBanner } from "./AccountEmailTransparencyBanner";
+import { AuthDialog } from "@/components/auth/AuthDialog";
 
 const STEPS = [
   "Identité et coordonnées",
@@ -35,8 +39,6 @@ const STEPS = [
 ];
 
 const STEPS_SHORT = ["Identité", "Sections", "Médical", "Autorisations", "Récap"];
-
-const SUBMIT_ENABLED = process.env.NEXT_PUBLIC_HYBRID_SUBMIT_ENABLED === "true";
 
 function validateStep(activeStep: number, draft: RegistrationDraft): string | null {
   if (activeStep === 0) {
@@ -154,6 +156,9 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
   const [hydrating, setHydrating] = useState(true);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[] | undefined> | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [authDialogOpen, setAuthDialogOpen] = useState(false);
+  const pendingPayloadRef = useRef<ClubRegistrationPayload | null>(null);
   const hasHydratedRef = useRef(false);
 
   /* Hydratation au mount : local-first, fallback éventuel sur le draft serveur (lecture seule pour l'instant). */
@@ -235,8 +240,45 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
   };
 
   /**
-   * Soumission désactivée tant que le feature flag est off.
-   * En PR 2, ce handler ouvrira l'AuthDialog en mode anonyme ou postera directement.
+   * Envoie le dossier au serveur. La validation Zod est rejouée côté client
+   * pour fail-fast ; le serveur revalide le payload et persiste en base.
+   *
+   * En cas de succès on déclenche un hard navigation : le `useAuth` du
+   * Layout ne se ré-instancie pas après un soft navigation, du coup il
+   * resterait sur `user = null` (bouton « Connexion » au lieu de l'avatar)
+   * tant qu'on ne recharge pas la page. C'est aussi le comportement
+   * historique des pages /login (cf. window.location.href = next).
+   */
+  const performSubmit = useCallback(
+    async (payload: ClubRegistrationPayload) => {
+      setSubmitError(null);
+      setFieldErrors(null);
+      setSubmitting(true);
+      try {
+        const result = await submitRegistration(payload);
+        if (result.ok) {
+          storage.clear();
+          actions.reset();
+          setActiveStep(0);
+          window.location.assign(
+            `/club/mes-inscriptions?created=${encodeURIComponent(result.id)}`
+          );
+          return;
+        }
+        if (result.fieldErrors) {
+          setFieldErrors(result.fieldErrors);
+        }
+        setSubmitError(result.error);
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [actions, storage]
+  );
+
+  /**
+   * Point d'entrée du clic « Envoyer ». Validation finale + bascule éventuelle
+   * vers l'AuthDialog si l'utilisateur est anonyme.
    */
   const handleSubmit = async () => {
     setSubmitError(null);
@@ -252,27 +294,34 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
     const payload = buildPayload();
     const parsed = clubRegistrationPayloadSchema.safeParse(payload);
     if (!parsed.success) {
-      setFieldErrors(parsed.error.flatten().fieldErrors as Record<string, string[] | undefined>);
+      setFieldErrors(
+        parsed.error.flatten().fieldErrors as Record<string, string[] | undefined>
+      );
       setSubmitError("Certaines informations sont invalides ou incomplètes.");
       return;
     }
 
-    if (!SUBMIT_ENABLED) {
-      setSubmitError(
-        "La soumission en ligne sera disponible prochainement. Vos informations sont enregistrées localement."
-      );
-      return;
-    }
-
     if (!accountEmail) {
-      setSubmitError(
-        "La soumission nécessite d’être connecté. La connexion intégrée arrive dans la prochaine livraison."
-      );
+      pendingPayloadRef.current = payload;
+      setAuthDialogOpen(true);
       return;
     }
 
-    /* PR 2 : POST /api/club/registration */
+    await performSubmit(payload);
   };
+
+  /**
+   * Callback de l'AuthDialog : la session vient d'être créée côté serveur,
+   * on enchaîne directement avec le POST sans demander à l'utilisateur de
+   * cliquer une seconde fois.
+   */
+  const handleAuthSuccess = useCallback(async () => {
+    setAuthDialogOpen(false);
+    const payload = pendingPayloadRef.current;
+    pendingPayloadRef.current = null;
+    if (!payload) return;
+    await performSubmit(payload);
+  }, [performSubmit]);
 
   return (
     <Stack spacing={3}>
@@ -362,7 +411,9 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
         justifyContent={activeStep === 0 ? "flex-end" : "space-between"}
       >
         {activeStep > 0 ? (
-          <Button onClick={handleBack}>Retour</Button>
+          <Button onClick={handleBack} disabled={submitting}>
+            Retour
+          </Button>
         ) : null}
         {activeStep < STEPS.length - 1 ? (
           <Button variant="contained" onClick={handleNext}>
@@ -372,16 +423,29 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
           <Button
             variant="contained"
             onClick={handleSubmit}
-            disabled={!SUBMIT_ENABLED}
+            disabled={submitting}
+            startIcon={submitting ? <CircularProgress size={16} /> : undefined}
           >
-            {SUBMIT_ENABLED
-              ? accountEmail
-                ? "Envoyer ma demande au club"
-                : "Se connecter pour envoyer"
-              : "Soumission disponible prochainement"}
+            {accountEmail
+              ? submitting
+                ? "Envoi en cours…"
+                : "Envoyer ma demande au club"
+              : "Se connecter pour envoyer"}
           </Button>
         )}
       </Stack>
+
+      <AuthDialog
+        open={authDialogOpen}
+        onClose={() => {
+          if (submitting) return;
+          setAuthDialogOpen(false);
+          pendingPayloadRef.current = null;
+        }}
+        defaultMode="login"
+        onSuccess={handleAuthSuccess}
+        headerSlot={<AccountEmailTransparencyBanner accountEmail={null} />}
+      />
 
       <DraftStorageDisclosure
         status={storage.status}
