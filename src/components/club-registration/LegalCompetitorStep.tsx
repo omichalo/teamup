@@ -47,12 +47,13 @@ export function LegalCompetitorStep({ draft, onChange }: Props) {
         </a>{" "}
         et les réseaux sociaux.
       </Typography>
-      <FormControl component="fieldset">
-        <Typography variant="subtitle2" gutterBottom>
+      <FormControl component="fieldset" required>
+        <Typography variant="subtitle2" gutterBottom id="photo-consent-label">
           Acceptez-vous une diffusion d&apos;images à caractère sportif vous concernant (ou votre
           enfant mineur) ?
         </Typography>
         <RadioGroup
+          aria-labelledby="photo-consent-label"
           value={draft.photoConsent}
           onChange={(e) =>
             onChange({

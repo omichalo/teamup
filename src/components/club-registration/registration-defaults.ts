@@ -1,11 +1,23 @@
 import type { ClubRegistrationPayload, Representative } from "@/lib/club-registration/schema";
 
 /**
- * Forme du draft local. Conserve une bascule UI pour `internalRulesAccepted`
- * (case à cocher contrôlée par l'utilisateur, alors que côté schéma on attend `true`).
+ * Forme du draft local.
+ *
+ * Diffère du payload final sur trois points :
+ * - `internalRulesAccepted` côté schéma exige `true` ; on expose un `rulesAccepted: boolean`
+ *   pour rester contrôlable dans l'UI.
+ * - `sex` et `photoConsent` autorisent la chaîne vide tant que l'utilisateur n'a pas
+ *   activement choisi. RGPD oblige : le consentement à la diffusion d'images doit être
+ *   un acte positif (pas de pré-cochage), et le sexe ne doit pas être imposé par défaut.
+ *   `buildPayload()` côté wizard refuse la chaîne vide avant tout POST.
  */
-export type RegistrationDraft = Omit<ClubRegistrationPayload, "internalRulesAccepted"> & {
+export type RegistrationDraft = Omit<
+  ClubRegistrationPayload,
+  "internalRulesAccepted" | "sex" | "photoConsent"
+> & {
   rulesAccepted: boolean;
+  sex: ClubRegistrationPayload["sex"] | "";
+  photoConsent: ClubRegistrationPayload["photoConsent"] | "";
 };
 
 export type { Representative };
@@ -26,7 +38,7 @@ export function createEmptyDraft(): RegistrationDraft {
     adherentRole: "self",
     firstName: "",
     lastName: "",
-    sex: "male",
+    sex: "",
     birthCity: "",
     birthDate: "",
     adherentEmail: "",
@@ -46,7 +58,7 @@ export function createEmptyDraft(): RegistrationDraft {
     reductionTypes: [],
     passSportCode: "",
     firstFemaleRegistrationSqy: undefined,
-    photoConsent: "accept",
+    photoConsent: "",
     emergencyMedicalAuthorization: "not_applicable_adult",
     supervisionAcknowledgement: "not_applicable_adult",
     rulesAccepted: false,
