@@ -92,9 +92,9 @@ export function ResendVerificationForm() {
       </Button>
 
       <Stack alignItems="center" sx={{ mt: 2 }}>
-        <NextLink href="/login" passHref legacyBehavior>
-          <MuiLink underline="hover">Retour à la connexion</MuiLink>
-        </NextLink>
+        <MuiLink component={NextLink} href="/login" underline="hover">
+          Retour à la connexion
+        </MuiLink>
       </Stack>
     </Box>
   );

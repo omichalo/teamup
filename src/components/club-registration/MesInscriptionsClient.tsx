@@ -122,9 +122,9 @@ export function MesInscriptionsClient() {
           <Typography variant="h4" component="h1">
             Mes inscriptions
           </Typography>
-          <NextLink href="/club/inscription" passHref legacyBehavior>
-            <Button variant="contained">Nouvelle inscription</Button>
-          </NextLink>
+          <Button component={NextLink} href="/club/inscription" variant="contained">
+            Nouvelle inscription
+          </Button>
         </Stack>
 
         {justCreated ? (

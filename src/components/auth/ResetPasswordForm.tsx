@@ -118,18 +118,22 @@ export function ResetPasswordForm({ oobCode, onSuccess }: Props) {
         <Alert
           severity="error"
           action={
-            <NextLink href="/reset" passHref legacyBehavior>
-              <Button color="inherit" size="small" variant="outlined">
-                Demander un nouveau lien
-              </Button>
-            </NextLink>
+            <Button
+              component={NextLink}
+              href="/reset"
+              color="inherit"
+              size="small"
+              variant="outlined"
+            >
+              Demander un nouveau lien
+            </Button>
           }
         >
           {err}
         </Alert>
-        <NextLink href="/login" passHref legacyBehavior>
-          <MuiLink underline="hover">Retour à la connexion</MuiLink>
-        </NextLink>
+        <MuiLink component={NextLink} href="/login" underline="hover">
+          Retour à la connexion
+        </MuiLink>
       </Stack>
     );
   }
@@ -188,9 +192,9 @@ export function ResetPasswordForm({ oobCode, onSuccess }: Props) {
       </Button>
 
       <Stack alignItems="center" sx={{ mt: 2 }}>
-        <NextLink href="/login" passHref legacyBehavior>
-          <MuiLink underline="hover">Retour à la connexion</MuiLink>
-        </NextLink>
+        <MuiLink component={NextLink} href="/login" underline="hover">
+          Retour à la connexion
+        </MuiLink>
       </Stack>
     </Box>
   );

@@ -187,9 +187,13 @@ function LoginPanel({
           embedded={embedded}
         />
         {embedded ? null : (
-          <NextLink href="/resend-verification" passHref legacyBehavior>
-            <MuiLink underline="hover">Renvoyer l’email de vérification</MuiLink>
-          </NextLink>
+          <MuiLink
+            component={NextLink}
+            href="/resend-verification"
+            underline="hover"
+          >
+            Renvoyer l’email de vérification
+          </MuiLink>
         )}
       </Stack>
     </Box>
@@ -496,9 +500,13 @@ function ModeSwitch({
     );
   }
   return (
-    <NextLink href={MODE_HREF[target]} passHref legacyBehavior>
-      <MuiLink underline="hover">{label}</MuiLink>
-    </NextLink>
+    <MuiLink
+      component={NextLink}
+      href={MODE_HREF[target]}
+      underline="hover"
+    >
+      {label}
+    </MuiLink>
   );
 }
 
