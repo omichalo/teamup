@@ -78,6 +78,7 @@ export function SectionSlotsStep({ draft, onChange }: Props) {
         <Select
           labelId="main-section-label"
           label="Section principale"
+          name="mainSectionId"
           value={draft.mainSectionId}
           onChange={(e) => {
             const next = e.target.value as RegistrationDraft["mainSectionId"];
@@ -94,7 +95,13 @@ export function SectionSlotsStep({ draft, onChange }: Props) {
       </FormControl>
 
       <Stack spacing={0.5}>
-        <Typography variant="subtitle2">Autres sections</Typography>
+        <Typography
+          variant="subtitle2"
+          data-field="additionalSectionIds"
+          tabIndex={-1}
+        >
+          Autres sections
+        </Typography>
         <FormGroup>
           {SECTION_PRINCIPALE_OPTIONS.filter((s) => s.id !== draft.mainSectionId).map((s) => (
             <FormControlLabel
@@ -111,7 +118,9 @@ export function SectionSlotsStep({ draft, onChange }: Props) {
         </FormGroup>
       </Stack>
 
-      <Typography variant="subtitle2">Créneaux souhaités</Typography>
+      <Typography variant="subtitle2" data-field="slotIds" tabIndex={-1}>
+        Créneaux souhaités
+      </Typography>
       {CLUB_REGISTRATION_SITES.map((site) => (
         <Accordion
           key={site.id}

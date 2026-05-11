@@ -107,6 +107,7 @@ export function MedicalFamilyStep({ draft, onChange }: Props) {
       <FormControl component="fieldset" required>
         <RadioGroup
           aria-labelledby="medical-certificate-label"
+          name="medicalCertificateDeclaration"
           value={declarationIsIncompatible ? "" : draft.medicalCertificateDeclaration}
           onChange={(e) =>
             onChange({
@@ -130,6 +131,7 @@ export function MedicalFamilyStep({ draft, onChange }: Props) {
         <Select
           labelId="cert-attestation-label"
           label="Attestation d’inscription"
+          name="wantsRegistrationCertificate"
           value={draft.wantsRegistrationCertificate ? "yes" : "no"}
           onChange={(e) =>
             onChange({ wantsRegistrationCertificate: e.target.value === "yes" })
@@ -146,6 +148,7 @@ export function MedicalFamilyStep({ draft, onChange }: Props) {
         </Typography>
         <RadioGroup
           aria-labelledby="family-order-label"
+          name="familyRegistrationOrder"
           value={draft.familyRegistrationOrder}
           onChange={(e) =>
             onChange({
@@ -165,7 +168,13 @@ export function MedicalFamilyStep({ draft, onChange }: Props) {
       </FormControl>
 
       <Stack spacing={0.5}>
-        <Typography variant="subtitle2">Réductions éventuelles</Typography>
+        <Typography
+          variant="subtitle2"
+          data-field="reductionTypes"
+          tabIndex={-1}
+        >
+          Réductions éventuelles
+        </Typography>
         <FormGroup>
           {REDUCTION_OPTIONS.map((r) => (
             <FormControlLabel
@@ -187,6 +196,7 @@ export function MedicalFamilyStep({ draft, onChange }: Props) {
         value={draft.passSportCode ?? ""}
         onChange={(e) => onChange({ passSportCode: e.target.value })}
         fullWidth
+        inputProps={{ "data-field": "passSportCode" }}
       />
 
       <Alert severity="info">

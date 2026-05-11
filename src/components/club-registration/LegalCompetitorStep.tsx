@@ -2,6 +2,7 @@
 
 import {
   Alert,
+  Box,
   Checkbox,
   FormControl,
   FormControlLabel,
@@ -64,6 +65,7 @@ export function LegalCompetitorStep({ draft, onChange }: Props) {
         </Typography>
         <RadioGroup
           aria-labelledby="photo-consent-label"
+          name="photoConsent"
           value={draft.photoConsent}
           onChange={(e) =>
             onChange({
@@ -83,50 +85,55 @@ export function LegalCompetitorStep({ draft, onChange }: Props) {
             Ces deux autorisations sont obligatoires pour l’inscription d’un mineur. Elles ne
             sont pas affichées si l’adhérent est majeur.
           </Typography>
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={draft.emergencyMedicalAuthorization === "yes"}
-                onChange={(e) =>
-                  onChange({
-                    emergencyMedicalAuthorization: e.target.checked
-                      ? "yes"
-                      : "not_applicable_adult",
-                  })
-                }
-              />
-            }
-            label={
-              <Typography variant="body2" component="span">
-                J’autorise les actes médicaux ou chirurgicaux en urgence pour mon enfant
-                mineur.
-              </Typography>
-            }
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={draft.supervisionAcknowledgement === "yes"}
-                onChange={(e) =>
-                  onChange({
-                    supervisionAcknowledgement: e.target.checked
-                      ? "yes"
-                      : "not_applicable_adult",
-                  })
-                }
-              />
-            }
-            label={
-              <Typography variant="body2" component="span">
-                Je m’engage à ce que mon enfant soit pris en charge par le responsable à
-                l’heure des cours.
-              </Typography>
-            }
-          />
+          <Box data-field="emergencyMedicalAuthorization" tabIndex={-1}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={draft.emergencyMedicalAuthorization === "yes"}
+                  onChange={(e) =>
+                    onChange({
+                      emergencyMedicalAuthorization: e.target.checked
+                        ? "yes"
+                        : "not_applicable_adult",
+                    })
+                  }
+                />
+              }
+              label={
+                <Typography variant="body2" component="span">
+                  J’autorise les actes médicaux ou chirurgicaux en urgence pour mon enfant
+                  mineur.
+                </Typography>
+              }
+            />
+          </Box>
+          <Box data-field="supervisionAcknowledgement" tabIndex={-1}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={draft.supervisionAcknowledgement === "yes"}
+                  onChange={(e) =>
+                    onChange({
+                      supervisionAcknowledgement: e.target.checked
+                        ? "yes"
+                        : "not_applicable_adult",
+                    })
+                  }
+                />
+              }
+              label={
+                <Typography variant="body2" component="span">
+                  Je m’engage à ce que mon enfant soit pris en charge par le responsable à
+                  l’heure des cours.
+                </Typography>
+              }
+            />
+          </Box>
         </>
       ) : null}
 
       <FormControlLabel
+        data-field="internalRulesAccepted"
         control={
           <Checkbox
             checked={draft.rulesAccepted}
@@ -158,6 +165,7 @@ export function LegalCompetitorStep({ draft, onChange }: Props) {
           </Alert>
         ) : (
           <FormControlLabel
+            data-field="wantsCompetitorExtras"
             control={
               <Switch
                 checked={draft.wantsCompetitorExtras}
@@ -175,6 +183,7 @@ export function LegalCompetitorStep({ draft, onChange }: Props) {
               <Select
                 labelId="jersey-label"
                 label="Taille de maillot de compétition"
+                name="competitionJerseySize"
                 value={draft.competitionJerseySize ?? ""}
                 onChange={(e) =>
                   onChange({
@@ -193,7 +202,13 @@ export function LegalCompetitorStep({ draft, onChange }: Props) {
               </Select>
             </FormControl>
 
-            <Typography variant="subtitle2">Compétitions envisagées</Typography>
+            <Typography
+              variant="subtitle2"
+              data-field="competitionIds"
+              tabIndex={-1}
+            >
+              Compétitions envisagées
+            </Typography>
             <FormGroup>
               {COMPETITION_OPTIONS.map((c) => (
                 <FormControlLabel
