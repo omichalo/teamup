@@ -20,6 +20,7 @@ import {
   CLUB_REGISTRATION_EXTERNAL_LINKS,
   JERSEY_SIZES,
 } from "@/lib/club-registration/constants";
+import { isMinorAt } from "@/lib/club-registration/age";
 import type { RegistrationDraft } from "./registration-defaults";
 
 const ADAPTED_SECTIONS = new Set(["handisport", "sport-adapte"]);
@@ -39,6 +40,12 @@ export function LegalCompetitorStep({ draft, onChange }: Props) {
     }
     onChange({ competitionIds: Array.from(set) });
   };
+
+  /* Les autorisations « actes médicaux d'urgence » et « prise en charge à l'heure
+     des cours » sont strictement pertinentes pour un mineur : un majeur n'a pas
+     à se prononcer dessus. On les masque et on délègue au wizard la responsabilité
+     de poser `not_applicable_adult` au moment du build du payload. */
+  const isMinor = isMinorAt(draft.birthDate);
 
   return (
     <Stack spacing={2}>
@@ -69,54 +76,55 @@ export function LegalCompetitorStep({ draft, onChange }: Props) {
         </RadioGroup>
       </FormControl>
 
-      <Typography variant="subtitle1">Mineurs — autorisations</Typography>
-      <FormControl component="fieldset">
-        <Typography variant="subtitle2" gutterBottom id="emergency-medical-label">
-          Autorisation d&apos;actes médicaux ou chirurgicaux en urgence pour mon enfant mineur (à
-          défaut : adhérent majeur non concerné).
-        </Typography>
-        <RadioGroup
-          aria-labelledby="emergency-medical-label"
-          value={draft.emergencyMedicalAuthorization}
-          onChange={(e) =>
-            onChange({
-              emergencyMedicalAuthorization: e.target
-                .value as RegistrationDraft["emergencyMedicalAuthorization"],
-            })
-          }
-        >
-          <FormControlLabel value="yes" control={<Radio />} label="Oui" />
+      {isMinor ? (
+        <>
+          <Typography variant="subtitle1">Autorisations pour l’adhérent mineur</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Ces deux autorisations sont obligatoires pour l’inscription d’un mineur. Elles ne
+            sont pas affichées si l’adhérent est majeur.
+          </Typography>
           <FormControlLabel
-            value="not_applicable_adult"
-            control={<Radio />}
-            label="Adhérent majeur — non concerné"
+            control={
+              <Checkbox
+                checked={draft.emergencyMedicalAuthorization === "yes"}
+                onChange={(e) =>
+                  onChange({
+                    emergencyMedicalAuthorization: e.target.checked
+                      ? "yes"
+                      : "not_applicable_adult",
+                  })
+                }
+              />
+            }
+            label={
+              <Typography variant="body2" component="span">
+                J’autorise les actes médicaux ou chirurgicaux en urgence pour mon enfant
+                mineur.
+              </Typography>
+            }
           />
-        </RadioGroup>
-      </FormControl>
-
-      <FormControl component="fieldset">
-        <Typography variant="subtitle2" gutterBottom id="supervision-label">
-          Je m&apos;engage à ce que mon enfant soit pris en charge par le responsable à l&apos;heure
-          des cours (sinon : adhérent majeur non concerné).
-        </Typography>
-        <RadioGroup
-          aria-labelledby="supervision-label"
-          value={draft.supervisionAcknowledgement}
-          onChange={(e) =>
-            onChange({
-              supervisionAcknowledgement: e.target
-                .value as RegistrationDraft["supervisionAcknowledgement"],
-            })
-          }
-        >
-          <FormControlLabel value="yes" control={<Radio />} label="Oui" />
           <FormControlLabel
-            value="not_applicable_adult"
-            control={<Radio />}
-            label="Adhérent majeur — non concerné"
+            control={
+              <Checkbox
+                checked={draft.supervisionAcknowledgement === "yes"}
+                onChange={(e) =>
+                  onChange({
+                    supervisionAcknowledgement: e.target.checked
+                      ? "yes"
+                      : "not_applicable_adult",
+                  })
+                }
+              />
+            }
+            label={
+              <Typography variant="body2" component="span">
+                Je m’engage à ce que mon enfant soit pris en charge par le responsable à
+                l’heure des cours.
+              </Typography>
+            }
           />
-        </RadioGroup>
-      </FormControl>
+        </>
+      ) : null}
 
       <FormControlLabel
         control={

@@ -335,6 +335,86 @@ describe("clubRegistrationPayloadSchema", () => {
     expect(r.success).toBe(true);
   });
 
+  it("refuse un mineur sans autorisation médicale d'urgence (yes)", () => {
+    const r = clubRegistrationPayloadSchema.safeParse(
+      buildPayload({
+        birthDate: "2015-04-12",
+        adherentRole: "minor_dependent",
+        emergencyMedicalAuthorization: "not_applicable_adult",
+        supervisionAcknowledgement: "yes",
+        representatives: [
+          {
+            role: "mother",
+            firstName: "Marie",
+            lastName: "Dupont",
+            email: "marie@example.com",
+            phone: "0612345670",
+          },
+        ],
+      })
+    );
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(
+        r.error.issues.some((i) => i.path.includes("emergencyMedicalAuthorization"))
+      ).toBe(true);
+    }
+  });
+
+  it("refuse un mineur sans engagement de prise en charge (yes)", () => {
+    const r = clubRegistrationPayloadSchema.safeParse(
+      buildPayload({
+        birthDate: "2015-04-12",
+        adherentRole: "minor_dependent",
+        emergencyMedicalAuthorization: "yes",
+        supervisionAcknowledgement: "not_applicable_adult",
+        representatives: [
+          {
+            role: "mother",
+            firstName: "Marie",
+            lastName: "Dupont",
+            email: "marie@example.com",
+            phone: "0612345670",
+          },
+        ],
+      })
+    );
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(
+        r.error.issues.some((i) => i.path.includes("supervisionAcknowledgement"))
+      ).toBe(true);
+    }
+  });
+
+  it("refuse un majeur qui aurait `yes` sur l'autorisation médicale d'urgence", () => {
+    const r = clubRegistrationPayloadSchema.safeParse(
+      buildPayload({
+        emergencyMedicalAuthorization: "yes",
+      })
+    );
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(
+        r.error.issues.some((i) => i.path.includes("emergencyMedicalAuthorization"))
+      ).toBe(true);
+    }
+  });
+
+  it("refuse un majeur qui aurait `yes` sur l'engagement de prise en charge", () => {
+    const r = clubRegistrationPayloadSchema.safeParse(
+      buildPayload({
+        supervisionAcknowledgement: "yes",
+      })
+    );
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(
+        r.error.issues.some((i) => i.path.includes("supervisionAcknowledgement"))
+      ).toBe(true);
+    }
+  });
+
   it("accepte `questionnaire_yes_certificate_required` quel que soit l'âge", () => {
     const young = clubRegistrationPayloadSchema.safeParse(
       buildPayload({

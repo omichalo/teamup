@@ -235,8 +235,48 @@ export const clubRegistrationPayloadSchema = z
       });
     }
 
-    /* Cohérence âge / rôle */
+    /* Cohérence âge / autorisations légales : seuls les mineurs sont concernés par
+       les autorisations « actes médicaux d'urgence » et « prise en charge à l'heure
+       des cours ». L'UI les masque pour les majeurs et les exige (case cochée) pour
+       les mineurs. Côté serveur on refuse les combinaisons incohérentes. */
     const minor = isMinorAt(data.birthDate);
+    if (minor) {
+      if (data.emergencyMedicalAuthorization !== "yes") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "L'autorisation d'actes médicaux d'urgence est obligatoire pour un mineur.",
+          path: ["emergencyMedicalAuthorization"],
+        });
+      }
+      if (data.supervisionAcknowledgement !== "yes") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "L'engagement de prise en charge à l'heure des cours est obligatoire pour un mineur.",
+          path: ["supervisionAcknowledgement"],
+        });
+      }
+    } else {
+      if (data.emergencyMedicalAuthorization !== "not_applicable_adult") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "L'autorisation d'actes médicaux d'urgence ne s'applique pas à un adhérent majeur.",
+          path: ["emergencyMedicalAuthorization"],
+        });
+      }
+      if (data.supervisionAcknowledgement !== "not_applicable_adult") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "L'engagement de prise en charge à l'heure des cours ne s'applique pas à un adhérent majeur.",
+          path: ["supervisionAcknowledgement"],
+        });
+      }
+    }
+
+    /* Cohérence âge / rôle */
     if (minor && data.adherentRole === "self") {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

@@ -150,6 +150,14 @@ function validateStep(activeStep: number, draft: RegistrationDraft): string | nu
     if (!draft.photoConsent) {
       return "Indiquez votre choix sur la diffusion d’images (acte de consentement explicite).";
     }
+    if (isMinorAt(draft.birthDate)) {
+      if (draft.emergencyMedicalAuthorization !== "yes") {
+        return "Cochez l’autorisation d’actes médicaux d’urgence (obligatoire pour un mineur).";
+      }
+      if (draft.supervisionAcknowledgement !== "yes") {
+        return "Cochez l’engagement de prise en charge à l’heure des cours (obligatoire pour un mineur).";
+      }
+    }
     if (!draft.rulesAccepted) return "Vous devez accepter le règlement intérieur pour continuer.";
     if (draft.wantsCompetitorExtras && !draft.competitionJerseySize) {
       return "Indiquez une taille de maillot pour la section compétiteur.";
@@ -265,10 +273,22 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
       draft.mainSectionId === "handisport" || draft.mainSectionId === "sport-adapte";
     const effectiveCompetitorExtras =
       !isAdaptedMainSection && draft.wantsCompetitorExtras;
+    /* Les autorisations légales mineurs sont forcées à `not_applicable_adult` côté
+       majeur (l'UI les masque). Côté mineur l'UI exige la case cochée donc la valeur
+       est déjà `yes` dans le draft. On garde une cohérence ceinture/bretelles. */
+    const minor = isMinorAt(draft.birthDate);
+    const emergencyMedicalAuthorization = minor
+      ? draft.emergencyMedicalAuthorization
+      : ("not_applicable_adult" as const);
+    const supervisionAcknowledgement = minor
+      ? draft.supervisionAcknowledgement
+      : ("not_applicable_adult" as const);
     return {
       ...rest,
       sex,
       photoConsent,
+      emergencyMedicalAuthorization,
+      supervisionAcknowledgement,
       internalRulesAccepted: true as const,
       wantsCompetitorExtras: effectiveCompetitorExtras,
       competitionJerseySize:
