@@ -13,7 +13,6 @@ import {
   Stepper,
   Typography,
 } from "@mui/material";
-import { useRouter } from "next/navigation";
 import { isValidFrenchPhoneSurface } from "@/lib/club-registration/phone-fr";
 import type { ClubRegistrationPayload } from "@/lib/club-registration/schema";
 import { clubRegistrationPayloadSchema } from "@/lib/club-registration/schema";
@@ -151,7 +150,6 @@ type Props = {
 };
 
 export function ClubRegistrationWizard({ accountEmail }: Props) {
-  const router = useRouter();
   const { draft, actions } = useRegistrationDraft();
   const storage = useRegistrationDraftStorage();
   const [activeStep, setActiveStep] = useState(0);
@@ -244,6 +242,12 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
   /**
    * Envoie le dossier au serveur. La validation Zod est rejouée côté client
    * pour fail-fast ; le serveur revalide le payload et persiste en base.
+   *
+   * En cas de succès on déclenche un hard navigation : le `useAuth` du
+   * Layout ne se ré-instancie pas après un soft navigation, du coup il
+   * resterait sur `user = null` (bouton « Connexion » au lieu de l'avatar)
+   * tant qu'on ne recharge pas la page. C'est aussi le comportement
+   * historique des pages /login (cf. window.location.href = next).
    */
   const performSubmit = useCallback(
     async (payload: ClubRegistrationPayload) => {
@@ -256,7 +260,9 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
           storage.clear();
           actions.reset();
           setActiveStep(0);
-          router.push(`/club/mes-inscriptions?created=${encodeURIComponent(result.id)}`);
+          window.location.assign(
+            `/club/mes-inscriptions?created=${encodeURIComponent(result.id)}`
+          );
           return;
         }
         if (result.fieldErrors) {
@@ -267,7 +273,7 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
         setSubmitting(false);
       }
     },
-    [actions, router, storage]
+    [actions, storage]
   );
 
   /**
