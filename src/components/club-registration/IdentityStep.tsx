@@ -160,7 +160,11 @@ export function IdentityStep({
         </Button>
       ) : null}
 
-      <Typography variant="subtitle1" component="h3">
+      <Typography
+        variant="subtitle1"
+        component="h3"
+        sx={{ color: "primary.main", fontWeight: 700 }}
+      >
         Identité de l’adhérent
       </Typography>
 
@@ -267,7 +271,11 @@ export function IdentityStep({
         />
       </Box>
 
-      <Typography variant="subtitle1" component="h3">
+      <Typography
+        variant="subtitle1"
+        component="h3"
+        sx={{ color: "primary.main", fontWeight: 700, pt: 1 }}
+      >
         Contact de l’adhérent
       </Typography>
 
@@ -329,7 +337,11 @@ export function IdentityStep({
 
       {showRepresentatives ? (
         <Stack spacing={1}>
-          <Typography variant="subtitle1" component="h3">
+          <Typography
+            variant="subtitle1"
+            component="h3"
+            sx={{ color: "primary.main", fontWeight: 700, pt: 1 }}
+          >
             Représentants légaux
           </Typography>
           <Typography variant="body2" color="text.secondary">
