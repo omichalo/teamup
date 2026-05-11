@@ -156,7 +156,16 @@ export function IdentityStep({
 
       <FormControl fullWidth required>
         <InputLabel id="sex-label">Sexe</InputLabel>
-        <Select labelId="sex-label" label="Sexe" value={draft.sex} onChange={handleSex}>
+        <Select
+          labelId="sex-label"
+          label="Sexe"
+          value={draft.sex}
+          onChange={handleSex}
+          displayEmpty
+        >
+          <MenuItem value="" disabled>
+            <em>Sélectionner…</em>
+          </MenuItem>
           <MenuItem value="female">Femme</MenuItem>
           <MenuItem value="male">Homme</MenuItem>
           <MenuItem value="other">Autre / Ne pas préciser</MenuItem>

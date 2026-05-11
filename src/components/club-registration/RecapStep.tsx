@@ -41,6 +41,7 @@ const ROLE_LABELS: Record<Representative["role"], string> = {
 };
 
 const SEX_LABELS: Record<RegistrationDraft["sex"], string> = {
+  "": "—",
   female: "Femme",
   male: "Homme",
   other: "Autre / Ne pas préciser",
@@ -66,6 +67,7 @@ const FAMILY_ORDER_LABELS: Record<RegistrationDraft["familyRegistrationOrder"], 
 };
 
 const PHOTO_LABELS: Record<RegistrationDraft["photoConsent"], string> = {
+  "": "—",
   accept: "J’accepte la diffusion d’images",
   refuse: "Je refuse la diffusion d’images",
 };

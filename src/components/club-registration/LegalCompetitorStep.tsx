@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Alert,
   Checkbox,
   FormControl,
   FormControlLabel,
@@ -20,6 +21,8 @@ import {
   JERSEY_SIZES,
 } from "@/lib/club-registration/constants";
 import type { RegistrationDraft } from "./registration-defaults";
+
+const ADAPTED_SECTIONS = new Set(["handisport", "sport-adapte"]);
 
 type Props = {
   draft: RegistrationDraft;
@@ -47,12 +50,13 @@ export function LegalCompetitorStep({ draft, onChange }: Props) {
         </a>{" "}
         et les réseaux sociaux.
       </Typography>
-      <FormControl component="fieldset">
-        <Typography variant="subtitle2" gutterBottom>
+      <FormControl component="fieldset" required>
+        <Typography variant="subtitle2" gutterBottom id="photo-consent-label">
           Acceptez-vous une diffusion d&apos;images à caractère sportif vous concernant (ou votre
           enfant mineur) ?
         </Typography>
         <RadioGroup
+          aria-labelledby="photo-consent-label"
           value={draft.photoConsent}
           onChange={(e) =>
             onChange({
@@ -67,11 +71,12 @@ export function LegalCompetitorStep({ draft, onChange }: Props) {
 
       <Typography variant="subtitle1">Mineurs — autorisations</Typography>
       <FormControl component="fieldset">
-        <Typography variant="subtitle2" gutterBottom>
+        <Typography variant="subtitle2" gutterBottom id="emergency-medical-label">
           Autorisation d&apos;actes médicaux ou chirurgicaux en urgence pour mon enfant mineur (à
           défaut : adhérent majeur non concerné).
         </Typography>
         <RadioGroup
+          aria-labelledby="emergency-medical-label"
           value={draft.emergencyMedicalAuthorization}
           onChange={(e) =>
             onChange({
@@ -90,11 +95,12 @@ export function LegalCompetitorStep({ draft, onChange }: Props) {
       </FormControl>
 
       <FormControl component="fieldset">
-        <Typography variant="subtitle2" gutterBottom>
+        <Typography variant="subtitle2" gutterBottom id="supervision-label">
           Je m&apos;engage à ce que mon enfant soit pris en charge par le responsable à l&apos;heure
           des cours (sinon : adhérent majeur non concerné).
         </Typography>
         <RadioGroup
+          aria-labelledby="supervision-label"
           value={draft.supervisionAcknowledgement}
           onChange={(e) =>
             onChange({
@@ -136,17 +142,25 @@ export function LegalCompetitorStep({ draft, onChange }: Props) {
       />
 
       <Stack spacing={1}>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={draft.wantsCompetitorExtras}
-              onChange={(e) => onChange({ wantsCompetitorExtras: e.target.checked })}
-            />
-          }
-          label="Section compétiteur : taille de maillot et compétitions"
-        />
+        {ADAPTED_SECTIONS.has(draft.mainSectionId) ? (
+          <Alert severity="info">
+            La section compétiteur classique (maillot, championnats fédéraux) ne s’applique pas
+            aux sections handisport et sport adapté. L’option « Compétition handisport » reste
+            disponible dans les compétitions, sans extension compétiteur.
+          </Alert>
+        ) : (
+          <FormControlLabel
+            control={
+              <Switch
+                checked={draft.wantsCompetitorExtras}
+                onChange={(e) => onChange({ wantsCompetitorExtras: e.target.checked })}
+              />
+            }
+            label="Section compétiteur : taille de maillot et compétitions"
+          />
+        )}
 
-        {draft.wantsCompetitorExtras && (
+        {!ADAPTED_SECTIONS.has(draft.mainSectionId) && draft.wantsCompetitorExtras && (
           <>
             <FormControl fullWidth required={draft.wantsCompetitorExtras}>
               <InputLabel id="jersey-label">Taille de maillot de compétition</InputLabel>

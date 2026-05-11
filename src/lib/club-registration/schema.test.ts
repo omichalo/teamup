@@ -193,6 +193,75 @@ describe("clubRegistrationPayloadSchema", () => {
     }
   });
 
+  it("refuse firstFemaleRegistrationSqy orphelin (sex !== female)", () => {
+    const r = clubRegistrationPayloadSchema.safeParse(
+      buildPayload({ sex: "male", firstFemaleRegistrationSqy: true })
+    );
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(
+        r.error.issues.some(
+          (i) =>
+            i.path.includes("firstFemaleRegistrationSqy") &&
+            typeof i.message === "string" &&
+            /sexe féminin/i.test(i.message)
+        )
+      ).toBe(true);
+    }
+  });
+
+  it("accepte un homme avec firstFemaleRegistrationSqy non renseigné (undefined)", () => {
+    const r = clubRegistrationPayloadSchema.safeParse(
+      buildPayload({ sex: "male", firstFemaleRegistrationSqy: undefined })
+    );
+    expect(r.success).toBe(true);
+  });
+
+  it("refuse wantsCompetitorExtras=true avec section handisport", () => {
+    const r = clubRegistrationPayloadSchema.safeParse(
+      buildPayload({
+        mainSectionId: "handisport",
+        slotIds: ["voisins-mar-1830-handisport"],
+        wantsCompetitorExtras: true,
+        competitionJerseySize: "M",
+      })
+    );
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(
+        r.error.issues.some((i) => i.path.includes("wantsCompetitorExtras"))
+      ).toBe(true);
+    }
+  });
+
+  it("refuse wantsCompetitorExtras=true avec section sport-adapté", () => {
+    const r = clubRegistrationPayloadSchema.safeParse(
+      buildPayload({
+        mainSectionId: "sport-adapte",
+        slotIds: ["villepreux-jeu-1030-sport-adapte"],
+        wantsCompetitorExtras: true,
+        competitionJerseySize: "M",
+      })
+    );
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(
+        r.error.issues.some((i) => i.path.includes("wantsCompetitorExtras"))
+      ).toBe(true);
+    }
+  });
+
+  it("accepte une section handisport sans extension compétiteur", () => {
+    const r = clubRegistrationPayloadSchema.safeParse(
+      buildPayload({
+        mainSectionId: "handisport",
+        slotIds: ["voisins-mar-1830-handisport"],
+        wantsCompetitorExtras: false,
+      })
+    );
+    expect(r.success).toBe(true);
+  });
+
   it("refuse un compétiteur sans taille de maillot", () => {
     const r = clubRegistrationPayloadSchema.safeParse(
       buildPayload({ wantsCompetitorExtras: true, competitionJerseySize: undefined })

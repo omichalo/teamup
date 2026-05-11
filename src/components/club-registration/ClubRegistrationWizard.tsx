@@ -44,6 +44,7 @@ function validateStep(activeStep: number, draft: RegistrationDraft): string | nu
   if (activeStep === 0) {
     if (!draft.firstName.trim()) return "Indiquez le prénom de l’adhérent.";
     if (!draft.lastName.trim()) return "Indiquez le nom de l’adhérent.";
+    if (!draft.sex) return "Indiquez le sexe de l’adhérent.";
     if (!draft.birthCity.trim()) return "Indiquez la ville de naissance.";
     if (!draft.birthDate) return "Indiquez la date de naissance.";
 
@@ -127,6 +128,9 @@ function validateStep(activeStep: number, draft: RegistrationDraft): string | nu
     if (draft.slotIds.length === 0) return "Sélectionnez au moins un créneau.";
   }
   if (activeStep === 3) {
+    if (!draft.photoConsent) {
+      return "Indiquez votre choix sur la diffusion d’images (acte de consentement explicite).";
+    }
     if (!draft.rulesAccepted) return "Vous devez accepter le règlement intérieur pour continuer.";
     if (draft.wantsCompetitorExtras && !draft.competitionJerseySize) {
       return "Indiquez une taille de maillot pour la section compétiteur.";
@@ -223,20 +227,37 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
     [activeStep, draft]
   );
 
-  const buildPayload = (): ClubRegistrationPayload => {
-    /* Le toggle `rulesAccepted` est interne à l'UI ; côté schéma on attend `internalRulesAccepted = true`. */
+  /**
+   * Construit le payload final en filtrant les valeurs sentinelles `""` de `sex` et
+   * `photoConsent` (RGPD : consentement et identité ne peuvent pas être pré-cochés).
+   * Retourne `null` si l'utilisateur n'a pas choisi explicitement ; le composant
+   * remonte alors un message ciblé sur l'étape concernée.
+   */
+  const buildPayload = (): ClubRegistrationPayload | null => {
     /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
-    const { rulesAccepted, ...rest } = draft;
-    const payload: ClubRegistrationPayload = {
+    const { rulesAccepted, sex, photoConsent, ...rest } = draft;
+    if (sex === "" || photoConsent === "") {
+      return null;
+    }
+    /* La section compétiteur classique est incompatible avec handisport / sport-adapté
+       (cf. superRefine côté schema). Si l'utilisateur a basculé sa section principale
+       après avoir coché le switch, on force la cohérence au moment du build. */
+    const isAdaptedMainSection =
+      draft.mainSectionId === "handisport" || draft.mainSectionId === "sport-adapte";
+    const effectiveCompetitorExtras =
+      !isAdaptedMainSection && draft.wantsCompetitorExtras;
+    return {
       ...rest,
+      sex,
+      photoConsent,
       internalRulesAccepted: true as const,
+      wantsCompetitorExtras: effectiveCompetitorExtras,
       competitionJerseySize:
-        draft.wantsCompetitorExtras && draft.competitionJerseySize
+        effectiveCompetitorExtras && draft.competitionJerseySize
           ? draft.competitionJerseySize
           : undefined,
-      competitionIds: draft.wantsCompetitorExtras ? draft.competitionIds : [],
+      competitionIds: effectiveCompetitorExtras ? draft.competitionIds : [],
     };
-    return payload;
   };
 
   /**
@@ -291,7 +312,23 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
       return;
     }
 
+    /* Garde-fou supplémentaire : on rejoue la validation de l'étape 1 au cas où
+       l'utilisateur aurait navigué via le stepper sans repasser par "Continuer". */
+    const err0 = validateStep(0, draft);
+    if (err0) {
+      setSubmitError(err0);
+      setActiveStep(0);
+      return;
+    }
+
     const payload = buildPayload();
+    if (!payload) {
+      /* `sex` ou `photoConsent` non choisis : impossible en pratique car validateStep
+         couvre le cas, mais on échoue gracieusement plutôt que de laisser passer un
+         payload incomplet. */
+      setSubmitError("Certaines informations obligatoires sont manquantes.");
+      return;
+    }
     const parsed = clubRegistrationPayloadSchema.safeParse(payload);
     if (!parsed.success) {
       setFieldErrors(

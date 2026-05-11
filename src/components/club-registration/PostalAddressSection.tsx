@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 import Collapse from "@mui/material/Collapse";
-import Link from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
@@ -63,42 +63,27 @@ export function PostalAddressSection({ draft, onChange }: Props) {
             placeholder="Ex. 12 rue Victor Hugo, Paris"
             helperText="Recherchez votre adresse dans la Base Adresse Nationale. Vous pourrez la compléter ensuite."
           />
-          <Link
-            component="button"
+          <Button
             type="button"
-            variant="body2"
+            variant="text"
+            size="small"
             onClick={handleSwitchToManual}
-            sx={{
-              alignSelf: "flex-start",
-              mt: 1,
-              cursor: "pointer",
-              border: 0,
-              background: "none",
-              font: "inherit",
-              textDecoration: "underline",
-            }}
+            sx={{ alignSelf: "flex-start", mt: 1, textTransform: "none" }}
           >
             Mon adresse n&apos;apparaît pas — saisir l&apos;adresse manuellement
-          </Link>
+          </Button>
         </Box>
       ) : (
         <Stack spacing={1}>
-          <Link
-            component="button"
+          <Button
             type="button"
-            variant="body2"
+            variant="text"
+            size="small"
             onClick={handleSwitchToSearch}
-            sx={{
-              alignSelf: "flex-start",
-              cursor: "pointer",
-              border: 0,
-              background: "none",
-              font: "inherit",
-              textDecoration: "underline",
-            }}
+            sx={{ alignSelf: "flex-start", textTransform: "none" }}
           >
             Rechercher une adresse officielle
-          </Link>
+          </Button>
         </Stack>
       )}
 
