@@ -17,6 +17,7 @@ import {
   SECTION_PRINCIPALE_OPTIONS,
 } from "@/lib/club-registration/constants";
 import { toFrenchPhoneMaskedDisplay } from "@/lib/club-registration/phone-fr";
+import { isMinorAt } from "@/lib/club-registration/age";
 import type { RegistrationDraft, Representative } from "./registration-defaults";
 
 type Props = {
@@ -170,6 +171,7 @@ export function RecapStep({ draft, accountEmail, onEditStep }: Props) {
   const slotLabels = draft.slotIds.map(findSlotLabel);
   const reductions = draft.reductionTypes.map(findReductionLabel);
   const competitions = draft.competitionIds.map(findCompetitionLabel);
+  const isMinor = isMinorAt(draft.birthDate);
 
   const fullAddress = [
     draft.addressLine1,
@@ -201,6 +203,14 @@ export function RecapStep({ draft, accountEmail, onEditStep }: Props) {
           { label: "Prénom", value: draft.firstName },
           { label: "Nom", value: draft.lastName },
           { label: "Sexe", value: SEX_LABELS[draft.sex] },
+          ...(draft.sex === "female"
+            ? [
+                {
+                  label: "1ʳᵉ inscription féminine au club",
+                  value: draft.firstFemaleRegistrationSqy ? "Oui" : "Non",
+                } as Field,
+              ]
+            : []),
           { label: "Né(e) le", value: draft.birthDate },
           { label: "Ville de naissance", value: draft.birthCity },
         ]}
@@ -312,14 +322,6 @@ export function RecapStep({ draft, accountEmail, onEditStep }: Props) {
               ),
           },
           { label: "Code Pass Sport", value: draft.passSportCode || "—" },
-          ...(draft.sex === "female"
-            ? [
-                {
-                  label: "1ʳᵉ inscription féminine au club",
-                  value: draft.firstFemaleRegistrationSqy ? "Oui" : "Non",
-                } as Field,
-              ]
-            : []),
         ]}
       />
 
@@ -328,14 +330,18 @@ export function RecapStep({ draft, accountEmail, onEditStep }: Props) {
         onEdit={() => onEditStep(STEP_INDEX.consents)}
         fields={[
           { label: "Image et communication", value: PHOTO_LABELS[draft.photoConsent] },
-          {
-            label: "Acte médical d’urgence (mineur)",
-            value: CONSENT_LABELS[draft.emergencyMedicalAuthorization],
-          },
-          {
-            label: "Prise en charge à l’heure des cours (mineur)",
-            value: CONSENT_LABELS[draft.supervisionAcknowledgement],
-          },
+          ...(isMinor
+            ? ([
+                {
+                  label: "Acte médical d’urgence",
+                  value: CONSENT_LABELS[draft.emergencyMedicalAuthorization],
+                },
+                {
+                  label: "Prise en charge à l’heure des cours",
+                  value: CONSENT_LABELS[draft.supervisionAcknowledgement],
+                },
+              ] as Field[])
+            : []),
           {
             label: "Règlement intérieur",
             value: draft.rulesAccepted ? "Accepté" : "Non accepté",
