@@ -1,32 +1,14 @@
 export const runtime = "nodejs";
 
 import { jsonNoStore } from "@/lib/http/cache-headers";
-import { cookies } from "next/headers";
 import type { DocumentData, QueryDocumentSnapshot, Query } from "firebase-admin/firestore";
 import { adminAuth, getFirestoreAdmin } from "@/lib/firebase-admin";
-import { hasAnyRole, USER_ROLES, resolveRole, resolveCoachRequestStatus } from "@/lib/auth/roles";
+import { USER_ROLES, resolveRole, resolveCoachRequestStatus } from "@/lib/auth/roles";
 import type { User } from "@/types";
+import { withAuth } from "@/lib/auth/api-utils";
 
-export async function GET() {
+export const GET = withAuth(async () => {
   try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-    if (!sessionCookie) {
-      return jsonNoStore(
-        { success: false, error: "Session cookie requis" },
-        { status: 401 }
-      );
-    }
-
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    const role = resolveRole(decoded.role as string | undefined);
-    if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
-      return jsonNoStore(
-        { success: false, error: "Accès refusé" },
-        { status: 403 }
-      );
-    }
-
     const firestore = getFirestoreAdmin();
 
     // Récupérer tous les utilisateurs avec pagination
@@ -173,6 +155,4 @@ export async function GET() {
       { status: 500 }
     );
   }
-}
-
-
+}, [USER_ROLES.ADMIN]);

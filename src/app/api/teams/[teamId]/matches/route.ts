@@ -1,43 +1,17 @@
-import type { NextRequest } from "next/server";
 import { jsonNoStore } from "@/lib/http/cache-headers";
-import { cookies } from "next/headers";
-import { initializeFirebaseAdmin, getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
+import { initializeFirebaseAdmin, getFirestoreAdmin } from "@/lib/firebase-admin";
 import { getTeamMatches } from "@/lib/server/team-matches";
+import { withAuth } from "@/lib/auth/api-utils";
+import { USER_ROLES } from "@/lib/auth/roles";
 
 export const runtime = "nodejs";
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ teamId: string }> }
-) {
-  // Vérification d'authentification
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get("__session")?.value;
-  
-  if (!sessionCookie) {
-    return jsonNoStore(
-      { error: "Authentification requise" },
-      { status: 401 }
-    );
-  }
-
-  try {
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    if (!decoded.email_verified) {
-      return jsonNoStore(
-        { error: "Email non vérifié" },
-        { status: 403 }
-      );
-    }
-  } catch {
-    return jsonNoStore(
-      { error: "Session invalide" },
-      { status: 401 }
-    );
-  }
-
+export const GET = withAuth(async (
+  _request: Request,
+  context: any
+) => {
   // Récupérer teamId depuis les paramètres de route
-  const { teamId } = await params;
+  const { teamId } = await (context.params as Promise<{ teamId: string }>);
 
   if (!teamId || typeof teamId !== "string") {
     return jsonNoStore(
@@ -68,11 +42,8 @@ export async function GET(
     return jsonNoStore(
       {
         error: "Failed to fetch team matches",
-        details: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 }
     );
   }
-}
-
-
+}, [USER_ROLES.ADMIN, USER_ROLES.COACH]);
