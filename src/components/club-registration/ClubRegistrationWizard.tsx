@@ -203,6 +203,12 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const stepHeadingRef = useRef<HTMLHeadingElement | null>(null);
   const prevActiveStepRef = useRef(0);
+  /* Mémorisation du scroll par étape : on enregistre la position au moment du
+     départ et on la restaure quand l'utilisateur revient en arrière sur cette
+     même étape. Cas typique : SectionSlotsStep est long, l'utilisateur clique
+     « Continuer » pendant qu'il était à mi-hauteur, puis revient en arrière —
+     on évite de le re-projeter en haut s'il avait déjà parcouru la liste. */
+  const scrollPositionsRef = useRef<Map<number, number>>(new Map());
 
   /* Hydratation au mount : local-first, fallback éventuel sur le draft serveur (lecture seule pour l'instant). */
   const storageLoad = storage.load;
@@ -227,6 +233,14 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
   const stepValidity = useMemo<(string | null)[]>(
     () => STEPS.map((_, idx) => validateStep(idx, draft)),
     [draft]
+  );
+
+  /* Nombre d'étapes 0..3 (toutes sauf le récap) sans erreur. Sert d'indicateur
+     de progression neutre — on évite un pourcentage flou qui dépendrait du
+     nombre de sous-champs validés. */
+  const completedStepsCount = useMemo(
+    () => stepValidity.slice(0, STEPS.length - 1).filter((v) => v === null).length,
+    [stepValidity]
   );
 
   /**
@@ -289,20 +303,39 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
   }, [fieldErrors, activeStep]);
 
   /**
-   * Gestion du focus au changement d'étape (accessibilité + fluidité au clavier) :
-   * - Remonte le scroll en haut de la Card pour que l'utilisateur ne se retrouve
-   *   pas au milieu de la nouvelle étape.
-   * - Donne le focus au titre invisible de l'étape (lu par les lecteurs d'écran).
+   * Gestion du focus / scroll au changement d'étape :
+   * - Sauvegarde la position de scroll de l'étape qu'on quitte (utilisée si
+   *   l'utilisateur y revient en arrière).
+   * - Si on revient sur une étape qui avait une position enregistrée, on
+   *   restaure ce scroll plutôt que de remonter en haut de la Card.
+   * - Sinon, scroll en haut de la Card (cas d'une étape jamais visitée ou
+   *   d'une avancée linéaire).
+   * - Donne le focus au titre invisible de l'étape (annoncé par les lecteurs
+   *   d'écran).
    *
-   * Si une erreur serveur vient d'arriver et va déclencher un focus ciblé sur le
-   * 1ᵉʳ champ en erreur, on laisse la main à l'autre effet pour ne pas voler le
-   * focus à un emplacement plus pertinent.
+   * Si une erreur serveur vient d'arriver et va déclencher un focus ciblé sur
+   * le 1ᵉʳ champ en erreur, on laisse la main à l'autre effet pour ne pas voler
+   * le focus à un emplacement plus pertinent.
    */
   useEffect(() => {
-    if (prevActiveStepRef.current === activeStep) return;
+    const previous = prevActiveStepRef.current;
+    if (previous === activeStep) return;
+
+    /* On enregistre la position de scroll vertical actuelle pour l'étape qu'on
+       quitte, AVANT de modifier le scroll. */
+    if (typeof window !== "undefined") {
+      scrollPositionsRef.current.set(previous, window.scrollY);
+    }
     prevActiveStepRef.current = activeStep;
 
-    cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const goingBackward = activeStep < previous;
+    const memorized = scrollPositionsRef.current.get(activeStep);
+
+    if (goingBackward && typeof memorized === "number") {
+      window.scrollTo({ top: memorized, behavior: "smooth" });
+    } else {
+      cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
 
     const hasServerFieldErrors =
       fieldErrors !== null &&
@@ -508,6 +541,17 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
       <Typography variant="body1" color="text.secondary">
         Préparez votre dossier d’inscription en quelques étapes. Vous pourrez vous connecter
         ou créer un compte juste avant l’envoi.
+      </Typography>
+
+      <Typography
+        variant="caption"
+        component="p"
+        color="text.secondary"
+        aria-live="polite"
+      >
+        Progression&nbsp;: {completedStepsCount} étape
+        {completedStepsCount > 1 ? "s" : ""} sur {STEPS.length - 1} validée
+        {completedStepsCount > 1 ? "s" : ""}.
       </Typography>
 
       {submitError && <Alert severity="error">{submitError}</Alert>}

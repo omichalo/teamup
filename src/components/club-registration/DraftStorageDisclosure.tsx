@@ -4,6 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import {
   Box,
   Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Link as MuiLink,
   Popover,
   Stack,
@@ -52,6 +57,10 @@ export function DraftStorageDisclosure({
 }: Props) {
   const [now, setNow] = useState<number>(() => Date.now());
   const [popoverAnchor, setPopoverAnchor] = useState<HTMLElement | null>(null);
+  /* Le bouton « Effacer mon brouillon » est destructif (toute la saisie en
+     cours disparaît) : on demande une confirmation explicite avant d'appeler
+     `onClear`. */
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const infoButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
@@ -128,7 +137,7 @@ export function DraftStorageDisclosure({
               component="button"
               type="button"
               variant="caption"
-              onClick={onClear}
+              onClick={() => setConfirmClearOpen(true)}
               underline="hover"
             >
               Effacer mon brouillon
@@ -180,6 +189,34 @@ export function DraftStorageDisclosure({
           </Box>
         </Stack>
       </Popover>
+
+      <Dialog
+        open={confirmClearOpen}
+        onClose={() => setConfirmClearOpen(false)}
+        aria-labelledby="confirm-clear-title"
+        aria-describedby="confirm-clear-description"
+      >
+        <DialogTitle id="confirm-clear-title">Effacer le brouillon ?</DialogTitle>
+        <DialogContent>
+          <DialogContentText id="confirm-clear-description">
+            Toutes les informations saisies dans le formulaire vont être supprimées
+            de ce navigateur, sans possibilité de récupération. Confirmez-vous ?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmClearOpen(false)}>Annuler</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => {
+              setConfirmClearOpen(false);
+              onClear();
+            }}
+          >
+            Effacer le brouillon
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
