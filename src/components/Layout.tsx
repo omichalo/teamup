@@ -28,7 +28,8 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { validateInternalRedirect } from "@/lib/auth/redirect-utils";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -44,6 +45,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, signOut, isAdmin, isPlayer } = useAuth();
 
   const router = useRouter();
+  const pathname = usePathname();
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
 
   const navigationItems = useMemo<NavigationItem[]>(() => {
@@ -240,7 +242,13 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               </Menu>
             </>
           ) : (
-            <Button color="inherit" onClick={() => router.push("/auth")}>
+            <Button
+              color="inherit"
+              onClick={() => {
+                const safeNext = validateInternalRedirect(pathname ?? null);
+                router.push(`/login?next=${encodeURIComponent(safeNext)}`);
+              }}
+            >
               Connexion
             </Button>
           )}
