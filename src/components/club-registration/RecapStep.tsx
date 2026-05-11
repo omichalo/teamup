@@ -56,7 +56,9 @@ const ADHERENT_ROLE_LABELS: Record<RegistrationDraft["adherentRole"], string> = 
 const MEDICAL_LABELS: Record<RegistrationDraft["medicalCertificateDeclaration"], string> = {
   under_40_all_no: "Moins de 40 ans : aucune réponse « Oui »",
   over_40_cert_unchanged_all_no:
-    "Plus de 40 ans, certificat existant valide : aucune réponse « Oui »",
+    "40 ans et plus, certificat déjà fourni : aucune réponse « Oui »",
+  over_40_first_or_changed_certificate_required:
+    "40 ans et plus, première inscription ou changement de catégorie : certificat requis",
   questionnaire_yes_certificate_required: "Au moins une réponse « Oui » : certificat requis",
 };
 

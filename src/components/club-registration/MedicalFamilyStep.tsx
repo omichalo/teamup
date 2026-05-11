@@ -19,7 +19,38 @@ import {
   CLUB_REGISTRATION_EXTERNAL_LINKS,
   REDUCTION_OPTIONS,
 } from "@/lib/club-registration/constants";
+import { isAtLeast40At } from "@/lib/club-registration/age";
 import type { RegistrationDraft } from "./registration-defaults";
+
+type MedicalOptionId = RegistrationDraft["medicalCertificateDeclaration"];
+
+const MEDICAL_OPTIONS_UNDER_40: ReadonlyArray<{ id: MedicalOptionId; label: string }> = [
+  {
+    id: "under_40_all_no",
+    label: "Moins de 40 ans : j’atteste avoir répondu « Non » à tout le questionnaire médical.",
+  },
+  {
+    id: "questionnaire_yes_certificate_required",
+    label: "J’ai répondu « Oui » à au moins une question : certificat médical requis.",
+  },
+];
+
+const MEDICAL_OPTIONS_AT_LEAST_40: ReadonlyArray<{ id: MedicalOptionId; label: string }> = [
+  {
+    id: "over_40_cert_unchanged_all_no",
+    label:
+      "40 ans et plus, certificat déjà fourni dans la même catégorie : j’atteste avoir répondu « Non » au questionnaire.",
+  },
+  {
+    id: "over_40_first_or_changed_certificate_required",
+    label:
+      "40 ans et plus, première inscription ou changement de catégorie : certificat médical requis.",
+  },
+  {
+    id: "questionnaire_yes_certificate_required",
+    label: "J’ai répondu « Oui » à au moins une question : certificat médical requis.",
+  },
+];
 
 type Props = {
   draft: RegistrationDraft;
@@ -36,6 +67,17 @@ export function MedicalFamilyStep({ draft, onChange }: Props) {
     }
     onChange({ reductionTypes: Array.from(set) });
   };
+
+  /* L'âge dérive de la date de naissance saisie à l'étape 1. Le wizard interdit déjà
+     de passer à l'étape 3 sans `birthDate`. */
+  const atLeast40 = isAtLeast40At(draft.birthDate);
+  const medicalOptions = atLeast40
+    ? MEDICAL_OPTIONS_AT_LEAST_40
+    : MEDICAL_OPTIONS_UNDER_40;
+  const allowedIds = new Set<MedicalOptionId>(medicalOptions.map((o) => o.id));
+  const declarationIsIncompatible =
+    Boolean(draft.medicalCertificateDeclaration) &&
+    !allowedIds.has(draft.medicalCertificateDeclaration);
 
   return (
     <Stack spacing={2}>
@@ -55,32 +97,31 @@ export function MedicalFamilyStep({ draft, onChange }: Props) {
         modalités du club.
       </Typography>
 
-      <FormControl component="fieldset">
+      {declarationIsIncompatible ? (
+        <Alert severity="warning">
+          La déclaration médicale précédemment sélectionnée n’est plus compatible avec la date
+          de naissance saisie. Choisissez une nouvelle option ci-dessous.
+        </Alert>
+      ) : null}
+
+      <FormControl component="fieldset" required>
         <RadioGroup
           aria-labelledby="medical-certificate-label"
-          value={draft.medicalCertificateDeclaration}
+          value={declarationIsIncompatible ? "" : draft.medicalCertificateDeclaration}
           onChange={(e) =>
             onChange({
-              medicalCertificateDeclaration: e.target
-                .value as RegistrationDraft["medicalCertificateDeclaration"],
+              medicalCertificateDeclaration: e.target.value as MedicalOptionId,
             })
           }
         >
-          <FormControlLabel
-            value="under_40_all_no"
-            control={<Radio />}
-            label='Moins de 40 ans : j’atteste avoir répondu « Non » à tout le questionnaire médical.'
-          />
-          <FormControlLabel
-            value="over_40_cert_unchanged_all_no"
-            control={<Radio />}
-            label="Plus de 40 ans, certificat dans la même catégorie : j’atteste avoir répondu « Non » au questionnaire."
-          />
-          <FormControlLabel
-            value="questionnaire_yes_certificate_required"
-            control={<Radio />}
-            label='J’ai répondu « Oui » à au moins une question : certificat médical requis.'
-          />
+          {medicalOptions.map((option) => (
+            <FormControlLabel
+              key={option.id}
+              value={option.id}
+              control={<Radio />}
+              label={option.label}
+            />
+          ))}
         </RadioGroup>
       </FormControl>
 

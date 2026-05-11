@@ -13,7 +13,9 @@ function buildPayload(
     lastName: "Dupont",
     sex: "male" as const,
     birthCity: "Paris",
-    birthDate: "1985-04-12",
+    /* Date choisie pour rester un majeur < 40 ans quelle que soit l'année du run
+       du test (compatible avec la déclaration `under_40_all_no` par défaut). */
+    birthDate: "2000-04-12",
     adherentEmail: "olivier@example.com",
     adherentPhonePrimary: "0612345678",
     adherentPhoneSecondary: "",
@@ -291,5 +293,62 @@ describe("clubRegistrationPayloadSchema", () => {
       buildPayload({ mainSectionId: "voisins", additionalSectionIds: ["voisins"] })
     );
     expect(r.success).toBe(false);
+  });
+
+  it("refuse une déclaration médicale `over_40_*` pour un moins de 40 ans", () => {
+    const r = clubRegistrationPayloadSchema.safeParse(
+      buildPayload({
+        birthDate: "1995-04-12",
+        medicalCertificateDeclaration: "over_40_cert_unchanged_all_no",
+      })
+    );
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(
+        r.error.issues.some((i) => i.path.includes("medicalCertificateDeclaration"))
+      ).toBe(true);
+    }
+  });
+
+  it("refuse une déclaration médicale `under_40_all_no` pour un ≥ 40 ans", () => {
+    const r = clubRegistrationPayloadSchema.safeParse(
+      buildPayload({
+        birthDate: "1960-04-12",
+        medicalCertificateDeclaration: "under_40_all_no",
+      })
+    );
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(
+        r.error.issues.some((i) => i.path.includes("medicalCertificateDeclaration"))
+      ).toBe(true);
+    }
+  });
+
+  it("accepte la nouvelle option `over_40_first_or_changed_certificate_required` pour un ≥ 40 ans", () => {
+    const r = clubRegistrationPayloadSchema.safeParse(
+      buildPayload({
+        birthDate: "1960-04-12",
+        medicalCertificateDeclaration: "over_40_first_or_changed_certificate_required",
+      })
+    );
+    expect(r.success).toBe(true);
+  });
+
+  it("accepte `questionnaire_yes_certificate_required` quel que soit l'âge", () => {
+    const young = clubRegistrationPayloadSchema.safeParse(
+      buildPayload({
+        birthDate: "1995-04-12",
+        medicalCertificateDeclaration: "questionnaire_yes_certificate_required",
+      })
+    );
+    const old = clubRegistrationPayloadSchema.safeParse(
+      buildPayload({
+        birthDate: "1960-04-12",
+        medicalCertificateDeclaration: "questionnaire_yes_certificate_required",
+      })
+    );
+    expect(young.success).toBe(true);
+    expect(old.success).toBe(true);
   });
 });
