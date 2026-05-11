@@ -239,16 +239,24 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
     if (sex === "" || photoConsent === "") {
       return null;
     }
+    /* La section compétiteur classique est incompatible avec handisport / sport-adapté
+       (cf. superRefine côté schema). Si l'utilisateur a basculé sa section principale
+       après avoir coché le switch, on force la cohérence au moment du build. */
+    const isAdaptedMainSection =
+      draft.mainSectionId === "handisport" || draft.mainSectionId === "sport-adapte";
+    const effectiveCompetitorExtras =
+      !isAdaptedMainSection && draft.wantsCompetitorExtras;
     return {
       ...rest,
       sex,
       photoConsent,
       internalRulesAccepted: true as const,
+      wantsCompetitorExtras: effectiveCompetitorExtras,
       competitionJerseySize:
-        draft.wantsCompetitorExtras && draft.competitionJerseySize
+        effectiveCompetitorExtras && draft.competitionJerseySize
           ? draft.competitionJerseySize
           : undefined,
-      competitionIds: draft.wantsCompetitorExtras ? draft.competitionIds : [],
+      competitionIds: effectiveCompetitorExtras ? draft.competitionIds : [],
     };
   };
 

@@ -153,12 +153,39 @@ export const clubRegistrationPayloadSchema = z
       });
     }
 
+    /* Valeur orpheline : firstFemaleRegistrationSqy n'a de sens que si sex==="female".
+       Côté UI le reducer remet déjà undefined quand on change de sexe, mais on
+       refuse défensivement les payloads incohérents reçus par l'API. */
+    if (data.sex !== "female" && data.firstFemaleRegistrationSqy !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "Le champ « première inscription féminine » n’est applicable qu’au sexe féminin",
+        path: ["firstFemaleRegistrationSqy"],
+      });
+    }
+
     /* Compétiteur : taille de maillot obligatoire */
     if (data.wantsCompetitorExtras && !data.competitionJerseySize) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Taille de maillot obligatoire pour la section compétiteur",
         path: ["competitionJerseySize"],
+      });
+    }
+
+    /* Cohérence section / extension compétiteur : la section compétiteur classique
+       (taille de maillot, championnats fédéraux) n'a pas de sens pour handisport
+       et sport adapté qui ont leur propre option dédiée dans `competitionIds`. */
+    if (
+      data.wantsCompetitorExtras &&
+      (data.mainSectionId === "handisport" || data.mainSectionId === "sport-adapte")
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "La section compétiteur ne s'applique pas aux sections handisport et sport adapté",
+        path: ["wantsCompetitorExtras"],
       });
     }
 
