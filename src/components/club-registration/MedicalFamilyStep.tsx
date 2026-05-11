@@ -19,7 +19,7 @@ import {
   CLUB_REGISTRATION_EXTERNAL_LINKS,
   REDUCTION_OPTIONS,
 } from "@/lib/club-registration/constants";
-import { isAtLeast40At } from "@/lib/club-registration/age";
+import { isAtLeast40At, isMinorAt } from "@/lib/club-registration/age";
 import type { RegistrationDraft } from "./registration-defaults";
 
 type MedicalOptionId = RegistrationDraft["medicalCertificateDeclaration"];
@@ -71,6 +71,7 @@ export function MedicalFamilyStep({ draft, onChange }: Props) {
   /* L'âge dérive de la date de naissance saisie à l'étape 1. Le wizard interdit déjà
      de passer à l'étape 3 sans `birthDate`. */
   const atLeast40 = isAtLeast40At(draft.birthDate);
+  const minor = isMinorAt(draft.birthDate);
   const medicalOptions = atLeast40
     ? MEDICAL_OPTIONS_AT_LEAST_40
     : MEDICAL_OPTIONS_UNDER_40;
@@ -79,22 +80,28 @@ export function MedicalFamilyStep({ draft, onChange }: Props) {
     Boolean(draft.medicalCertificateDeclaration) &&
     !allowedIds.has(draft.medicalCertificateDeclaration);
 
+  /* On présente uniquement le questionnaire pertinent au regard de l'âge de
+     l'adhérent : afficher les deux liens force l'utilisateur à choisir alors
+     qu'on a déjà l'information de l'âge (cf. étape 1). */
+  const questionnaireUrl = minor
+    ? CLUB_REGISTRATION_EXTERNAL_LINKS.questionnaireMineur
+    : CLUB_REGISTRATION_EXTERNAL_LINKS.questionnaireMajeur;
+  const questionnaireLabel = minor
+    ? "questionnaire de santé mineur"
+    : "questionnaire de santé majeur";
+
   return (
     <Stack spacing={2}>
       <Typography variant="subtitle1" id="medical-certificate-label">
         Certificat médical
       </Typography>
       <Typography variant="body2" color="text.secondary">
-        Téléchargez le questionnaire adapté si besoin :{" "}
-        <a href={CLUB_REGISTRATION_EXTERNAL_LINKS.questionnaireMajeur} target="_blank" rel="noreferrer">
-          majeur
-        </a>
-        {" · "}
-        <a href={CLUB_REGISTRATION_EXTERNAL_LINKS.questionnaireMineur} target="_blank" rel="noreferrer">
-          mineur
-        </a>
-        . En cas de certificat à fournir, vous pourrez le transmettre au secrétariat selon les
-        modalités du club.
+        Téléchargez le{" "}
+        <a href={questionnaireUrl} target="_blank" rel="noreferrer">
+          {questionnaireLabel}
+        </a>{" "}
+        si besoin. En cas de certificat à fournir, vous pourrez le transmettre au
+        secrétariat selon les modalités du club.
       </Typography>
 
       {declarationIsIncompatible ? (
