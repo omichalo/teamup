@@ -8,10 +8,12 @@ export const runtime = "nodejs";
 
 export const GET = withAuth(async (
   _request: Request,
-  context: any
+  context: unknown
 ) => {
   // Récupérer teamId depuis les paramètres de route
-  const { teamId } = await (context.params as Promise<{ teamId: string }>);
+  const { teamId } = await (
+    (context as { params: Promise<{ teamId: string }> }).params
+  );
 
   if (!teamId || typeof teamId !== "string") {
     return jsonNoStore(
