@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   AlertTitle,
+  Box,
   Button,
   Card,
   CardContent,
@@ -14,6 +15,7 @@ import {
   Stepper,
   Typography,
 } from "@mui/material";
+import { visuallyHidden } from "@mui/utils";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import { isValidFrenchPhoneSurface } from "@/lib/club-registration/phone-fr";
 import type { ClubRegistrationPayload } from "@/lib/club-registration/schema";
@@ -197,6 +199,10 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const pendingPayloadRef = useRef<ClubRegistrationPayload | null>(null);
   const hasHydratedRef = useRef(false);
+  /* Refs pour la gestion du focus au changement d'étape. */
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const stepHeadingRef = useRef<HTMLHeadingElement | null>(null);
+  const prevActiveStepRef = useRef(0);
 
   /* Hydratation au mount : local-first, fallback éventuel sur le draft serveur (lecture seule pour l'instant). */
   const storageLoad = storage.load;
@@ -281,6 +287,36 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
       if (raf2 !== undefined) cancelAnimationFrame(raf2);
     };
   }, [fieldErrors, activeStep]);
+
+  /**
+   * Gestion du focus au changement d'étape (accessibilité + fluidité au clavier) :
+   * - Remonte le scroll en haut de la Card pour que l'utilisateur ne se retrouve
+   *   pas au milieu de la nouvelle étape.
+   * - Donne le focus au titre invisible de l'étape (lu par les lecteurs d'écran).
+   *
+   * Si une erreur serveur vient d'arriver et va déclencher un focus ciblé sur le
+   * 1ᵉʳ champ en erreur, on laisse la main à l'autre effet pour ne pas voler le
+   * focus à un emplacement plus pertinent.
+   */
+  useEffect(() => {
+    if (prevActiveStepRef.current === activeStep) return;
+    prevActiveStepRef.current = activeStep;
+
+    cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+    const hasServerFieldErrors =
+      fieldErrors !== null &&
+      Object.values(fieldErrors).some(
+        (msgs) => Array.isArray(msgs) && msgs.length > 0
+      );
+    if (hasServerFieldErrors) return;
+
+    /* RAF pour laisser React peindre le nouveau step avant de focus. */
+    const raf = requestAnimationFrame(() => {
+      stepHeadingRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [activeStep, fieldErrors]);
 
   const handleNext = () => {
     setSubmitError(null);
@@ -571,8 +607,20 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
         </Stack>
       </Stack>
 
-      <Card variant="outlined">
+      <Card variant="outlined" ref={cardRef}>
         <CardContent>
+          {/* Titre invisible mais focusable : annonce l'étape courante aux
+              lecteurs d'écran et reçoit le focus à chaque changement d'étape.
+              On utilise `style` plutôt que `sx` car `visuallyHidden` retourne
+              du CSSProperties brut, incompatible avec le typage `SxProps`. */}
+          <Box
+            component="h2"
+            ref={stepHeadingRef}
+            tabIndex={-1}
+            style={visuallyHidden}
+          >
+            Étape {activeStep + 1} sur {STEPS.length} : {STEPS[activeStep]}
+          </Box>
           {activeStep === 0 && (
             <IdentityStep
               draft={draft}
