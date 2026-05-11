@@ -3,6 +3,7 @@
 import type { ChangeEvent } from "react";
 import {
   Alert,
+  Box,
   Button,
   FormControl,
   FormControlLabel,
@@ -16,6 +17,8 @@ import {
   Typography,
   type SelectChangeEvent,
 } from "@mui/material";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import dayjs, { type Dayjs } from "dayjs";
 import {
   extractNationalDigitsForMask,
   formatFrenchPhoneMask,
@@ -229,22 +232,40 @@ export function IdentityStep({
         inputProps={{ "data-field": "birthCity" }}
       />
 
-      <TextField
-        required
-        label="Date de naissance"
-        type="date"
-        value={draft.birthDate}
-        onChange={(e) => onPatch({ birthDate: e.target.value })}
-        fullWidth
-        name="clubRegistrationBirthDate"
-        autoComplete="section-club-birth bday"
-        slotProps={{ inputLabel: { shrink: true } }}
-        inputProps={{
-          min: "1900-01-01",
-          max: new Date().toISOString().slice(0, 10),
-          "data-field": "birthDate",
-        }}
-      />
+      {/* On stocke `birthDate` au format ISO `YYYY-MM-DD` (compat schéma Zod
+          existant + indépendant du fuseau côté affichage). Le DatePicker MUI X
+          travaille en Dayjs ; on convertit aux frontières.
+
+          `PickersTextFieldProps` n'accepte pas `inputProps`, donc on porte
+          l'attribut `data-field` sur un wrapper focusable plutôt que de
+          customiser le slot interne du picker. */}
+      <Box data-field="birthDate" tabIndex={-1}>
+        <DatePicker
+          label="Date de naissance"
+          value={
+            draft.birthDate
+              ? dayjs(draft.birthDate, "YYYY-MM-DD", true)
+              : null
+          }
+          onChange={(value: Dayjs | null) => {
+            if (value && value.isValid()) {
+              onPatch({ birthDate: value.format("YYYY-MM-DD") });
+            } else {
+              onPatch({ birthDate: "" });
+            }
+          }}
+          format="DD/MM/YYYY"
+          minDate={dayjs("1900-01-01", "YYYY-MM-DD", true)}
+          maxDate={dayjs()}
+          slotProps={{
+            textField: {
+              required: true,
+              fullWidth: true,
+              name: "clubRegistrationBirthDate",
+            },
+          }}
+        />
+      </Box>
 
       <Typography variant="subtitle1" component="h3">
         Contact de l’adhérent

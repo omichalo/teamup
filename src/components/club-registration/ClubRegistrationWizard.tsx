@@ -17,6 +17,9 @@ import {
 } from "@mui/material";
 import { visuallyHidden } from "@mui/utils";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import "dayjs/locale/fr";
 import { isValidFrenchPhoneSurface } from "@/lib/club-registration/phone-fr";
 import type { ClubRegistrationPayload } from "@/lib/club-registration/schema";
 import { clubRegistrationPayloadSchema } from "@/lib/club-registration/schema";
@@ -534,6 +537,7 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
   }, [performSubmit]);
 
   return (
+    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="fr">
     <Stack spacing={3}>
       <Typography variant="h4" component="h1">
         Inscription au club
@@ -744,5 +748,6 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
         }}
       />
     </Stack>
+    </LocalizationProvider>
   );
 }

@@ -3,6 +3,9 @@
  */
 
 import { render, screen, fireEvent } from "@testing-library/react";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import "dayjs/locale/fr";
 import { IdentityStep } from "./IdentityStep";
 import { createEmptyDraft, type RegistrationDraft } from "./registration-defaults";
 
@@ -16,15 +19,17 @@ function setup(overrides: Partial<RegistrationDraft> = {}) {
   const onRemoveRepresentative = jest.fn();
 
   render(
-    <IdentityStep
-      draft={draft}
-      onPatch={onPatch}
-      onSetAdherentRole={onSetAdherentRole}
-      onSetSex={onSetSex}
-      onAddRepresentative={onAddRepresentative}
-      onUpdateRepresentative={onUpdateRepresentative}
-      onRemoveRepresentative={onRemoveRepresentative}
-    />
+    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="fr">
+      <IdentityStep
+        draft={draft}
+        onPatch={onPatch}
+        onSetAdherentRole={onSetAdherentRole}
+        onSetSex={onSetSex}
+        onAddRepresentative={onAddRepresentative}
+        onUpdateRepresentative={onUpdateRepresentative}
+        onRemoveRepresentative={onRemoveRepresentative}
+      />
+    </LocalizationProvider>
   );
 }
 
