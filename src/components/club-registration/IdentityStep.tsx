@@ -26,9 +26,13 @@ import { isMinorAt } from "@/lib/club-registration/age";
 import { getDevIdentityFixture } from "./dev-identity-fixture";
 import { PostalAddressSection } from "./PostalAddressSection";
 import { RepresentativesBlock } from "./RepresentativesBlock";
+import { useTouchedFields } from "./useTouchedFields";
 import type { RegistrationDraft, Representative } from "./registration-defaults";
 
 const IS_DEV = process.env.NODE_ENV === "development";
+
+/** Regex e-mail volontairement laxiste (mêmes contraintes que côté Zod). */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type Props = {
   draft: RegistrationDraft;
@@ -49,12 +53,34 @@ export function IdentityStep({
   onUpdateRepresentative,
   onRemoveRepresentative,
 }: Props) {
-  const primaryInvalid =
-    draft.adherentPhonePrimary.trim() !== "" &&
-    !isValidFrenchPhoneSurface(draft.adherentPhonePrimary);
-  const secondaryInvalid =
-    (draft.adherentPhoneSecondary ?? "").trim() !== "" &&
+  /* Validation onBlur : on n'affiche les erreurs au champ qu'après que
+     l'utilisateur ait quitté ce champ une première fois. Évite la friction
+     visuelle pendant la saisie tout en signalant clairement les formats. */
+  const { isTouched, markTouched } = useTouchedFields();
+
+  const emailValue = (draft.adherentEmail ?? "").trim();
+  const emailFormatInvalid = emailValue !== "" && !EMAIL_RE.test(emailValue);
+  const showEmailError = isTouched("adherentEmail") && emailFormatInvalid;
+
+  const primaryRaw = draft.adherentPhonePrimary.trim();
+  const primaryFormatInvalid =
+    primaryRaw !== "" && !isValidFrenchPhoneSurface(draft.adherentPhonePrimary);
+  const primaryRequiredMissing = primaryRaw === "";
+  const showPrimaryError =
+    isTouched("adherentPhonePrimary") &&
+    (primaryFormatInvalid || primaryRequiredMissing);
+  const primaryHelperText = primaryFormatInvalid
+    ? "Numéro français invalide (10 chiffres ou +33)."
+    : primaryRequiredMissing
+      ? "Téléphone obligatoire."
+      : undefined;
+
+  const secondaryRaw = (draft.adherentPhoneSecondary ?? "").trim();
+  const secondaryFormatInvalid =
+    secondaryRaw !== "" &&
     !isValidFrenchPhoneSurface(draft.adherentPhoneSecondary ?? "");
+  const showSecondaryError =
+    isTouched("adherentPhoneSecondary") && secondaryFormatInvalid;
 
   const handlePhoneChange =
     (field: "adherentPhonePrimary" | "adherentPhoneSecondary") =>
@@ -143,6 +169,7 @@ export function IdentityStep({
           onChange={(e) => onPatch({ firstName: e.target.value })}
           fullWidth
           autoComplete="given-name"
+          inputProps={{ "data-field": "firstName" }}
         />
         <TextField
           required
@@ -151,6 +178,7 @@ export function IdentityStep({
           onChange={(e) => onPatch({ lastName: e.target.value })}
           fullWidth
           autoComplete="family-name"
+          inputProps={{ "data-field": "lastName" }}
         />
       </Stack>
 
@@ -198,6 +226,7 @@ export function IdentityStep({
         fullWidth
         name="clubRegistrationBirthCity"
         autoComplete="section-club-birth address-level2"
+        inputProps={{ "data-field": "birthCity" }}
       />
 
       <TextField
@@ -213,6 +242,7 @@ export function IdentityStep({
         inputProps={{
           min: "1900-01-01",
           max: new Date().toISOString().slice(0, 10),
+          "data-field": "birthDate",
         }}
       />
 
@@ -225,9 +255,16 @@ export function IdentityStep({
         type="email"
         value={draft.adherentEmail ?? ""}
         onChange={(e) => onPatch({ adherentEmail: e.target.value })}
+        onBlur={() => markTouched("adherentEmail")}
         fullWidth
         autoComplete="email"
-        helperText="Si l’adhérent a sa propre adresse (ado, adulte) — sinon laissez vide."
+        error={showEmailError}
+        helperText={
+          showEmailError
+            ? "Adresse e-mail invalide."
+            : "Si l’adhérent a sa propre adresse (ado, adulte) — sinon laissez vide."
+        }
+        inputProps={{ "data-field": "adherentEmail" }}
       />
 
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
@@ -236,27 +273,38 @@ export function IdentityStep({
           label="Téléphone principal de l’adhérent"
           value={toFrenchPhoneMaskedDisplay(draft.adherentPhonePrimary)}
           onChange={handlePhoneChange("adherentPhonePrimary")}
+          onBlur={() => markTouched("adherentPhonePrimary")}
           fullWidth
           autoComplete="tel-national"
           placeholder="06 34 44 55 33"
           inputMode="numeric"
-          error={primaryInvalid}
-          helperText={primaryInvalid ? "Numéro invalide" : undefined}
+          error={showPrimaryError}
+          helperText={showPrimaryError ? primaryHelperText : undefined}
+          inputProps={{ "data-field": "adherentPhonePrimary" }}
         />
         <TextField
           label="Téléphone secondaire (optionnel)"
           value={toFrenchPhoneMaskedDisplay(draft.adherentPhoneSecondary ?? "")}
           onChange={handlePhoneChange("adherentPhoneSecondary")}
+          onBlur={() => markTouched("adherentPhoneSecondary")}
           fullWidth
           autoComplete="tel-national"
           placeholder="06 34 44 55 33"
           inputMode="numeric"
-          error={secondaryInvalid}
-          helperText={secondaryInvalid ? "Numéro invalide" : undefined}
+          error={showSecondaryError}
+          helperText={
+            showSecondaryError ? "Numéro français invalide." : undefined
+          }
+          inputProps={{ "data-field": "adherentPhoneSecondary" }}
         />
       </Stack>
 
-      <PostalAddressSection draft={draft} onChange={onPatch} />
+      <PostalAddressSection
+        draft={draft}
+        onChange={onPatch}
+        isTouched={isTouched}
+        markTouched={markTouched}
+      />
 
       {showRepresentatives ? (
         <Stack spacing={1}>
@@ -273,6 +321,8 @@ export function IdentityStep({
             onAdd={onAddRepresentative}
             onUpdate={onUpdateRepresentative}
             onRemove={onRemoveRepresentative}
+            isTouched={isTouched}
+            markTouched={markTouched}
           />
         </Stack>
       ) : null}

@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  AlertTitle,
   Button,
   Card,
   CardContent,
@@ -13,10 +14,15 @@ import {
   Stepper,
   Typography,
 } from "@mui/material";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import { isValidFrenchPhoneSurface } from "@/lib/club-registration/phone-fr";
 import type { ClubRegistrationPayload } from "@/lib/club-registration/schema";
 import { clubRegistrationPayloadSchema } from "@/lib/club-registration/schema";
 import { isAtLeast40At, isMinorAt } from "@/lib/club-registration/age";
+import {
+  firstStepWithError,
+  stepsWithError,
+} from "@/lib/club-registration/field-to-step";
 import { submitRegistration } from "@/lib/club-registration/submit";
 import type { RegistrationDraft } from "./registration-defaults";
 import { IdentityStep } from "./IdentityStep";
@@ -207,6 +213,17 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
   }, [hydrate, storageLoad]);
 
   /**
+   * Évaluation paresseuse de la validité de chaque étape. On l'utilise à la fois
+   * pour le rendu (icône erreur dans le stepper, résumé dans l'Alert global) et
+   * pour la navigation (impossible d'atteindre une étape postérieure tant que les
+   * étapes antérieures contiennent une erreur). 5 appels par render, négligeable.
+   */
+  const stepValidity = useMemo<(string | null)[]>(
+    () => STEPS.map((_, idx) => validateStep(idx, draft)),
+    [draft]
+  );
+
+  /**
    * Auto-save à chaque changement de draft. On dépend uniquement de la fonction `save`
    * (stable via `useCallback` dans le hook) pour éviter la boucle de re-render qui
    * faisait clignoter le bandeau de statut à chaque frappe.
@@ -216,6 +233,54 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
     if (hydrating) return;
     storageSave(draft);
   }, [draft, hydrating, storageSave]);
+
+  /**
+   * Quand le serveur retourne des fieldErrors (réponse 400), on saute automatiquement
+   * à la 1ʳᵉ étape qui contient une erreur et on fait défiler la vue vers le premier
+   * champ concerné pour réduire la friction (l'utilisateur n'a rien à chercher).
+   */
+  useEffect(() => {
+    if (!fieldErrors || Object.keys(fieldErrors).length === 0) return;
+    const target = firstStepWithError(fieldErrors);
+    if (target === null) return;
+    if (target !== activeStep) {
+      setActiveStep(target);
+    }
+    /* Le DOM doit avoir rendu l'étape cible avant qu'on cherche le 1er champ. On
+       attend deux frames pour couvrir le cas où le changement d'étape réordonne
+       la sous-arborescence. */
+    const errantFields = Object.entries(fieldErrors).filter(
+      ([, msgs]) => Array.isArray(msgs) && msgs.length > 0
+    );
+    if (errantFields.length === 0) return;
+    const firstField = errantFields[0][0];
+    let raf2: number | undefined;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        const escaped =
+          typeof CSS !== "undefined" && typeof CSS.escape === "function"
+            ? CSS.escape(firstField)
+            : firstField;
+        const el = document.querySelector<HTMLElement>(
+          `[name="${escaped}"], [data-field="${escaped}"]`
+        );
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          if (typeof el.focus === "function") {
+            try {
+              el.focus({ preventScroll: true });
+            } catch {
+              // Certains éléments ne supportent pas focus(); on ignore silencieusement.
+            }
+          }
+        }
+      });
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      if (raf2 !== undefined) cancelAnimationFrame(raf2);
+    };
+  }, [fieldErrors, activeStep]);
 
   const handleNext = () => {
     setSubmitError(null);
@@ -410,11 +475,30 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
       </Typography>
 
       {submitError && <Alert severity="error">{submitError}</Alert>}
-      {fieldErrors && Object.keys(fieldErrors).length > 0 && (
+      {fieldErrors && Object.keys(fieldErrors).length > 0 ? (
         <Alert severity="error">
-          Vérifiez les champs signalés par le serveur. Détail technique disponible pour le support.
+          <AlertTitle>Des informations doivent être corrigées</AlertTitle>
+          <Stack spacing={0.5}>
+            {stepsWithError(fieldErrors).map((idx) => (
+              <Button
+                key={idx}
+                size="small"
+                variant="text"
+                color="error"
+                onClick={() => handleGoToStep(idx)}
+                sx={{
+                  justifyContent: "flex-start",
+                  textTransform: "none",
+                  px: 0,
+                  minHeight: 0,
+                }}
+              >
+                Étape {idx + 1} — {STEPS_SHORT[idx] ?? STEPS[idx]}
+              </Button>
+            ))}
+          </Stack>
         </Alert>
-      )}
+      ) : null}
 
       <Stepper
         activeStep={activeStep}
@@ -422,17 +506,39 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
         alternativeLabel
         sx={{ display: { xs: "none", md: "flex" } }}
       >
-        {STEPS.map((label, index) => (
-          <Step key={label} completed={index < activeStep}>
-            <StepButton
-              color="inherit"
-              disabled={!canNavigateToStep(index, activeStep, draft)}
-              onClick={() => handleGoToStep(index)}
-            >
-              {label}
-            </StepButton>
-          </Step>
-        ))}
+        {STEPS.map((label, index) => {
+          const isPast = index < activeStep;
+          const stepInvalid = stepValidity[index] !== null;
+          /* `completed` ne reflète plus uniquement la position de l'étape :
+             elle exige que validateStep retourne null. Si l'utilisateur est
+             passé sur une étape ultérieure puis a invalidé une étape précédente,
+             celle-ci affiche désormais un état erreur (icône + texte) au lieu
+             d'apparaître à tort comme « cochée ». */
+          const completed = isPast && !stepInvalid;
+          return (
+            <Step key={label} completed={completed}>
+              <StepButton
+                color="inherit"
+                disabled={!canNavigateToStep(index, activeStep, draft)}
+                onClick={() => handleGoToStep(index)}
+                icon={
+                  isPast && stepInvalid ? (
+                    <ErrorOutlineIcon color="error" fontSize="small" />
+                  ) : undefined
+                }
+                optional={
+                  isPast && stepInvalid ? (
+                    <Typography variant="caption" color="error">
+                      À corriger
+                    </Typography>
+                  ) : undefined
+                }
+              >
+                {label}
+              </StepButton>
+            </Step>
+          );
+        })}
       </Stepper>
 
       <Stack spacing={1} sx={{ display: { md: "none" } }}>
@@ -440,18 +546,28 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
           Étape {activeStep + 1} / {STEPS.length} — {STEPS[activeStep]}
         </Typography>
         <Stack direction="row" flexWrap="wrap" useFlexGap sx={{ gap: 1 }}>
-          {STEPS.map((label, index) => (
-            <Button
-              key={label}
-              size="small"
-              variant={activeStep === index ? "contained" : "outlined"}
-              disabled={!canNavigateToStep(index, activeStep, draft)}
-              onClick={() => handleGoToStep(index)}
-              aria-current={activeStep === index ? "step" : undefined}
-            >
-              {index + 1}. {STEPS_SHORT[index] ?? label}
-            </Button>
-          ))}
+          {STEPS.map((label, index) => {
+            const isPast = index < activeStep;
+            const stepInvalid = stepValidity[index] !== null;
+            return (
+              <Button
+                key={label}
+                size="small"
+                color={isPast && stepInvalid ? "error" : "primary"}
+                variant={activeStep === index ? "contained" : "outlined"}
+                disabled={!canNavigateToStep(index, activeStep, draft)}
+                onClick={() => handleGoToStep(index)}
+                aria-current={activeStep === index ? "step" : undefined}
+                startIcon={
+                  isPast && stepInvalid ? (
+                    <ErrorOutlineIcon fontSize="small" />
+                  ) : undefined
+                }
+              >
+                {index + 1}. {STEPS_SHORT[index] ?? label}
+              </Button>
+            );
+          })}
         </Stack>
       </Stack>
 

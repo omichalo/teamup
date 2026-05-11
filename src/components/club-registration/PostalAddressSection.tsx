@@ -13,6 +13,15 @@ import type { RegistrationDraft } from "./registration-defaults";
 type Props = {
   draft: RegistrationDraft;
   onChange: (patch: Partial<RegistrationDraft>) => void;
+  /**
+   * Helpers de validation onBlur fournis par le parent (`IdentityStep`).
+   * Si non fournis, on considère que les champs sont déjà "touchés" : les
+   * erreurs s'affichent dès que le format est invalide. Cela permet à ce
+   * composant de rester utilisable de manière autonome dans les tests ou
+   * dans un éventuel formulaire futur.
+   */
+  isTouched?: (field: string) => boolean;
+  markTouched?: (field: string) => void;
 };
 
 function hasAnyAddressValue(d: RegistrationDraft): boolean {
@@ -24,12 +33,29 @@ function hasAnyAddressValue(d: RegistrationDraft): boolean {
   );
 }
 
-export function PostalAddressSection({ draft, onChange }: Props) {
+export function PostalAddressSection({
+  draft,
+  onChange,
+  isTouched,
+  markTouched,
+}: Props) {
   const [manualMode, setManualMode] = useState(false);
   const [filledViaBan, setFilledViaBan] = useState(false);
 
   const persistedOrEditedAddress = hasAnyAddressValue(draft);
   const showDetailFields = manualMode || filledViaBan || persistedOrEditedAddress;
+
+  /* `isTouched`/`markTouched` peuvent être omis quand le composant est utilisé
+     hors du wizard ; on bascule alors en "toujours touché" pour conserver le
+     comportement historique (erreur dès le format invalide). */
+  const touched = isTouched ?? (() => true);
+  const mark = markTouched ?? (() => {});
+
+  const postalCodeRaw = draft.postalCode.trim();
+  const postalCodeFormatInvalid =
+    postalCodeRaw !== "" && !/^[0-9]{5}$/.test(postalCodeRaw);
+  const showPostalCodeError =
+    touched("postalCode") && postalCodeFormatInvalid;
 
   const handleBanSelect = (a: { addressLine1: string; postalCode: string; city: string }) => {
     onChange({
@@ -103,6 +129,7 @@ export function PostalAddressSection({ draft, onChange }: Props) {
             fullWidth
             name="clubRegistrationAddressLine1"
             autoComplete="section-club-residence street-address"
+            inputProps={{ "data-field": "addressLine1" }}
           />
           <TextField
             label="Complément d’adresse"
@@ -112,6 +139,7 @@ export function PostalAddressSection({ draft, onChange }: Props) {
             name="clubRegistrationAddressLine2"
             autoComplete="section-club-residence address-line2"
             helperText="Étage, bâtiment, résidence, appartement…"
+            inputProps={{ "data-field": "addressLine2" }}
           />
 
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
@@ -120,10 +148,21 @@ export function PostalAddressSection({ draft, onChange }: Props) {
               label="Code postal"
               value={draft.postalCode}
               onChange={(e) => onChange({ postalCode: e.target.value })}
+              onBlur={() => mark("postalCode")}
               fullWidth
               name="clubRegistrationPostalCode"
               autoComplete="section-club-residence postal-code"
-              inputProps={{ inputMode: "numeric", maxLength: 5 }}
+              inputProps={{
+                inputMode: "numeric",
+                maxLength: 5,
+                "data-field": "postalCode",
+              }}
+              error={showPostalCodeError}
+              helperText={
+                showPostalCodeError
+                  ? "Code postal français à 5 chiffres."
+                  : undefined
+              }
             />
             <TextField
               required
@@ -133,6 +172,7 @@ export function PostalAddressSection({ draft, onChange }: Props) {
               fullWidth
               name="clubRegistrationCity"
               autoComplete="section-club-residence address-level2"
+              inputProps={{ "data-field": "city" }}
             />
           </Stack>
         </Stack>

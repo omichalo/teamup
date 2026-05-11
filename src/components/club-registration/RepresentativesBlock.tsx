@@ -32,6 +32,13 @@ type Props = {
   onAdd: () => void;
   onUpdate: (index: number, patch: Partial<Representative>) => void;
   onRemove: (index: number) => void;
+  /**
+   * Helpers de validation onBlur fournis par le parent. Si non fournis, les
+   * champs sont considérés comme déjà "touchés" pour conserver le
+   * comportement historique (affichage de l'erreur dès le format invalide).
+   */
+  isTouched?: (field: string) => boolean;
+  markTouched?: (field: string) => void;
 };
 
 const ROLE_OPTIONS: Array<{ value: Representative["role"]; label: string }> = [
@@ -53,7 +60,11 @@ export function RepresentativesBlock({
   onAdd,
   onUpdate,
   onRemove,
+  isTouched,
+  markTouched,
 }: Props) {
+  const touched = isTouched ?? (() => true);
+  const mark = markTouched ?? (() => {});
   const handleField =
     (index: number, field: keyof Representative) =>
     (e: ChangeEvent<HTMLInputElement>) => {
@@ -84,9 +95,28 @@ export function RepresentativesBlock({
       {representatives.map((rep, index) => {
         const removable = !(firstIsRequired && index === 0);
         const required = firstIsRequired && index === 0;
-        const phoneInvalid =
+        const emailField = `representatives.${index}.email`;
+        const phoneField = `representatives.${index}.phone`;
+        const phoneFormatInvalid =
           rep.phone.trim() !== "" && !isValidFrenchPhoneSurface(rep.phone);
-        const emailInvalid = isInvalidEmail(rep.email);
+        const phoneRequiredMissing = required && rep.phone.trim() === "";
+        const showPhoneError =
+          touched(phoneField) && (phoneFormatInvalid || phoneRequiredMissing);
+        const phoneHelperText = phoneFormatInvalid
+          ? "Numéro français invalide."
+          : phoneRequiredMissing
+            ? "Téléphone obligatoire pour le représentant légal."
+            : undefined;
+
+        const emailFormatInvalid = isInvalidEmail(rep.email);
+        const emailRequiredMissing = required && rep.email.trim() === "";
+        const showEmailError =
+          touched(emailField) && (emailFormatInvalid || emailRequiredMissing);
+        const emailHelperText = emailFormatInvalid
+          ? "Adresse e-mail invalide."
+          : emailRequiredMissing
+            ? "E-mail obligatoire pour le représentant légal."
+            : undefined;
 
         return (
           <Card key={index} variant="outlined">
@@ -151,10 +181,11 @@ export function RepresentativesBlock({
                   type="email"
                   value={rep.email}
                   onChange={handleField(index, "email")}
+                  onBlur={() => mark(emailField)}
                   fullWidth
                   autoComplete="off"
-                  error={emailInvalid}
-                  helperText={emailInvalid ? "Adresse e-mail invalide" : undefined}
+                  error={showEmailError}
+                  helperText={showEmailError ? emailHelperText : undefined}
                 />
 
                 <TextField
@@ -162,12 +193,13 @@ export function RepresentativesBlock({
                   label="Téléphone"
                   value={toFrenchPhoneMaskedDisplay(rep.phone)}
                   onChange={handlePhone(index)}
+                  onBlur={() => mark(phoneField)}
                   fullWidth
                   inputMode="numeric"
                   placeholder="06 12 34 56 78"
                   autoComplete="off"
-                  error={phoneInvalid}
-                  helperText={phoneInvalid ? "Numéro invalide" : undefined}
+                  error={showPhoneError}
+                  helperText={showPhoneError ? phoneHelperText : undefined}
                 />
               </Stack>
             </CardContent>
