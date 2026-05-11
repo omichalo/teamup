@@ -85,6 +85,7 @@ export const AUDIT_ACTIONS = {
   COACH_REQUEST_SUBMITTED: "coach.request.submitted",
   COACH_REQUEST_APPROVED: "coach.request.approved",
   COACH_REQUEST_REJECTED: "coach.request.rejected",
+  CLUB_REGISTRATION_SUBMITTED: "club.registration.submitted",
   TEAM_CREATED: "team.created",
   TEAM_UPDATED: "team.updated",
   TEAM_DELETED: "team.deleted",

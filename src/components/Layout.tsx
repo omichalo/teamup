@@ -22,6 +22,7 @@ import {
   Assignment,
   PlaylistAddCheck,
   Home,
+  HowToReg,
 } from "@mui/icons-material";
 import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
@@ -56,10 +57,20 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           href: "/joueur",
           icon: <Home />,
         },
+        {
+          label: "Inscription club",
+          href: "/club/inscription",
+          icon: <HowToReg />,
+        },
       ];
     }
 
     const items: NavigationItem[] = [
+      {
+        label: "Inscription club",
+        href: "/club/inscription",
+        icon: <HowToReg />,
+      },
       { label: "Joueurs", href: "/joueurs", icon: <Person /> },
       { label: "Équipes", href: "/equipes", icon: <Groups /> },
       { label: "Disponibilités", href: "/disponibilites", icon: <Event /> },
