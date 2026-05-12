@@ -427,8 +427,8 @@ export function RecapStep({ draft, accountEmail, onEditStep }: Props) {
         padding="compact"
         description={
           accountEmail
-            ? "L’adresse de votre compte est conservée comme adresse du soumettant et sert au club pour le suivi de cette inscription. Elle est distincte des adresses de l’adhérent et des représentants légaux."
-            : "L’adresse du compte que vous utiliserez pour vous connecter au moment de l’envoi sera conservée comme adresse du soumettant. Elle est distincte des adresses de l’adhérent et des représentants légaux."
+            ? "L’adresse de votre compte est conservée comme adresse du soumettant. Si une adresse de contact métier est vide, le club pourra utiliser cette adresse, même si elle vient de Google, Apple ou Facebook."
+            : "L’adresse du compte que vous utiliserez au moment de l’envoi sera conservée comme adresse du soumettant. Si une adresse de contact métier est vide, le club pourra utiliser cette adresse."
         }
       >
         <Stack

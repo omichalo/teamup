@@ -34,6 +34,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type Props = {
   draft: RegistrationDraft;
+  accountEmail: string | null;
   onPatch: (patch: Partial<RegistrationDraft>) => void;
   onSetSex: (sex: RegistrationDraft["sex"]) => void;
 };
@@ -45,7 +46,7 @@ type Props = {
  * contact et adresse postale. Le bloc « Représentants légaux » est extrait
  * dans une étape conditionnelle dédiée pour ne pas surcharger cette page.
  */
-export function AdherentStep({ draft, onPatch, onSetSex }: Props) {
+export function AdherentStep({ draft, accountEmail, onPatch, onSetSex }: Props) {
   const { isTouched, markTouched } = useTouchedFields();
 
   const emailValue = (draft.adherentEmail ?? "").trim();
@@ -84,14 +85,15 @@ export function AdherentStep({ draft, onPatch, onSetSex }: Props) {
     onSetSex(e.target.value as RegistrationDraft["sex"]);
   };
 
-  /* Pour un majeur l'email reste optionnel à la validation (schéma serveur
-     inchangé), mais on le signale comme fortement recommandé pour la
-     communication directe avec l'adhérent. Pour un mineur, l'adresse
-     principale reste celle des représentants légaux. */
+  /* L'e-mail du compte sert de fallback technique au moment de l'envoi, mais
+     il peut venir d'un fournisseur social et ne doit pas être imposé comme
+     adresse métier de contact. */
   const minor = isMinorAt(draft.birthDate);
   const emailHelperDefault = minor
-    ? "Adresse personnelle de l’adhérent mineur (ado), s’il en a une. Sinon laissez vide."
-    : "Recommandé pour les communications directes du club avec l’adhérent.";
+    ? "Optionnel. Pour un mineur, les communications importantes passent par le représentant légal."
+    : accountEmail
+      ? "Optionnel. Si vous laissez vide, le club utilisera l’e-mail du compte utilisé pour envoyer le dossier."
+      : "Optionnel. Si vous laissez vide, l’e-mail du compte créé ou utilisé au moment de l’envoi servira de contact.";
 
   return (
     <Stack spacing={3}>

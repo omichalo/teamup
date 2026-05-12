@@ -734,6 +734,7 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
               {currentStepId === "adherent" && (
                 <AdherentStep
                   draft={draft}
+                  accountEmail={accountEmail}
                   onPatch={actions.patchFields}
                   onSetSex={actions.setSex}
                 />

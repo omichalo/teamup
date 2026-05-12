@@ -14,7 +14,30 @@ function setup(overrides: Partial<RegistrationDraft> = {}) {
   const onPatch = jest.fn();
   const onSetSex = jest.fn();
 
-  render(<AdherentStep draft={draft} onPatch={onPatch} onSetSex={onSetSex} />);
+  render(
+    <AdherentStep
+      draft={draft}
+      accountEmail={null}
+      onPatch={onPatch}
+      onSetSex={onSetSex}
+    />
+  );
+}
+
+function setupWithAccountEmail(
+  accountEmail: string,
+  overrides: Partial<RegistrationDraft> = {}
+) {
+  const draft: RegistrationDraft = { ...createEmptyDraft(), ...overrides };
+
+  render(
+    <AdherentStep
+      draft={draft}
+      accountEmail={accountEmail}
+      onPatch={jest.fn()}
+      onSetSex={jest.fn()}
+    />
+  );
 }
 
 describe("AdherentStep — validation onBlur", () => {
@@ -59,10 +82,10 @@ describe("AdherentStep — validation onBlur", () => {
 });
 
 describe("AdherentStep — helper e-mail adapté à l'âge", () => {
-  it("propose un message orienté « adulte » par défaut (date vide → considéré majeur)", () => {
+  it("explique le fallback vers le compte créé au moment de l'envoi", () => {
     setup({});
     expect(
-      screen.getByText(/communications directes du club avec l’adhérent/i)
+      screen.getByText(/l’e-mail du compte créé ou utilisé au moment de l’envoi/i)
     ).toBeInTheDocument();
   });
 
@@ -71,7 +94,19 @@ describe("AdherentStep — helper e-mail adapté à l'âge", () => {
     minorBirth.setFullYear(minorBirth.getFullYear() - 10);
     setup({ birthDate: minorBirth.toISOString().slice(0, 10) });
     expect(
-      screen.getByText(/adresse personnelle de l’adhérent mineur/i)
+      screen.getByText(/les communications importantes passent par le représentant légal/i)
     ).toBeInTheDocument();
+  });
+
+  it("n'assimile pas l'e-mail du compte connecté à une adresse métier préremplie", () => {
+    setupWithAccountEmail("parent@example.com", {
+      adherentEmail: "parent@example.com",
+    });
+    expect(
+      screen.getByText(/le club utilisera l’e-mail du compte utilisé pour envoyer/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/prérempli avec l’e-mail vérifié de votre compte/i)
+    ).not.toBeInTheDocument();
   });
 });
