@@ -51,6 +51,7 @@ export const useAuth = () => {
     signIn: async () => ({ success: false, error: "Use /login page" }),
     signUp: async () => ({ success: false, error: "Use /signup page" }),
     isAdmin: user?.role === USER_ROLES.ADMIN,
+    isSecretary: user?.role === USER_ROLES.SECRETARY,
     isCoach:
       user?.role === USER_ROLES.COACH || user?.role === USER_ROLES.ADMIN,
     isPlayer: user?.role === USER_ROLES.PLAYER,
@@ -62,4 +63,3 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
-

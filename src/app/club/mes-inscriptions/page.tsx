@@ -12,7 +12,12 @@ import { USER_ROLES } from "@/lib/auth/roles";
 export default function MesInscriptionsPage() {
   return (
     <AuthGuard
-      allowedRoles={[USER_ROLES.PLAYER, USER_ROLES.COACH, USER_ROLES.ADMIN]}
+      allowedRoles={[
+        USER_ROLES.PLAYER,
+        USER_ROLES.SECRETARY,
+        USER_ROLES.COACH,
+        USER_ROLES.ADMIN,
+      ]}
     >
       <MesInscriptionsClient />
     </AuthGuard>

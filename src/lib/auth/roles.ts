@@ -4,6 +4,7 @@ export type { UserRole };
 
 export const USER_ROLES = {
   ADMIN: "admin",
+  SECRETARY: "secretary",
   COACH: "coach",
   PLAYER: "player",
 } as const satisfies Record<string, UserRole>;
@@ -17,6 +18,7 @@ export const COACH_REQUEST_STATUS = {
 
 export const ROLE_PRIORITY: Record<UserRole, number> = {
   [USER_ROLES.ADMIN]: 3,
+  [USER_ROLES.SECRETARY]: 2,
   [USER_ROLES.COACH]: 2,
   [USER_ROLES.PLAYER]: 1,
 };
@@ -32,6 +34,9 @@ export const isAdmin = (role?: UserRole | null): role is "admin" =>
 export const isCoach = (role?: UserRole | null): boolean =>
   role === USER_ROLES.COACH;
 
+export const isSecretary = (role?: UserRole | null): boolean =>
+  role === USER_ROLES.SECRETARY;
+
 export const isPlayer = (role?: UserRole | null): boolean =>
   role === USER_ROLES.PLAYER;
 
@@ -40,7 +45,11 @@ export const resolveRole = (role?: string | null): UserRole => {
     return DEFAULT_ROLE;
   }
 
-  if (role === USER_ROLES.ADMIN || role === USER_ROLES.COACH) {
+  if (
+    role === USER_ROLES.ADMIN ||
+    role === USER_ROLES.SECRETARY ||
+    role === USER_ROLES.COACH
+  ) {
     return role;
   }
 

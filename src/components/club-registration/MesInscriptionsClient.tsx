@@ -29,6 +29,8 @@ type RegistrationSummary = {
   isMinor?: boolean;
   mainSectionId?: string;
   status?: string;
+  paymentAmountCents?: number;
+  paymentStatus?: string;
   submittedAt?: string | null;
   updatedAt?: string | null;
 };
@@ -45,15 +47,29 @@ const ROLE_LABEL: Record<NonNullable<RegistrationSummary["adherentRole"]>, strin
 
 const STATUS_COLOR: Record<string, "default" | "warning" | "success" | "error"> = {
   submitted: "warning",
+  in_review: "warning",
+  payment_requested: "warning",
+  paid: "success",
   approved: "success",
   rejected: "error",
 };
 
 const STATUS_LABEL: Record<string, string> = {
   submitted: "En cours d’examen",
+  in_review: "En cours de relecture",
+  payment_requested: "Paiement demandé",
+  paid: "Paiement reçu",
   approved: "Approuvé",
   rejected: "Refusé",
 };
+
+function formatAmount(cents: number | undefined): string | null {
+  if (typeof cents !== "number") return null;
+  return new Intl.NumberFormat("fr-FR", {
+    style: "currency",
+    currency: "EUR",
+  }).format(cents / 100);
+}
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -203,6 +219,11 @@ export function MesInscriptionsClient() {
                       <Typography variant="caption" color="text.secondary">
                         Envoyé le {formatDate(r.submittedAt)}
                       </Typography>
+                      {r.status === "payment_requested" ? (
+                        <Typography variant="caption" color="secondary.main" fontWeight={700}>
+                          Paiement attendu{formatAmount(r.paymentAmountCents) ? ` : ${formatAmount(r.paymentAmountCents)}` : ""}
+                        </Typography>
+                      ) : null}
                     </Stack>
                   </Stack>
                 </CardContent>

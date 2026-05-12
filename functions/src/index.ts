@@ -11,7 +11,7 @@ import {
   syncTeamMatchesWrapper,
 } from "./sync-wrappers";
 
-const ALLOWED_ROLES = new Set(["admin", "coach", "player"]);
+const ALLOWED_ROLES = new Set(["admin", "secretary", "coach", "player"]);
 const ALLOWED_COACH_STATUSES = new Set([
   "none",
   "pending",
@@ -19,16 +19,16 @@ const ALLOWED_COACH_STATUSES = new Set([
   "rejected",
 ]);
 
-const resolveRole = (role: unknown): "admin" | "coach" | "player" => {
+const resolveRole = (role: unknown): "admin" | "secretary" | "coach" | "player" => {
   if (typeof role === "string" && ALLOWED_ROLES.has(role)) {
-    return role as "admin" | "coach" | "player";
+    return role as "admin" | "secretary" | "coach" | "player";
   }
   return "player";
 };
 
 const resolveCoachStatus = (
   status: unknown,
-  role: "admin" | "coach" | "player"
+  role: "admin" | "secretary" | "coach" | "player"
 ): "none" | "pending" | "approved" | "rejected" => {
   if (role === "coach") {
     if (typeof status === "string" && ALLOWED_COACH_STATUSES.has(status)) {

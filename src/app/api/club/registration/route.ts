@@ -12,6 +12,7 @@ import { isMinorAt } from "@/lib/club-registration/age";
 import { checkRateLimit } from "@/lib/auth/rate-limit";
 
 const COLLECTION = "clubRegistrations";
+const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
 
 /** Champs métier renvoyés au client (hors Timestamps bruts). */
 const REGISTRATION_CLIENT_FIELDS = [
@@ -50,6 +51,51 @@ const REGISTRATION_CLIENT_FIELDS = [
   "submitterAccountEmail",
   "schemaVersion",
   "status",
+  "reviewNotes",
+  "paymentAmountCents",
+  "paymentRequestedAt",
+  "paymentRequestedBy",
+  "paymentEmailSentTo",
+  "stripeCheckoutSessionId",
+  "stripeCheckoutUrl",
+  "stripeInvoiceId",
+  "paymentStatus",
+  "paidAt",
+] as const;
+
+const MANAGER_EDITABLE_FIELDS = [
+  "adherentRole",
+  "firstName",
+  "lastName",
+  "sex",
+  "birthCity",
+  "birthDate",
+  "adherentEmail",
+  "adherentPhonePrimary",
+  "adherentPhoneSecondary",
+  "addressLine1",
+  "addressLine2",
+  "postalCode",
+  "city",
+  "representatives",
+  "mainSectionId",
+  "additionalSectionIds",
+  "slotIds",
+  "medicalCertificateDeclaration",
+  "wantsRegistrationCertificate",
+  "familyRegistrationOrder",
+  "reductionTypes",
+  "passSportCode",
+  "firstFemaleRegistrationSqy",
+  "photoConsent",
+  "emergencyMedicalAuthorization",
+  "supervisionAcknowledgement",
+  "internalRulesAccepted",
+  "wantsCompetitorExtras",
+  "competitionJerseySize",
+  "competitionIds",
+  "reviewNotes",
+  "paymentAmountCents",
 ] as const;
 
 function stripUndefined<T extends Record<string, unknown>>(obj: T): Record<string, unknown> {
@@ -79,7 +125,14 @@ export async function GET(req: Request) {
 
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     const role = resolveRole(decoded.role as string | undefined);
-    if (!hasAnyRole(role, [USER_ROLES.PLAYER, USER_ROLES.COACH, USER_ROLES.ADMIN])) {
+    if (
+      !hasAnyRole(role, [
+        USER_ROLES.PLAYER,
+        USER_ROLES.SECRETARY,
+        USER_ROLES.COACH,
+        USER_ROLES.ADMIN,
+      ])
+    ) {
       return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
     }
 
@@ -93,8 +146,8 @@ export async function GET(req: Request) {
       return jsonNoStore({ error: "Dossier introuvable" }, { status: 404 });
     }
 
-    const isAdmin = role === USER_ROLES.ADMIN;
-    if (!isAdmin && data.submitterUid !== decoded.uid) {
+    const isManager = hasAnyRole(role, MANAGER_ROLES);
+    if (!isManager && data.submitterUid !== decoded.uid) {
       return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
     }
 
@@ -106,11 +159,94 @@ export async function GET(req: Request) {
     }
     registration.submittedAt = data.submittedAt?.toDate?.()?.toISOString?.() ?? null;
     registration.updatedAt = data.updatedAt?.toDate?.()?.toISOString?.() ?? null;
+    registration.paymentRequestedAt =
+      data.paymentRequestedAt?.toDate?.()?.toISOString?.() ?? null;
+    registration.paidAt = data.paidAt?.toDate?.()?.toISOString?.() ?? null;
 
     return jsonNoStore({ registration }, { status: 200 });
   } catch (error) {
     console.error("[api/club/registration GET]", error);
     return jsonNoStore({ error: "Impossible de charger le dossier" }, { status: 500 });
+  }
+}
+
+/** PATCH /api/club/registration?id={registrationId} — correction d'un dossier par admin/secrétaire. */
+export async function PATCH(req: Request) {
+  try {
+    if (!validateOrigin(req)) {
+      return jsonNoStore({ error: "Invalid origin" }, { status: 403 });
+    }
+
+    const url = new URL(req.url);
+    const id = url.searchParams.get("id");
+    if (!id) {
+      return jsonNoStore({ error: "Paramètre 'id' requis" }, { status: 400 });
+    }
+
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("__session")?.value;
+    if (!sessionCookie) {
+      return jsonNoStore({ error: "Authentification requise" }, { status: 401 });
+    }
+
+    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+    const role = resolveRole(decoded.role as string | undefined);
+    if (!hasAnyRole(role, MANAGER_ROLES)) {
+      return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
+    }
+
+    const body = ((await req.json()) ?? {}) as Record<string, unknown>;
+    const updates: Record<string, unknown> = {};
+    for (const field of MANAGER_EDITABLE_FIELDS) {
+      if (body[field] !== undefined) {
+        updates[field] = body[field];
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return jsonNoStore({ error: "Aucun champ modifiable fourni" }, { status: 400 });
+    }
+
+    if (
+      updates.paymentAmountCents !== undefined &&
+      (!Number.isInteger(updates.paymentAmountCents) ||
+        (updates.paymentAmountCents as number) < 0)
+    ) {
+      return jsonNoStore({ error: "Montant de paiement invalide" }, { status: 400 });
+    }
+
+    const db = getFirestoreAdmin();
+    const docRef = db.collection(COLLECTION).doc(id);
+    const snap = await docRef.get();
+    if (!snap.exists) {
+      return jsonNoStore({ error: "Dossier introuvable" }, { status: 404 });
+    }
+    const currentStatus = snap.data()?.status;
+    const statusPatch =
+      currentStatus === "submitted" ? { status: "in_review" } : {};
+
+    await docRef.set(
+      {
+        ...updates,
+        ...statusPatch,
+        reviewedBy: decoded.uid,
+        reviewedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_UPDATED, decoded.uid, {
+      resource: "clubRegistration",
+      resourceId: id,
+      details: { fields: Object.keys(updates) },
+      success: true,
+    });
+
+    return jsonNoStore({ success: true }, { status: 200 });
+  } catch (error) {
+    console.error("[api/club/registration PATCH]", error);
+    return jsonNoStore({ error: "Impossible de mettre à jour le dossier" }, { status: 500 });
   }
 }
 
@@ -137,7 +273,14 @@ export async function POST(req: Request) {
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     const role = resolveRole(decoded.role as string | undefined);
 
-    if (!hasAnyRole(role, [USER_ROLES.PLAYER, USER_ROLES.COACH, USER_ROLES.ADMIN])) {
+    if (
+      !hasAnyRole(role, [
+        USER_ROLES.PLAYER,
+        USER_ROLES.SECRETARY,
+        USER_ROLES.COACH,
+        USER_ROLES.ADMIN,
+      ])
+    ) {
       return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
     }
 
