@@ -526,6 +526,8 @@ export default function AdminPage() {
     switch (role) {
       case USER_ROLES.ADMIN:
         return "admin";
+      case USER_ROLES.SECRETARY:
+        return "secrétaire";
       case USER_ROLES.COACH:
         return "coach";
       default:

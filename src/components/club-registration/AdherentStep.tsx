@@ -2,8 +2,6 @@
 
 import type { ChangeEvent } from "react";
 import {
-  Alert,
-  Box,
   Button,
   FormControl,
   FormControlLabel,
@@ -17,8 +15,6 @@ import {
   Typography,
   type SelectChangeEvent,
 } from "@mui/material";
-import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import dayjs, { type Dayjs } from "dayjs";
 import {
   extractNationalDigitsForMask,
   formatFrenchPhoneMask,
@@ -28,9 +24,8 @@ import {
 import { isMinorAt } from "@/lib/club-registration/age";
 import { getDevIdentityFixture } from "./dev-identity-fixture";
 import { PostalAddressSection } from "./PostalAddressSection";
-import { RepresentativesBlock } from "./RepresentativesBlock";
 import { useTouchedFields } from "./useTouchedFields";
-import type { RegistrationDraft, Representative } from "./registration-defaults";
+import type { RegistrationDraft } from "./registration-defaults";
 
 const IS_DEV = process.env.NODE_ENV === "development";
 
@@ -39,26 +34,19 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 type Props = {
   draft: RegistrationDraft;
+  accountEmail: string | null;
   onPatch: (patch: Partial<RegistrationDraft>) => void;
-  onSetAdherentRole: (role: RegistrationDraft["adherentRole"]) => void;
   onSetSex: (sex: RegistrationDraft["sex"]) => void;
-  onAddRepresentative: () => void;
-  onUpdateRepresentative: (index: number, patch: Partial<Representative>) => void;
-  onRemoveRepresentative: (index: number) => void;
 };
 
-export function IdentityStep({
-  draft,
-  onPatch,
-  onSetAdherentRole,
-  onSetSex,
-  onAddRepresentative,
-  onUpdateRepresentative,
-  onRemoveRepresentative,
-}: Props) {
-  /* Validation onBlur : on n'affiche les erreurs au champ qu'après que
-     l'utilisateur ait quitté ce champ une première fois. Évite la friction
-     visuelle pendant la saisie tout en signalant clairement les formats. */
+/**
+ * Étape 2 — « L'adhérent ».
+ *
+ * Identité (hors date de naissance, désormais à l'étape « Pour qui ? »),
+ * contact et adresse postale. Le bloc « Représentants légaux » est extrait
+ * dans une étape conditionnelle dédiée pour ne pas surcharger cette page.
+ */
+export function AdherentStep({ draft, accountEmail, onPatch, onSetSex }: Props) {
   const { isTouched, markTouched } = useTouchedFields();
 
   const emailValue = (draft.adherentEmail ?? "").trim();
@@ -97,48 +85,18 @@ export function IdentityStep({
     onSetSex(e.target.value as RegistrationDraft["sex"]);
   };
 
-  const handleAdherentRole = (e: ChangeEvent<HTMLInputElement>) => {
-    onSetAdherentRole(e.target.value as RegistrationDraft["adherentRole"]);
-  };
-
-  /* Représentants légaux : uniquement pour les inscriptions de mineurs.
-     Pour un adulte (self majeur ou other_adult), pas de bloc. */
-  const minorByDob = isMinorAt(draft.birthDate);
-  const showRepresentatives =
-    draft.adherentRole === "minor_dependent" || minorByDob;
+  /* L'e-mail du compte sert de fallback technique au moment de l'envoi, mais
+     il peut venir d'un fournisseur social et ne doit pas être imposé comme
+     adresse métier de contact. */
+  const minor = isMinorAt(draft.birthDate);
+  const emailHelperDefault = minor
+    ? "Optionnel. Pour un mineur, les communications importantes passent par le représentant légal."
+    : accountEmail
+      ? "Optionnel. Si vous laissez vide, le club utilisera l’e-mail du compte utilisé pour envoyer le dossier."
+      : "Optionnel. Si vous laissez vide, l’e-mail du compte créé ou utilisé au moment de l’envoi servira de contact.";
 
   return (
     <Stack spacing={3}>
-      <FormControl component="fieldset" required>
-        <Typography variant="subtitle2" gutterBottom id="adherent-role-label">
-          Cette inscription concerne :
-        </Typography>
-        <RadioGroup
-          aria-labelledby="adherent-role-label"
-          value={draft.adherentRole}
-          onChange={handleAdherentRole}
-        >
-          <FormControlLabel value="self" control={<Radio />} label="Moi-même" />
-          <FormControlLabel
-            value="minor_dependent"
-            control={<Radio />}
-            label="Un mineur dont je suis le représentant légal"
-          />
-          <FormControlLabel
-            value="other_adult"
-            control={<Radio />}
-            label="Un autre adulte (cas particulier : tutelle, etc.)"
-          />
-        </RadioGroup>
-      </FormControl>
-
-      {minorByDob && draft.adherentRole === "self" ? (
-        <Alert severity="warning">
-          La date de naissance saisie correspond à un mineur. Sélectionnez plutôt
-          « un mineur dont je suis le représentant légal ».
-        </Alert>
-      ) : null}
-
       {IS_DEV ? (
         <Button
           type="button"
@@ -210,7 +168,7 @@ export function IdentityStep({
       {draft.sex === "female" ? (
         <FormControl component="fieldset" required>
           <Typography variant="subtitle2" gutterBottom id="first-female-label">
-            Première inscription féminine au club SQY PING ?
+            Première inscription féminine au club SQY PING&nbsp;?
           </Typography>
           <RadioGroup
             aria-labelledby="first-female-label"
@@ -236,41 +194,6 @@ export function IdentityStep({
         inputProps={{ "data-field": "birthCity" }}
       />
 
-      {/* On stocke `birthDate` au format ISO `YYYY-MM-DD` (compat schéma Zod
-          existant + indépendant du fuseau côté affichage). Le DatePicker MUI X
-          travaille en Dayjs ; on convertit aux frontières.
-
-          `PickersTextFieldProps` n'accepte pas `inputProps`, donc on porte
-          l'attribut `data-field` sur un wrapper focusable plutôt que de
-          customiser le slot interne du picker. */}
-      <Box data-field="birthDate" tabIndex={-1}>
-        <DatePicker
-          label="Date de naissance"
-          value={
-            draft.birthDate
-              ? dayjs(draft.birthDate, "YYYY-MM-DD", true)
-              : null
-          }
-          onChange={(value: Dayjs | null) => {
-            if (value && value.isValid()) {
-              onPatch({ birthDate: value.format("YYYY-MM-DD") });
-            } else {
-              onPatch({ birthDate: "" });
-            }
-          }}
-          format="DD/MM/YYYY"
-          minDate={dayjs("1900-01-01", "YYYY-MM-DD", true)}
-          maxDate={dayjs()}
-          slotProps={{
-            textField: {
-              required: true,
-              fullWidth: true,
-              name: "clubRegistrationBirthDate",
-            },
-          }}
-        />
-      </Box>
-
       <Typography
         variant="subtitle1"
         component="h3"
@@ -289,9 +212,7 @@ export function IdentityStep({
         autoComplete="email"
         error={showEmailError}
         helperText={
-          showEmailError
-            ? "Adresse e-mail invalide."
-            : "Si l’adhérent a sa propre adresse (ado, adulte) — sinon laissez vide."
+          showEmailError ? "Adresse e-mail invalide." : emailHelperDefault
         }
         inputProps={{ "data-field": "adherentEmail" }}
       />
@@ -334,31 +255,6 @@ export function IdentityStep({
         isTouched={isTouched}
         markTouched={markTouched}
       />
-
-      {showRepresentatives ? (
-        <Stack spacing={1}>
-          <Typography
-            variant="subtitle1"
-            component="h3"
-            sx={{ color: "primary.main", fontWeight: 700, pt: 1 }}
-          >
-            Représentants légaux
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Un représentant légal est obligatoire pour l’inscription d’un mineur. Vous
-            pouvez en ajouter un second (parent 2, tuteur).
-          </Typography>
-          <RepresentativesBlock
-            representatives={draft.representatives}
-            firstIsRequired
-            onAdd={onAddRepresentative}
-            onUpdate={onUpdateRepresentative}
-            onRemove={onRemoveRepresentative}
-            isTouched={isTouched}
-            markTouched={markTouched}
-          />
-        </Stack>
-      ) : null}
     </Stack>
   );
 }

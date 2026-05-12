@@ -116,7 +116,7 @@ export function RepresentativesBlock({
           ? "Adresse e-mail invalide."
           : emailRequiredMissing
             ? "E-mail obligatoire pour le représentant légal."
-            : undefined;
+            : "Utilisé comme contact principal pour l’inscription du mineur. Indiquez l’adresse réellement consultée par le représentant légal.";
 
         return (
           <Card key={index} variant="outlined">
@@ -185,7 +185,7 @@ export function RepresentativesBlock({
                   fullWidth
                   autoComplete="off"
                   error={showEmailError}
-                  helperText={showEmailError ? emailHelperText : undefined}
+                  helperText={emailHelperText}
                 />
 
                 <TextField

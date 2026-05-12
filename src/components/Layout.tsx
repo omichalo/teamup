@@ -35,6 +35,7 @@ import {
   Menu as MenuIcon,
   Person,
   PlaylistAddCheck,
+  RateReview,
 } from "@mui/icons-material";
 import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
@@ -67,7 +68,7 @@ function isItemActive(pathname: string | null, href: string): boolean {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { user, signOut, isAdmin, isPlayer } = useAuth();
+  const { user, signOut, isAdmin, isPlayer, isSecretary } = useAuth();
 
   const router = useRouter();
   const pathname = usePathname();
@@ -82,6 +83,18 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     if (isPlayer) {
       return [
         { label: "Accueil joueur", href: "/joueur", icon: <Home /> },
+        { label: "Inscription club", href: "/club/inscription", icon: <HowToReg /> },
+        { label: "Mes inscriptions", href: "/club/mes-inscriptions", icon: <FactCheck /> },
+      ];
+    }
+
+    if (isSecretary) {
+      return [
+        {
+          label: "Demandes d’adhésion",
+          href: "/club/demandes-adhesion",
+          icon: <RateReview />,
+        },
         { label: "Inscription club", href: "/club/inscription", icon: <HowToReg /> },
         { label: "Mes inscriptions", href: "/club/mes-inscriptions", icon: <FactCheck /> },
       ];
@@ -102,11 +115,16 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     ];
 
     if (isAdmin) {
+      items.push({
+        label: "Demandes d’adhésion",
+        href: "/club/demandes-adhesion",
+        icon: <RateReview />,
+      });
       items.push({ label: "Admin", href: "/admin", icon: <AdminPanelSettings /> });
     }
 
     return items;
-  }, [isAdmin, isPlayer, user]);
+  }, [isAdmin, isPlayer, isSecretary, user]);
 
   const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);

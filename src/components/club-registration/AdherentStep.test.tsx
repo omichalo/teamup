@@ -3,37 +3,44 @@
  */
 
 import { render, screen, fireEvent } from "@testing-library/react";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import "dayjs/locale/fr";
-import { IdentityStep } from "./IdentityStep";
-import { createEmptyDraft, type RegistrationDraft } from "./registration-defaults";
+import { AdherentStep } from "./AdherentStep";
+import {
+  createEmptyDraft,
+  type RegistrationDraft,
+} from "./registration-defaults";
 
 function setup(overrides: Partial<RegistrationDraft> = {}) {
   const draft: RegistrationDraft = { ...createEmptyDraft(), ...overrides };
   const onPatch = jest.fn();
-  const onSetAdherentRole = jest.fn();
   const onSetSex = jest.fn();
-  const onAddRepresentative = jest.fn();
-  const onUpdateRepresentative = jest.fn();
-  const onRemoveRepresentative = jest.fn();
 
   render(
-    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="fr">
-      <IdentityStep
-        draft={draft}
-        onPatch={onPatch}
-        onSetAdherentRole={onSetAdherentRole}
-        onSetSex={onSetSex}
-        onAddRepresentative={onAddRepresentative}
-        onUpdateRepresentative={onUpdateRepresentative}
-        onRemoveRepresentative={onRemoveRepresentative}
-      />
-    </LocalizationProvider>
+    <AdherentStep
+      draft={draft}
+      accountEmail={null}
+      onPatch={onPatch}
+      onSetSex={onSetSex}
+    />
   );
 }
 
-describe("IdentityStep — validation onBlur", () => {
+function setupWithAccountEmail(
+  accountEmail: string,
+  overrides: Partial<RegistrationDraft> = {}
+) {
+  const draft: RegistrationDraft = { ...createEmptyDraft(), ...overrides };
+
+  render(
+    <AdherentStep
+      draft={draft}
+      accountEmail={accountEmail}
+      onPatch={jest.fn()}
+      onSetSex={jest.fn()}
+    />
+  );
+}
+
+describe("AdherentStep — validation onBlur", () => {
   it("n'affiche pas d'erreur e-mail invalide avant le 1er blur (pas de friction)", () => {
     setup({ adherentEmail: "pas-un-email" });
     expect(
@@ -71,5 +78,35 @@ describe("IdentityStep — validation onBlur", () => {
     expect(
       screen.getByText(/numéro français invalide/i)
     ).toBeInTheDocument();
+  });
+});
+
+describe("AdherentStep — helper e-mail adapté à l'âge", () => {
+  it("explique le fallback vers le compte créé au moment de l'envoi", () => {
+    setup({});
+    expect(
+      screen.getByText(/l’e-mail du compte créé ou utilisé au moment de l’envoi/i)
+    ).toBeInTheDocument();
+  });
+
+  it("propose un message orienté « mineur » si la date correspond à un mineur", () => {
+    const minorBirth = new Date();
+    minorBirth.setFullYear(minorBirth.getFullYear() - 10);
+    setup({ birthDate: minorBirth.toISOString().slice(0, 10) });
+    expect(
+      screen.getByText(/les communications importantes passent par le représentant légal/i)
+    ).toBeInTheDocument();
+  });
+
+  it("n'assimile pas l'e-mail du compte connecté à une adresse métier préremplie", () => {
+    setupWithAccountEmail("parent@example.com", {
+      adherentEmail: "parent@example.com",
+    });
+    expect(
+      screen.getByText(/le club utilisera l’e-mail du compte utilisé pour envoyer/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/prérempli avec l’e-mail vérifié de votre compte/i)
+    ).not.toBeInTheDocument();
   });
 });
