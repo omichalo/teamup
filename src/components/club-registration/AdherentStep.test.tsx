@@ -3,37 +3,21 @@
  */
 
 import { render, screen, fireEvent } from "@testing-library/react";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import "dayjs/locale/fr";
-import { IdentityStep } from "./IdentityStep";
-import { createEmptyDraft, type RegistrationDraft } from "./registration-defaults";
+import { AdherentStep } from "./AdherentStep";
+import {
+  createEmptyDraft,
+  type RegistrationDraft,
+} from "./registration-defaults";
 
 function setup(overrides: Partial<RegistrationDraft> = {}) {
   const draft: RegistrationDraft = { ...createEmptyDraft(), ...overrides };
   const onPatch = jest.fn();
-  const onSetAdherentRole = jest.fn();
   const onSetSex = jest.fn();
-  const onAddRepresentative = jest.fn();
-  const onUpdateRepresentative = jest.fn();
-  const onRemoveRepresentative = jest.fn();
 
-  render(
-    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="fr">
-      <IdentityStep
-        draft={draft}
-        onPatch={onPatch}
-        onSetAdherentRole={onSetAdherentRole}
-        onSetSex={onSetSex}
-        onAddRepresentative={onAddRepresentative}
-        onUpdateRepresentative={onUpdateRepresentative}
-        onRemoveRepresentative={onRemoveRepresentative}
-      />
-    </LocalizationProvider>
-  );
+  render(<AdherentStep draft={draft} onPatch={onPatch} onSetSex={onSetSex} />);
 }
 
-describe("IdentityStep — validation onBlur", () => {
+describe("AdherentStep — validation onBlur", () => {
   it("n'affiche pas d'erreur e-mail invalide avant le 1er blur (pas de friction)", () => {
     setup({ adherentEmail: "pas-un-email" });
     expect(
@@ -70,6 +54,24 @@ describe("IdentityStep — validation onBlur", () => {
     fireEvent.blur(secondary);
     expect(
       screen.getByText(/numéro français invalide/i)
+    ).toBeInTheDocument();
+  });
+});
+
+describe("AdherentStep — helper e-mail adapté à l'âge", () => {
+  it("propose un message orienté « adulte » par défaut (date vide → considéré majeur)", () => {
+    setup({});
+    expect(
+      screen.getByText(/communications directes du club avec l’adhérent/i)
+    ).toBeInTheDocument();
+  });
+
+  it("propose un message orienté « mineur » si la date correspond à un mineur", () => {
+    const minorBirth = new Date();
+    minorBirth.setFullYear(minorBirth.getFullYear() - 10);
+    setup({ birthDate: minorBirth.toISOString().slice(0, 10) });
+    expect(
+      screen.getByText(/adresse personnelle de l’adhérent mineur/i)
     ).toBeInTheDocument();
   });
 });

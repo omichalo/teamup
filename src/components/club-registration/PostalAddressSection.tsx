@@ -14,7 +14,7 @@ type Props = {
   draft: RegistrationDraft;
   onChange: (patch: Partial<RegistrationDraft>) => void;
   /**
-   * Helpers de validation onBlur fournis par le parent (`IdentityStep`).
+   * Helpers de validation onBlur fournis par le parent (`AdherentStep`).
    * Si non fournis, on considère que les champs sont déjà "touchés" : les
    * erreurs s'affichent dès que le format est invalide. Cela permet à ce
    * composant de rester utilisable de manière autonome dans les tests ou
