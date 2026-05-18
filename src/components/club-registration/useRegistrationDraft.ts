@@ -3,6 +3,10 @@
 import { useReducer, useCallback } from "react";
 import type { Representative } from "@/lib/club-registration/schema";
 import {
+  inferMedicalDossierFromDeclaration,
+  syncMedicalCertificateDeclaration,
+} from "@/lib/club-registration/medical-dossier";
+import {
   createEmptyDraft,
   createEmptyRepresentative,
   type RegistrationDraft,
@@ -85,8 +89,25 @@ export function registrationDraftReducer(
       return { ...state, representatives: list };
     }
 
-    case "HYDRATE":
-      return { ...action.draft };
+    case "HYDRATE": {
+      const merged: RegistrationDraft = {
+        ...createEmptyDraft(),
+        ...action.draft,
+      };
+      const dossierEmpty =
+        merged.medicalQuestionnaire.summary === "" &&
+        merged.medicalVeteranPath.hadFfttLicense === "" &&
+        merged.medicalVeteranPath.categoryChanged === "";
+      if (merged.medicalCertificateDeclaration && dossierEmpty) {
+        const inferred = inferMedicalDossierFromDeclaration(
+          merged.medicalCertificateDeclaration,
+          merged.birthDate
+        );
+        merged.medicalQuestionnaire = inferred.questionnaire;
+        merged.medicalVeteranPath = inferred.veteranPath;
+      }
+      return syncMedicalCertificateDeclaration(merged);
+    }
 
     case "RESET":
       return createEmptyDraft();

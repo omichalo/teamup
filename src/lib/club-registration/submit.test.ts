@@ -22,6 +22,7 @@ function makePayload(): ClubRegistrationPayload {
     mainSectionId: "voisins",
     additionalSectionIds: [],
     slotIds: ["voisins-mar-2030-adultes-loisirs"],
+    medicalQuestionnaire: { summary: "all_no", answers: {} },
     medicalCertificateDeclaration: "under_40_all_no",
     wantsRegistrationCertificate: false,
     familyRegistrationOrder: "none",

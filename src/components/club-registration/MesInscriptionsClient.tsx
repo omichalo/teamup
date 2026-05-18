@@ -19,6 +19,10 @@ import NextLink from "next/link";
 import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/ui";
 import { SECTION_PRINCIPALE_OPTIONS } from "@/lib/club-registration/constants";
+import {
+  MEDICAL_CERTIFICATE_STATUS_LABELS,
+  type MedicalCertificateStatus,
+} from "@/lib/club-registration/medical-certificate";
 
 type RegistrationSummary = {
   id: string;
@@ -28,6 +32,7 @@ type RegistrationSummary = {
   birthDate?: string;
   isMinor?: boolean;
   mainSectionId?: string;
+  medicalCertificateStatus?: MedicalCertificateStatus;
   status?: string;
   paymentAmountCents?: number;
   paymentStatus?: string;
@@ -61,6 +66,16 @@ const STATUS_LABEL: Record<string, string> = {
   paid: "Paiement reçu",
   approved: "Approuvé",
   rejected: "Refusé",
+};
+
+const MEDICAL_CERTIFICATE_STATUS_COLOR: Record<
+  MedicalCertificateStatus,
+  "default" | "warning" | "success"
+> = {
+  not_required: "default",
+  required_not_received: "warning",
+  received: "warning",
+  validated: "success",
 };
 
 function formatAmount(cents: number | undefined): string | null {
@@ -223,6 +238,24 @@ export function MesInscriptionsClient() {
                         <Typography variant="caption" color="secondary.main" fontWeight={700}>
                           Paiement attendu{formatAmount(r.paymentAmountCents) ? ` : ${formatAmount(r.paymentAmountCents)}` : ""}
                         </Typography>
+                      ) : null}
+                      {r.medicalCertificateStatus &&
+                      r.medicalCertificateStatus !== "not_required" ? (
+                        <Chip
+                          size="small"
+                          variant="outlined"
+                          label={`Certificat : ${
+                            MEDICAL_CERTIFICATE_STATUS_LABELS[
+                              r.medicalCertificateStatus
+                            ]
+                          }`}
+                          color={
+                            MEDICAL_CERTIFICATE_STATUS_COLOR[
+                              r.medicalCertificateStatus
+                            ]
+                          }
+                          sx={{ flexShrink: 0 }}
+                        />
                       ) : null}
                     </Stack>
                   </Stack>

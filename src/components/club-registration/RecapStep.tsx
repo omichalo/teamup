@@ -52,8 +52,13 @@ const ADHERENT_ROLE_LABELS: Record<RegistrationDraft["adherentRole"], string> =
     other_adult: "Un autre adulte",
   };
 
-const MEDICAL_LABELS: Record<
+type MedicalOptionId = Exclude<
   RegistrationDraft["medicalCertificateDeclaration"],
+  ""
+>;
+
+const MEDICAL_LABELS: Record<
+  MedicalOptionId,
   string
 > = {
   under_40_all_no: "Moins de 40 ans : aucune réponse « Oui »",
@@ -200,6 +205,14 @@ export function RecapStep({ draft, accountEmail, onEditStep }: Props) {
   const hasPassSport = draft.reductionTypes.includes(PASS_SPORT_ID);
   const competitions = draft.competitionIds.map(findCompetitionLabel);
   const isMinor = isMinorAt(draft.birthDate);
+  const primaryContactLabel = isMinor
+    ? "Représentant légal principal"
+    : draft.adherentRole === "other_adult"
+      ? "Adhérent"
+      : "Adhérent";
+  const primaryContactEmail = isMinor
+    ? draft.representatives[0]?.email
+    : draft.adherentEmail;
 
   const fullAddress = [
     draft.addressLine1,
@@ -224,6 +237,14 @@ export function RecapStep({ draft, accountEmail, onEditStep }: Props) {
             label: "Inscription pour",
             value: ADHERENT_ROLE_LABELS[draft.adherentRole],
           },
+          {
+            label: "Licence FFTT",
+            value: draft.ffttLicense
+              ? draft.ffttLicenseLookup?.nomClub
+                ? `${draft.ffttLicense} — ${draft.ffttLicenseLookup.nomClub}`
+                : draft.ffttLicense
+              : "—",
+          },
           { label: "Date de naissance", value: draft.birthDate },
         ]}
       />
@@ -235,6 +256,22 @@ export function RecapStep({ draft, accountEmail, onEditStep }: Props) {
           { label: "Prénom", value: draft.firstName },
           { label: "Nom", value: draft.lastName },
           { label: "Sexe", value: SEX_LABELS[draft.sex] },
+          ...(draft.ffttLicenseLookup
+            ? ([
+                {
+                  label: "Catégorie FFTT",
+                  value: draft.ffttLicenseLookup.categorie ?? "—",
+                },
+                {
+                  label: "Points licence",
+                  value:
+                    draft.ffttLicenseLookup.pointsLicence !== undefined &&
+                    draft.ffttLicenseLookup.pointsLicence !== null
+                      ? `${draft.ffttLicenseLookup.pointsLicence}`
+                      : "—",
+                },
+              ] as Field[])
+            : []),
           ...(draft.sex === "female"
             ? [
                 {
@@ -251,7 +288,10 @@ export function RecapStep({ draft, accountEmail, onEditStep }: Props) {
         title="Contact de l’adhérent"
         onEdit={() => onEditStep("adherent")}
         fields={[
-          { label: "E-mail", value: draft.adherentEmail || "—" },
+          {
+            label: isMinor ? "E-mail du mineur" : "E-mail de contact",
+            value: draft.adherentEmail || "—",
+          },
           {
             label: "Téléphone principal",
             value: toFrenchPhoneMaskedDisplay(draft.adherentPhonePrimary),
@@ -361,7 +401,9 @@ export function RecapStep({ draft, accountEmail, onEditStep }: Props) {
         fields={[
           {
             label: "Déclaration médicale",
-            value: MEDICAL_LABELS[draft.medicalCertificateDeclaration],
+            value: draft.medicalCertificateDeclaration
+              ? MEDICAL_LABELS[draft.medicalCertificateDeclaration]
+              : "—",
           },
           {
             label: "Inscription dans la famille",
@@ -423,12 +465,12 @@ export function RecapStep({ draft, accountEmail, onEditStep }: Props) {
       />
 
       <SectionCard
-        title="Adresses e-mail enregistrées dans le dossier"
+        title="Contacts et compte"
         padding="compact"
         description={
           accountEmail
-            ? "L’adresse de votre compte est conservée comme adresse du soumettant. Si une adresse de contact métier est vide, le club pourra utiliser cette adresse, même si elle vient de Google, Apple ou Facebook."
-            : "L’adresse du compte que vous utiliserez au moment de l’envoi sera conservée comme adresse du soumettant. Si une adresse de contact métier est vide, le club pourra utiliser cette adresse."
+            ? "Le compte connecté sert à envoyer et retrouver le dossier. Le club utilisera en priorité le contact principal indiqué ci-dessous."
+            : "Vous vous connecterez ou créerez un compte au moment d’envoyer le dossier. Le club utilisera en priorité le contact principal indiqué ci-dessous."
         }
       >
         <Stack
@@ -436,16 +478,25 @@ export function RecapStep({ draft, accountEmail, onEditStep }: Props) {
           divider={<Divider flexItem sx={{ borderColor: "divider" }} />}
         >
           <EmailRow
-            label="Soumettant (votre compte)"
+            label={`Contact principal (${primaryContactLabel})`}
+            value={primaryContactEmail || "—"}
+          />
+          <EmailRow
+            label="Compte qui envoie le dossier"
             value={
               accountEmail ? (
                 <strong>{accountEmail}</strong>
               ) : (
-                <em>(à confirmer à la connexion)</em>
+                <em>(à confirmer avant l’envoi)</em>
               )
             }
           />
-          <EmailRow label="Adhérent" value={draft.adherentEmail || "—"} />
+          {!isMinor ? null : (
+            <EmailRow
+              label="E-mail de l’adhérent mineur"
+              value={draft.adherentEmail || "—"}
+            />
+          )}
           {draft.representatives.map((rep, i) => (
             <EmailRow
               key={i}

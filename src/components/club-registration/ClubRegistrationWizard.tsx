@@ -28,6 +28,11 @@ import type { ClubRegistrationPayload } from "@/lib/club-registration/schema";
 import { clubRegistrationPayloadSchema } from "@/lib/club-registration/schema";
 import { isAtLeast40At, isMinorAt } from "@/lib/club-registration/age";
 import {
+  deriveMedicalCertificateDeclaration,
+  effectiveHadFfttLicense,
+  isMedicalAdminStepComplete,
+} from "@/lib/club-registration/medical-dossier";
+import {
   firstStepWithError,
   stepsWithError,
   type RegistrationStepId,
@@ -70,7 +75,7 @@ const STEP_SHORT_LABELS: Record<RegistrationStepId, string> = {
 
 const STEP_DESCRIPTIONS: Record<RegistrationStepId, string> = {
   audience:
-    "Type d’inscription et date de naissance. Ces informations conditionnent les étapes suivantes (options médicales, autorisations, représentants légaux).",
+    "Indiquez pour qui est l’inscription et, si vous en avez une, votre licence FFTT.",
   adherent:
     "Identité, contact et adresse postale de la personne qui pratiquera au club.",
   representatives:
@@ -113,6 +118,16 @@ function validateStepById(
     if (!draft.sex) return "Indiquez le sexe de l’adhérent.";
     if (!draft.birthCity.trim()) return "Indiquez la ville de naissance.";
 
+    const minor = isMinorAt(draft.birthDate);
+    if (!minor && !draft.adherentEmail?.trim()) {
+      return "Indiquez l’e-mail de contact de l’adhérent.";
+    }
+    if (draft.adherentEmail && draft.adherentEmail.trim() !== "") {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.adherentEmail.trim())) {
+        return "L’adresse e-mail de contact est invalide.";
+      }
+    }
+
     if (!draft.adherentPhonePrimary.trim()) {
       return "Indiquez un téléphone principal.";
     }
@@ -122,12 +137,6 @@ function validateStepById(
     const sec = draft.adherentPhoneSecondary?.trim();
     if (sec && !isValidFrenchPhoneSurface(sec)) {
       return "Le téléphone secondaire doit être un numéro français valide.";
-    }
-
-    if (draft.adherentEmail && draft.adherentEmail.trim() !== "") {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.adherentEmail.trim())) {
-        return "L’adresse e-mail de l’adhérent est invalide.";
-      }
     }
 
     const addr1 = draft.addressLine1.trim();
@@ -197,8 +206,16 @@ function validateStepById(
   if (stepId === "admin") {
     const atLeast40 = isAtLeast40At(draft.birthDate);
     const decl = draft.medicalCertificateDeclaration;
-    if (!decl) {
-      return "Choisissez une déclaration sur le questionnaire médical.";
+    if (
+      !decl ||
+      !isMedicalAdminStepComplete({
+        birthDate: draft.birthDate,
+        questionnaire: draft.medicalQuestionnaire,
+        veteranPath: draft.medicalVeteranPath,
+        hasVerifiedFfttLicense: Boolean(draft.ffttLicenseLookup?.licence),
+      })
+    ) {
+      return "Répondez aux questions de la déclaration médicale.";
     }
     if (
       !atLeast40 &&
@@ -270,6 +287,10 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const pendingPayloadRef = useRef<ClubRegistrationPayload | null>(null);
   const hasHydratedRef = useRef(false);
+  const accountEmailAutofillRef = useRef<{
+    selfContact?: string;
+    representativeContact?: string;
+  }>({});
   const cardRef = useRef<HTMLDivElement | null>(null);
   const stepHeadingRef = useRef<HTMLHeadingElement | null>(null);
   const prevActiveStepRef = useRef(0);
@@ -324,6 +345,33 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
     if (hydrating) return;
     storageSave(draft);
   }, [draft, hydrating, storageSave]);
+
+  /* Préremplissage non destructif depuis le compte connecté. L'utilisateur
+     peut ensuite modifier ou vider le champ sans qu'on le remplisse à nouveau. */
+  useEffect(() => {
+    if (!accountEmail) return;
+    if (
+      draft.adherentRole === "self" &&
+      !draft.adherentEmail?.trim() &&
+      accountEmailAutofillRef.current.selfContact !== accountEmail
+    ) {
+      accountEmailAutofillRef.current.selfContact = accountEmail;
+      actions.patchFields({ adherentEmail: accountEmail });
+    }
+  }, [accountEmail, actions, draft.adherentEmail, draft.adherentRole]);
+
+  useEffect(() => {
+    if (!accountEmail || draft.adherentRole !== "minor_dependent") return;
+    const first = draft.representatives[0];
+    if (
+      first &&
+      !first.email.trim() &&
+      accountEmailAutofillRef.current.representativeContact !== accountEmail
+    ) {
+      accountEmailAutofillRef.current.representativeContact = accountEmail;
+      actions.updateRepresentative(0, { email: accountEmail });
+    }
+  }, [accountEmail, actions, draft.adherentRole, draft.representatives]);
 
   /* Sur fieldErrors serveur, on saute à la 1ʳᵉ étape qui contient une erreur
      et on fait défiler la vue vers le premier champ concerné. */
@@ -443,11 +491,42 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
   );
 
   const buildPayload = (): ClubRegistrationPayload | null => {
-    /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
-    const { rulesAccepted, sex, photoConsent, ...rest } = draft;
-    if (sex === "" || photoConsent === "") {
+    const {
+      rulesAccepted: _rulesAccepted,
+      sex,
+      photoConsent,
+      medicalCertificateDeclaration: _decl,
+      medicalQuestionnaire,
+      medicalVeteranPath,
+      ...rest
+    } = draft;
+    void _rulesAccepted;
+    void _decl;
+    const hasVerifiedFfttLicense = Boolean(draft.ffttLicenseLookup?.licence);
+    const medicalCertificateDeclaration = deriveMedicalCertificateDeclaration({
+      birthDate: draft.birthDate,
+      questionnaire: medicalQuestionnaire,
+      veteranPath: medicalVeteranPath,
+      hasVerifiedFfttLicense,
+    });
+    if (
+      sex === "" ||
+      photoConsent === "" ||
+      medicalCertificateDeclaration === "" ||
+      !isMedicalAdminStepComplete({
+        birthDate: draft.birthDate,
+        questionnaire: medicalQuestionnaire,
+        veteranPath: medicalVeteranPath,
+        hasVerifiedFfttLicense,
+      })
+    ) {
       return null;
     }
+    const atLeast40 = isAtLeast40At(draft.birthDate);
+    const hadLicense = effectiveHadFfttLicense(
+      medicalVeteranPath,
+      hasVerifiedFfttLicense
+    );
     const isAdaptedMainSection =
       draft.mainSectionId === "handisport" ||
       draft.mainSectionId === "sport-adapte";
@@ -464,6 +543,23 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
       ...rest,
       sex,
       photoConsent,
+      medicalQuestionnaire: {
+        ...(medicalQuestionnaire.summary !== ""
+          ? { summary: medicalQuestionnaire.summary }
+          : {}),
+        answers: medicalQuestionnaire.answers,
+      },
+      medicalVeteranPath: atLeast40
+        ? hadLicense === "yes"
+          ? {
+              hadFfttLicense: hadLicense,
+              categoryChanged: medicalVeteranPath.categoryChanged as
+                | "yes"
+                | "no",
+            }
+          : { hadFfttLicense: hadLicense as "yes" | "no" }
+        : undefined,
+      medicalCertificateDeclaration,
       emergencyMedicalAuthorization,
       supervisionAcknowledgement,
       internalRulesAccepted: true as const,
@@ -559,6 +655,10 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
       ? "Envoi en cours…"
       : "Envoyer ma demande au club"
     : "Se connecter pour envoyer";
+  const authInitialEmail =
+    draft.adherentRole === "minor_dependent"
+      ? draft.representatives[0]?.email || accountEmail || undefined
+      : draft.adherentEmail || accountEmail || undefined;
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="fr">
@@ -566,7 +666,7 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
         <PageHeader
           eyebrow="Inscription au club"
           title="Préparez votre dossier"
-          subtitle="En quelques étapes, renseignez les informations nécessaires. Votre brouillon est enregistré localement et vous pourrez vous connecter ou créer un compte juste avant l’envoi."
+          subtitle="Renseignez les informations nécessaires pour demander votre adhésion au club."
         />
 
         <SectionCard padding="compact" contentSx={{ py: 2 }}>
@@ -706,7 +806,6 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
               draft={draft}
               sequence={sequence}
               activeStepIndex={activeStep}
-              stepValidity={stepValidity}
             />
           </Box>
 
@@ -729,6 +828,7 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
                   draft={draft}
                   onPatch={actions.patchFields}
                   onSetAdherentRole={actions.setAdherentRole}
+                  onSetSex={actions.setSex}
                 />
               )}
               {currentStepId === "adherent" && (
@@ -864,6 +964,7 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
           }}
           defaultMode="login"
           onSuccess={handleAuthSuccess}
+          {...(authInitialEmail ? { initialEmail: authInitialEmail } : {})}
           headerSlot={<AccountEmailTransparencyBanner accountEmail={null} />}
         />
 

@@ -116,7 +116,9 @@ export function RepresentativesBlock({
           ? "Adresse e-mail invalide."
           : emailRequiredMissing
             ? "E-mail obligatoire pour le représentant légal."
-            : "Utilisé comme contact principal pour l’inscription du mineur. Indiquez l’adresse réellement consultée par le représentant légal.";
+            : index === 0
+              ? "Contact principal du club pour ce dossier."
+              : "Le club pourra aussi utiliser cette adresse pour le suivi du dossier.";
 
         return (
           <Card key={index} variant="outlined">
@@ -177,7 +179,11 @@ export function RepresentativesBlock({
 
                 <TextField
                   required={required}
-                  label="E-mail"
+                  label={
+                    index === 0
+                      ? "E-mail du représentant légal principal"
+                      : "E-mail du second représentant"
+                  }
                   type="email"
                   value={rep.email}
                   onChange={handleField(index, "email")}

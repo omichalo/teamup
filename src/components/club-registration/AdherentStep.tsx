@@ -49,9 +49,12 @@ type Props = {
 export function AdherentStep({ draft, accountEmail, onPatch, onSetSex }: Props) {
   const { isTouched, markTouched } = useTouchedFields();
 
+  const minor = isMinorAt(draft.birthDate);
   const emailValue = (draft.adherentEmail ?? "").trim();
+  const emailRequiredMissing = !minor && emailValue === "";
   const emailFormatInvalid = emailValue !== "" && !EMAIL_RE.test(emailValue);
-  const showEmailError = isTouched("adherentEmail") && emailFormatInvalid;
+  const showEmailError =
+    isTouched("adherentEmail") && (emailFormatInvalid || emailRequiredMissing);
 
   const primaryRaw = draft.adherentPhonePrimary.trim();
   const primaryFormatInvalid =
@@ -88,12 +91,18 @@ export function AdherentStep({ draft, accountEmail, onPatch, onSetSex }: Props) 
   /* L'e-mail du compte sert de fallback technique au moment de l'envoi, mais
      il peut venir d'un fournisseur social et ne doit pas être imposé comme
      adresse métier de contact. */
-  const minor = isMinorAt(draft.birthDate);
+  const emailLabel = minor
+    ? "E-mail de l’adhérent mineur (optionnel)"
+    : draft.adherentRole === "other_adult"
+      ? "E-mail de contact de l’adhérent"
+      : "E-mail de contact";
   const emailHelperDefault = minor
-    ? "Optionnel. Pour un mineur, les communications importantes passent par le représentant légal."
-    : accountEmail
-      ? "Optionnel. Si vous laissez vide, le club utilisera l’e-mail du compte utilisé pour envoyer le dossier."
-      : "Optionnel. Si vous laissez vide, l’e-mail du compte créé ou utilisé au moment de l’envoi servira de contact.";
+    ? "Optionnel. Pour un mineur, le contact principal est le représentant légal."
+    : draft.adherentRole === "other_adult"
+      ? "Indiquez l’adresse à utiliser pour le suivi de ce dossier. Elle peut être différente du compte qui envoie la demande."
+      : accountEmail
+        ? "Le club utilisera cette adresse pour vous contacter au sujet de l’inscription. Elle peut être différente du compte connecté."
+        : "Le club utilisera cette adresse pour vous contacter au sujet de l’inscription. Elle servira aussi à préremplir la connexion ou la création de compte.";
 
   return (
     <Stack spacing={3}>
@@ -148,7 +157,9 @@ export function AdherentStep({ draft, accountEmail, onPatch, onSetSex }: Props) 
       </Stack>
 
       <FormControl fullWidth required>
-        <InputLabel id="sex-label">Sexe</InputLabel>
+        <InputLabel id="sex-label" shrink>
+          Sexe
+        </InputLabel>
         <Select
           labelId="sex-label"
           label="Sexe"
@@ -203,7 +214,8 @@ export function AdherentStep({ draft, accountEmail, onPatch, onSetSex }: Props) 
       </Typography>
 
       <TextField
-        label="E-mail de l’adhérent (optionnel)"
+        required={!minor}
+        label={emailLabel}
         type="email"
         value={draft.adherentEmail ?? ""}
         onChange={(e) => onPatch({ adherentEmail: e.target.value })}
@@ -212,7 +224,11 @@ export function AdherentStep({ draft, accountEmail, onPatch, onSetSex }: Props) 
         autoComplete="email"
         error={showEmailError}
         helperText={
-          showEmailError ? "Adresse e-mail invalide." : emailHelperDefault
+          showEmailError
+            ? emailFormatInvalid
+              ? "Adresse e-mail invalide."
+              : "E-mail de contact obligatoire."
+            : emailHelperDefault
         }
         inputProps={{ "data-field": "adherentEmail" }}
       />

@@ -32,6 +32,8 @@ export const REGISTRATION_FIELD_TO_STEP_ID: Readonly<
 > = {
   /* Étape 1 — Pour qui ? */
   adherentRole: "audience",
+  ffttLicense: "audience",
+  ffttLicenseLookup: "audience",
   birthDate: "audience",
 
   /* Étape 2 — L'adhérent */
@@ -61,6 +63,8 @@ export const REGISTRATION_FIELD_TO_STEP_ID: Readonly<
 
   /* Étape 5 — Dossier administratif */
   medicalCertificateDeclaration: "admin",
+  medicalQuestionnaire: "admin",
+  medicalVeteranPath: "admin",
   wantsRegistrationCertificate: "admin",
   familyRegistrationOrder: "admin",
   reductionTypes: "admin",

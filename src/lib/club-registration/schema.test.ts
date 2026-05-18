@@ -1,4 +1,5 @@
 import { clubRegistrationPayloadSchema } from "./schema";
+import { inferMedicalDossierFromDeclaration } from "./medical-dossier";
 
 /**
  * Helper qui construit un payload valide minimal pour un adulte qui s'inscrit lui-même,
@@ -7,6 +8,17 @@ import { clubRegistrationPayloadSchema } from "./schema";
 function buildPayload(
   overrides: Partial<Parameters<typeof clubRegistrationPayloadSchema.safeParse>[0]> = {}
 ) {
+  const birthDate = overrides.birthDate ?? "2000-04-12";
+  const medicalCertificateDeclaration =
+    overrides.medicalCertificateDeclaration ?? "under_40_all_no";
+  const inferred = inferMedicalDossierFromDeclaration(
+    medicalCertificateDeclaration,
+    birthDate
+  );
+  const inferredSummary = inferred.questionnaire.summary;
+  const summary =
+    overrides.medicalQuestionnaire?.summary ??
+    (inferredSummary !== "" ? inferredSummary : undefined);
   const base = {
     adherentRole: "self" as const,
     firstName: "Olivier",
@@ -15,7 +27,7 @@ function buildPayload(
     birthCity: "Paris",
     /* Date choisie pour rester un majeur < 40 ans quelle que soit l'année du run
        du test (compatible avec la déclaration `under_40_all_no` par défaut). */
-    birthDate: "2000-04-12",
+    birthDate,
     adherentEmail: "olivier@example.com",
     adherentPhonePrimary: "0612345678",
     adherentPhoneSecondary: "",
@@ -27,7 +39,11 @@ function buildPayload(
     mainSectionId: "voisins",
     additionalSectionIds: [],
     slotIds: ["voisins-mar-2030-adultes-loisirs"],
-    medicalCertificateDeclaration: "under_40_all_no",
+    medicalQuestionnaire: {
+      ...(summary !== undefined ? { summary } : {}),
+      answers: overrides.medicalQuestionnaire?.answers ?? {},
+    },
+    medicalCertificateDeclaration,
     wantsRegistrationCertificate: false,
     familyRegistrationOrder: "none",
     reductionTypes: [],
@@ -39,7 +55,20 @@ function buildPayload(
     wantsCompetitorExtras: false,
     competitionIds: [],
   };
-  return { ...base, ...overrides };
+  const merged = { ...base, ...overrides };
+  if (
+    overrides.medicalVeteranPath === undefined &&
+    inferred.veteranPath.hadFfttLicense !== ""
+  ) {
+    const { hadFfttLicense, categoryChanged } = inferred.veteranPath;
+    merged.medicalVeteranPath = {
+      hadFfttLicense,
+      ...(categoryChanged !== ""
+        ? { categoryChanged: categoryChanged as "yes" | "no" }
+        : {}),
+    };
+  }
+  return merged;
 }
 
 describe("clubRegistrationPayloadSchema", () => {
@@ -426,6 +455,8 @@ describe("clubRegistrationPayloadSchema", () => {
       buildPayload({
         birthDate: "1960-04-12",
         medicalCertificateDeclaration: "questionnaire_yes_certificate_required",
+        medicalQuestionnaire: { summary: "has_yes", answers: {} },
+        medicalVeteranPath: { hadFfttLicense: "yes", categoryChanged: "no" },
       })
     );
     expect(young.success).toBe(true);

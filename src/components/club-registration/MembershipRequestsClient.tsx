@@ -43,6 +43,13 @@ import {
   REDUCTION_OPTIONS,
   SECTION_PRINCIPALE_OPTIONS,
 } from "@/lib/club-registration/constants";
+import {
+  MEDICAL_CERTIFICATE_STATUS_LABELS,
+  MEDICAL_CERTIFICATE_STATUS_VALUES,
+  isMedicalCertificateRequired,
+  normalizeMedicalCertificateStatus,
+  type MedicalCertificateStatus,
+} from "@/lib/club-registration/medical-certificate";
 import type { Representative } from "@/lib/club-registration/schema";
 
 type RegistrationSummary = {
@@ -51,6 +58,8 @@ type RegistrationSummary = {
   lastName?: string;
   submitterAccountEmail?: string;
   mainSectionId?: string;
+  medicalCertificateDeclaration?: string;
+  medicalCertificateStatus?: MedicalCertificateStatus;
   status?: string;
   paymentAmountCents?: number;
   paymentStatus?: string;
@@ -73,7 +82,8 @@ type RegistrationDetail = RegistrationSummary & {
   representatives?: Representative[];
   additionalSectionIds?: string[];
   slotIds?: string[];
-  medicalCertificateDeclaration?: string;
+  medicalCertificateStatusUpdatedAt?: string | null;
+  medicalCertificateStatusUpdatedBy?: string;
   wantsRegistrationCertificate?: boolean;
   familyRegistrationOrder?: string;
   reductionTypes?: string[];
@@ -110,6 +120,7 @@ type EditableRegistration = {
   additionalSectionIds: string[];
   slotIds: string[];
   medicalCertificateDeclaration: string;
+  medicalCertificateStatus: MedicalCertificateStatus;
   wantsRegistrationCertificate: boolean;
   familyRegistrationOrder: string;
   reductionTypes: string[];
@@ -180,6 +191,22 @@ const MEDICAL_OPTIONS = [
   },
 ] as const;
 
+const MEDICAL_CERTIFICATE_STATUS_COLOR: Record<
+  MedicalCertificateStatus,
+  "default" | "info" | "warning" | "success"
+> = {
+  not_required: "default",
+  required_not_received: "warning",
+  received: "info",
+  validated: "success",
+};
+
+const MEDICAL_CERTIFICATE_STATUS_OPTIONS =
+  MEDICAL_CERTIFICATE_STATUS_VALUES.map((value) => ({
+    value,
+    label: MEDICAL_CERTIFICATE_STATUS_LABELS[value],
+  }));
+
 const FAMILY_ORDER_OPTIONS = [
   { value: "none", label: "Première inscription dans la famille" },
   { value: "second", label: "Deuxième inscription dans la famille" },
@@ -242,6 +269,10 @@ function toEditable(registration: RegistrationDetail): EditableRegistration {
     slotIds: registration.slotIds ?? [],
     medicalCertificateDeclaration:
       registration.medicalCertificateDeclaration ?? "under_40_all_no",
+    medicalCertificateStatus: normalizeMedicalCertificateStatus(
+      registration.medicalCertificateStatus,
+      registration.medicalCertificateDeclaration
+    ),
     wantsRegistrationCertificate: registration.wantsRegistrationCertificate ?? false,
     familyRegistrationOrder: registration.familyRegistrationOrder ?? "none",
     reductionTypes: registration.reductionTypes ?? [],
@@ -399,6 +430,21 @@ export function MembershipRequestsClient() {
     setForm((current) => (current ? { ...current, [field]: value } : current));
   };
 
+  const updateMedicalDeclaration = (nextDeclaration: string) => {
+    setForm((current) =>
+      current
+        ? {
+            ...current,
+            medicalCertificateDeclaration: nextDeclaration,
+            medicalCertificateStatus: normalizeMedicalCertificateStatus(
+              current.medicalCertificateStatus,
+              nextDeclaration
+            ),
+          }
+        : current
+    );
+  };
+
   const updateRepresentative = (
     index: number,
     patch: Partial<Representative>
@@ -474,6 +520,7 @@ export function MembershipRequestsClient() {
           additionalSectionIds: form.additionalSectionIds,
           slotIds: form.slotIds,
           medicalCertificateDeclaration: form.medicalCertificateDeclaration,
+          medicalCertificateStatus: form.medicalCertificateStatus,
           wantsRegistrationCertificate: form.wantsRegistrationCertificate,
           familyRegistrationOrder: form.familyRegistrationOrder,
           reductionTypes: form.reductionTypes,
@@ -606,6 +653,24 @@ export function MembershipRequestsClient() {
                           <Typography variant="caption" color="text.secondary">
                             Envoyé le {formatDate(registration.submittedAt)}
                           </Typography>
+                          {registration.medicalCertificateStatus &&
+                          registration.medicalCertificateStatus !== "not_required" ? (
+                            <Chip
+                              size="small"
+                              variant="outlined"
+                              label={
+                                MEDICAL_CERTIFICATE_STATUS_LABELS[
+                                  registration.medicalCertificateStatus
+                                ]
+                              }
+                              color={
+                                MEDICAL_CERTIFICATE_STATUS_COLOR[
+                                  registration.medicalCertificateStatus
+                                ]
+                              }
+                              sx={{ alignSelf: "flex-start" }}
+                            />
+                          ) : null}
                         </Stack>
                       </CardContent>
                       <CardActions sx={{ px: 2, pt: 0, pb: 1.5 }}>
@@ -802,10 +867,44 @@ export function MembershipRequestsClient() {
 
                     <SectionTitle>Dossier administratif</SectionTitle>
                     <Grid container spacing={2}>
-                      <Grid size={{ xs: 12 }}>
-                        <TextField select label="Déclaration médicale" value={form.medicalCertificateDeclaration} onChange={(e) => updateField("medicalCertificateDeclaration", e.target.value)} fullWidth>
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <TextField select label="Déclaration médicale" value={form.medicalCertificateDeclaration} onChange={(e) => updateMedicalDeclaration(e.target.value)} fullWidth>
                           {MEDICAL_OPTIONS.map((option) => (
                             <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
+                          ))}
+                        </TextField>
+                      </Grid>
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <TextField
+                          select
+                          label="Suivi certificat médical"
+                          value={form.medicalCertificateStatus}
+                          onChange={(e) =>
+                            updateField(
+                              "medicalCertificateStatus",
+                              e.target.value as MedicalCertificateStatus
+                            )
+                          }
+                          disabled={!isMedicalCertificateRequired(form.medicalCertificateDeclaration)}
+                          fullWidth
+                          helperText={
+                            isMedicalCertificateRequired(form.medicalCertificateDeclaration)
+                              ? "Suivi interne du certificat, sans stockage du document."
+                              : "Aucun certificat médical requis pour cette déclaration."
+                          }
+                        >
+                          {MEDICAL_CERTIFICATE_STATUS_OPTIONS.map((option) => (
+                            <MenuItem
+                              key={option.value}
+                              value={option.value}
+                              disabled={
+                                isMedicalCertificateRequired(
+                                  form.medicalCertificateDeclaration
+                                ) && option.value === "not_required"
+                              }
+                            >
+                              {option.label}
+                            </MenuItem>
                           ))}
                         </TextField>
                       </Grid>

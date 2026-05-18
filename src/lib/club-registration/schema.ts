@@ -8,6 +8,13 @@ import {
 } from "./constants";
 import { isValidFrenchPhoneSurface, normalizeFrenchPhoneInput } from "./phone-fr";
 import { isAtLeast40At, isMinorAt } from "./age";
+import {
+  createEmptyMedicalVeteranPath,
+  deriveMedicalCertificateDeclaration,
+  effectiveHadFfttLicense,
+  type MedicalQuestionnaire,
+  type MedicalVeteranPath,
+} from "./medical-dossier";
 
 const sectionIds = SECTION_PRINCIPALE_OPTIONS.map((s) => s.id) as [
   string,
@@ -66,10 +73,48 @@ export const adherentRoleSchema = z.enum([
 ]);
 export type AdherentRole = z.infer<typeof adherentRoleSchema>;
 
+const medicalYesNoSchema = z.enum(["yes", "no"]);
+
+export const medicalQuestionnaireSchema = z.object({
+  /** Obligatoire lorsque le parcours UI affiche le questionnaire (cf. superRefine). */
+  summary: z.enum(["all_no", "has_yes"]).optional(),
+  answers: z.record(z.string(), medicalYesNoSchema).default({}),
+});
+
+export const medicalVeteranPathSchema = z.object({
+  hadFfttLicense: medicalYesNoSchema,
+  /** Absent ou omis lorsque `hadFfttLicense` vaut `no` (première licence). */
+  categoryChanged: medicalYesNoSchema.optional(),
+});
+
+export type MedicalQuestionnairePayload = z.infer<typeof medicalQuestionnaireSchema>;
+export type MedicalVeteranPathPayload = z.infer<typeof medicalVeteranPathSchema>;
+
+const ffttLicenseLookupSchema = z.object({
+  licence: z.string().regex(/^[0-9]{5,12}$/),
+  nom: z.string().trim().max(120).optional(),
+  prenom: z.string().trim().max(120).optional(),
+  isHomme: z.boolean().optional(),
+  numClub: z.string().trim().max(40).optional(),
+  nomClub: z.string().trim().max(160).optional(),
+  categorie: z.string().trim().max(40).optional(),
+  typeLicence: z.string().trim().max(20).nullable().optional(),
+  certificat: z.string().trim().max(20).optional(),
+  nationalite: z.string().trim().max(20).optional(),
+  pointsLicence: z.number().nullable().optional(),
+});
+
 export const clubRegistrationPayloadSchema = z
   .object({
     /* Bloc adhérent ----------------------------------------------------- */
     adherentRole: adherentRoleSchema,
+    ffttLicense: z
+      .union([
+        z.literal(""),
+        z.string().trim().regex(/^[0-9]{5,12}$/, "Numéro de licence FFTT invalide"),
+      ])
+      .optional(),
+    ffttLicenseLookup: ffttLicenseLookupSchema.optional(),
     firstName: z.string().trim().min(1, "Le prénom est obligatoire").max(120),
     lastName: z.string().trim().min(1, "Le nom est obligatoire").max(120),
     sex: z.enum(["female", "male", "other"]),
@@ -99,6 +144,8 @@ export const clubRegistrationPayloadSchema = z
     slotIds: z.array(z.string()).min(1, "Sélectionnez au moins un créneau"),
 
     /* Médical / aides -------------------------------------------------- */
+    medicalQuestionnaire: medicalQuestionnaireSchema,
+    medicalVeteranPath: medicalVeteranPathSchema.optional(),
     medicalCertificateDeclaration: z.enum([
       "under_40_all_no",
       "over_40_cert_unchanged_all_no",
@@ -214,6 +261,72 @@ export const clubRegistrationPayloadSchema = z
        (certificat médical requis) reste disponible quel que soit l'âge. */
     const atLeast40 = isAtLeast40At(data.birthDate);
     const decl = data.medicalCertificateDeclaration;
+    const hasVerifiedFfttLicense = Boolean(data.ffttLicenseLookup?.licence);
+    const veteranPath: MedicalVeteranPath = data.medicalVeteranPath
+      ? {
+          hadFfttLicense: data.medicalVeteranPath.hadFfttLicense,
+          categoryChanged: data.medicalVeteranPath.categoryChanged ?? "",
+        }
+      : createEmptyMedicalVeteranPath();
+    const questionnaire: MedicalQuestionnaire = {
+      summary: data.medicalQuestionnaire.summary ?? "",
+      answers: data.medicalQuestionnaire.answers,
+    };
+    const derivedDecl = deriveMedicalCertificateDeclaration({
+      birthDate: data.birthDate,
+      questionnaire,
+      veteranPath,
+      hasVerifiedFfttLicense,
+    });
+    if (derivedDecl !== decl) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "La déclaration médicale ne correspond pas aux réponses du dossier médical.",
+        path: ["medicalCertificateDeclaration"],
+      });
+    }
+    if (atLeast40 && !data.medicalVeteranPath) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Complétez le parcours médical vétéran (licence FFTT).",
+        path: ["medicalVeteranPath"],
+      });
+    }
+
+    const needsQuestionnaireSummary =
+      !atLeast40 ||
+      (effectiveHadFfttLicense(veteranPath, hasVerifiedFfttLicense) === "yes" &&
+        veteranPath.categoryChanged === "no");
+    if (needsQuestionnaireSummary && !data.medicalQuestionnaire.summary) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Indiquez le résultat de votre questionnaire de santé.",
+        path: ["medicalQuestionnaire", "summary"],
+      });
+    }
+
+    if (
+      atLeast40 &&
+      data.medicalVeteranPath &&
+      effectiveHadFfttLicense(veteranPath, hasVerifiedFfttLicense) === "yes" &&
+      data.medicalVeteranPath.categoryChanged === undefined
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Indiquez si votre catégorie vétéran a changé.",
+        path: ["medicalVeteranPath", "categoryChanged"],
+      });
+    }
+
+    if (!atLeast40 && data.medicalVeteranPath) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "Le parcours licence FFTT vétéran ne s'applique pas aux moins de 40 ans.",
+        path: ["medicalVeteranPath"],
+      });
+    }
     if (
       !atLeast40 &&
       (decl === "over_40_cert_unchanged_all_no" ||
@@ -240,6 +353,13 @@ export const clubRegistrationPayloadSchema = z
        des cours ». L'UI les masque pour les majeurs et les exige (case cochée) pour
        les mineurs. Côté serveur on refuse les combinaisons incohérentes. */
     const minor = isMinorAt(data.birthDate);
+    if (!minor && !data.adherentEmail?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "L'e-mail de contact est obligatoire pour un adhérent majeur.",
+        path: ["adherentEmail"],
+      });
+    }
     if (minor) {
       if (data.emergencyMedicalAuthorization !== "yes") {
         ctx.addIssue({

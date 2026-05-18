@@ -20,20 +20,20 @@ export function AccountEmailTransparencyBanner({ accountEmail }: Props) {
         </Typography>
         {accountEmail ? (
           <Typography variant="body2">
-            Vous êtes connecté(e) en tant que <strong>{accountEmail}</strong>. Cette adresse
-            sera enregistrée dans le dossier comme adresse du soumettant et servira au club
-            pour le suivi de cette inscription.
+            Vous êtes connecté(e) avec le compte <strong>{accountEmail}</strong>.
+            Cette adresse sera enregistrée comme compte qui envoie le dossier.
+            Le contact principal du club reste celui indiqué dans le formulaire.
           </Typography>
         ) : (
           <Typography variant="body2">
             Au moment d&apos;envoyer votre demande, vous serez invité(e) à vous connecter ou à
-            créer un compte. L&apos;adresse e-mail de ce compte sera enregistrée dans le
-            dossier comme adresse du soumettant.
+            créer un compte. Ce compte permettra d&apos;envoyer le dossier et de le
+            retrouver plus tard.
           </Typography>
         )}
         <Typography variant="caption" color="text.secondary">
-          Les e-mails de l&apos;adhérent et des représentants légaux sont distincts et se
-          renseignent dans le formulaire ci-dessous.
+          L&apos;e-mail de contact, l&apos;e-mail des représentants légaux et l&apos;e-mail du compte
+          peuvent être identiques ou différents.
         </Typography>
       </Stack>
     </Alert>

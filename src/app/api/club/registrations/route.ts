@@ -4,6 +4,7 @@ import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
+import { normalizeMedicalCertificateStatus } from "@/lib/club-registration/medical-certificate";
 
 const COLLECTION = "clubRegistrations";
 const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
@@ -16,6 +17,8 @@ const LIST_FIELDS = [
   "birthDate",
   "isMinor",
   "mainSectionId",
+  "medicalCertificateDeclaration",
+  "medicalCertificateStatus",
   "status",
   "submitterUid",
   "submitterAccountEmail",
@@ -78,6 +81,10 @@ export async function GET(req: Request) {
             summary[key] = data[key];
           }
         }
+        summary.medicalCertificateStatus = normalizeMedicalCertificateStatus(
+          data.medicalCertificateStatus,
+          data.medicalCertificateDeclaration
+        );
         const submittedAtMs: number = data.submittedAt?.toMillis?.() ?? 0;
         summary.submittedAt =
           data.submittedAt?.toDate?.()?.toISOString?.() ?? null;

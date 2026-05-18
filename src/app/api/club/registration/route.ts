@@ -9,6 +9,11 @@ import { validateOrigin } from "@/lib/auth/csrf-utils";
 import { logAuditAction, AUDIT_ACTIONS } from "@/lib/auth/audit-logger";
 import { clubRegistrationPayloadSchema } from "@/lib/club-registration/schema";
 import { isMinorAt } from "@/lib/club-registration/age";
+import {
+  initialMedicalCertificateStatus,
+  isMedicalCertificateStatus,
+  normalizeMedicalCertificateStatus,
+} from "@/lib/club-registration/medical-certificate";
 import { checkRateLimit } from "@/lib/auth/rate-limit";
 
 const COLLECTION = "clubRegistrations";
@@ -17,6 +22,8 @@ const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
 /** Champs métier renvoyés au client (hors Timestamps bruts). */
 const REGISTRATION_CLIENT_FIELDS = [
   "adherentRole",
+  "ffttLicense",
+  "ffttLicenseLookup",
   "firstName",
   "lastName",
   "sex",
@@ -34,6 +41,11 @@ const REGISTRATION_CLIENT_FIELDS = [
   "additionalSectionIds",
   "slotIds",
   "medicalCertificateDeclaration",
+  "medicalQuestionnaire",
+  "medicalVeteranPath",
+  "medicalCertificateStatus",
+  "medicalCertificateStatusUpdatedAt",
+  "medicalCertificateStatusUpdatedBy",
   "wantsRegistrationCertificate",
   "familyRegistrationOrder",
   "reductionTypes",
@@ -65,6 +77,8 @@ const REGISTRATION_CLIENT_FIELDS = [
 
 const MANAGER_EDITABLE_FIELDS = [
   "adherentRole",
+  "ffttLicense",
+  "ffttLicenseLookup",
   "firstName",
   "lastName",
   "sex",
@@ -82,6 +96,9 @@ const MANAGER_EDITABLE_FIELDS = [
   "additionalSectionIds",
   "slotIds",
   "medicalCertificateDeclaration",
+  "medicalQuestionnaire",
+  "medicalVeteranPath",
+  "medicalCertificateStatus",
   "wantsRegistrationCertificate",
   "familyRegistrationOrder",
   "reductionTypes",
@@ -157,8 +174,14 @@ export async function GET(req: Request) {
         registration[key] = data[key];
       }
     }
+    registration.medicalCertificateStatus = normalizeMedicalCertificateStatus(
+      data.medicalCertificateStatus,
+      data.medicalCertificateDeclaration
+    );
     registration.submittedAt = data.submittedAt?.toDate?.()?.toISOString?.() ?? null;
     registration.updatedAt = data.updatedAt?.toDate?.()?.toISOString?.() ?? null;
+    registration.medicalCertificateStatusUpdatedAt =
+      data.medicalCertificateStatusUpdatedAt?.toDate?.()?.toISOString?.() ?? null;
     registration.paymentRequestedAt =
       data.paymentRequestedAt?.toDate?.()?.toISOString?.() ?? null;
     registration.paidAt = data.paidAt?.toDate?.()?.toISOString?.() ?? null;
@@ -215,15 +238,47 @@ export async function PATCH(req: Request) {
       return jsonNoStore({ error: "Montant de paiement invalide" }, { status: 400 });
     }
 
+    if (
+      updates.medicalCertificateStatus !== undefined &&
+      !isMedicalCertificateStatus(updates.medicalCertificateStatus)
+    ) {
+      return jsonNoStore(
+        { error: "Statut de certificat médical invalide" },
+        { status: 400 }
+      );
+    }
+
     const db = getFirestoreAdmin();
     const docRef = db.collection(COLLECTION).doc(id);
     const snap = await docRef.get();
     if (!snap.exists) {
       return jsonNoStore({ error: "Dossier introuvable" }, { status: 404 });
     }
-    const currentStatus = snap.data()?.status;
+    const currentData = snap.data() ?? {};
+    const currentStatus = currentData.status;
     const statusPatch =
       currentStatus === "submitted" ? { status: "in_review" } : {};
+
+    if (
+      updates.medicalCertificateDeclaration !== undefined ||
+      updates.medicalCertificateStatus !== undefined
+    ) {
+      const nextDeclaration =
+        (updates.medicalCertificateDeclaration as string | undefined) ??
+        (currentData.medicalCertificateDeclaration as string | undefined);
+      const currentCertificateStatus = currentData.medicalCertificateStatus;
+      const requestedCertificateStatus =
+        updates.medicalCertificateStatus ?? currentCertificateStatus;
+      const nextCertificateStatus = normalizeMedicalCertificateStatus(
+        requestedCertificateStatus,
+        nextDeclaration
+      );
+      updates.medicalCertificateStatus = nextCertificateStatus;
+      if (nextCertificateStatus !== currentCertificateStatus) {
+        updates.medicalCertificateStatusUpdatedBy = decoded.uid;
+        updates.medicalCertificateStatusUpdatedAt = FieldValue.serverTimestamp();
+      }
+    }
 
     await docRef.set(
       {
@@ -312,6 +367,9 @@ export async function POST(req: Request) {
     const docRef = await db.collection(COLLECTION).add({
       ...baseFields,
       isMinor: isMinorAt(payload.birthDate),
+      medicalCertificateStatus: initialMedicalCertificateStatus(
+        payload.medicalCertificateDeclaration
+      ),
       submitterUid: decoded.uid,
       submitterAccountEmail: decoded.email ?? null,
       schemaVersion: 1,

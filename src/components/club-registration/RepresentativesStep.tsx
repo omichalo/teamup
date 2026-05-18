@@ -37,9 +37,9 @@ export function RepresentativesStep({
     <Stack spacing={2}>
       <Typography variant="body2" color="text.secondary">
         Un représentant légal est obligatoire pour l’inscription d’un mineur.
-        Son e-mail est le contact principal du club pour ce dossier, même si le
-        compte de connexion utilise une autre adresse. Vous pouvez ajouter un
-        second représentant (parent 2, tuteur).
+        Son e-mail est le contact principal du club pour ce dossier. Le compte
+        utilisé pour envoyer la demande peut être le même, ou une autre adresse.
+        Vous pouvez ajouter un second représentant (parent 2, tuteur).
       </Typography>
       <RepresentativesBlock
         representatives={draft.representatives}

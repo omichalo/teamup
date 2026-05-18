@@ -1,4 +1,10 @@
 import type { ClubRegistrationPayload, Representative } from "@/lib/club-registration/schema";
+import {
+  createEmptyMedicalQuestionnaire,
+  createEmptyMedicalVeteranPath,
+  type MedicalQuestionnaire,
+  type MedicalVeteranPath,
+} from "@/lib/club-registration/medical-dossier";
 
 /**
  * Forme du draft local.
@@ -13,11 +19,21 @@ import type { ClubRegistrationPayload, Representative } from "@/lib/club-registr
  */
 export type RegistrationDraft = Omit<
   ClubRegistrationPayload,
-  "internalRulesAccepted" | "sex" | "photoConsent"
+  | "internalRulesAccepted"
+  | "sex"
+  | "photoConsent"
+  | "medicalCertificateDeclaration"
+  | "medicalQuestionnaire"
+  | "medicalVeteranPath"
 > & {
   rulesAccepted: boolean;
   sex: ClubRegistrationPayload["sex"] | "";
   photoConsent: ClubRegistrationPayload["photoConsent"] | "";
+  medicalQuestionnaire: MedicalQuestionnaire;
+  medicalVeteranPath: MedicalVeteranPath;
+  medicalCertificateDeclaration:
+    | ClubRegistrationPayload["medicalCertificateDeclaration"]
+    | "";
 };
 
 export type { Representative };
@@ -36,6 +52,8 @@ export function createEmptyRepresentative(): Representative {
 export function createEmptyDraft(): RegistrationDraft {
   return {
     adherentRole: "self",
+    ffttLicense: "",
+    ffttLicenseLookup: undefined,
     firstName: "",
     lastName: "",
     sex: "",
@@ -52,7 +70,9 @@ export function createEmptyDraft(): RegistrationDraft {
     mainSectionId: "voisins",
     additionalSectionIds: [],
     slotIds: [],
-    medicalCertificateDeclaration: "under_40_all_no",
+    medicalQuestionnaire: createEmptyMedicalQuestionnaire(),
+    medicalVeteranPath: createEmptyMedicalVeteranPath(),
+    medicalCertificateDeclaration: "",
     wantsRegistrationCertificate: false,
     familyRegistrationOrder: "none",
     reductionTypes: [],

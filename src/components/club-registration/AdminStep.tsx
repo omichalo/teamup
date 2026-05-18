@@ -2,6 +2,7 @@
 
 import {
   Alert,
+  Button,
   Checkbox,
   Collapse,
   FormControl,
@@ -21,56 +22,55 @@ import {
   CLUB_REGISTRATION_EXTERNAL_LINKS,
   REDUCTION_OPTIONS,
 } from "@/lib/club-registration/constants";
-import { isAtLeast40At, isMinorAt } from "@/lib/club-registration/age";
+import { isMedicalCertificateRequired } from "@/lib/club-registration/medical-certificate";
+import {
+  createEmptyMedicalQuestionnaire,
+  createEmptyMedicalVeteranPath,
+  effectiveHadFfttLicense,
+} from "@/lib/club-registration/medical-dossier";
+import {
+  computeAgeAt,
+  isAtLeast40At,
+  isMinorAt,
+} from "@/lib/club-registration/age";
 import type { RegistrationDraft } from "./registration-defaults";
+import { buildMedicalDossierPatch } from "./medical-dossier-patch";
 
-type MedicalOptionId = RegistrationDraft["medicalCertificateDeclaration"];
-
-const MEDICAL_OPTIONS_UNDER_40: ReadonlyArray<{
-  id: MedicalOptionId;
-  label: string;
-}> = [
-  {
-    id: "under_40_all_no",
-    label:
-      "Moins de 40 ans : j’atteste avoir répondu « Non » à tout le questionnaire médical.",
-  },
-  {
-    id: "questionnaire_yes_certificate_required",
-    label:
-      "J’ai répondu « Oui » à au moins une question : certificat médical requis.",
-  },
-];
-
-const MEDICAL_OPTIONS_AT_LEAST_40: ReadonlyArray<{
-  id: MedicalOptionId;
-  label: string;
-}> = [
-  {
-    id: "over_40_cert_unchanged_all_no",
-    label:
-      "40 ans et plus, certificat déjà fourni dans la même catégorie : j’atteste avoir répondu « Non » au questionnaire.",
-  },
-  {
-    id: "over_40_first_or_changed_certificate_required",
-    label:
-      "40 ans et plus, première inscription ou changement de catégorie : certificat médical requis.",
-  },
-  {
-    id: "questionnaire_yes_certificate_required",
-    label:
-      "J’ai répondu « Oui » à au moins une question : certificat médical requis.",
-  },
-];
+const IS_DEV = process.env.NODE_ENV === "development";
+const DEV_TEST_AGES = [15, 25, 39, 40, 50] as const;
 
 /* Pass Sport est piloté par un switch dédié (UX) mais reste persistant via la
    liste `reductionTypes` (pour ne pas modifier le schéma serveur). On filtre
    donc l'option Pass Sport de la liste « autres réductions » : elle n'a
-   qu'une source de vérité côté UI. */
+   qu'une seule source de vérité côté UI. */
 const PASS_SPORT_ID = "pass_sport" as const;
 const OTHER_REDUCTION_OPTIONS = REDUCTION_OPTIONS.filter(
   (r) => r.id !== PASS_SPORT_ID
 );
+
+function medicalConclusion(id: RegistrationDraft["medicalCertificateDeclaration"]) {
+  if (!id) return null;
+  if (isMedicalCertificateRequired(id)) {
+    return {
+      severity: "warning" as const,
+      text:
+        "Certificat médical requis. Vous pourrez le remettre à votre entraîneur ou l’envoyer par e-mail à secretaire@sqyping.fr.",
+    };
+  }
+  return {
+    severity: "success" as const,
+    text:
+      "Aucun certificat médical à fournir à ce stade. Votre déclaration sera prise en compte dans le dossier.",
+  };
+}
+
+function birthDateForAge(age: number): string {
+  const today = new Date();
+  const year = today.getFullYear() - age;
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 type Props = {
   draft: RegistrationDraft;
@@ -120,15 +120,33 @@ export function AdminStep({ draft, onChange }: Props) {
     }
   };
 
+  const patchMedical = (patch: Parameters<typeof buildMedicalDossierPatch>[1]) => {
+    onChange(buildMedicalDossierPatch(draft, patch));
+  };
+
   const atLeast40 = isAtLeast40At(draft.birthDate);
   const minor = isMinorAt(draft.birthDate);
-  const medicalOptions = atLeast40
-    ? MEDICAL_OPTIONS_AT_LEAST_40
-    : MEDICAL_OPTIONS_UNDER_40;
-  const allowedIds = new Set<MedicalOptionId>(medicalOptions.map((o) => o.id));
-  const declarationIsIncompatible =
-    Boolean(draft.medicalCertificateDeclaration) &&
-    !allowedIds.has(draft.medicalCertificateDeclaration);
+  const currentAge = computeAgeAt(draft.birthDate);
+  const hasVerifiedFfttLicense = Boolean(draft.ffttLicenseLookup?.licence);
+  const skipVeteranFirstRegistration = atLeast40 && hasVerifiedFfttLicense;
+  const conclusion = medicalConclusion(draft.medicalCertificateDeclaration);
+
+  const veteranHadLicense = effectiveHadFfttLicense(
+    draft.medicalVeteranPath,
+    hasVerifiedFfttLicense
+  );
+  const veteranCategoryChanged = draft.medicalVeteranPath.categoryChanged;
+  const questionnaireSummary = draft.medicalQuestionnaire.summary;
+
+  const setDevAge = (age: number) => {
+    if (!Number.isFinite(age) || age < 1 || age > 120) return;
+    onChange({
+      birthDate: birthDateForAge(age),
+      medicalQuestionnaire: createEmptyMedicalQuestionnaire(),
+      medicalVeteranPath: createEmptyMedicalVeteranPath(),
+      medicalCertificateDeclaration: "",
+    });
+  };
 
   const questionnaireUrl = minor
     ? CLUB_REGISTRATION_EXTERNAL_LINKS.questionnaireMineur
@@ -139,6 +157,56 @@ export function AdminStep({ draft, onChange }: Props) {
 
   return (
     <Stack spacing={3}>
+      {IS_DEV ? (
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1}
+          alignItems={{ xs: "stretch", sm: "center" }}
+          sx={{
+            alignSelf: "flex-start",
+            opacity: 0.72,
+            "&:hover": { opacity: 1 },
+          }}
+        >
+          <TextField
+            label="Âge test"
+            type="number"
+            size="small"
+            value={currentAge ?? ""}
+            onChange={(e) => setDevAge(Number(e.target.value))}
+            inputProps={{
+              min: 1,
+              max: 120,
+              "aria-label": "Âge de test développement",
+            }}
+            sx={{ width: { xs: "100%", sm: 112 } }}
+          />
+          <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+            {DEV_TEST_AGES.map((age) => (
+              <Button
+                key={age}
+                type="button"
+                variant="text"
+                size="small"
+                onClick={() => setDevAge(age)}
+                sx={{
+                  minWidth: 0,
+                  px: 1,
+                  color: "text.disabled",
+                  textTransform: "none",
+                  "&:hover": {
+                    color: "text.secondary",
+                    backgroundColor: "action.hover",
+                  },
+                }}
+              >
+                {age} ans
+              </Button>
+            ))}
+          </Stack>
+        </Stack>
+      ) : null}
+
       <Typography
         variant="subtitle1"
         id="medical-certificate-label"
@@ -148,47 +216,169 @@ export function AdminStep({ draft, onChange }: Props) {
         Déclaration médicale
       </Typography>
       <Typography variant="body2" color="text.secondary">
-        Téléchargez le{" "}
-        <a href={questionnaireUrl} target="_blank" rel="noreferrer">
-          {questionnaireLabel}
-        </a>{" "}
-        si besoin. En cas de certificat à fournir, vous pourrez le transmettre
-        au secrétariat selon les modalités du club.
+        {atLeast40 ? (
+          <>
+            Répondez d’abord aux questions sur votre situation FFTT. En cas de
+            première licence FFTT ou de changement de catégorie vétéran, un
+            certificat médical est requis directement. Sinon, remplissez le{" "}
+            <a href={questionnaireUrl} target="_blank" rel="noreferrer">
+              {questionnaireLabel}
+            </a>{" "}
+            puis indiquez si toutes vos réponses sont « Non ». Aucun
+            questionnaire n’est à déposer ici.
+          </>
+        ) : (
+          <>
+            Remplissez le{" "}
+            <a href={questionnaireUrl} target="_blank" rel="noreferrer">
+              {questionnaireLabel}
+            </a>{" "}
+            puis indiquez si toutes vos réponses sont « Non ». Aucun
+            questionnaire n’est à déposer ici.
+          </>
+        )}
       </Typography>
 
-      {declarationIsIncompatible ? (
-        <Alert severity="warning">
-          La déclaration médicale précédemment sélectionnée n’est plus
-          compatible avec la date de naissance saisie. Choisissez une nouvelle
-          option ci-dessous.
-        </Alert>
-      ) : null}
+      {atLeast40 ? (
+        <Stack spacing={2}>
+          {skipVeteranFirstRegistration ? null : (
+            <FormControl component="fieldset" required>
+              <Typography variant="subtitle2" gutterBottom id="medical-first-label">
+                Avez-vous déjà eu une licence FFTT&nbsp;?
+              </Typography>
+              <RadioGroup
+                aria-labelledby="medical-first-label"
+                name="medicalFirstRegistration"
+                value={draft.medicalVeteranPath.hadFfttLicense}
+                onChange={(e) => {
+                  const next = e.target.value as "yes" | "no";
+                  patchMedical({
+                    veteranPath: {
+                      hadFfttLicense: next,
+                      categoryChanged: "",
+                    },
+                    questionnaire: { summary: "", answers: {} },
+                  });
+                }}
+              >
+                <FormControlLabel
+                  value="yes"
+                  control={<Radio />}
+                  label="Oui, j’ai déjà été licencié FFTT"
+                />
+                <FormControlLabel
+                  value="no"
+                  control={<Radio />}
+                  label="Non, c’est ma première licence FFTT"
+                />
+              </RadioGroup>
+            </FormControl>
+          )}
 
-      <FormControl component="fieldset" required>
-        <RadioGroup
-          aria-labelledby="medical-certificate-label"
-          name="medicalCertificateDeclaration"
-          value={
-            declarationIsIncompatible
-              ? ""
-              : draft.medicalCertificateDeclaration
-          }
-          onChange={(e) =>
-            onChange({
-              medicalCertificateDeclaration: e.target.value as MedicalOptionId,
-            })
-          }
-        >
-          {medicalOptions.map((option) => (
+          {veteranHadLicense === "yes" ? (
+            <FormControl component="fieldset" required>
+              <Typography
+                variant="subtitle2"
+                gutterBottom
+                id="medical-category-label"
+              >
+                Avez-vous changé de catégorie vétéran depuis votre dernier
+                certificat médical FFTT&nbsp;?
+              </Typography>
+              <RadioGroup
+                aria-labelledby="medical-category-label"
+                name="medicalVeteranCategoryChanged"
+                value={veteranCategoryChanged}
+                onChange={(e) => {
+                  const next = e.target.value as "yes" | "no";
+                  patchMedical({
+                    veteranPath: { categoryChanged: next },
+                    ...(next === "yes"
+                      ? { questionnaire: { summary: "", answers: {} } }
+                      : {}),
+                  });
+                }}
+              >
+                <FormControlLabel value="yes" control={<Radio />} label="Oui" />
+                <FormControlLabel value="no" control={<Radio />} label="Non" />
+              </RadioGroup>
+            </FormControl>
+          ) : null}
+
+          {veteranHadLicense === "yes" && veteranCategoryChanged === "no" ? (
+            <FormControl component="fieldset" required>
+              <Typography
+                variant="subtitle2"
+                gutterBottom
+                id="medical-questionnaire-veteran-label"
+              >
+                Quel est le résultat de votre questionnaire de santé&nbsp;?
+              </Typography>
+              <RadioGroup
+                aria-labelledby="medical-questionnaire-veteran-label"
+                name="medicalQuestionnaireVeteran"
+                value={questionnaireSummary}
+                onChange={(e) =>
+                  patchMedical({
+                    questionnaire: {
+                      summary:
+                        e.target.value === "all_no" ? "all_no" : "has_yes",
+                    },
+                  })
+                }
+              >
+                <FormControlLabel
+                  value="all_no"
+                  control={<Radio />}
+                  label="Toutes mes réponses sont « Non »"
+                />
+                <FormControlLabel
+                  value="has_yes"
+                  control={<Radio />}
+                  label="J’ai au moins une réponse « Oui »"
+                />
+              </RadioGroup>
+            </FormControl>
+          ) : null}
+        </Stack>
+      ) : (
+        <FormControl component="fieldset" required>
+          <Typography
+            variant="subtitle2"
+            gutterBottom
+            id="medical-questionnaire-label"
+          >
+            Quel est le résultat de votre questionnaire de santé&nbsp;?
+          </Typography>
+          <RadioGroup
+            aria-labelledby="medical-questionnaire-label"
+            name="medicalQuestionnaire"
+            value={questionnaireSummary}
+            onChange={(e) =>
+              patchMedical({
+                questionnaire: {
+                  summary: e.target.value === "all_no" ? "all_no" : "has_yes",
+                },
+              })
+            }
+          >
             <FormControlLabel
-              key={option.id}
-              value={option.id}
+              value="all_no"
               control={<Radio />}
-              label={option.label}
+              label="Toutes mes réponses sont « Non »"
             />
-          ))}
-        </RadioGroup>
-      </FormControl>
+            <FormControlLabel
+              value="has_yes"
+              control={<Radio />}
+              label="J’ai au moins une réponse « Oui »"
+            />
+          </RadioGroup>
+        </FormControl>
+      )}
+
+      {conclusion ? (
+        <Alert severity={conclusion.severity}>{conclusion.text}</Alert>
+      ) : null}
 
       <Typography
         variant="subtitle1"
