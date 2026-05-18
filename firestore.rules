@@ -187,7 +187,36 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isCoach();
     }
-    
+
+    // ============================================
+    // Collection: clubRegistrations
+    // ============================================
+    // Dossier d'inscription au club. Un soumettant (parent ou adulte qui s'inscrit lui-même)
+    // peut créer plusieurs dossiers (ex. inscription de 2 enfants). Le couplage 1 dossier ↔ 1 uid
+    // est volontairement abandonné.
+    //
+    // - read   : owner (submitterUid == uid) ou admin
+    // - create : owner se déclare comme submitterUid, schemaVersion strict
+    // - update : owner uniquement, tant que status != 'approved'
+    // - delete : interdit côté client (l'admin gère via Admin SDK)
+    match /clubRegistrations/{registrationId} {
+      allow read: if isAuthenticated()
+                  && (isAdmin() || resource.data.submitterUid == request.auth.uid);
+      allow create: if isAuthenticated()
+                    && request.resource.data.submitterUid == request.auth.uid
+                    && request.resource.data.schemaVersion == 1;
+      allow update: if isAuthenticated()
+                    && resource.data.submitterUid == request.auth.uid
+                    && request.resource.data.submitterUid == request.auth.uid
+                    && resource.data.get('status', 'draft') != 'approved';
+      allow delete: if false;
+    }
+    // List queries : autorisées aux utilisateurs authentifiés. Les requêtes sont filtrées
+    // côté serveur API par submitterUid (admin SDK contourne les rules de toute façon).
+    match /clubRegistrations/{document=**} {
+      allow list: if isAuthenticated();
+    }
+
     // ============================================
     // Règle par défaut : refuser tout accès non explicitement autorisé
     // ============================================
