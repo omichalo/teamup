@@ -1,27 +1,14 @@
 export const runtime = "nodejs";
 
 import { jsonNoStore } from "@/lib/http/cache-headers";
-import { cookies } from "next/headers";
-import { adminAuth } from "@/lib/firebase-admin";
+import { withAuth } from "@/lib/auth/api-utils";
+import { USER_ROLES } from "@/lib/auth/roles";
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const DISCORD_SERVER_ID = process.env.DISCORD_SERVER_ID;
 
-export async function GET() {
+export const GET = withAuth(async () => {
   try {
-    // Vérifier l'authentification
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-    
-    if (!sessionCookie) {
-      return jsonNoStore(
-        { success: false, error: "Non authentifié" },
-        { status: 401 }
-      );
-    }
-
-    await adminAuth.verifySessionCookie(sessionCookie, true);
-
     if (!DISCORD_TOKEN || !DISCORD_SERVER_ID) {
       return jsonNoStore(
         { success: false, error: "Configuration Discord manquante" },
@@ -106,11 +93,11 @@ export async function GET() {
 
     return jsonNoStore({ success: true, members });
   } catch (error) {
-    console.error("[Discord] Erreur:", error);
+    console.error("[Discord Members] Erreur:", error);
     return jsonNoStore(
       { success: false, error: "Erreur lors de la récupération des membres" },
       { status: 500 }
     );
   }
-}
+}, [USER_ROLES.ADMIN, USER_ROLES.COACH]);
 
