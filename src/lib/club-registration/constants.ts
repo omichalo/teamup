@@ -146,6 +146,12 @@ export const COMPETITION_OPTIONS = [
 
 export const JERSEY_SIZES = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL"] as const;
 
+/** Pratique handisport (grille tarifaire distincte loisirs / compétition). */
+export const HANDISPORT_PRACTICE_OPTIONS = [
+  { id: "leisure", label: "Loisirs" },
+  { id: "competition", label: "Compétition" },
+] as const;
+
 export const REDUCTION_OPTIONS = [
   { id: "pass_plus", label: "Pass Plus" },
   { id: "pass_sport", label: "Pass Sport" },

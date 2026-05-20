@@ -11,6 +11,7 @@ type RegistrationPricingInput = Pick<
   | "sex"
   | "firstFemaleRegistrationSqy"
   | "reductionTypes"
+  | "handisportPracticeLevel"
 > & {
   handisportPracticeLevel?: PricingContext["handisportPracticeLevel"];
   pricingDate?: string;

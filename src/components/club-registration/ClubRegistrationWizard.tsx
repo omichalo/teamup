@@ -197,6 +197,13 @@ function validateStepById(
 
   if (stepId === "practice") {
     if (draft.slotIds.length === 0) return "Sélectionnez au moins un créneau.";
+    if (
+      draft.mainSectionId === "handisport" &&
+      draft.handisportPracticeLevel !== "leisure" &&
+      draft.handisportPracticeLevel !== "competition"
+    ) {
+      return "Indiquez si la pratique handisport est en loisir ou en compétition.";
+    }
     if (draft.wantsCompetitorExtras && !draft.competitionJerseySize) {
       return "Indiquez une taille de maillot pour la section compétiteur.";
     }
@@ -569,6 +576,12 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
           ? draft.competitionJerseySize
           : undefined,
       competitionIds: effectiveCompetitorExtras ? draft.competitionIds : [],
+      handisportPracticeLevel:
+        draft.mainSectionId === "handisport" &&
+        (draft.handisportPracticeLevel === "leisure" ||
+          draft.handisportPracticeLevel === "competition")
+          ? draft.handisportPracticeLevel
+          : undefined,
     };
   };
 

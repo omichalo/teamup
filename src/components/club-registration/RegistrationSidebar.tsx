@@ -11,7 +11,10 @@ import {
   Typography,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import { SECTION_PRINCIPALE_OPTIONS } from "@/lib/club-registration/constants";
+import {
+  HANDISPORT_PRACTICE_OPTIONS,
+  SECTION_PRINCIPALE_OPTIONS,
+} from "@/lib/club-registration/constants";
 import { computeAgeAt, isMinorAt } from "@/lib/club-registration/age";
 import type { RegistrationStepId } from "@/lib/club-registration/field-to-step";
 import { PricingBreakdown } from "./PricingBreakdown";
@@ -111,6 +114,22 @@ function SidebarContent({
                     : "À choisir"
                 }
               />
+              {draft.mainSectionId === "handisport" &&
+              (draft.handisportPracticeLevel === "leisure" ||
+                draft.handisportPracticeLevel === "competition") ? (
+                <Box sx={{ mt: 0.5 }}>
+                  <Chip
+                    size="small"
+                    color="secondary"
+                    variant="outlined"
+                    label={
+                      HANDISPORT_PRACTICE_OPTIONS.find(
+                        (o) => o.id === draft.handisportPracticeLevel
+                      )?.label ?? "Handisport"
+                    }
+                  />
+                </Box>
+              ) : null}
               {draft.wantsCompetitorExtras ? (
                 <Box sx={{ mt: 0.5 }}>
                   <Chip

@@ -41,6 +41,7 @@ import {
   COMPETITION_OPTIONS,
   JERSEY_SIZES,
   REDUCTION_OPTIONS,
+  HANDISPORT_PRACTICE_OPTIONS,
   SECTION_PRINCIPALE_OPTIONS,
 } from "@/lib/club-registration/constants";
 import {
@@ -59,6 +60,7 @@ import {
   type PriceQuote,
 } from "@/lib/pricing";
 import { PricingBreakdown } from "./PricingBreakdown";
+import type { RegistrationDraft } from "./registration-defaults";
 
 type RegistrationSummary = {
   id: string;
@@ -224,11 +226,6 @@ const FAMILY_ORDER_OPTIONS = [
   { value: "none", label: "Première inscription dans la famille" },
   { value: "second", label: "Deuxième inscription dans la famille" },
   { value: "third_or_more", label: "Troisième inscription ou plus" },
-] as const;
-
-const HANDISPORT_PRACTICE_OPTIONS = [
-  { value: "leisure", label: "Handisport — Loisirs" },
-  { value: "competition", label: "Handisport — Compétition" },
 ] as const;
 
 const BOOLEAN_CONSENT_OPTIONS = [
@@ -1126,14 +1123,28 @@ export function MembershipRequestsClient() {
                         >
                           <MenuItem value="">Non renseigné</MenuItem>
                           {HANDISPORT_PRACTICE_OPTIONS.map((option) => (
-                            <MenuItem key={option.value} value={option.value}>
+                            <MenuItem key={option.id} value={option.id}>
                               {option.label}
                             </MenuItem>
                           ))}
                         </TextField>
                       ) : null}
 
-                      <PricingBreakdown draft={formToPricingInput(form)} variant="full" />
+                      <PricingBreakdown
+                        draft={{
+                          birthDate: form.birthDate,
+                          mainSectionId: form.mainSectionId,
+                          wantsCompetitorExtras: form.wantsCompetitorExtras,
+                          competitionIds: form.competitionIds,
+                          familyRegistrationOrder:
+                            form.familyRegistrationOrder as RegistrationDraft["familyRegistrationOrder"],
+                          sex: form.sex,
+                          firstFemaleRegistrationSqy: form.firstFemaleRegistrationSqy,
+                          handisportPracticeLevel: form.handisportPracticeLevel,
+                          reductionTypes: form.reductionTypes,
+                        }}
+                        variant="full"
+                      />
 
                       {liveQuote && liveQuote.totalCents > 0 ? (
                         <Typography variant="body2" color="text.secondary">

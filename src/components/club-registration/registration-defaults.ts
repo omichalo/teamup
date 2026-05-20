@@ -25,10 +25,12 @@ export type RegistrationDraft = Omit<
   | "medicalCertificateDeclaration"
   | "medicalQuestionnaire"
   | "medicalVeteranPath"
+  | "handisportPracticeLevel"
 > & {
   rulesAccepted: boolean;
   sex: ClubRegistrationPayload["sex"] | "";
   photoConsent: ClubRegistrationPayload["photoConsent"] | "";
+  handisportPracticeLevel: "leisure" | "competition" | "";
   medicalQuestionnaire: MedicalQuestionnaire;
   medicalVeteranPath: MedicalVeteranPath;
   medicalCertificateDeclaration:
@@ -85,5 +87,6 @@ export function createEmptyDraft(): RegistrationDraft {
     wantsCompetitorExtras: false,
     competitionJerseySize: undefined,
     competitionIds: [],
+    handisportPracticeLevel: "",
   };
 }

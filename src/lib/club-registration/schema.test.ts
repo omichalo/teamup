@@ -287,6 +287,7 @@ describe("clubRegistrationPayloadSchema", () => {
       buildPayload({
         mainSectionId: "handisport",
         slotIds: ["voisins-mar-1830-handisport"],
+        handisportPracticeLevel: "leisure",
         wantsCompetitorExtras: false,
       })
     );
@@ -440,6 +441,48 @@ describe("clubRegistrationPayloadSchema", () => {
     if (!r.success) {
       expect(
         r.error.issues.some((i) => i.path.includes("supervisionAcknowledgement"))
+      ).toBe(true);
+    }
+  });
+
+  it("exige handisportPracticeLevel pour la section handisport", () => {
+    const r = clubRegistrationPayloadSchema.safeParse(
+      buildPayload({
+        mainSectionId: "handisport",
+        slotIds: ["voisins-mar-1830-handisport"],
+        wantsCompetitorExtras: false,
+      })
+    );
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(
+        r.error.issues.some((i) => i.path.includes("handisportPracticeLevel"))
+      ).toBe(true);
+    }
+  });
+
+  it("accepte handisport en loisirs avec handisportPracticeLevel", () => {
+    const r = clubRegistrationPayloadSchema.safeParse(
+      buildPayload({
+        mainSectionId: "handisport",
+        slotIds: ["voisins-mar-1830-handisport"],
+        handisportPracticeLevel: "leisure",
+        wantsCompetitorExtras: false,
+      })
+    );
+    expect(r.success).toBe(true);
+  });
+
+  it("refuse handisportPracticeLevel hors section handisport", () => {
+    const r = clubRegistrationPayloadSchema.safeParse(
+      buildPayload({
+        handisportPracticeLevel: "leisure",
+      })
+    );
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(
+        r.error.issues.some((i) => i.path.includes("handisportPracticeLevel"))
       ).toBe(true);
     }
   });

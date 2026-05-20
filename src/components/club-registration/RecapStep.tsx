@@ -13,6 +13,7 @@ import { SectionCard } from "@/components/ui";
 import {
   CLUB_REGISTRATION_SITES,
   COMPETITION_OPTIONS,
+  HANDISPORT_PRACTICE_OPTIONS,
   REDUCTION_OPTIONS,
   SECTION_PRINCIPALE_OPTIONS,
 } from "@/lib/club-registration/constants";
@@ -114,6 +115,13 @@ function findReductionLabel(id: string): string {
 
 function findCompetitionLabel(id: string): string {
   return COMPETITION_OPTIONS.find((c) => c.id === id)?.label ?? id;
+}
+
+function findHandisportPracticeLabel(
+  level: RegistrationDraft["handisportPracticeLevel"]
+): string {
+  if (level === "") return "—";
+  return HANDISPORT_PRACTICE_OPTIONS.find((o) => o.id === level)?.label ?? level;
 }
 
 type Field = { label: string; value: React.ReactNode };
@@ -338,6 +346,14 @@ export function RecapStep({ draft, accountEmail, onEditStep }: Props) {
             label: "Lieu principal",
             value: findSectionLabel(draft.mainSectionId),
           },
+          ...(draft.mainSectionId === "handisport"
+            ? ([
+                {
+                  label: "Pratique handisport",
+                  value: findHandisportPracticeLabel(draft.handisportPracticeLevel),
+                },
+              ] as Field[])
+            : []),
           {
             label: "Autres lieux",
             value:

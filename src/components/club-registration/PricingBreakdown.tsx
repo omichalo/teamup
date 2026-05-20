@@ -29,9 +29,27 @@ export type PricingBreakdownDraft = Pick<
   | "sex"
   | "firstFemaleRegistrationSqy"
   | "reductionTypes"
-> & {
-  handisportPracticeLevel?: "leisure" | "competition" | undefined;
-};
+  | "handisportPracticeLevel"
+>;
+
+function toPricingContextInput(draft: PricingBreakdownDraft) {
+  const input = {
+    birthDate: draft.birthDate,
+    mainSectionId: draft.mainSectionId,
+    wantsCompetitorExtras: draft.wantsCompetitorExtras,
+    competitionIds: draft.competitionIds,
+    familyRegistrationOrder: draft.familyRegistrationOrder,
+    sex: draft.sex === "" ? ("other" as const) : draft.sex,
+    firstFemaleRegistrationSqy: draft.firstFemaleRegistrationSqy,
+    reductionTypes: draft.reductionTypes,
+    handisportPracticeLevel:
+      draft.handisportPracticeLevel === "leisure" ||
+      draft.handisportPracticeLevel === "competition"
+        ? draft.handisportPracticeLevel
+        : undefined,
+  };
+  return buildPricingContext(input);
+}
 
 type Props = {
   draft: PricingBreakdownDraft;
@@ -47,12 +65,7 @@ export function PricingBreakdown({ draft, variant = "full" }: Props) {
     if (!canEstimate(draft)) {
       return null;
     }
-    return calculateQuote(
-      buildPricingContext({
-        ...draft,
-        sex: draft.sex === "" ? "other" : draft.sex,
-      })
-    );
+    return calculateQuote(toPricingContextInput(draft));
   }, [draft]);
 
   if (!canEstimate(draft)) {

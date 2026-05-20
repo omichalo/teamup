@@ -168,6 +168,9 @@ export const clubRegistrationPayloadSchema = z
     wantsCompetitorExtras: z.boolean(),
     competitionJerseySize: z.enum(JERSEY_SIZES).optional(),
     competitionIds: z.array(z.enum(competitionIds)).default([]),
+
+    /** Obligatoire si `mainSectionId === "handisport"`. */
+    handisportPracticeLevel: z.enum(["leisure", "competition"]).optional(),
   })
   .superRefine((data, ctx) => {
     /* Créneaux connus */
@@ -210,6 +213,24 @@ export const clubRegistrationPayloadSchema = z
         message:
           "Le champ « première inscription féminine » n’est applicable qu’au sexe féminin",
         path: ["firstFemaleRegistrationSqy"],
+      });
+    }
+
+    /* Handisport : type de pratique obligatoire pour la tarification */
+    if (data.mainSectionId === "handisport" && !data.handisportPracticeLevel) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Indiquez si la pratique handisport est en loisir ou en compétition",
+        path: ["handisportPracticeLevel"],
+      });
+    }
+
+    if (data.mainSectionId !== "handisport" && data.handisportPracticeLevel !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "Le type de pratique handisport n’est applicable que pour la section handisport",
+        path: ["handisportPracticeLevel"],
       });
     }
 

@@ -12,6 +12,8 @@ import {
   FormGroup,
   InputLabel,
   MenuItem,
+  Radio,
+  RadioGroup,
   Select,
   Stack,
   Switch,
@@ -21,6 +23,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import {
   CLUB_REGISTRATION_SITES,
   COMPETITION_OPTIONS,
+  HANDISPORT_PRACTICE_OPTIONS,
   JERSEY_SIZES,
   SECTION_PRINCIPALE_OPTIONS,
 } from "@/lib/club-registration/constants";
@@ -123,7 +126,14 @@ export function PracticeStep({ draft, onChange }: Props) {
           onChange={(e) => {
             const next = e.target.value as RegistrationDraft["mainSectionId"];
             const cleaned = draft.additionalSectionIds.filter((x) => x !== next);
-            onChange({ mainSectionId: next, additionalSectionIds: cleaned });
+            const patch: Partial<RegistrationDraft> = {
+              mainSectionId: next,
+              additionalSectionIds: cleaned,
+            };
+            if (next !== "handisport") {
+              patch.handisportPracticeLevel = "";
+            }
+            onChange(patch);
           }}
         >
           {SECTION_PRINCIPALE_OPTIONS.map((s) => (
@@ -133,6 +143,46 @@ export function PracticeStep({ draft, onChange }: Props) {
           ))}
         </Select>
       </FormControl>
+
+      {draft.mainSectionId === "handisport" ? (
+        <FormControl
+          component="fieldset"
+          required
+          data-field="handisportPracticeLevel"
+        >
+          <Typography
+            variant="subtitle2"
+            component="legend"
+            id="handisport-practice-label"
+            sx={{ mb: 0.5 }}
+          >
+            Type de pratique handisport
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: "block" }}>
+            Ce choix détermine le tarif (loisirs ou compétition selon l’âge).
+          </Typography>
+          <RadioGroup
+            aria-labelledby="handisport-practice-label"
+            name="handisportPracticeLevel"
+            value={draft.handisportPracticeLevel}
+            onChange={(e) =>
+              onChange({
+                handisportPracticeLevel: e.target
+                  .value as RegistrationDraft["handisportPracticeLevel"],
+              })
+            }
+          >
+            {HANDISPORT_PRACTICE_OPTIONS.map((option) => (
+              <FormControlLabel
+                key={option.id}
+                value={option.id}
+                control={<Radio />}
+                label={option.label}
+              />
+            ))}
+          </RadioGroup>
+        </FormControl>
+      ) : null}
 
       <Stack spacing={0.5}>
         <Typography

@@ -60,6 +60,7 @@ export const REGISTRATION_FIELD_TO_STEP_ID: Readonly<
   wantsCompetitorExtras: "practice",
   competitionJerseySize: "practice",
   competitionIds: "practice",
+  handisportPracticeLevel: "practice",
 
   /* Étape 5 — Dossier administratif */
   medicalCertificateDeclaration: "admin",
