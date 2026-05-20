@@ -14,8 +14,7 @@ export {
   billableLines,
   stripeCheckoutLines,
 } from "./format";
-export { hashPriceQuote } from "./quote-hash";
-export { parseStoredPriceQuote } from "./parse-stored-quote";
+/** Réservé au serveur (Stripe, API) — ne pas réexporter ici : évite `node:crypto` côté client. */
 export {
   assertStripeLinesMatchQuote,
   buildStripeCheckoutLineItems,
