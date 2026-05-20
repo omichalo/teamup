@@ -5,6 +5,7 @@ import { readFile } from "fs/promises";
 import path from "path";
 import { getFirebaseErrorMessage } from "@/lib/firebase-error-utils";
 import { checkRateLimit } from "@/lib/auth/rate-limit";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,6 +21,14 @@ function getAuthErrorCode(error: unknown): string {
 
 export async function POST(req: Request) {
   try {
+    // Valider l'origine de la requête pour prévenir les attaques CSRF
+    if (!validateOrigin(req)) {
+      return jsonNoStore(
+        { error: "Invalid origin" },
+        { status: 403 }
+      );
+    }
+
     const { email } = await req.json();
     if (!email || typeof email !== "string") {
       return jsonNoStore({ error: "Email requis" }, { status: 400 });
@@ -216,7 +225,10 @@ export async function POST(req: Request) {
     let statusCode = 500;
     const errorString = error instanceof Error ? error.message : String(error);
     
-    if (errorString.includes("invalid-email") || errorString.includes("INVALID_EMAIL")) {
+    if (errorString.includes("user-not-found") || errorString.includes("USER_NOT_FOUND")) {
+      // Pour les erreurs de type user-not-found capturées ici, on retourne aussi 200 OK
+      return jsonNoStore({ ok: true });
+    } else if (errorString.includes("invalid-email") || errorString.includes("INVALID_EMAIL")) {
       statusCode = 400;
     } else if (errorString.includes("too-many-requests") || errorString.includes("TOO_MANY_REQUESTS")) {
       statusCode = 429;

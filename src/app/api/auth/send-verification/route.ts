@@ -5,6 +5,7 @@ import { readFile } from "fs/promises";
 import path from "path";
 import { getFirebaseErrorMessage } from "@/lib/firebase-error-utils";
 import { checkRateLimit } from "@/lib/auth/rate-limit";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
 
 export const runtime = "nodejs";
 
@@ -19,6 +20,14 @@ function getAuthErrorCode(error: unknown): string {
 
 export async function POST(req: Request) {
   try {
+    // Valider l'origine de la requête pour prévenir les attaques CSRF
+    if (!validateOrigin(req)) {
+      return jsonNoStore(
+        { error: "Invalid origin" },
+        { status: 403 }
+      );
+    }
+
     const { email } = await req.json();
     if (!email || typeof email !== "string") {
       return jsonNoStore({ error: "Email requis" }, { status: 400 });
@@ -109,10 +118,8 @@ export async function POST(req: Request) {
         errorMessage.includes("USER_NOT_FOUND") ||
         errorMessage.includes("no user record")
       ) {
-        return jsonNoStore(
-          { error: "Utilisateur non trouvé", message: "Aucun compte n'est associé à cet email" },
-          { status: 404 }
-        );
+        // Ne pas révéler si l'utilisateur existe ou non (sécurité contre l'énumération d'emails)
+        return jsonNoStore({ ok: true });
       }
       
       if (
@@ -192,7 +199,8 @@ export async function POST(req: Request) {
     // Déterminer le code HTTP approprié
     let statusCode = 500;
     if (errorString.includes("user-not-found") || errorString.includes("USER_NOT_FOUND")) {
-      statusCode = 404;
+      // Pour les erreurs de type user-not-found capturées ici, on retourne aussi 200 OK
+      return jsonNoStore({ ok: true });
     } else if (errorString.includes("invalid-email") || errorString.includes("INVALID_EMAIL")) {
       statusCode = 400;
     } else if (errorString.includes("too-many-requests") || errorString.includes("TOO_MANY_REQUESTS")) {
