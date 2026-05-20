@@ -18,6 +18,7 @@
 
 ### Code
 - [ ] Le code respecte les règles du projet (voir `.cursor/rules/`)
+- [ ] `npm run check:file-sizes` passe (plafonds universels `src/` — voir `21-react-component-size.mdc` ; pas d’agrandissement des fichiers listés dans `scripts/legacy-oversized-files.json`)
 - [ ] Pas de `any` implicite, TypeScript strict respecté
 - [ ] Pas de code mort, imports inutilisés, ou console.log permanents
 - [ ] Pas de TODO dans le code (remplacer par des issues GitHub si nécessaire)

@@ -205,6 +205,8 @@ Pour chaque fichier (traiter par ordre métier / douleur) :
 
 **Critère :** Fichier principal < ~400 lignes **ou** justification inline (composant purement présentationnel sans logique).
 
+**Gate automatisé (2026-05) :** `npm run check:file-sizes` — politique universelle sur `src/` (`scripts/file-size-policy.mjs`). Dette existante figée dans `scripts/legacy-oversized-files.json` (interdiction de grossir ; retirer une entrée après découpage).
+
 ### G.2 Couche API client & hooks
 
 - [ ] **G.2.1** Créer des modules `lib/api/*.ts` ou hooks `useXxx` pour centraliser `fetch` vers `/api/...`, erreurs typées, et `credentials: "include"` si nécessaire.

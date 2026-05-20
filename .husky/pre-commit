@@ -1,2 +1,2 @@
-echo "🔎 Lint + type-check (pre-commit)..."
-npm run lint -- --fix && npm run type-check
+echo "🔎 Lint + file sizes + type-check (pre-commit)..."
+npm run lint -- --fix && npm run check:file-sizes && npm run type-check

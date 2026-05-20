@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "check": "npm run lint && npm run type-check && npm test -- --ci && npm run build",
-    "check:dev": "npm run lint && npm run type-check",
+    "check": "npm run lint && npm run check:file-sizes && npm run type-check && npm test -- --ci && npm run build",
+    "check:dev": "npm run lint && npm run check:file-sizes && npm run type-check",
+    "check:file-sizes": "node scripts/check-file-sizes.mjs",
     "dev": "next dev",
     "dev:no-turbo": "next dev",
     "build": "next build",
