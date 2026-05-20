@@ -10,6 +10,7 @@ import {
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import { SectionCard } from "@/components/ui";
+import { normalizeCompetitionIds } from "@/lib/club-registration/competition-ids";
 import {
   CLUB_REGISTRATION_SITES,
   COMPETITION_OPTIONS,
@@ -17,6 +18,7 @@ import {
   REDUCTION_OPTIONS,
   SECTION_PRINCIPALE_OPTIONS,
 } from "@/lib/club-registration/constants";
+import { COMPETITION_LABELS } from "@/lib/pricing/catalog/sqyping-2025";
 import { toFrenchPhoneMaskedDisplay } from "@/lib/club-registration/phone-fr";
 import { isMinorAt } from "@/lib/club-registration/age";
 import type { RegistrationStepId } from "@/lib/club-registration/field-to-step";
@@ -114,7 +116,11 @@ function findReductionLabel(id: string): string {
 }
 
 function findCompetitionLabel(id: string): string {
-  return COMPETITION_OPTIONS.find((c) => c.id === id)?.label ?? id;
+  return (
+    COMPETITION_OPTIONS.find((c) => c.id === id)?.label ??
+    COMPETITION_LABELS[id] ??
+    id
+  );
 }
 
 function findHandisportPracticeLabel(
@@ -212,7 +218,9 @@ export function RecapStep({ draft, accountEmail, onEditStep }: Props) {
     .filter((id) => id !== PASS_SPORT_ID)
     .map(findReductionLabel);
   const hasPassSport = draft.reductionTypes.includes(PASS_SPORT_ID);
-  const competitions = draft.competitionIds.map(findCompetitionLabel);
+  const competitions = normalizeCompetitionIds(draft.competitionIds).map(
+    findCompetitionLabel
+  );
   const isMinor = isMinorAt(draft.birthDate);
   const primaryContactLabel = isMinor
     ? "Représentant légal principal"

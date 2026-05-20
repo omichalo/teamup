@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
   ALL_SLOT_IDS,
-  COMPETITION_OPTIONS,
+  COMPETITION_ID_VALUES,
   JERSEY_SIZES,
   REDUCTION_OPTIONS,
   SECTION_PRINCIPALE_OPTIONS,
@@ -21,10 +21,7 @@ const sectionIds = SECTION_PRINCIPALE_OPTIONS.map((s) => s.id) as [
   ...string[],
 ];
 
-const competitionIds = COMPETITION_OPTIONS.map((c) => c.id) as [
-  string,
-  ...string[],
-];
+const competitionIds = [...COMPETITION_ID_VALUES] as [string, ...string[]];
 
 const reductionIds = REDUCTION_OPTIONS.map((r) => r.id) as [string, ...string[]];
 

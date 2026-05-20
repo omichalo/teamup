@@ -136,6 +136,20 @@ describe("calculateQuote — sport adapté", () => {
 });
 
 describe("calculateQuote — compétitions", () => {
+  it("facture 25 € une seule fois pour les compétitions jeunes (ids historiques)", () => {
+    const quote = calculateQuote(
+      ctx({
+        birthDate: "2005-01-01",
+        wantsCompetitorExtras: true,
+        competitionIds: ["championnat_jeunes", "criterium_federal_jeunes"],
+      })
+    );
+    const competitionLines = quote.lines.filter((l) => l.kind === "competition");
+    expect(competitionLines).toHaveLength(1);
+    expect(competitionLines[0]?.label).toBe("Compétitions jeunes");
+    expect(competitionLines[0]?.amountCents).toBe(2_500);
+  });
+
   it("ajoute chaque compétition cochée", () => {
     const quote = calculateQuote(
       ctx({

@@ -1,3 +1,4 @@
+import { normalizeCompetitionIds } from "@/lib/club-registration/competition-ids";
 import {
   COMPETITION_LABELS,
   COMPETITION_PRICE_CENTS,
@@ -80,7 +81,7 @@ function buildCompetitionLines(competitionIds: string[]): {
   const lines: PriceLine[] = [];
   const warnings: string[] = [];
 
-  for (const id of competitionIds) {
+  for (const id of normalizeCompetitionIds(competitionIds)) {
     if (!(id in COMPETITION_PRICE_CENTS)) {
       warnings.push(`Compétition inconnue ignorée pour le tarif : ${id}`);
       continue;

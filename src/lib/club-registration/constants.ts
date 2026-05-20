@@ -3,6 +3,11 @@
  * Les créneaux et sections peuvent être ajustés ici sans toucher à la logique métier.
  */
 
+import {
+  COMPETITIONS_JEUNES_ID,
+  LEGACY_COMPETITIONS_JEUNES_IDS,
+} from "./competition-ids";
+
 export type ClubRegistrationSiteSlot = {
   id: string;
   label: string;
@@ -125,23 +130,26 @@ export const ALL_SLOT_IDS: ReadonlySet<string> = new Set(
   CLUB_REGISTRATION_SITES.flatMap((s) => s.slots.map((sl) => sl.id))
 );
 
-/** Compétitions optionnelles (bloc compétiteur). */
+/** Options affichées dans le formulaire (alignées sur sqyping.fr/tarifs). */
 export const COMPETITION_OPTIONS = [
-  {
-    id: "championnat_jeunes",
-    label: "Championnat des jeunes (25 € pouvant comprendre le critérium fédéral jeunes)",
-  },
-  {
-    id: "criterium_federal_jeunes",
-    label: "Critérium fédéral Jeunes (25 € pouvant comprendre le championnat des jeunes)",
-  },
-  { id: "championnat_equipe", label: "Championnat par équipe (25 €)" },
-  { id: "criterium_federal_seniors", label: "Critérium fédéral Seniors (42 €)" },
+  { id: COMPETITIONS_JEUNES_ID, label: "Compétitions jeunes (25 €)" },
+  { id: "criterium_federal_seniors", label: "Critérium fédéral seniors (42 €)" },
+  { id: "championnat_equipe", label: "Championnat par équipes (25 €)" },
   { id: "championnat_paris", label: "Championnat de Paris (15 €)" },
   {
     id: "competition_handisport",
     label: "Compétition handisport (0 € — paiement à chaque compétition)",
   },
+] as const;
+
+/** Valeurs acceptées en base / API (inclut les ids jeunes historiques). */
+export const COMPETITION_ID_VALUES = [
+  COMPETITIONS_JEUNES_ID,
+  ...LEGACY_COMPETITIONS_JEUNES_IDS,
+  "criterium_federal_seniors",
+  "championnat_equipe",
+  "championnat_paris",
+  "competition_handisport",
 ] as const;
 
 export const JERSEY_SIZES = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL"] as const;

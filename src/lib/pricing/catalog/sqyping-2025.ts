@@ -4,17 +4,16 @@
  */
 
 export const COMPETITION_PRICE_CENTS: Readonly<Record<string, number>> = {
-  championnat_jeunes: 2_500,
-  criterium_federal_jeunes: 2_500,
+  competitions_jeunes: 2_500,
   championnat_equipe: 2_500,
   criterium_federal_seniors: 4_200,
   championnat_paris: 1_500,
   competition_handisport: 0,
 };
 
+/** Libellés facture / devis (sqyping.fr/tarifs). */
 export const COMPETITION_LABELS: Readonly<Record<string, string>> = {
-  championnat_jeunes: "Championnat des jeunes",
-  criterium_federal_jeunes: "Critérium fédéral jeunes",
+  competitions_jeunes: "Compétitions jeunes",
   championnat_equipe: "Championnat par équipes",
   criterium_federal_seniors: "Critérium fédéral seniors",
   championnat_paris: "Championnat de Paris",

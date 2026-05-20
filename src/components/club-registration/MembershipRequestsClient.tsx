@@ -52,6 +52,7 @@ import {
   type MedicalCertificateStatus,
 } from "@/lib/club-registration/medical-certificate";
 import type { Representative } from "@/lib/club-registration/schema";
+import { normalizeCompetitionIds } from "@/lib/club-registration/competition-ids";
 import {
   calculateQuote,
   buildPricingContext,
@@ -301,7 +302,7 @@ function toEditable(registration: RegistrationDetail): EditableRegistration {
     internalRulesAccepted: registration.internalRulesAccepted ?? false,
     wantsCompetitorExtras: registration.wantsCompetitorExtras ?? false,
     competitionJerseySize: registration.competitionJerseySize ?? "",
-    competitionIds: registration.competitionIds ?? [],
+    competitionIds: normalizeCompetitionIds(registration.competitionIds ?? []),
     reviewNotes: registration.reviewNotes ?? "",
     amountEuros:
       typeof registration.paymentAmountCents === "number"

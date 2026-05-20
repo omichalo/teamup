@@ -6,6 +6,7 @@ import {
   inferMedicalDossierFromDeclaration,
   syncMedicalCertificateDeclaration,
 } from "@/lib/club-registration/medical-dossier";
+import { normalizeCompetitionIds } from "@/lib/club-registration/competition-ids";
 import {
   createEmptyDraft,
   createEmptyRepresentative,
@@ -106,6 +107,7 @@ export function registrationDraftReducer(
         merged.medicalQuestionnaire = inferred.questionnaire;
         merged.medicalVeteranPath = inferred.veteranPath;
       }
+      merged.competitionIds = normalizeCompetitionIds(merged.competitionIds);
       return syncMedicalCertificateDeclaration(merged);
     }
 

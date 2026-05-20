@@ -23,6 +23,7 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import "dayjs/locale/fr";
 import { PageHeader, SectionCard, StepProgressBar } from "@/components/ui";
+import { normalizeCompetitionIds } from "@/lib/club-registration/competition-ids";
 import { isValidFrenchPhoneSurface } from "@/lib/club-registration/phone-fr";
 import type { ClubRegistrationPayload } from "@/lib/club-registration/schema";
 import { clubRegistrationPayloadSchema } from "@/lib/club-registration/schema";
@@ -575,7 +576,9 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
         effectiveCompetitorExtras && draft.competitionJerseySize
           ? draft.competitionJerseySize
           : undefined,
-      competitionIds: effectiveCompetitorExtras ? draft.competitionIds : [],
+      competitionIds: effectiveCompetitorExtras
+        ? normalizeCompetitionIds(draft.competitionIds)
+        : [],
       handisportPracticeLevel:
         draft.mainSectionId === "handisport" &&
         (draft.handisportPracticeLevel === "leisure" ||
