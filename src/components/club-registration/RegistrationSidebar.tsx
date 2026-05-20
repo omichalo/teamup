@@ -14,6 +14,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { SECTION_PRINCIPALE_OPTIONS } from "@/lib/club-registration/constants";
 import { computeAgeAt, isMinorAt } from "@/lib/club-registration/age";
 import type { RegistrationStepId } from "@/lib/club-registration/field-to-step";
+import { PricingBreakdown } from "./PricingBreakdown";
 import type { RegistrationDraft } from "./registration-defaults";
 
 type Props = {
@@ -128,6 +129,22 @@ function SidebarContent({
           Le résumé se complétera au fil des étapes.
         </Typography>
       )}
+
+      {age !== null ? (
+        <>
+          <Divider flexItem />
+          <Stack spacing={0.75}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ fontWeight: 600, letterSpacing: "0.04em" }}
+            >
+              ESTIMATION TARIFAIRE
+            </Typography>
+            <PricingBreakdown draft={draft} variant="compact" />
+          </Stack>
+        </>
+      ) : null}
     </Stack>
   );
 }

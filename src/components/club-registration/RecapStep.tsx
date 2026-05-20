@@ -23,6 +23,7 @@ import type {
   RegistrationDraft,
   Representative,
 } from "./registration-defaults";
+import { PricingBreakdown } from "./PricingBreakdown";
 
 type Props = {
   draft: RegistrationDraft;
@@ -463,6 +464,14 @@ export function RecapStep({ draft, accountEmail, onEditStep }: Props) {
           },
         ]}
       />
+
+      <SectionCard
+        title="Tarif estimé"
+        padding="compact"
+        description="Adhésion club, licence FFTT et compétitions sélectionnées, selon la grille publique du club."
+      >
+        <PricingBreakdown draft={draft} variant="full" />
+      </SectionCard>
 
       <SectionCard
         title="Contacts et compte"
