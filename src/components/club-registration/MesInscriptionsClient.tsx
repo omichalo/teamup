@@ -15,6 +15,7 @@ import {
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import DownloadIcon from "@mui/icons-material/Download";
 import NextLink from "next/link";
 import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/ui";
@@ -36,8 +37,10 @@ type RegistrationSummary = {
   status?: string;
   paymentAmountCents?: number;
   paymentStatus?: string;
+  invoiceAvailable?: boolean;
   submittedAt?: string | null;
   updatedAt?: string | null;
+  paidAt?: string | null;
 };
 
 type ApiResponse =
@@ -101,12 +104,25 @@ function findSectionLabel(id: string | undefined): string {
   return found?.label ?? id;
 }
 
+function isRegistrationPaid(r: RegistrationSummary): boolean {
+  return (
+    r.status === "paid" ||
+    r.paymentStatus === "paid" ||
+    r.paymentStatus === "complete"
+  );
+}
+
 export function MesInscriptionsClient() {
   const params = useSearchParams();
   const createdId = params?.get("created") ?? null;
+  const paymentSuccessId = params?.get("registration") ?? null;
+  const paymentBanner =
+    params?.get("payment") === "success" ? "success" : null;
   const [loading, setLoading] = useState(true);
   const [registrations, setRegistrations] = useState<RegistrationSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [invoiceError, setInvoiceError] = useState<string | null>(null);
+  const [invoiceLoadingId, setInvoiceLoadingId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,6 +159,33 @@ export function MesInscriptionsClient() {
     [registrations, createdId]
   );
 
+  const paymentJustCompleted = useMemo(
+    () => registrations.find((r) => r.id === paymentSuccessId) ?? null,
+    [registrations, paymentSuccessId]
+  );
+
+  const openInvoice = async (registrationId: string) => {
+    setInvoiceLoadingId(registrationId);
+    setInvoiceError(null);
+    try {
+      const res = await fetch(
+        `/api/club/registration/${encodeURIComponent(registrationId)}/invoice`,
+        { credentials: "include" }
+      );
+      const json = (await res.json()) as { url?: string; error?: string };
+      if (!res.ok || !json.url) {
+        throw new Error(json.error ?? "Facture indisponible pour le moment.");
+      }
+      window.open(json.url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      setInvoiceError(
+        err instanceof Error ? err.message : "Impossible d’ouvrir la facture."
+      );
+    } finally {
+      setInvoiceLoadingId(null);
+    }
+  };
+
   return (
     <Container maxWidth="md" sx={{ py: { xs: 3, sm: 5 } }}>
       <Stack spacing={3}>
@@ -171,7 +214,31 @@ export function MesInscriptionsClient() {
           </Alert>
         ) : null}
 
+        {paymentBanner && paymentJustCompleted ? (
+          <Alert severity="success">
+            Paiement enregistré pour{" "}
+            <strong>
+              {paymentJustCompleted.firstName} {paymentJustCompleted.lastName}
+            </strong>
+            .{" "}
+            {paymentJustCompleted.invoiceAvailable ||
+            isRegistrationPaid(paymentJustCompleted) ? (
+              <>
+                Votre facture Stripe est disponible ci-dessous (
+                <em>Télécharger la facture</em>).
+              </>
+            ) : (
+              <>La facture apparaîtra d’ici quelques instants sur cette page.</>
+            )}
+          </Alert>
+        ) : null}
+
         {error ? <Alert severity="error">{error}</Alert> : null}
+        {invoiceError ? (
+          <Alert severity="error" onClose={() => setInvoiceError(null)}>
+            {invoiceError}
+          </Alert>
+        ) : null}
 
         {loading ? (
           <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
@@ -262,7 +329,10 @@ export function MesInscriptionsClient() {
                 </CardContent>
                 <CardActions
                   sx={{
-                    justifyContent: { xs: "flex-start", sm: "flex-end" },
+                    flexDirection: { xs: "column", sm: "row" },
+                    alignItems: { xs: "stretch", sm: "center" },
+                    justifyContent: "space-between",
+                    gap: 1,
                     pt: 0,
                     px: { xs: 2, sm: 3 },
                     pb: 2,
@@ -275,6 +345,29 @@ export function MesInscriptionsClient() {
                   >
                     Référence&nbsp;: {r.id}
                   </Typography>
+                  {isRegistrationPaid(r) && r.invoiceAvailable ? (
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="secondary"
+                      startIcon={
+                        invoiceLoadingId === r.id ? (
+                          <CircularProgress size={16} color="inherit" />
+                        ) : (
+                          <DownloadIcon fontSize="small" />
+                        )
+                      }
+                      disabled={invoiceLoadingId === r.id}
+                      onClick={() => openInvoice(r.id)}
+                      sx={{ alignSelf: { xs: "stretch", sm: "auto" }, flexShrink: 0 }}
+                    >
+                      Télécharger la facture
+                    </Button>
+                  ) : isRegistrationPaid(r) ? (
+                    <Typography variant="caption" color="text.secondary">
+                      Facture en cours de publication…
+                    </Typography>
+                  ) : null}
                 </CardActions>
               </Card>
             ))}

@@ -92,6 +92,8 @@ export async function GET(req: Request) {
         summary.paymentRequestedAt =
           data.paymentRequestedAt?.toDate?.()?.toISOString?.() ?? null;
         summary.paidAt = data.paidAt?.toDate?.()?.toISOString?.() ?? null;
+        summary.invoiceAvailable =
+          typeof data.stripeInvoiceId === "string" && data.stripeInvoiceId.length > 0;
         return { summary, submittedAtMs };
       })
       .sort((a, b) => b.submittedAtMs - a.submittedAtMs)

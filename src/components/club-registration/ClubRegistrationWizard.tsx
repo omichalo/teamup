@@ -24,7 +24,7 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import "dayjs/locale/fr";
 import { PageHeader, SectionCard, StepProgressBar } from "@/components/ui";
 import { normalizeCompetitionIds } from "@/lib/club-registration/competition-ids";
-import { isValidFrenchPhoneSurface } from "@/lib/club-registration/phone-fr";
+import { scrollToFormTarget } from "@/lib/club-registration/scroll-to-form-target";
 import type { ClubRegistrationPayload } from "@/lib/club-registration/schema";
 import { clubRegistrationPayloadSchema } from "@/lib/club-registration/schema";
 import { isAtLeast40At, isMinorAt } from "@/lib/club-registration/age";
@@ -48,6 +48,8 @@ import { AdminStep } from "./AdminStep";
 import { EngagementsStep } from "./EngagementsStep";
 import { RecapStep } from "./RecapStep";
 import { RegistrationSidebar } from "./RegistrationSidebar";
+import { validateStep, validateStepById } from "./step-validation";
+import { useRegistrationStickyOffsets } from "./useRegistrationStickyOffsets";
 import { useRegistrationDraft } from "./useRegistrationDraft";
 import { useRegistrationDraftStorage } from "./useRegistrationDraftStorage";
 import { DraftStorageDisclosure } from "./DraftStorageDisclosure";
@@ -100,166 +102,6 @@ function buildSequence(draft: RegistrationDraft): RegistrationStepId[] {
   return base;
 }
 
-function validateStepById(
-  stepId: RegistrationStepId,
-  draft: RegistrationDraft
-): string | null {
-  if (stepId === "audience") {
-    if (!draft.birthDate) return "Indiquez la date de naissance.";
-    const minor = isMinorAt(draft.birthDate);
-    if (minor && draft.adherentRole === "self") {
-      return "La date de naissance correspond à un mineur : passez en mode « mineur dont je suis le représentant légal ».";
-    }
-    return null;
-  }
-
-  if (stepId === "adherent") {
-    if (!draft.firstName.trim()) return "Indiquez le prénom de l’adhérent.";
-    if (!draft.lastName.trim()) return "Indiquez le nom de l’adhérent.";
-    if (!draft.sex) return "Indiquez le sexe de l’adhérent.";
-    if (!draft.birthCity.trim()) return "Indiquez la ville de naissance.";
-
-    const minor = isMinorAt(draft.birthDate);
-    if (!minor && !draft.adherentEmail?.trim()) {
-      return "Indiquez l’e-mail de contact de l’adhérent.";
-    }
-    if (draft.adherentEmail && draft.adherentEmail.trim() !== "") {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.adherentEmail.trim())) {
-        return "L’adresse e-mail de contact est invalide.";
-      }
-    }
-
-    if (!draft.adherentPhonePrimary.trim()) {
-      return "Indiquez un téléphone principal.";
-    }
-    if (!isValidFrenchPhoneSurface(draft.adherentPhonePrimary)) {
-      return "Le téléphone principal doit être un numéro français valide (10 chiffres ou +33).";
-    }
-    const sec = draft.adherentPhoneSecondary?.trim();
-    if (sec && !isValidFrenchPhoneSurface(sec)) {
-      return "Le téléphone secondaire doit être un numéro français valide.";
-    }
-
-    const addr1 = draft.addressLine1.trim();
-    const pc = draft.postalCode.trim();
-    const city = draft.city.trim();
-    if (!addr1 || !pc || !city) {
-      return "Veuillez sélectionner une adresse ou saisir l’adresse manuellement.";
-    }
-    if (!/^[0-9]{5}$/.test(pc)) {
-      return "Code postal français à 5 chiffres.";
-    }
-    return null;
-  }
-
-  if (stepId === "representatives") {
-    if (draft.representatives.length === 0) {
-      return "Au moins un représentant légal est obligatoire pour l’inscription d’un mineur.";
-    }
-    for (let i = 0; i < draft.representatives.length; i++) {
-      const r = draft.representatives[i];
-      const isFirstRequired = i === 0;
-      if (isFirstRequired) {
-        if (!r.firstName.trim() || !r.lastName.trim()) {
-          return `Représentant ${i + 1} : prénom et nom obligatoires.`;
-        }
-        if (!r.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email.trim())) {
-          return `Représentant ${i + 1} : adresse e-mail invalide.`;
-        }
-        if (!r.phone.trim() || !isValidFrenchPhoneSurface(r.phone)) {
-          return `Représentant ${i + 1} : téléphone invalide.`;
-        }
-      } else if (
-        r.firstName.trim() ||
-        r.lastName.trim() ||
-        r.email.trim() ||
-        r.phone.trim()
-      ) {
-        if (!r.firstName.trim() || !r.lastName.trim()) {
-          return `Représentant ${i + 1} : prénom et nom obligatoires si vous le renseignez.`;
-        }
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email.trim())) {
-          return `Représentant ${i + 1} : adresse e-mail invalide.`;
-        }
-        if (!isValidFrenchPhoneSurface(r.phone)) {
-          return `Représentant ${i + 1} : téléphone invalide.`;
-        }
-      }
-    }
-    if (draft.representatives.length === 2) {
-      const a = draft.representatives[0].email.trim().toLowerCase();
-      const b = draft.representatives[1].email.trim().toLowerCase();
-      if (a && b && a === b) {
-        return "Les deux représentants doivent avoir des adresses e-mail différentes.";
-      }
-    }
-    return null;
-  }
-
-  if (stepId === "practice") {
-    if (draft.slotIds.length === 0) return "Sélectionnez au moins un créneau.";
-    if (
-      draft.mainSectionId === "handisport" &&
-      draft.handisportPracticeLevel !== "leisure" &&
-      draft.handisportPracticeLevel !== "competition"
-    ) {
-      return "Indiquez si la pratique handisport est en loisir ou en compétition.";
-    }
-    if (draft.wantsCompetitorExtras && !draft.competitionJerseySize) {
-      return "Indiquez une taille de maillot pour la section compétiteur.";
-    }
-    return null;
-  }
-
-  if (stepId === "admin") {
-    const atLeast40 = isAtLeast40At(draft.birthDate);
-    const decl = draft.medicalCertificateDeclaration;
-    if (
-      !decl ||
-      !isMedicalAdminStepComplete({
-        birthDate: draft.birthDate,
-        questionnaire: draft.medicalQuestionnaire,
-        veteranPath: draft.medicalVeteranPath,
-        hasVerifiedFfttLicense: Boolean(draft.ffttLicenseLookup?.licence),
-      })
-    ) {
-      return "Répondez aux questions de la déclaration médicale.";
-    }
-    if (
-      !atLeast40 &&
-      (decl === "over_40_cert_unchanged_all_no" ||
-        decl === "over_40_first_or_changed_certificate_required")
-    ) {
-      return "La déclaration médicale sélectionnée est réservée aux 40 ans et plus.";
-    }
-    if (atLeast40 && decl === "under_40_all_no") {
-      return "La déclaration médicale « moins de 40 ans » n’est pas applicable à votre date de naissance.";
-    }
-    return null;
-  }
-
-  if (stepId === "engagements") {
-    if (!draft.photoConsent) {
-      return "Indiquez votre choix sur la diffusion d’images (acte de consentement explicite).";
-    }
-    if (isMinorAt(draft.birthDate)) {
-      if (draft.emergencyMedicalAuthorization !== "yes") {
-        return "Cochez l’autorisation d’actes médicaux d’urgence (obligatoire pour un mineur).";
-      }
-      if (draft.supervisionAcknowledgement !== "yes") {
-        return "Cochez l’engagement de prise en charge à l’heure des cours (obligatoire pour un mineur).";
-      }
-    }
-    if (!draft.rulesAccepted) {
-      return "Vous devez accepter le règlement intérieur pour continuer.";
-    }
-    return null;
-  }
-
-  if (stepId === "recap") return null;
-  return null;
-}
-
 /**
  * Permet d'accéder à l'étape cible : retour libre ; étapes suivantes seulement
  * si les étapes intermédiaires sont valides.
@@ -300,9 +142,12 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
     representativeContact?: string;
   }>({});
   const cardRef = useRef<HTMLDivElement | null>(null);
+  const stepErrorAlertRef = useRef<HTMLDivElement | null>(null);
   const stepHeadingRef = useRef<HTMLHeadingElement | null>(null);
   const prevActiveStepRef = useRef(0);
   const scrollPositionsRef = useRef<Map<number, number>>(new Map());
+  const navStickyRef = useRef<HTMLDivElement | null>(null);
+  const stickyOffsets = useRegistrationStickyOffsets(navStickyRef, activeStep);
 
   /* Hydratation au mount : local-first, fallback éventuel sur le draft serveur. */
   const storageLoad = storage.load;
@@ -324,6 +169,24 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
   );
   const totalSteps = sequence.length;
   const currentStepId = sequence[activeStep] ?? "audience";
+
+  const revealStepValidationError = useCallback(
+    (stepId: RegistrationStepId) => {
+      const result = validateStep(stepId, draft);
+      if (result.valid) return true;
+      setSubmitError(result.message);
+      scrollToFormTarget(result.focusSelector, {
+        fallback: () => {
+          stepErrorAlertRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        },
+      });
+      return false;
+    },
+    [draft]
+  );
 
   /* Si la séquence vient de raccourcir (passage mineur → majeur après coup) et
      que l'utilisateur se trouve au-delà de la dernière étape, on le ramène sur
@@ -452,9 +315,7 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
 
   const handleNext = () => {
     setSubmitError(null);
-    const err = validateStepById(currentStepId, draft);
-    if (err) {
-      setSubmitError(err);
+    if (!revealStepValidationError(currentStepId)) {
       return;
     }
     setActiveStep((s) => Math.min(s + 1, totalSteps - 1));
@@ -475,10 +336,19 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
         return;
       }
       for (let s = activeStep; s < to; s++) {
-        const err = validateStepById(sequence[s], draft);
-        if (err) {
-          setSubmitError(err);
+        const stepId = sequence[s];
+        const result = validateStep(stepId, draft);
+        if (!result.valid) {
           setActiveStep(s);
+          setSubmitError(result.message);
+          scrollToFormTarget(result.focusSelector, {
+            fallback: () => {
+              stepErrorAlertRef.current?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+              });
+            },
+          });
           return;
         }
       }
@@ -621,10 +491,19 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
     /* On rejoue la validation de toutes les étapes (hors récap) pour rattraper
        les cas de navigation libre via le stepper. */
     for (let i = 0; i < sequence.length - 1; i++) {
-      const err = validateStepById(sequence[i], draft);
-      if (err) {
-        setSubmitError(err);
+      const stepId = sequence[i];
+      const result = validateStep(stepId, draft);
+      if (!result.valid) {
         setActiveStep(i);
+        setSubmitError(result.message);
+        scrollToFormTarget(result.focusSelector, {
+          fallback: () => {
+            stepErrorAlertRef.current?.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+            });
+          },
+        });
         return;
       }
     }
@@ -776,7 +655,13 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
           </Stack>
         </SectionCard>
 
-        {submitError && <Alert severity="error">{submitError}</Alert>}
+        {submitError ? (
+          <Box ref={stepErrorAlertRef} id="registration-step-error" tabIndex={-1}>
+            <Alert severity="error" role="alert">
+              {submitError}
+            </Alert>
+          </Box>
+        ) : null}
         {fieldErrors && Object.keys(fieldErrors).length > 0 ? (
           <Alert severity="error">
             <AlertTitle>Des informations doivent être corrigées</AlertTitle>
@@ -807,25 +692,37 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
 
         <Box
           sx={{
-            display: { xs: "flex", md: "grid" },
-            flexDirection: { xs: "column", md: "unset" },
-            gridTemplateColumns: { md: "minmax(0, 1fr) 320px" },
-            gap: { xs: 2, md: 3 },
-            alignItems: "start",
+            display: { xs: "flex", lg: "grid" },
+            flexDirection: { xs: "column", lg: "unset" },
+            gridTemplateColumns: { lg: "minmax(0, 1fr) 300px" },
+            gap: { xs: 2, lg: 3 },
+            /* stretch : la colonne sidebar prend la hauteur du formulaire,
+               ce qui est nécessaire pour que position: sticky fonctionne. */
+            alignItems: { lg: "stretch" },
           }}
         >
           {/* Sidebar (mobile : au-dessus via flex-direction column, desktop :
               colonne de droite). On la rend en premier dans le DOM côté mobile
               pour qu'elle soit accessible avant la liste de champs longs. */}
-          <Box sx={{ order: { xs: 0, md: 2 }, width: "100%" }}>
+          <Box
+            sx={{
+              order: { xs: 0, lg: 2 },
+              width: "100%",
+              alignSelf: { lg: "stretch" },
+              display: { lg: "flex" },
+              flexDirection: { lg: "column" },
+              pb: { xs: 0, lg: `${stickyOffsets.bottomPx}px` },
+            }}
+          >
             <RegistrationSidebar
               draft={draft}
               sequence={sequence}
               activeStepIndex={activeStep}
+              stickyOffsets={stickyOffsets}
             />
           </Box>
 
-          <Box ref={cardRef} sx={{ order: { xs: 1, md: 1 }, minWidth: 0 }}>
+          <Box ref={cardRef} sx={{ order: { xs: 1, lg: 1 }, minWidth: 0 }}>
             <SectionCard
               eyebrow={`Étape ${activeStep + 1} sur ${totalSteps}`}
               title={stepLabel}
@@ -890,11 +787,12 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
         </Box>
 
         <Paper
+          ref={navStickyRef}
           elevation={0}
           sx={{
-            position: { xs: "sticky", md: "static" },
-            bottom: { xs: 0, md: "auto" },
-            zIndex: { xs: 5, md: "auto" },
+            position: "sticky",
+            bottom: { xs: 0, lg: 16 },
+            zIndex: 5,
             borderRadius: 2,
             border: 1,
             borderColor: "divider",
@@ -905,12 +803,15 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
               xs: "calc(env(safe-area-inset-bottom, 0px) + 12px)",
               sm: 2,
             },
-            boxShadow: {
-              xs: "0 -6px 18px rgba(15, 23, 42, 0.08)",
-              md: "none",
-            },
+            boxShadow: "0 -6px 18px rgba(15, 23, 42, 0.08)",
+            mt: { lg: 1 },
           }}
         >
+          {submitError ? (
+            <Alert severity="error" role="alert" sx={{ mb: 1.5 }}>
+              {submitError}
+            </Alert>
+          ) : null}
           <Stack
             direction="row"
             spacing={1.5}

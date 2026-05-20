@@ -53,20 +53,24 @@ function toPricingContextInput(draft: PricingBreakdownDraft) {
 
 type Props = {
   draft: PricingBreakdownDraft;
-  variant?: "compact" | "full";
+  variant?: "compact" | "full" | "sidebar";
 };
 
 function canEstimate(draft: PricingBreakdownDraft): boolean {
   return computeAgeAt(draft.birthDate) !== null;
 }
 
-export function PricingBreakdown({ draft, variant = "full" }: Props) {
-  const quote = useMemo(() => {
+export function usePricingQuote(draft: PricingBreakdownDraft) {
+  return useMemo(() => {
     if (!canEstimate(draft)) {
       return null;
     }
     return calculateQuote(toPricingContextInput(draft));
   }, [draft]);
+}
+
+export function PricingBreakdown({ draft, variant = "full" }: Props) {
+  const quote = usePricingQuote(draft);
 
   if (!canEstimate(draft)) {
     return (
@@ -114,9 +118,18 @@ export function PricingBreakdown({ draft, variant = "full" }: Props) {
     );
   }
 
+  const isSidebar = variant === "sidebar";
+  const cellSx = isSidebar
+    ? { border: 0, py: 0.35, fontSize: "0.8125rem" }
+    : { border: 0, py: 0.5 };
+
   return (
-    <Stack spacing={1.5}>
-      <Typography variant="body2" color="text.secondary">
+    <Stack spacing={isSidebar ? 0.5 : 1.5}>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ lineHeight: 1.3, display: "block" }}
+      >
         {quote.segmentLabel}
       </Typography>
 
@@ -125,14 +138,13 @@ export function PricingBreakdown({ draft, variant = "full" }: Props) {
           <TableBody>
             {billable.map((line) => (
               <TableRow key={line.id}>
-                <TableCell sx={{ border: 0, py: 0.5, pl: 0 }}>
+                <TableCell sx={{ ...cellSx, pl: 0 }}>
                   {line.label}
                 </TableCell>
                 <TableCell
                   align="right"
                   sx={{
-                    border: 0,
-                    py: 0.5,
+                    ...cellSx,
                     pr: 0,
                     whiteSpace: "nowrap",
                     fontWeight: line.amountCents < 0 ? 600 : 400,
@@ -144,10 +156,27 @@ export function PricingBreakdown({ draft, variant = "full" }: Props) {
               </TableRow>
             ))}
             <TableRow>
-              <TableCell sx={{ border: 0, pt: 1, pl: 0, fontWeight: 700 }}>
+              <TableCell
+                sx={{
+                  ...cellSx,
+                  pt: 0.75,
+                  pl: 0,
+                  fontWeight: 700,
+                  fontSize: isSidebar ? "0.875rem" : undefined,
+                }}
+              >
                 Total estimé
               </TableCell>
-              <TableCell align="right" sx={{ border: 0, pt: 1, pr: 0, fontWeight: 700 }}>
+              <TableCell
+                align="right"
+                sx={{
+                  ...cellSx,
+                  pt: 0.75,
+                  pr: 0,
+                  fontWeight: 700,
+                  fontSize: isSidebar ? "0.875rem" : undefined,
+                }}
+              >
                 {formatCentsAsEuros(quote.totalCents)}
               </TableCell>
             </TableRow>
@@ -155,22 +184,38 @@ export function PricingBreakdown({ draft, variant = "full" }: Props) {
         </Table>
       </Box>
 
-      {infoLines.map((line) => (
-        <Typography key={line.id} variant="caption" color="text.secondary">
-          {line.label}
+      {!isSidebar
+        ? infoLines.map((line) => (
+            <Typography key={line.id} variant="caption" color="text.secondary">
+              {line.label}
+            </Typography>
+          ))
+        : infoLines[0]
+          ? (
+              <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.3 }}>
+                {infoLines[0].label}
+              </Typography>
+            )
+          : null}
+
+      {quote.warnings.map((w) =>
+        isSidebar ? (
+          <Typography key={w} variant="caption" color="warning.main" sx={{ lineHeight: 1.3 }}>
+            {w}
+          </Typography>
+        ) : (
+          <Alert key={w} severity="info" variant="outlined">
+            {w}
+          </Alert>
+        )
+      )}
+
+      {!isSidebar ? (
+        <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.4 }}>
+          Montant indicatif : le secrétariat valide le total définitif avant tout
+          paiement (aides Pass Sport, Labaz, etc.).
         </Typography>
-      ))}
-
-      {quote.warnings.map((w) => (
-        <Alert key={w} severity="info" variant="outlined">
-          {w}
-        </Alert>
-      ))}
-
-      <Typography variant="caption" color="text.secondary">
-        Montant indicatif : le secrétariat valide le total définitif avant tout
-        paiement (aides Pass Sport, Labaz, etc.).
-      </Typography>
+      ) : null}
     </Stack>
   );
 }

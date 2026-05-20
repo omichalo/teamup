@@ -209,7 +209,7 @@ export function AdminStep({ draft, onChange }: Props) {
 
       <Typography
         variant="subtitle1"
-        id="medical-certificate-label"
+        id="medical-dossier-section"
         component="h3"
         sx={{ color: "primary.main", fontWeight: 700 }}
       >

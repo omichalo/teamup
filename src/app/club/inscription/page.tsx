@@ -26,7 +26,7 @@ export default function ClubInscriptionPage() {
   }
 
   return (
-    <Container maxWidth="md" sx={{ py: { xs: 3, sm: 5 } }}>
+    <Container maxWidth="lg" sx={{ py: { xs: 3, sm: 5 } }}>
       <ClubRegistrationWizard accountEmail={user?.email ?? null} />
     </Container>
   );

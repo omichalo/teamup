@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Guide — Parcours d'inscription club SQY Ping</title>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --primary: #28306d;
+      --secondary: #f1861f;
+      --text: #1f2233;
+      --muted: #525871;
+      --bg: #f6f7fb;
+      --card: #ffffff;
+      --border: rgba(40, 48, 109, 0.1);
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Figtree", system-ui, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.55;
+      font-size: 11pt;
+      margin: 0;
+    }
+    .cover {
+      page-break-after: always;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      background: linear-gradient(160deg, #28306d 0%, #1a2147 55%, #f1861f 120%);
+      color: #fff;
+      padding: 48px;
+    }
+    .cover h1 { font-size: 2.4rem; font-weight: 900; margin: 16px 0; line-height: 1.15; }
+    .cover p { font-size: 1.1rem; opacity: 0.92; max-width: 520px; }
+    .cover .badge {
+      background: rgba(255,255,255,0.15);
+      padding: 8px 20px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .cover .meta { margin-top: 48px; font-size: 0.9rem; opacity: 0.75; }
+    .page { padding: 32px 40px; max-width: 210mm; margin: 0 auto; }
+    h2 {
+      color: var(--primary);
+      font-size: 1.5rem;
+      font-weight: 900;
+      margin: 0 0 8px;
+      page-break-after: avoid;
+    }
+    h3 { color: var(--primary); font-size: 1.1rem; margin: 20px 0 8px; page-break-after: avoid; }
+    h4 { font-size: 0.95rem; margin: 14px 0 6px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    p { margin: 0 0 10px; }
+    .lead { font-size: 1.05rem; color: var(--muted); margin-bottom: 20px; }
+    .toc { page-break-after: always; }
+    .toc ol { padding-left: 1.4rem; }
+    .toc li { margin: 6px 0; }
+    .toc a { color: var(--primary); text-decoration: none; font-weight: 500; }
+    .section { page-break-before: always; }
+    .section:first-of-type { page-break-before: auto; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin: 12px 0;
+    }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    ul, ol { margin: 8px 0 12px; padding-left: 1.3rem; }
+    li { margin: 4px 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin: 12px 0; }
+    th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; }
+    th { background: rgba(40,48,109,0.06); color: var(--primary); font-weight: 700; }
+    .figure { margin: 16px 0; page-break-inside: avoid; }
+    .figure img {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 20px rgba(40,48,109,0.1);
+    }
+    .figure figcaption {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 8px;
+      font-style: italic;
+    }
+    .tip {
+      background: #fff8e1;
+      border-left: 4px solid var(--secondary);
+      padding: 12px 16px;
+      border-radius: 0 8px 8px 0;
+      margin: 12px 0;
+      font-size: 0.95rem;
+    }
+    .info {
+      background: #e8eaf6;
+      border-left: 4px solid var(--primary);
+      padding: 12px 16px;
+      border-radius: 0 8px 8px 0;
+      margin: 12px 0;
+    }
+    .flow {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      font-family: ui-monospace, monospace;
+      font-size: 0.8rem;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      margin: 16px 0;
+    }
+    .tag {
+      display: inline-block;
+      background: rgba(241,134,31,0.15);
+      color: #d16a0a;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+    @media print {
+      body { background: #fff; }
+      .page { padding: 0; max-width: none; }
+    }
+  </style>
+</head>
+<body>
+
+<section class="cover">
+  <div class="badge">Team Up — SQY Ping</div>
+  <h1>Guide du parcours<br>d'inscription au club</h1>
+  <p>Documentation pédagogique et exhaustive : formulaire d'adhésion, espace « Mes inscriptions » et interface secrétariat « Demandes d'adhésion ».</p>
+  <p class="meta">Version locale — mai 2026<br>Application Next.js / Firebase / Stripe Checkout</p>
+</section>
+
+<div class="page toc">
+  <h2>Sommaire</h2>
+  <ol>
+    <li><a href="#intro">Introduction et vue d'ensemble</a></li>
+    <li><a href="#roles">Qui accède à quoi ?</a></li>
+    <li><a href="#parcours">Parcours d'inscription (wizard)</a></li>
+    <li><a href="#etape1">Étape 1 — Pour qui ? (Profil)</a></li>
+    <li><a href="#etape2">Étape 2 — L'adhérent</a></li>
+    <li><a href="#etape2b">Étape conditionnelle — Représentants légaux</a></li>
+    <li><a href="#etape3">Étape 3 — Pratique sportive</a></li>
+    <li><a href="#etape4">Étape 4 — Dossier administratif</a></li>
+    <li><a href="#etape5">Étape 5 — Engagements</a></li>
+    <li><a href="#etape6">Étape 6 — Récapitulatif et envoi</a></li>
+    <li><a href="#tarif">Tarif estimé et panneau latéral</a></li>
+    <li><a href="#brouillon">Brouillon local et confidentialité</a></li>
+    <li><a href="#mes-inscriptions">Page « Mes inscriptions »</a></li>
+    <li><a href="#demandes">Page « Demandes d'adhésion » (secrétariat)</a></li>
+    <li><a href="#paiement">Paiement Stripe et factures</a></li>
+    <li><a href="#statuts">Statuts d'un dossier</a></li>
+  </ol>
+</div>
+
+<div class="page section" id="intro">
+  <h2>1. Introduction et vue d'ensemble</h2>
+  <p class="lead">Team Up propose un parcours d'adhésion au club SQY Ping en ligne, aligné sur le formulaire papier historique, avec calcul de tarif en temps réel et traitement par le secrétariat.</p>
+  <p>Le dispositif repose sur trois écrans principaux :</p>
+  <ul>
+    <li><strong>Inscription club</strong> (<code>/club/inscription</code>) — assistant en plusieurs étapes, utilisable sans compte jusqu'à l'envoi.</li>
+    <li><strong>Mes inscriptions</strong> (<code>/club/mes-inscriptions</code>) — suivi des dossiers envoyés par l'utilisateur connecté.</li>
+    <li><strong>Demandes d'adhésion</strong> (<code>/club/demandes-adhesion</code>) — relecture, correction et demande de paiement par le secrétariat.</li>
+  </ul>
+  <div class="flow">Visiteur / parent
+    │
+    ▼
+[Inscription club] ── brouillon localStorage ──► étapes 1→6
+    │
+    ▼ (connexion obligatoire)
+Envoi dossier ──► Firestore clubRegistration
+    │
+    ▼
+[Mes inscriptions] ◄── statuts, paiement, facture
+    │
+    ▼
+[Demandes d'adhésion] ── relecture, devis, e-mail Stripe
+    │
+    ▼
+Paiement en ligne ── webhook ──► statut « payé » + facture PDF</div>
+</div>
+
+<div class="page section" id="roles">
+  <h2>2. Qui accède à quoi ?</h2>
+  <table>
+    <thead><tr><th>Écran</th><th>URL</th><th>Rôles autorisés</th></tr></thead>
+    <tbody>
+      <tr><td>Inscription club</td><td>/club/inscription</td><td>Public (anonyme jusqu'à l'envoi)</td></tr>
+      <tr><td>Mes inscriptions</td><td>/club/mes-inscriptions</td><td>Joueur, Coach, Secrétaire, Admin</td></tr>
+      <tr><td>Demandes d'adhésion</td><td>/club/demandes-adhesion</td><td>Secrétaire, Admin</td></tr>
+    </tbody>
+  </table>
+  <div class="info">Les contrôles côté client (menus, AuthGuard) sont doublés par des vérifications sur chaque route API : un utilisateur non autorisé reçoit une réponse 403.</div>
+</div>
+
+<div class="page section" id="parcours">
+  <h2>3. Parcours d'inscription (wizard)</h2>
+  <p>L'assistant « Préparez votre dossier » comporte <strong>6 étapes pour un majeur</strong> ou <strong>7 étapes pour un mineur</strong> (ajout des représentants légaux). Une barre de progression et un stepper permettent de naviguer vers les étapes déjà validées.</p>
+  <table>
+    <thead><tr><th>#</th><th>Étape</th><th>Contenu principal</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Pour qui ?</td><td>Type d'inscription, licence FFTT, date de naissance</td></tr>
+      <tr><td>2</td><td>L'adhérent</td><td>Identité, contact, adresse (BAN)</td></tr>
+      <tr><td>3*</td><td>Représentants</td><td>1 ou 2 représentants légaux (mineur uniquement)</td></tr>
+      <tr><td>3/4</td><td>Pratique</td><td>Section, créneaux, option compétiteur</td></tr>
+      <tr><td>4/5</td><td>Dossier</td><td>Médical, famille, aides, attestation</td></tr>
+      <tr><td>5/6</td><td>Engagements</td><td>Image, autorisations mineur, règlement</td></tr>
+      <tr><td>6/7</td><td>Récap</td><td>Vérification, tarif, envoi</td></tr>
+    </tbody>
+  </table>
+  <p><span class="tag">Navigation</span> Retour libre ; étapes suivantes accessibles seulement si les étapes intermédiaires sont valides. Les erreurs scrollent vers le premier champ concerné.</p>
+  <figure class="figure">
+    <img src="screenshots/01-inscription-etape-audience.png" alt="Étape 1 — Pour qui ?" />
+    <figcaption>Figure 1 — Étape 1 « Pour qui ? » : choix du profil et date de naissance.</figcaption>
+  </figure>
+</div>
+
+<div class="page section" id="etape1">
+  <h2>4. Étape 1 — Pour qui ? (Profil)</h2>
+  <h3>Choix du type d'inscription</h3>
+  <ul>
+    <li><strong>Moi-même</strong> — l'adhérent est majeur et remplit pour lui-même.</li>
+    <li><strong>Un mineur dont je suis le représentant légal</strong> — active l'étape « Représentants » et des engagements spécifiques.</li>
+    <li><strong>Un autre adulte</strong> — cas tutelle / tiers (encadrant, etc.).</li>
+  </ul>
+  <h3>Licence FFTT (optionnelle)</h3>
+  <p>Saisie du numéro de licence puis bouton <em>Retrouver</em> : appel API <code>/api/club/registration/license-lookup</code> pour préremplir identité (prénom, nom, sexe, date de naissance) sans exposer de données sensibles inutiles.</p>
+  <h3>Date de naissance</h3>
+  <p>Détermine l'âge, l'affichage conditionnel (mineur / majeur), le tarif et les règles médicales. Si un mineur est détecté avec le profil « Moi-même », un message demande de changer de profil.</p>
+</div>
+
+<div class="page section" id="etape2">
+  <h2>5. Étape 2 — L'adhérent</h2>
+  <p>Identité (prénom, nom, sexe, ville de naissance), contact (e-mail, téléphones au format français) et adresse postale via la Base Adresse Nationale ou saisie manuelle.</p>
+  <div class="tip">Pour une inscription « moi-même », l'e-mail sert aussi à préremplir la connexion ou la création de compte à l'envoi. Pour un mineur, l'e-mail de l'adhérent peut rester vide ; le contact principal est celui du représentant.</div>
+  <p>Pour les femmes : case <em>Première inscription féminine au club SQY Ping</em> (réduction tarifaire −80 € sur l'adhésion).</p>
+  <figure class="figure">
+    <img src="screenshots/02-inscription-etape-adherent.png" alt="Étape 2 — L'adhérent" />
+    <figcaption>Figure 2 — Identité, contact et adresse de l'adhérent.</figcaption>
+  </figure>
+</div>
+
+<div class="page section" id="etape2b">
+  <h2>6. Étape conditionnelle — Représentants légaux</h2>
+  <p>Affichée uniquement si l'inscription concerne un mineur. Un représentant est <strong>obligatoire</strong>, un second est facultatif (e-mails distincts).</p>
+  <p>Champs : lien (mère, père, tuteur, autre), prénom, nom, e-mail, téléphone. L'e-mail du compte connecté peut être proposé en préremplissage non destructif.</p>
+  <figure class="figure">
+    <img src="screenshots/02b-inscription-etape-representants.png" alt="Représentants légaux" />
+    <figcaption>Figure 3 — Représentants légaux (parcours mineur, 7 étapes).</figcaption>
+  </figure>
+</div>
+
+<div class="page section" id="etape3">
+  <h2>7. Étape 3 — Pratique sportive</h2>
+  <h3>Lieu et créneaux</h3>
+  <ul>
+    <li><strong>Section principale</strong> — Voisins, Villepreux, Guyancourt, Magny, La Verrière, Trappes, Handisport, Sport adapté.</li>
+    <li><strong>Lieux complémentaires</strong> — cases à cocher optionnelles.</li>
+    <li><strong>Créneaux</strong> — au moins un créneau obligatoire, regroupés par site (accordéons).</li>
+  </ul>
+  <h3>Extension compétiteur</h3>
+  <p>Interrupteur « section compétiteur » : taille de maillot, choix des compétitions (jeunes, critérium seniors, championnat par équipes, Paris, handisport) avec montants indicatifs.</p>
+  <h3>Handisport</h3>
+  <p>Si la section principale est handisport : niveau loisir ou compétition requis pour le tarif.</p>
+  <figure class="figure">
+    <img src="screenshots/03-inscription-etape-pratique.png" alt="Pratique sportive" />
+    <figcaption>Figure 4 — Lieux, créneaux et options compétiteur.</figcaption>
+  </figure>
+</div>
+
+<div class="page section" id="etape4">
+  <h2>8. Étape 4 — Dossier administratif</h2>
+  <h3>Déclaration médicale</h3>
+  <p>Logique progressive selon l'âge et l'historique FFTT :</p>
+  <ul>
+    <li>Moins de 40 ans : questionnaire de santé (toutes réponses « Non » ou au moins un « Oui »).</li>
+    <li>40 ans et plus : questions licence FFTT passée, changement de catégorie vétéran, puis questionnaire si applicable.</li>
+    <li>Première licence ou changement vétéran : certificat médical requis (suivi côté secrétariat, sans upload de document dans l'app).</li>
+  </ul>
+  <h3>Famille et tarification dégressive</h3>
+  <p>Première, deuxième ou troisième inscription et plus dans la même famille — réductions sur l'adhésion club.</p>
+  <h3>Aides</h3>
+  <p>Pass Sport (code 10 caractères), Pass Plus, Labaz, aide municipale — affichées comme <em>en attente de validation</em> dans le devis (non déduites automatiquement).</p>
+  <h3>Attestation d'inscription</h3>
+  <p>Demande optionnelle d'attestation pour tiers (employeur, CAF, etc.).</p>
+  <figure class="figure">
+    <img src="screenshots/04-inscription-etape-dossier.png" alt="Dossier administratif" />
+    <figcaption>Figure 5 — Déclaration médicale, famille et aides.</figcaption>
+  </figure>
+</div>
+
+<div class="page section" id="etape5">
+  <h2>9. Étape 5 — Engagements à signer</h2>
+  <ul>
+    <li><strong>Diffusion d'images</strong> — consentement RGPD explicite (accepter / refuser).</li>
+    <li><strong>Mineur</strong> — autorisation actes médicaux d'urgence ; engagement de prise en charge à l'heure des cours.</li>
+    <li><strong>Règlement intérieur</strong> — case obligatoire + lien vers sqyping.fr ; mention transmission données licence FFTT.</li>
+  </ul>
+  <figure class="figure">
+    <img src="screenshots/05-inscription-etape-engagements.png" alt="Engagements" />
+    <figcaption>Figure 6 — Engagements légaux et règlement intérieur.</figcaption>
+  </figure>
+</div>
+
+<div class="page section" id="etape6">
+  <h2>10. Étape 6 — Récapitulatif et envoi</h2>
+  <p>Résumé par bloc avec boutons <em>Modifier</em> renvoyant à l'étape concernée. Tarif estimé et rappel des contacts.</p>
+  <p><strong>Envoi</strong> : si non connecté, bouton <em>Se connecter pour envoyer</em> ouvre la boîte de dialogue d'authentification (connexion ou création) sans quitter la page ; le dossier est alors soumis via <code>POST /api/club/registration</code>.</p>
+  <p>Après succès : redirection vers Mes inscriptions avec message de confirmation (<code>?created=&lt;id&gt;</code>).</p>
+  <figure class="figure">
+    <img src="screenshots/06-inscription-etape-recap.png" alt="Récapitulatif" />
+    <figcaption>Figure 7 — Récapitulatif avant envoi.</figcaption>
+  </figure>
+  <figure class="figure">
+    <img src="screenshots/08-page-connexion.png" alt="Connexion" />
+    <figcaption>Figure 8 — Connexion requise pour accéder à Mes inscriptions ou envoyer le dossier.</figcaption>
+  </figure>
+</div>
+
+<div class="page section" id="tarif">
+  <h2>11. Tarif estimé et panneau latéral</h2>
+  <p>Le bandeau <strong>Mon dossier — XX,XX €</strong> (mobile : accordéon) affiche en temps réel :</p>
+  <ul>
+    <li>Profil résumé (pour qui, âge, pratique).</li>
+    <li>Détail des lignes : adhésion club, licence FFTT, compétitions, réductions famille / 1ʳᵉ femme.</li>
+    <li>Mention des aides non encore validées (Pass Sport, etc.).</li>
+  </ul>
+  <p>Le calcul repose sur la grille publique SQY Ping 2025 (<code>lib/pricing</code>), recalculée à chaque modification du brouillon.</p>
+  <figure class="figure">
+    <img src="screenshots/07-inscription-sidebar-tarif.png" alt="Détail tarif" />
+    <figcaption>Figure 9 — Détail du tarif estimé (panneau Mon dossier).</figcaption>
+  </figure>
+</div>
+
+<div class="page section" id="brouillon">
+  <h2>12. Brouillon local et confidentialité</h2>
+  <p>Le formulaire enregistre automatiquement un brouillon dans le <strong>localStorage</strong> du navigateur (transparence RGPD via bandeau « En savoir plus » : effacer, désactiver).</p>
+  <p>Avantages : reprise après fermeture de l'onglet sans compte. Limites : brouillon lié au navigateur / appareil ; pas de synchronisation cloud tant que le dossier n'est pas envoyé.</p>
+</div>
+
+<div class="page section" id="mes-inscriptions">
+  <h2>13. Page « Mes inscriptions »</h2>
+  <p class="lead">Espace personnel listant tous les dossiers envoyés avec le compte connecté (soumetteur).</p>
+  <h3>Fonctionnalités</h3>
+  <ul>
+    <li>Bouton <strong>Nouvelle inscription</strong> vers le wizard.</li>
+    <li>Cartes par dossier : nom, type d'inscription, section, statut (chip coloré), date d'envoi.</li>
+    <li>Indicateur certificat médical si requis (reçu, validé, etc.).</li>
+    <li>Montant attendu si statut <em>Paiement demandé</em>.</li>
+    <li><strong>Télécharger la facture</strong> — lien Stripe PDF après paiement (<code>GET .../invoice</code>).</li>
+    <li>Bannières : succès création (<code>?created=</code>), succès paiement (<code>?payment=success&registration=</code>).</li>
+  </ul>
+  <figure class="figure">
+    <img src="screenshots/09-mes-inscriptions.png" alt="Mes inscriptions" />
+    <figcaption>Figure 10 — Liste des dossiers et téléchargement de facture.</figcaption>
+  </figure>
+</div>
+
+<div class="page section" id="demandes">
+  <h2>14. Page « Demandes d'adhésion » (secrétariat)</h2>
+  <p class="lead">Interface de relecture et traitement réservée aux rôles Secrétaire et Admin.</p>
+  <h3>Colonne liste (gauche)</h3>
+  <p>Cartes cliquables : nom, e-mail du compte soumetteur, date, statut, montant, suivi certificat. Bouton Actualiser.</p>
+  <h3>Panneau de détail (droite)</h3>
+  <p>Formulaire éditable reprenant l'intégralité du dossier par sections : identité, contact, représentants, sections/créneaux, administratif, engagements, compétition, tarification, paiement.</p>
+  <h3>Actions secrétariat</h3>
+  <ul>
+    <li><strong>Enregistrer</strong> — persiste les corrections (PATCH).</li>
+    <li><strong>Appliquer le montant calculé</strong> / <strong>Enregistrer le devis</strong> — aligne le montant sur la grille.</li>
+    <li><strong>Valider et demander le paiement</strong> — enregistre puis envoie un e-mail Stripe Checkout au contact ; statut <em>payment_requested</em>.</li>
+    <li>Notes internes — champ libre non visible du demandeur.</li>
+    <li>Suivi certificat médical — statuts internes sans stockage du fichier.</li>
+  </ul>
+  <figure class="figure">
+    <img src="screenshots/10-demandes-adhesion.png" alt="Demandes d'adhésion" />
+    <figcaption>Figure 11 — Relecture dossier et demande de paiement Stripe.</figcaption>
+  </figure>
+</div>
+
+<div class="page section" id="paiement">
+  <h2>15. Paiement Stripe et factures</h2>
+  <ol>
+    <li>Le secrétariat fixe le montant et déclenche la demande de paiement.</li>
+    <li>L'adhérent reçoit un e-mail avec lien Stripe Checkout.</li>
+    <li>Après paiement, le webhook met à jour le dossier (statut payé).</li>
+    <li>Sur Mes inscriptions : bouton facture ouvre le PDF hébergé Stripe (URL signée, pas de stockage carte).</li>
+  </ol>
+  <div class="info">Ne jamais se fier au seul retour navigateur après paiement : la source de vérité est le webhook (<code>/api/stripe/webhook</code>).</div>
+</div>
+
+<div class="page section" id="statuts">
+  <h2>16. Statuts d'un dossier</h2>
+  <table>
+    <thead><tr><th>Statut</th><th>Signification côté demandeur</th><th>Secrétariat</th></tr></thead>
+    <tbody>
+      <tr><td>submitted</td><td>En cours d'examen</td><td>A relire</td></tr>
+      <tr><td>in_review</td><td>En cours de relecture</td><td>En relecture</td></tr>
+      <tr><td>payment_requested</td><td>Paiement demandé (+ montant)</td><td>Paiement demandé</td></tr>
+      <tr><td>paid</td><td>Paiement reçu</td><td>Payé</td></tr>
+      <tr><td>approved</td><td>Approuvé</td><td>Approuvé</td></tr>
+      <tr><td>rejected</td><td>Refusé</td><td>Refusé</td></tr>
+    </tbody>
+  </table>
+  <p style="margin-top:32px;color:var(--muted);font-size:0.9rem;">Document généré pour SQY Ping — TeamUp. Captures réalisées sur l'environnement de développement local.</p>
+</div>
+
+</body>
+</html>

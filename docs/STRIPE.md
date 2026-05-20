@@ -43,7 +43,7 @@ stripe login
 Puis lancer l'ecoute locale :
 
 ```bash
-stripe listen --forward-to localhost:3010/api/stripe/webhook
+stripe listen --forward-to localhost:3000/api/stripe/webhook
 ```
 
 La commande affiche une cle `whsec_...`. C'est la valeur a mettre dans
@@ -101,7 +101,7 @@ npm run dev
 2. Demarrer Stripe CLI :
 
 ```bash
-stripe listen --forward-to localhost:3010/api/stripe/webhook
+stripe listen --forward-to localhost:3000/api/stripe/webhook
 ```
 
 3. Demander un paiement depuis `/club/demandes-adhesion`.
@@ -115,3 +115,6 @@ stripe listen --forward-to localhost:3010/api/stripe/webhook
 avec une date future, un CVC quelconque et un code postal quelconque.
 
 6. Verifier que le dossier passe au statut `Payé` / `paid`.
+7. Sur `/club/mes-inscriptions`, utiliser **Télécharger la facture** (API
+   `GET /api/club/registration/[id]/invoice`, lien PDF ou page Stripe).
+   Accès : **admin**, **secrétariat**, ou **soumettant** du dossier (`submitterUid`).

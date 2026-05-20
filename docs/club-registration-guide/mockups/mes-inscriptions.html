@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Mes inscriptions — SQY Ping Team Up</title>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;900&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "Figtree", sans-serif; background: #f6f7fb; color: #1f2233; min-height: 100vh; }
+    .appbar { background: linear-gradient(90deg, #f1861f, #ff6b35, #f1861f); padding: 2px 0; }
+    .appbar-inner { background: #28306d; color: #fff; padding: 12px 32px; display: flex; justify-content: space-between; align-items: center; }
+    .logo { font-weight: 700; font-size: 1.1rem; }
+    .container { max-width: 900px; margin: 0 auto; padding: 40px 24px; }
+    .eyebrow { color: #f1861f; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+    h1 { font-size: 2rem; font-weight: 900; color: #28306d; margin: 8px 0; }
+    .subtitle { color: #525871; margin-bottom: 24px; }
+    .header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+    .btn-primary { background: #f1861f; color: #fff; border: none; padding: 10px 20px; border-radius: 12px; font-weight: 600; font-size: 0.95rem; display: inline-flex; align-items: center; gap: 8px; }
+    .alert-success { background: #e8f5e9; border: 1px solid #a5d6a7; color: #2e7d32; padding: 14px 18px; border-radius: 12px; margin-bottom: 20px; font-size: 0.95rem; }
+    .card { background: #fff; border-radius: 12px; border: 1px solid rgba(40,48,109,0.08); box-shadow: 0 2px 12px rgba(40,48,109,0.06); margin-bottom: 16px; overflow: hidden; }
+    .card-content { padding: 20px 24px 12px; }
+    .card-actions { padding: 0 24px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+    .name { font-size: 1.25rem; font-weight: 700; color: #28306d; }
+    .meta { color: #525871; font-size: 0.9rem; margin-top: 4px; }
+    .chips { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+    .chip { display: inline-block; padding: 4px 10px; border-radius: 16px; font-size: 0.75rem; font-weight: 600; }
+    .chip-warning { background: #fff3e0; color: #e65100; }
+    .chip-success { background: #e8f5e9; color: #2e7d32; }
+    .chip-outlined { border: 1px solid #ffb74d; color: #e65100; background: transparent; }
+    .caption { font-size: 0.75rem; color: #525871; }
+    .btn-outlined { border: 1px solid #f1861f; color: #f1861f; background: #fff; padding: 6px 14px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; }
+    .ref { font-size: 0.75rem; color: #525871; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <div class="appbar"><div class="appbar-inner"><span class="logo">SQY Ping — Team Up</span><span>Mon compte</span></div></div>
+  <div class="container">
+    <div class="header-row">
+      <div>
+        <div class="eyebrow">Mon espace</div>
+        <h1>Mes inscriptions</h1>
+        <p class="subtitle">Retrouvez l'historique de vos demandes au club et leur statut.</p>
+      </div>
+      <button class="btn-primary">+ Nouvelle inscription</button>
+    </div>
+    <div class="alert-success">
+      Paiement enregistré pour <strong>Camille DevTest</strong>. Votre facture Stripe est disponible ci-dessous (<em>Télécharger la facture</em>).
+    </div>
+    <div class="card">
+      <div class="card-content" style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+        <div>
+          <div class="name">Camille DevTest</div>
+          <div class="meta">Inscription pour moi • Voisins-le-Bretonneux</div>
+        </div>
+        <div class="chips">
+          <span class="chip chip-success">Paiement reçu</span>
+          <span class="caption">Envoyé le 15/05/2026</span>
+          <span class="chip chip-outlined">Certificat : Reçu</span>
+        </div>
+      </div>
+      <div class="card-actions">
+        <span class="ref">Référence : x0BZpF0iWUDTtWO1VozN</span>
+        <button class="btn-outlined">⬇ Télécharger la facture</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-content" style="display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+        <div>
+          <div class="name">Léa Martin</div>
+          <div class="meta">Mineur dont je suis le représentant légal • Guyancourt</div>
+        </div>
+        <div class="chips">
+          <span class="chip chip-warning">Paiement demandé</span>
+          <span class="caption">Envoyé le 02/05/2026</span>
+          <span class="caption" style="color:#f1861f;font-weight:700;">Paiement attendu : 245,00 €</span>
+        </div>
+      </div>
+      <div class="card-actions">
+        <span class="ref">Référence : aB3cD9eF2gH4iJ6kL8mN</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

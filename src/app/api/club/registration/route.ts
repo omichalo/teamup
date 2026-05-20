@@ -4,6 +4,7 @@ import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
+import { canAccessClubRegistration } from "@/lib/club-registration/registration-access";
 import { FieldValue } from "firebase-admin/firestore";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
 import { logAuditAction, AUDIT_ACTIONS } from "@/lib/auth/audit-logger";
@@ -150,16 +151,6 @@ export async function GET(req: Request) {
 
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     const role = resolveRole(decoded.role as string | undefined);
-    if (
-      !hasAnyRole(role, [
-        USER_ROLES.PLAYER,
-        USER_ROLES.SECRETARY,
-        USER_ROLES.COACH,
-        USER_ROLES.ADMIN,
-      ])
-    ) {
-      return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
-    }
 
     const db = getFirestoreAdmin();
     const snap = await db.collection(COLLECTION).doc(id).get();
@@ -171,8 +162,9 @@ export async function GET(req: Request) {
       return jsonNoStore({ error: "Dossier introuvable" }, { status: 404 });
     }
 
-    const isManager = hasAnyRole(role, MANAGER_ROLES);
-    if (!isManager && data.submitterUid !== decoded.uid) {
+    const submitterUid =
+      typeof data.submitterUid === "string" ? data.submitterUid : undefined;
+    if (!canAccessClubRegistration(role, submitterUid, decoded.uid)) {
       return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
     }
 

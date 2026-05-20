@@ -34,7 +34,7 @@ export function RepresentativesStep({
   const { isTouched, markTouched } = useTouchedFields();
 
   return (
-    <Stack spacing={2}>
+    <Stack spacing={2} id="representatives-section">
       <Typography variant="body2" color="text.secondary">
         Un représentant légal est obligatoire pour l’inscription d’un mineur.
         Son e-mail est le contact principal du club pour ce dossier. Le compte

@@ -126,6 +126,46 @@ export async function createLegacySingleLineCheckoutSession(params: {
   });
 }
 
+export type StripeInvoiceLinks = {
+  hostedInvoiceUrl: string | null;
+  invoicePdf: string | null;
+};
+
+/** Récupère les URLs publiques Stripe pour consulter / télécharger une facture. */
+export async function retrieveStripeInvoiceLinks(
+  invoiceId: string
+): Promise<StripeInvoiceLinks> {
+  const response = await fetch(
+    `https://api.stripe.com/v1/invoices/${encodeURIComponent(invoiceId)}`,
+    {
+      headers: {
+        Authorization: `Bearer ${requireEnv("STRIPE_SECRET_KEY")}`,
+      },
+      cache: "no-store",
+    }
+  );
+
+  const json = (await response.json()) as {
+    hosted_invoice_url?: string | null;
+    invoice_pdf?: string | null;
+    error?: { message?: string };
+  };
+
+  if (!response.ok) {
+    throw new Error(json.error?.message ?? "Impossible de récupérer la facture Stripe");
+  }
+
+  return {
+    hostedInvoiceUrl: json.hosted_invoice_url ?? null,
+    invoicePdf: json.invoice_pdf ?? null,
+  };
+}
+
+/** URL à ouvrir côté adhérent : PDF si disponible, sinon page hébergée Stripe. */
+export function pickInvoiceDownloadUrl(links: StripeInvoiceLinks): string | null {
+  return links.invoicePdf ?? links.hostedInvoiceUrl ?? null;
+}
+
 export function verifyStripeWebhookSignature(
   payload: string,
   signatureHeader: string | null

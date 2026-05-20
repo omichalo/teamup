@@ -26,6 +26,15 @@ service cloud.firestore {
     function isCoach() {
       return isAdmin() || authRole() == "coach";
     }
+
+    // Secrétariat (gestion des dossiers d'inscription côté client limitée ; API Admin SDK en prod)
+    function isSecretary() {
+      return authRole() == "secretary";
+    }
+
+    function isClubRegistrationManager() {
+      return isAdmin() || isSecretary();
+    }
     
     // ============================================
     // Collection: users
@@ -195,13 +204,14 @@ service cloud.firestore {
     // peut créer plusieurs dossiers (ex. inscription de 2 enfants). Le couplage 1 dossier ↔ 1 uid
     // est volontairement abandonné.
     //
-    // - read   : owner (submitterUid == uid) ou admin
+    // - read   : owner (submitterUid == uid), admin ou secrétariat
     // - create : owner se déclare comme submitterUid, schemaVersion strict
     // - update : owner uniquement, tant que status != 'approved'
     // - delete : interdit côté client (l'admin gère via Admin SDK)
     match /clubRegistrations/{registrationId} {
       allow read: if isAuthenticated()
-                  && (isAdmin() || resource.data.submitterUid == request.auth.uid);
+                  && (isClubRegistrationManager()
+                      || resource.data.submitterUid == request.auth.uid);
       allow create: if isAuthenticated()
                     && request.resource.data.submitterUid == request.auth.uid
                     && request.resource.data.schemaVersion == 1;

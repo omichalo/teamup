@@ -121,7 +121,7 @@ export function RepresentativesBlock({
               : "Le club pourra aussi utiliser cette adresse pour le suivi du dossier.";
 
         return (
-          <Card key={index} variant="outlined">
+          <Card key={index} id={`representative-${index}`} variant="outlined">
             <CardContent>
               <Stack spacing={2}>
                 <Stack direction="row" alignItems="center" justifyContent="space-between">
