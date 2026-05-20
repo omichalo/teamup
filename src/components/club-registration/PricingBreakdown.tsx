@@ -30,7 +30,7 @@ export type PricingBreakdownDraft = Pick<
   | "firstFemaleRegistrationSqy"
   | "reductionTypes"
 > & {
-  handisportPracticeLevel?: "leisure" | "competition";
+  handisportPracticeLevel?: "leisure" | "competition" | undefined;
 };
 
 type Props = {

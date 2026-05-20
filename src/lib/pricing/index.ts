@@ -1,4 +1,5 @@
 export { buildPricingContext } from "./build-context";
+export { buildPricingContextFromRecord } from "./from-registration-record";
 export {
   calculateQuote,
 } from "./calculate-quote";

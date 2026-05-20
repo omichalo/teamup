@@ -51,6 +51,14 @@ import {
   type MedicalCertificateStatus,
 } from "@/lib/club-registration/medical-certificate";
 import type { Representative } from "@/lib/club-registration/schema";
+import {
+  calculateQuote,
+  buildPricingContext,
+  formatCentsAsEuros,
+  type FamilyRegistrationOrder,
+  type PriceQuote,
+} from "@/lib/pricing";
+import { PricingBreakdown } from "./PricingBreakdown";
 
 type RegistrationSummary = {
   id: string;
@@ -62,6 +70,10 @@ type RegistrationSummary = {
   medicalCertificateStatus?: MedicalCertificateStatus;
   status?: string;
   paymentAmountCents?: number;
+  pricingQuote?: PriceQuote;
+  pricingQuoteStatus?: string;
+  pricingQuoteComputedAt?: string | null;
+  handisportPracticeLevel?: "leisure" | "competition";
   paymentStatus?: string;
   submittedAt?: string | null;
   updatedAt?: string | null;
@@ -135,6 +147,7 @@ type EditableRegistration = {
   competitionIds: string[];
   reviewNotes: string;
   amountEuros: string;
+  handisportPracticeLevel: "" | "leisure" | "competition";
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -211,6 +224,11 @@ const FAMILY_ORDER_OPTIONS = [
   { value: "none", label: "Première inscription dans la famille" },
   { value: "second", label: "Deuxième inscription dans la famille" },
   { value: "third_or_more", label: "Troisième inscription ou plus" },
+] as const;
+
+const HANDISPORT_PRACTICE_OPTIONS = [
+  { value: "leisure", label: "Handisport — Loisirs" },
+  { value: "competition", label: "Handisport — Compétition" },
 ] as const;
 
 const BOOLEAN_CONSENT_OPTIONS = [
@@ -292,7 +310,29 @@ function toEditable(registration: RegistrationDetail): EditableRegistration {
       typeof registration.paymentAmountCents === "number"
         ? String(registration.paymentAmountCents / 100)
         : "",
+    handisportPracticeLevel: registration.handisportPracticeLevel ?? "",
   };
+}
+
+function formToPricingInput(form: EditableRegistration) {
+  const input: Parameters<typeof buildPricingContext>[0] = {
+    birthDate: form.birthDate,
+    mainSectionId: form.mainSectionId,
+    wantsCompetitorExtras: form.wantsCompetitorExtras,
+    competitionIds: form.competitionIds,
+    familyRegistrationOrder: form.familyRegistrationOrder as FamilyRegistrationOrder,
+    sex: form.sex,
+    reductionTypes: form.reductionTypes,
+  };
+
+  if (form.firstFemaleRegistrationSqy !== undefined) {
+    input.firstFemaleRegistrationSqy = form.firstFemaleRegistrationSqy;
+  }
+  if (form.handisportPracticeLevel === "leisure" || form.handisportPracticeLevel === "competition") {
+    input.handisportPracticeLevel = form.handisportPracticeLevel;
+  }
+
+  return input;
 }
 
 function parseAmountCents(value: string): number | null {
@@ -361,6 +401,7 @@ export function MembershipRequestsClient() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [saving, setSaving] = useState(false);
   const [requestingPayment, setRequestingPayment] = useState(false);
+  const [persistingQuote, setPersistingQuote] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -422,6 +463,24 @@ export function MembershipRequestsClient() {
     () => registrations.find((registration) => registration.id === selectedId) ?? null,
     [registrations, selectedId]
   );
+
+  const liveQuote = useMemo(() => {
+    if (!form?.birthDate) {
+      return null;
+    }
+    return calculateQuote(buildPricingContext(formToPricingInput(form)));
+  }, [form]);
+
+  const enteredAmountCents = useMemo(() => {
+    if (!form) return null;
+    return parseAmountCents(form.amountEuros);
+  }, [form]);
+
+  const amountDiffersFromQuote =
+    liveQuote !== null &&
+    liveQuote.totalCents > 0 &&
+    enteredAmountCents !== null &&
+    enteredAmountCents !== liveQuote.totalCents;
 
   const updateField = <K extends keyof EditableRegistration>(
     field: K,
@@ -535,6 +594,10 @@ export function MembershipRequestsClient() {
           competitionJerseySize: form.competitionJerseySize || undefined,
           competitionIds: form.competitionIds,
           reviewNotes: form.reviewNotes,
+          handisportPracticeLevel:
+            form.mainSectionId === "handisport" && form.handisportPracticeLevel
+              ? form.handisportPracticeLevel
+              : undefined,
           ...(amountCents !== null ? { paymentAmountCents: amountCents } : {}),
         }),
       });
@@ -550,6 +613,55 @@ export function MembershipRequestsClient() {
       return false;
     } finally {
       setSaving(false);
+    }
+  };
+
+  const applyCalculatedAmount = () => {
+    if (!form || !liveQuote || liveQuote.totalCents <= 0) {
+      setError("Impossible d'appliquer un montant : devis incomplet ou nul.");
+      return;
+    }
+    updateField("amountEuros", String(liveQuote.totalCents / 100));
+    setSuccess("Montant aligné sur le devis calculé.");
+  };
+
+  const persistQuote = async () => {
+    if (!selectedId || !form) return;
+
+    setPersistingQuote(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await fetch(
+        `/api/club/registration/${encodeURIComponent(selectedId)}/pricing`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...formToPricingInput(form),
+            persist: true,
+            applyPaymentAmount: true,
+            handisportPracticeLevel:
+              form.mainSectionId === "handisport" && form.handisportPracticeLevel
+                ? form.handisportPracticeLevel
+                : undefined,
+          }),
+        }
+      );
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json.error) {
+        throw new Error(json.error || "Impossible d'enregistrer le devis.");
+      }
+      if (typeof json.paymentAmountCents === "number") {
+        updateField("amountEuros", String(json.paymentAmountCents / 100));
+      }
+      setSuccess("Devis enregistré et montant à régler mis à jour.");
+      await Promise.all([fetchRegistrations(), fetchDetail(selectedId)]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur lors de l'enregistrement du devis.");
+    } finally {
+      setPersistingQuote(false);
     }
   };
 
@@ -996,6 +1108,77 @@ export function MembershipRequestsClient() {
                       </Grid>
                     </Grid>
 
+                    <SectionTitle>Tarification</SectionTitle>
+                    <Stack spacing={2}>
+                      {form.mainSectionId === "handisport" ? (
+                        <TextField
+                          select
+                          label="Pratique handisport"
+                          value={form.handisportPracticeLevel}
+                          onChange={(e) =>
+                            updateField(
+                              "handisportPracticeLevel",
+                              e.target.value as EditableRegistration["handisportPracticeLevel"]
+                            )
+                          }
+                          fullWidth
+                          helperText="Requis pour calculer le tarif handisport."
+                        >
+                          <MenuItem value="">Non renseigné</MenuItem>
+                          {HANDISPORT_PRACTICE_OPTIONS.map((option) => (
+                            <MenuItem key={option.value} value={option.value}>
+                              {option.label}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      ) : null}
+
+                      <PricingBreakdown draft={formToPricingInput(form)} variant="full" />
+
+                      {liveQuote && liveQuote.totalCents > 0 ? (
+                        <Typography variant="body2" color="text.secondary">
+                          Total calculé :{" "}
+                          <strong>{formatCentsAsEuros(liveQuote.totalCents)}</strong>
+                          {selected.pricingQuoteComputedAt
+                            ? ` — dernier devis serveur : ${formatDate(selected.pricingQuoteComputedAt)}`
+                            : null}
+                        </Typography>
+                      ) : null}
+
+                      {amountDiffersFromQuote ? (
+                        <Alert severity="warning">
+                          Le montant saisi (
+                          {formatCentsAsEuros(enteredAmountCents ?? 0)}) diffère du devis
+                          calculé ({formatCentsAsEuros(liveQuote?.totalCents ?? 0)}).
+                        </Alert>
+                      ) : null}
+
+                      <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                        <Button
+                          variant="outlined"
+                          onClick={applyCalculatedAmount}
+                          disabled={
+                            !liveQuote ||
+                            liveQuote.totalCents <= 0 ||
+                            saving ||
+                            requestingPayment ||
+                            persistingQuote
+                          }
+                        >
+                          Appliquer le montant calculé
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          color="secondary"
+                          startIcon={<RefreshIcon />}
+                          onClick={() => void persistQuote()}
+                          disabled={saving || requestingPayment || persistingQuote}
+                        >
+                          {persistingQuote ? "Enregistrement..." : "Enregistrer le devis"}
+                        </Button>
+                      </Stack>
+                    </Stack>
+
                     <SectionTitle>Paiement et notes internes</SectionTitle>
                     <Grid container spacing={2}>
                       <Grid size={{ xs: 12, sm: 6 }}>
@@ -1036,7 +1219,7 @@ export function MembershipRequestsClient() {
                         variant="outlined"
                         startIcon={<SaveIcon />}
                         onClick={save}
-                        disabled={saving || requestingPayment}
+                        disabled={saving || requestingPayment || persistingQuote}
                       >
                         {saving ? "Enregistrement..." : "Enregistrer"}
                       </Button>
@@ -1045,7 +1228,7 @@ export function MembershipRequestsClient() {
                         color="secondary"
                         startIcon={<MarkEmailReadIcon />}
                         onClick={requestPayment}
-                        disabled={saving || requestingPayment}
+                        disabled={saving || requestingPayment || persistingQuote}
                       >
                         {requestingPayment ? "Envoi..." : "Valider et demander le paiement"}
                       </Button>

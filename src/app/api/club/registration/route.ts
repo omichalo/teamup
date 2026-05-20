@@ -15,6 +15,8 @@ import {
   normalizeMedicalCertificateStatus,
 } from "@/lib/club-registration/medical-certificate";
 import { checkRateLimit } from "@/lib/auth/rate-limit";
+import { calculateQuote } from "@/lib/pricing/calculate-quote";
+import { buildPricingContextFromRecord } from "@/lib/pricing/from-registration-record";
 
 const COLLECTION = "clubRegistrations";
 const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
@@ -73,6 +75,10 @@ const REGISTRATION_CLIENT_FIELDS = [
   "stripeInvoiceId",
   "paymentStatus",
   "paidAt",
+  "pricingQuote",
+  "pricingQuoteStatus",
+  "pricingQuoteComputedAt",
+  "handisportPracticeLevel",
 ] as const;
 
 const MANAGER_EDITABLE_FIELDS = [
@@ -113,6 +119,7 @@ const MANAGER_EDITABLE_FIELDS = [
   "competitionIds",
   "reviewNotes",
   "paymentAmountCents",
+  "handisportPracticeLevel",
 ] as const;
 
 function stripUndefined<T extends Record<string, unknown>>(obj: T): Record<string, unknown> {
@@ -185,6 +192,8 @@ export async function GET(req: Request) {
     registration.paymentRequestedAt =
       data.paymentRequestedAt?.toDate?.()?.toISOString?.() ?? null;
     registration.paidAt = data.paidAt?.toDate?.()?.toISOString?.() ?? null;
+    registration.pricingQuoteComputedAt =
+      data.pricingQuoteComputedAt?.toDate?.()?.toISOString?.() ?? null;
 
     return jsonNoStore({ registration }, { status: 200 });
   } catch (error) {
@@ -280,9 +289,20 @@ export async function PATCH(req: Request) {
       }
     }
 
+    const mergedForPricing = { ...currentData, ...updates };
+    const pricingCtx = buildPricingContextFromRecord(mergedForPricing);
+    const pricingPatch: Record<string, unknown> = {};
+    if (pricingCtx) {
+      const quote = calculateQuote(pricingCtx);
+      pricingPatch.pricingQuote = quote;
+      pricingPatch.pricingQuoteStatus = "proposed";
+      pricingPatch.pricingQuoteComputedAt = FieldValue.serverTimestamp();
+    }
+
     await docRef.set(
       {
         ...updates,
+        ...pricingPatch,
         ...statusPatch,
         reviewedBy: decoded.uid,
         reviewedAt: FieldValue.serverTimestamp(),
