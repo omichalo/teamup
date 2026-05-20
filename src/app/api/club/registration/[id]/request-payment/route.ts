@@ -19,6 +19,7 @@ import { hashPriceQuote } from "@/lib/pricing/quote-hash";
 import {
   assertStripeLinesMatchQuote,
   buildStripeCheckoutLineItems,
+  buildStripeInvoiceCustomFields,
 } from "@/lib/pricing/stripe-checkout-lines";
 import type { PriceQuote } from "@/lib/pricing/types";
 
@@ -149,6 +150,7 @@ export async function POST(
       }
 
       const stripeLineItems = buildStripeCheckoutLineItems(quote);
+      const invoiceCustomFields = buildStripeInvoiceCustomFields(quote);
       assertStripeLinesMatchQuote(quote, stripeLineItems);
 
       session = await createMembershipCheckoutSession({
@@ -158,6 +160,7 @@ export async function POST(
         invoiceDescription: `Adhésion SQY Ping — dossier ${id}`,
         catalogVersion: quote.catalogVersion,
         quoteHash: hashPriceQuote(quote),
+        invoiceCustomFields,
         successUrl,
         cancelUrl,
       });

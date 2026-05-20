@@ -3,6 +3,7 @@ import type { PricingContext } from "./types";
 import {
   assertStripeLinesMatchQuote,
   buildStripeCheckoutLineItems,
+  buildStripeInvoiceCustomFields,
   sumStripeCheckoutLineItems,
 } from "./stripe-checkout-lines";
 
@@ -29,11 +30,23 @@ describe("buildStripeCheckoutLineItems", () => {
       })
     );
     const items = buildStripeCheckoutLineItems(quote);
-    expect(items.find((i) => i.name === "Adhésion club")?.amountCents).toBe(
-      16_000 - 1_500 - 8_000
-    );
+    const membership = items.find((i) => i.name.includes("Adhésion club"));
+    expect(membership?.amountCents).toBe(16_000 - 1_500 - 8_000);
+    expect(membership?.name).toBe("Adhésion club (net après remises)");
+    expect(membership?.description).toContain("160,00");
+    expect(membership?.description).toContain("montant facturé");
     expect(sumStripeCheckoutLineItems(items)).toBe(quote.totalCents);
     expect(() => assertStripeLinesMatchQuote(quote, items)).not.toThrow();
+  });
+
+  it("ajoute un champ personnalisé facture pour les remises", () => {
+    const quote = calculateQuote(
+      ctx({ birthDate: "2014-06-01", familyRegistrationOrder: "second" })
+    );
+    const fields = buildStripeInvoiceCustomFields(quote);
+    expect(fields).toHaveLength(1);
+    expect(fields[0]?.name).toBe("Remises sur adhésion");
+    expect(fields[0]?.value).toContain("15,00");
   });
 
   it("expose licence et compétitions en lignes séparées", () => {

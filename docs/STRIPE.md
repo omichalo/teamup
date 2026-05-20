@@ -81,8 +81,10 @@ checkout.session.completed
 4. Le serveur recalcule le devis (`pricingQuote`), verifie que le montant
    saisi correspond au total, puis cree une session Stripe Checkout **multi-lignes**
    (adhésion nette, licence FFTT, compétitions) avec facture Stripe activee.
-   Les remises catalogue sont integrees au net de la ligne « Adhésion club »
-   (Stripe n'accepte pas de montants negatifs sur les line_items).
+   Les remises catalogue sont integrees au net de la ligne « Adhésion club (net
+   apres remises) », avec description detaillee (brut, remises, net facture) et
+   un champ personnalise facture « Remises sur adhesion » (Stripe n'accepte pas de
+   montants negatifs sur les line_items).
 5. Un e-mail contenant le lien de paiement est envoye a l'adherent, au premier
    representant legal, ou au compte soumetteur selon les donnees disponibles.
 6. Lorsque Stripe envoie `checkout.session.completed`, le webhook marque le

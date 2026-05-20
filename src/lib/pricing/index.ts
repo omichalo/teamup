@@ -19,8 +19,11 @@ export { parseStoredPriceQuote } from "./parse-stored-quote";
 export {
   assertStripeLinesMatchQuote,
   buildStripeCheckoutLineItems,
+  buildStripeInvoiceCustomFields,
+  formatDiscountBreakdown,
   sumStripeCheckoutLineItems,
   type StripeCheckoutLineItem,
+  type StripeInvoiceCustomField,
 } from "./stripe-checkout-lines";
 export {
   resolveClassicAgeBand,

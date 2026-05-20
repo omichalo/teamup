@@ -1,5 +1,8 @@
 import crypto from "node:crypto";
-import type { StripeCheckoutLineItem } from "@/lib/pricing/stripe-checkout-lines";
+import type {
+  StripeCheckoutLineItem,
+  StripeInvoiceCustomField,
+} from "@/lib/pricing/stripe-checkout-lines";
 
 export interface StripeCheckoutSession {
   id: string;
@@ -38,6 +41,8 @@ export async function createMembershipCheckoutSession(params: {
   quoteHash: string;
   successUrl: string;
   cancelUrl: string;
+  /** Champs informatifs sur la facture (ex. détail des remises). */
+  invoiceCustomFields?: StripeInvoiceCustomField[];
 }): Promise<StripeCheckoutSession> {
   if (params.lineItems.length === 0) {
     throw new Error("Au moins une ligne de paiement est requise.");
@@ -57,6 +62,11 @@ export async function createMembershipCheckoutSession(params: {
   body.set("payment_intent_data[metadata][quoteHash]", params.quoteHash);
   body.set("invoice_creation[enabled]", "true");
   body.set("invoice_creation[invoice_data][description]", params.invoiceDescription);
+
+  (params.invoiceCustomFields ?? []).forEach((field, index) => {
+    body.set(`invoice_creation[invoice_data][custom_fields][${index}][name]`, field.name);
+    body.set(`invoice_creation[invoice_data][custom_fields][${index}][value]`, field.value);
+  });
 
   params.lineItems.forEach((item, index) => {
     body.set(`line_items[${index}][quantity]`, "1");
