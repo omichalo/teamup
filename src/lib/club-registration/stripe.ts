@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import type { StripeCheckoutLineItem } from "@/lib/pricing/stripe-checkout-lines";
 
 export interface StripeCheckoutSession {
   id: string;
@@ -29,12 +30,19 @@ export function getAppBaseUrl(req?: Request): string {
 
 export async function createMembershipCheckoutSession(params: {
   registrationId: string;
-  amountCents: number;
+  lineItems: StripeCheckoutLineItem[];
   customerEmail: string;
-  adherentName: string;
+  /** Description de facture (en-tête) — identité dossier, pas les lignes. */
+  invoiceDescription: string;
+  catalogVersion: string;
+  quoteHash: string;
   successUrl: string;
   cancelUrl: string;
 }): Promise<StripeCheckoutSession> {
+  if (params.lineItems.length === 0) {
+    throw new Error("Au moins une ligne de paiement est requise.");
+  }
+
   const body = new URLSearchParams();
   body.set("mode", "payment");
   body.set("customer_email", params.customerEmail);
@@ -42,19 +50,26 @@ export async function createMembershipCheckoutSession(params: {
   body.set("cancel_url", params.cancelUrl);
   body.set("client_reference_id", params.registrationId);
   body.set("metadata[registrationId]", params.registrationId);
+  body.set("metadata[catalogVersion]", params.catalogVersion);
+  body.set("metadata[quoteHash]", params.quoteHash);
   body.set("payment_intent_data[metadata][registrationId]", params.registrationId);
+  body.set("payment_intent_data[metadata][catalogVersion]", params.catalogVersion);
+  body.set("payment_intent_data[metadata][quoteHash]", params.quoteHash);
   body.set("invoice_creation[enabled]", "true");
-  body.set("line_items[0][quantity]", "1");
-  body.set("line_items[0][price_data][currency]", "eur");
-  body.set("line_items[0][price_data][unit_amount]", String(params.amountCents));
-  body.set(
-    "line_items[0][price_data][product_data][name]",
-    `Adhésion SQY Ping - ${params.adherentName}`
-  );
-  body.set(
-    "line_items[0][price_data][product_data][description]",
-    `Dossier d'adhésion ${params.registrationId}`
-  );
+  body.set("invoice_creation[invoice_data][description]", params.invoiceDescription);
+
+  params.lineItems.forEach((item, index) => {
+    body.set(`line_items[${index}][quantity]`, "1");
+    body.set(`line_items[${index}][price_data][currency]`, "eur");
+    body.set(`line_items[${index}][price_data][unit_amount]`, String(item.amountCents));
+    body.set(`line_items[${index}][price_data][product_data][name]`, item.name);
+    if (item.description) {
+      body.set(
+        `line_items[${index}][price_data][product_data][description]`,
+        item.description
+      );
+    }
+  });
 
   const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
     method: "POST",
@@ -72,6 +87,33 @@ export async function createMembershipCheckoutSession(params: {
     throw new Error(json.error?.message || "Impossible de créer la session Stripe");
   }
   return json;
+}
+
+/** @deprecated Préférer `createMembershipCheckoutSession` avec `lineItems` issus du devis. */
+export async function createLegacySingleLineCheckoutSession(params: {
+  registrationId: string;
+  amountCents: number;
+  customerEmail: string;
+  adherentName: string;
+  successUrl: string;
+  cancelUrl: string;
+}): Promise<StripeCheckoutSession> {
+  return createMembershipCheckoutSession({
+    registrationId: params.registrationId,
+    lineItems: [
+      {
+        name: "Adhésion SQY Ping",
+        amountCents: params.amountCents,
+        description: `Dossier ${params.registrationId}`,
+      },
+    ],
+    customerEmail: params.customerEmail,
+    invoiceDescription: `Adhésion SQY Ping — ${params.adherentName}`,
+    catalogVersion: "legacy",
+    quoteHash: "legacy",
+    successUrl: params.successUrl,
+    cancelUrl: params.cancelUrl,
+  });
 }
 
 export function verifyStripeWebhookSignature(

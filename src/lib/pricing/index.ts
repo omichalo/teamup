@@ -14,6 +14,14 @@ export {
   billableLines,
   stripeCheckoutLines,
 } from "./format";
+export { hashPriceQuote } from "./quote-hash";
+export { parseStoredPriceQuote } from "./parse-stored-quote";
+export {
+  assertStripeLinesMatchQuote,
+  buildStripeCheckoutLineItems,
+  sumStripeCheckoutLineItems,
+  type StripeCheckoutLineItem,
+} from "./stripe-checkout-lines";
 export {
   resolveClassicAgeBand,
   resolveHandisportCompetitionAgeBand,

@@ -9,9 +9,18 @@ import { validateOrigin } from "@/lib/auth/csrf-utils";
 import { sendMail } from "@/lib/mailer";
 import { AUDIT_ACTIONS, logAuditAction } from "@/lib/auth/audit-logger";
 import {
+  createLegacySingleLineCheckoutSession,
   createMembershipCheckoutSession,
   getAppBaseUrl,
 } from "@/lib/club-registration/stripe";
+import { calculateQuote } from "@/lib/pricing/calculate-quote";
+import { buildPricingContextFromRecord } from "@/lib/pricing/from-registration-record";
+import { hashPriceQuote } from "@/lib/pricing/quote-hash";
+import {
+  assertStripeLinesMatchQuote,
+  buildStripeCheckoutLineItems,
+} from "@/lib/pricing/stripe-checkout-lines";
+import type { PriceQuote } from "@/lib/pricing/types";
 
 const COLLECTION = "clubRegistrations";
 const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
@@ -21,6 +30,24 @@ function formatEuros(amountCents: number): string {
     style: "currency",
     currency: "EUR",
   }).format(amountCents / 100);
+}
+
+function formatQuoteBreakdownText(quote: PriceQuote): string {
+  return quote.lines
+    .filter((line) => line.kind !== "info" && line.amountCents !== 0)
+    .map((line) => `  - ${line.label} : ${formatEuros(line.amountCents)}`)
+    .join("\n");
+}
+
+function formatQuoteBreakdownHtml(quote: PriceQuote): string {
+  const rows = quote.lines
+    .filter((line) => line.kind !== "info" && line.amountCents !== 0)
+    .map(
+      (line) =>
+        `<li>${line.label} : <strong>${formatEuros(line.amountCents)}</strong></li>`
+    )
+    .join("");
+  return `<ul>${rows}</ul><p><strong>Total : ${formatEuros(quote.totalCents)}</strong></p>`;
 }
 
 function resolvePaymentEmail(data: DocumentData): string | null {
@@ -41,6 +68,14 @@ function resolvePaymentEmail(data: DocumentData): string | null {
     return data.submitterAccountEmail;
   }
   return null;
+}
+
+function resolveQuoteFromRegistration(data: DocumentData): PriceQuote | null {
+  const ctx = buildPricingContextFromRecord(data);
+  if (!ctx) {
+    return null;
+  }
+  return calculateQuote(ctx);
 }
 
 export async function POST(
@@ -77,8 +112,8 @@ export async function POST(
     }
 
     const data = snap.data() ?? {};
-    const amountCents = body.amountCents ?? data.paymentAmountCents;
-    if (!Number.isInteger(amountCents) || amountCents <= 0) {
+    const requestedAmount = body.amountCents ?? data.paymentAmountCents;
+    if (!Number.isInteger(requestedAmount) || requestedAmount <= 0) {
       return jsonNoStore(
         { error: "Indiquez un montant strictement positif avant de demander le paiement." },
         { status: 400 }
@@ -95,14 +130,152 @@ export async function POST(
 
     const adherentName = `${data.firstName ?? ""} ${data.lastName ?? ""}`.trim() || "adhérent";
     const baseUrl = getAppBaseUrl(req);
-    const session = await createMembershipCheckoutSession({
-      registrationId: id,
-      amountCents,
-      customerEmail: paymentEmail,
-      adherentName,
-      successUrl: `${baseUrl}/club/mes-inscriptions?payment=success&registration=${encodeURIComponent(id)}`,
-      cancelUrl: `${baseUrl}/club/mes-inscriptions?payment=cancelled&registration=${encodeURIComponent(id)}`,
-    });
+    const successUrl = `${baseUrl}/club/mes-inscriptions?payment=success&registration=${encodeURIComponent(id)}`;
+    const cancelUrl = `${baseUrl}/club/mes-inscriptions?payment=cancelled&registration=${encodeURIComponent(id)}`;
+
+    const quote = resolveQuoteFromRegistration(data);
+    let session;
+
+    if (quote && quote.totalCents > 0) {
+      if (requestedAmount !== quote.totalCents) {
+        return jsonNoStore(
+          {
+            error:
+              "Le montant à régler ne correspond pas au devis calculé. Enregistrez le devis ou alignez le montant.",
+            expectedAmountCents: quote.totalCents,
+          },
+          { status: 400 }
+        );
+      }
+
+      const stripeLineItems = buildStripeCheckoutLineItems(quote);
+      assertStripeLinesMatchQuote(quote, stripeLineItems);
+
+      session = await createMembershipCheckoutSession({
+        registrationId: id,
+        lineItems: stripeLineItems,
+        customerEmail: paymentEmail,
+        invoiceDescription: `Adhésion SQY Ping — dossier ${id}`,
+        catalogVersion: quote.catalogVersion,
+        quoteHash: hashPriceQuote(quote),
+        successUrl,
+        cancelUrl,
+      });
+
+      await docRef.set(
+        {
+          status: "payment_requested",
+          paymentAmountCents: quote.totalCents,
+          paymentStatus: "pending",
+          paymentRequestedAt: FieldValue.serverTimestamp(),
+          paymentRequestedBy: decoded.uid,
+          paymentEmailSentTo: paymentEmail,
+          stripeCheckoutSessionId: session.id,
+          stripeCheckoutUrl: session.url,
+          pricingQuote: quote,
+          pricingQuoteStatus: "validated",
+          paymentStripeLineItems: stripeLineItems,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      const breakdownText = formatQuoteBreakdownText(quote);
+      await sendMail({
+        to: paymentEmail,
+        subject: `Paiement de votre adhésion SQY Ping - ${adherentName}`,
+        text: [
+          `Bonjour,`,
+          ``,
+          `Votre dossier d'adhésion SQY Ping a été relu et validé administrativement.`,
+          ``,
+          `Détail :`,
+          breakdownText,
+          ``,
+          `Montant à régler : ${formatEuros(quote.totalCents)}.`,
+          ``,
+          `Paiement sécurisé Stripe : ${session.url}`,
+          ``,
+          `Une facture détaillée sera disponible après paiement.`,
+          ``,
+          `SQY Ping TeamUp`,
+        ].join("\n"),
+        html: `
+          <p>Bonjour,</p>
+          <p>Votre dossier d'adhésion SQY Ping a été relu et validé administrativement.</p>
+          <p><strong>Détail :</strong></p>
+          ${formatQuoteBreakdownHtml(quote)}
+          <p><a href="${session.url}">Procéder au paiement sécurisé Stripe</a></p>
+          <p>Une facture détaillée sera disponible après paiement.</p>
+          <p>SQY Ping TeamUp</p>
+        `,
+      });
+
+      logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_PAYMENT_REQUESTED, decoded.uid, {
+        resource: "clubRegistration",
+        resourceId: id,
+        details: {
+          amountCents: quote.totalCents,
+          stripeCheckoutSessionId: session.id,
+          lineCount: stripeLineItems.length,
+          catalogVersion: quote.catalogVersion,
+        },
+        success: true,
+      });
+    } else {
+      session = await createLegacySingleLineCheckoutSession({
+        registrationId: id,
+        amountCents: requestedAmount,
+        customerEmail: paymentEmail,
+        adherentName,
+        successUrl,
+        cancelUrl,
+      });
+
+      await docRef.set(
+        {
+          status: "payment_requested",
+          paymentAmountCents: requestedAmount,
+          paymentStatus: "pending",
+          paymentRequestedAt: FieldValue.serverTimestamp(),
+          paymentRequestedBy: decoded.uid,
+          paymentEmailSentTo: paymentEmail,
+          stripeCheckoutSessionId: session.id,
+          stripeCheckoutUrl: session.url,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      await sendMail({
+        to: paymentEmail,
+        subject: `Paiement de votre adhésion SQY Ping - ${adherentName}`,
+        text: [
+          `Bonjour,`,
+          ``,
+          `Votre dossier d'adhésion SQY Ping a été relu et validé administrativement.`,
+          `Montant à régler : ${formatEuros(requestedAmount)}.`,
+          ``,
+          `Paiement sécurisé Stripe : ${session.url}`,
+          ``,
+          `SQY Ping TeamUp`,
+        ].join("\n"),
+        html: `
+          <p>Bonjour,</p>
+          <p>Votre dossier d'adhésion SQY Ping a été relu et validé administrativement.</p>
+          <p><strong>Montant à régler : ${formatEuros(requestedAmount)}</strong></p>
+          <p><a href="${session.url}">Procéder au paiement sécurisé Stripe</a></p>
+          <p>SQY Ping TeamUp</p>
+        `,
+      });
+
+      logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_PAYMENT_REQUESTED, decoded.uid, {
+        resource: "clubRegistration",
+        resourceId: id,
+        details: { amountCents: requestedAmount, stripeCheckoutSessionId: session.id, legacy: true },
+        success: true,
+      });
+    }
 
     if (!session.url) {
       return jsonNoStore(
@@ -110,53 +283,6 @@ export async function POST(
         { status: 502 }
       );
     }
-
-    await docRef.set(
-      {
-        status: "payment_requested",
-        paymentAmountCents: amountCents,
-        paymentStatus: "pending",
-        paymentRequestedAt: FieldValue.serverTimestamp(),
-        paymentRequestedBy: decoded.uid,
-        paymentEmailSentTo: paymentEmail,
-        stripeCheckoutSessionId: session.id,
-        stripeCheckoutUrl: session.url,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
-
-    await sendMail({
-      to: paymentEmail,
-      subject: `Paiement de votre adhésion SQY Ping - ${adherentName}`,
-      text: [
-        `Bonjour,`,
-        ``,
-        `Votre dossier d'adhésion SQY Ping a été relu et validé administrativement.`,
-        `Montant à régler : ${formatEuros(amountCents)}.`,
-        ``,
-        `Vous pouvez procéder au paiement sécurisé Stripe ici : ${session.url}`,
-        ``,
-        `Une facture pourra être générée par Stripe après paiement.`,
-        ``,
-        `SQY Ping TeamUp`,
-      ].join("\n"),
-      html: `
-        <p>Bonjour,</p>
-        <p>Votre dossier d'adhésion SQY Ping a été relu et validé administrativement.</p>
-        <p><strong>Montant à régler : ${formatEuros(amountCents)}</strong></p>
-        <p><a href="${session.url}">Procéder au paiement sécurisé Stripe</a></p>
-        <p>Une facture pourra être générée par Stripe après paiement.</p>
-        <p>SQY Ping TeamUp</p>
-      `,
-    });
-
-    logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_PAYMENT_REQUESTED, decoded.uid, {
-      resource: "clubRegistration",
-      resourceId: id,
-      details: { amountCents, stripeCheckoutSessionId: session.id },
-      success: true,
-    });
 
     return jsonNoStore({ success: true, checkoutUrl: session.url }, { status: 200 });
   } catch (error) {

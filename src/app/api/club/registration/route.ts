@@ -79,6 +79,7 @@ const REGISTRATION_CLIENT_FIELDS = [
   "pricingQuoteStatus",
   "pricingQuoteComputedAt",
   "handisportPracticeLevel",
+  "paymentStripeLineItems",
 ] as const;
 
 const MANAGER_EDITABLE_FIELDS = [

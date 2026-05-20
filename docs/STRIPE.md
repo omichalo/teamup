@@ -78,8 +78,11 @@ checkout.session.completed
    `/club/demandes-adhesion`.
 3. La secretaire renseigne le montant, puis clique sur
    `Valider et demander le paiement`.
-4. Le serveur cree une session Stripe Checkout avec generation de facture
-   Stripe activee.
+4. Le serveur recalcule le devis (`pricingQuote`), verifie que le montant
+   saisi correspond au total, puis cree une session Stripe Checkout **multi-lignes**
+   (adhésion nette, licence FFTT, compétitions) avec facture Stripe activee.
+   Les remises catalogue sont integrees au net de la ligne « Adhésion club »
+   (Stripe n'accepte pas de montants negatifs sur les line_items).
 5. Un e-mail contenant le lien de paiement est envoye a l'adherent, au premier
    representant legal, ou au compte soumetteur selon les donnees disponibles.
 6. Lorsque Stripe envoie `checkout.session.completed`, le webhook marque le

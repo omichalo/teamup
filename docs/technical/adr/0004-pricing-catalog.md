@@ -16,10 +16,10 @@ La grille publique [sqyping.fr/tarifs](https://www.sqyping.fr/tarifs) n’était
 4. **Compétitions** : une ligne par option cochée aux montants grille ; critérium fédéral **seniors** distinct des tarifs jeunes.
 5. **Pass Sport, Labaz, aide municipale** : déclaration conservée, **sans montant** en V1 (`requiresAdminReview` + message secrétariat).
 6. **Handisport** : champ `handisportPracticeLevel` (`leisure` | `competition`) requis pour le calcul.
-7. **Stripe (PR ultérieure)** : lignes génériques (« Adhésion club », « Licence FFTT », …) ; identité dossier en metadata.
+7. **Stripe** : lignes génériques (« Adhésion club » nette, « Licence FFTT », compétitions) ; en-tête facture = référence dossier ; metadata `registrationId`, `catalogVersion`, `quoteHash`. Remises intégrées au net de l'adhésion (pas de `unit_amount` négatif).
 
 ## Conséquences
 
 - Tests unitaires exhaustifs sur la grille dans `calculate-quote.test.ts`.
 - Évolution annuelle = nouveau fichier catalogue + bump de version.
-- UI estimation et Checkout multi-lignes : PRs 2 à 4.
+- Checkout multi-lignes : `buildStripeCheckoutLineItems` + validation montant = `quote.totalCents`.
