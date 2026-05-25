@@ -224,7 +224,6 @@ export async function POST(req: Request) {
 
     // Déterminer le code HTTP approprié
     let statusCode = 500;
-    const errorString = error instanceof Error ? error.message : String(error);
     
     if (errorString.includes("invalid-email") || errorString.includes("INVALID_EMAIL")) {
       statusCode = 400;
