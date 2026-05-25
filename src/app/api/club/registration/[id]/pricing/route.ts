@@ -7,8 +7,7 @@ import { adminAuth, getFirestoreAdmin } from "@/lib/firebase-admin";
 import { hasAnyRole, resolveRole, USER_ROLES } from "@/lib/auth/roles";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
 import { AUDIT_ACTIONS, logAuditAction } from "@/lib/auth/audit-logger";
-import { calculateQuote } from "@/lib/pricing/calculate-quote";
-import { buildPricingContextFromRecord } from "@/lib/pricing/from-registration-record";
+import { calculateQuoteForRecord } from "@/lib/club-registration-config/pricing-resolve";
 import type { PriceQuote } from "@/lib/pricing/types";
 
 const COLLECTION = "clubRegistrations";
@@ -52,14 +51,14 @@ async function authorizeManager() {
   return { decoded };
 }
 
-function computeQuoteFromRecord(
+async function computeQuoteFromRecord(
   record: Record<string, unknown>
-): { quote: PriceQuote } | { error: string } {
-  const ctx = buildPricingContextFromRecord(record);
-  if (!ctx) {
+): Promise<{ quote: PriceQuote } | { error: string }> {
+  const quote = await calculateQuoteForRecord(record);
+  if (!quote) {
     return { error: "Date de naissance manquante ou invalide pour le calcul tarifaire." };
   }
-  return { quote: calculateQuote(ctx) };
+  return { quote };
 }
 
 /** GET — devis calculé à partir du dossier enregistré. */
@@ -81,7 +80,7 @@ export async function GET(
     }
 
     const data = snap.data() ?? {};
-    const result = computeQuoteFromRecord(data);
+    const result = await computeQuoteFromRecord(data);
     if ("error" in result) {
       return jsonNoStore({ error: result.error }, { status: 400 });
     }
@@ -135,7 +134,7 @@ export async function POST(
     }
 
     const merged = { ...(snap.data() ?? {}), ...pickPricingFields(body) };
-    const result = computeQuoteFromRecord(merged);
+    const result = await computeQuoteFromRecord(merged);
     if ("error" in result) {
       return jsonNoStore({ error: result.error }, { status: 400 });
     }

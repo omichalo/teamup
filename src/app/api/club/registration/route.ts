@@ -1,6 +1,7 @@
 export const runtime = "nodejs";
 
 import { jsonNoStore } from "@/lib/http/cache-headers";
+import { normalizeReductionReferenceCodes } from "@/lib/club-registration/reduction-reference-codes";
 import { cookies } from "next/headers";
 import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
@@ -8,7 +9,7 @@ import { canAccessClubRegistration } from "@/lib/club-registration/registration-
 import { FieldValue } from "firebase-admin/firestore";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
 import { logAuditAction, AUDIT_ACTIONS } from "@/lib/auth/audit-logger";
-import { clubRegistrationPayloadSchema } from "@/lib/club-registration/schema";
+import { buildRegistrationPayloadSchema } from "@/lib/club-registration/schema";
 import { isMinorAt } from "@/lib/club-registration/age";
 import {
   initialMedicalCertificateStatus,
@@ -16,8 +17,12 @@ import {
   normalizeMedicalCertificateStatus,
 } from "@/lib/club-registration/medical-certificate";
 import { checkRateLimit } from "@/lib/auth/rate-limit";
-import { calculateQuote } from "@/lib/pricing/calculate-quote";
 import { buildPricingContextFromRecord } from "@/lib/pricing/from-registration-record";
+import {
+  getActiveRegistrationConfig,
+  ensureRegistrationConfigSeeded,
+} from "@/lib/club-registration-config/store";
+import { calculateQuoteWithConfig } from "@/lib/club-registration-config/pricing-resolve";
 
 const COLLECTION = "clubRegistrations";
 const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
@@ -43,6 +48,7 @@ const REGISTRATION_CLIENT_FIELDS = [
   "mainSectionId",
   "additionalSectionIds",
   "slotIds",
+  "schoolPickupSlotIds",
   "medicalCertificateDeclaration",
   "medicalQuestionnaire",
   "medicalVeteranPath",
@@ -52,7 +58,7 @@ const REGISTRATION_CLIENT_FIELDS = [
   "wantsRegistrationCertificate",
   "familyRegistrationOrder",
   "reductionTypes",
-  "passSportCode",
+  "reductionReferenceCodes",
   "firstFemaleRegistrationSqy",
   "photoConsent",
   "emergencyMedicalAuthorization",
@@ -103,6 +109,7 @@ const MANAGER_EDITABLE_FIELDS = [
   "mainSectionId",
   "additionalSectionIds",
   "slotIds",
+  "schoolPickupSlotIds",
   "medicalCertificateDeclaration",
   "medicalQuestionnaire",
   "medicalVeteranPath",
@@ -110,7 +117,7 @@ const MANAGER_EDITABLE_FIELDS = [
   "wantsRegistrationCertificate",
   "familyRegistrationOrder",
   "reductionTypes",
-  "passSportCode",
+  "reductionReferenceCodes",
   "firstFemaleRegistrationSqy",
   "photoConsent",
   "emergencyMedicalAuthorization",
@@ -174,6 +181,11 @@ export async function GET(req: Request) {
         registration[key] = data[key];
       }
     }
+    registration.reductionReferenceCodes = normalizeReductionReferenceCodes(
+      registration.reductionReferenceCodes as Record<string, string> | undefined,
+      typeof data.passSportCode === "string" ? data.passSportCode : undefined
+    );
+    delete registration.passSportCode;
     registration.medicalCertificateStatus = normalizeMedicalCertificateStatus(
       data.medicalCertificateStatus,
       data.medicalCertificateDeclaration
@@ -286,7 +298,9 @@ export async function PATCH(req: Request) {
     const pricingCtx = buildPricingContextFromRecord(mergedForPricing);
     const pricingPatch: Record<string, unknown> = {};
     if (pricingCtx) {
-      const quote = calculateQuote(pricingCtx);
+      await ensureRegistrationConfigSeeded();
+      const config = await getActiveRegistrationConfig();
+      const quote = calculateQuoteWithConfig(pricingCtx, config);
       pricingPatch.pricingQuote = quote;
       pricingPatch.pricingQuoteStatus = "proposed";
       pricingPatch.pricingQuoteComputedAt = FieldValue.serverTimestamp();
@@ -361,7 +375,9 @@ export async function POST(req: Request) {
     }
 
     const json = (await req.json()) ?? {};
-    const parsed = clubRegistrationPayloadSchema.safeParse(json);
+    await ensureRegistrationConfigSeeded();
+    const activeConfig = await getActiveRegistrationConfig();
+    const parsed = buildRegistrationPayloadSchema(activeConfig).safeParse(json);
 
     if (!parsed.success) {
       const first = parsed.error.flatten();

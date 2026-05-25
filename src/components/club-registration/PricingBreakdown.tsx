@@ -12,6 +12,7 @@ import {
   Typography,
 } from "@mui/material";
 import { computeAgeAt } from "@/lib/club-registration/age";
+import { useRegistrationConfigValue } from "@/hooks/useRegistrationConfig";
 import {
   buildPricingContext,
   calculateQuote,
@@ -29,7 +30,6 @@ export type PricingBreakdownDraft = Pick<
   | "sex"
   | "firstFemaleRegistrationSqy"
   | "reductionTypes"
-  | "handisportPracticeLevel"
 >;
 
 function toPricingContextInput(draft: PricingBreakdownDraft) {
@@ -42,11 +42,6 @@ function toPricingContextInput(draft: PricingBreakdownDraft) {
     sex: draft.sex === "" ? ("other" as const) : draft.sex,
     firstFemaleRegistrationSqy: draft.firstFemaleRegistrationSqy,
     reductionTypes: draft.reductionTypes,
-    handisportPracticeLevel:
-      draft.handisportPracticeLevel === "leisure" ||
-      draft.handisportPracticeLevel === "competition"
-        ? draft.handisportPracticeLevel
-        : undefined,
   };
   return buildPricingContext(input);
 }
@@ -61,12 +56,13 @@ function canEstimate(draft: PricingBreakdownDraft): boolean {
 }
 
 export function usePricingQuote(draft: PricingBreakdownDraft) {
+  const config = useRegistrationConfigValue();
   return useMemo(() => {
     if (!canEstimate(draft)) {
       return null;
     }
-    return calculateQuote(toPricingContextInput(draft));
-  }, [draft]);
+    return calculateQuote(toPricingContextInput(draft), config);
+  }, [draft, config]);
 }
 
 export function PricingBreakdown({ draft, variant = "full" }: Props) {

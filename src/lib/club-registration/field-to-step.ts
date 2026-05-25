@@ -18,6 +18,8 @@
  * Toute clé non listée tombe sur la 1ʳᵉ étape de la séquence par défaut.
  */
 
+import { resolveRegistrationFieldStepKey } from "./reduction-reference-codes";
+
 export type RegistrationStepId =
   | "audience"
   | "adherent"
@@ -57,10 +59,10 @@ export const REGISTRATION_FIELD_TO_STEP_ID: Readonly<
   mainSectionId: "practice",
   additionalSectionIds: "practice",
   slotIds: "practice",
+  schoolPickupSlotIds: "practice",
   wantsCompetitorExtras: "practice",
   competitionJerseySize: "practice",
   competitionIds: "practice",
-  handisportPracticeLevel: "practice",
 
   /* Étape 5 — Dossier administratif */
   medicalCertificateDeclaration: "admin",
@@ -69,7 +71,7 @@ export const REGISTRATION_FIELD_TO_STEP_ID: Readonly<
   wantsRegistrationCertificate: "admin",
   familyRegistrationOrder: "admin",
   reductionTypes: "admin",
-  passSportCode: "admin",
+  reductionReferenceCodes: "admin",
 
   /* Étape 6 — Engagements à signer */
   photoConsent: "engagements",
@@ -77,6 +79,11 @@ export const REGISTRATION_FIELD_TO_STEP_ID: Readonly<
   supervisionAcknowledgement: "engagements",
   internalRulesAccepted: "engagements",
 };
+
+function resolveFieldStepId(fieldKey: string, sequence: ReadonlyArray<RegistrationStepId>): RegistrationStepId {
+  const mappedKey = resolveRegistrationFieldStepKey(fieldKey);
+  return REGISTRATION_FIELD_TO_STEP_ID[mappedKey] ?? sequence[0] ?? "audience";
+}
 
 /**
  * Retourne l'index (dans la séquence fournie) de la 1ʳᵉ étape qui contient une
@@ -91,7 +98,7 @@ export function firstStepWithError(
   let best: number | null = null;
   for (const [key, messages] of Object.entries(fieldErrors)) {
     if (!messages || messages.length === 0) continue;
-    const stepId = REGISTRATION_FIELD_TO_STEP_ID[key] ?? sequence[0];
+    const stepId = resolveFieldStepId(key, sequence);
     const idx = sequence.indexOf(stepId);
     const resolved = idx === -1 ? 0 : idx;
     if (best === null || resolved < best) {
@@ -113,7 +120,7 @@ export function stepsWithError(
   const set = new Set<number>();
   for (const [key, messages] of Object.entries(fieldErrors)) {
     if (!messages || messages.length === 0) continue;
-    const stepId = REGISTRATION_FIELD_TO_STEP_ID[key] ?? sequence[0];
+    const stepId = resolveFieldStepId(key, sequence);
     const idx = sequence.indexOf(stepId);
     set.add(idx === -1 ? 0 : idx);
   }

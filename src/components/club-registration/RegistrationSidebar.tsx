@@ -13,16 +13,16 @@ import {
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import {
-  HANDISPORT_PRACTICE_OPTIONS,
-  REDUCTION_OPTIONS,
-  SECTION_PRINCIPALE_OPTIONS,
-} from "@/lib/club-registration/constants";
+  getEnabledSections,
+} from "@/lib/club-registration-config/helpers";
+import { useRegistrationConfigValue } from "@/hooks/useRegistrationConfig";
 import { computeAgeAt, isMinorAt } from "@/lib/club-registration/age";
 import type { RegistrationStepId } from "@/lib/club-registration/field-to-step";
 import { formatCentsAsEuros } from "@/lib/pricing";
 import { PricingBreakdown, usePricingQuote } from "./PricingBreakdown";
 import { registrationSidebarPanelSx } from "./registration-sidebar-styles";
 import type { RegistrationStickyOffsets } from "./useRegistrationStickyOffsets";
+import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import type { RegistrationDraft } from "./registration-defaults";
 
 type Props = {
@@ -39,12 +39,12 @@ const ROLE_SHORT: Record<RegistrationDraft["adherentRole"], string> = {
   other_adult: "Pour un autre adulte",
 };
 
-function findSectionLabel(id: string): string {
-  return SECTION_PRINCIPALE_OPTIONS.find((s) => s.id === id)?.label ?? id;
+function findSectionLabel(config: RegistrationConfigV1, id: string): string {
+  return getEnabledSections(config).find((s) => s.id === id)?.label ?? id;
 }
 
-function findReductionLabel(id: string): string {
-  return REDUCTION_OPTIONS.find((r) => r.id === id)?.label ?? id;
+function findReductionLabel(config: RegistrationConfigV1, id: string): string {
+  return config.aidRules.find((r) => r.id === id)?.label ?? id;
 }
 
 /** Label court · valeur sur une seule ligne. */
@@ -74,10 +74,14 @@ function CompactRow({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-function buildPracticeLine(draft: RegistrationDraft, slotsCount: number): string | null {
+function buildPracticeLine(
+  config: RegistrationConfigV1,
+  draft: RegistrationDraft,
+  slotsCount: number
+): string | null {
   const parts: string[] = [];
   if (draft.mainSectionId && draft.mainSectionId !== "voisins") {
-    parts.push(findSectionLabel(draft.mainSectionId));
+    parts.push(findSectionLabel(config, draft.mainSectionId));
   }
   if (slotsCount > 0) {
     parts.push(
@@ -86,19 +90,6 @@ function buildPracticeLine(draft: RegistrationDraft, slotsCount: number): string
   }
   if (draft.wantsCompetitorExtras) {
     parts.push("Compétiteur");
-  }
-  if (
-    draft.mainSectionId === "handisport" &&
-    (draft.handisportPracticeLevel === "leisure" ||
-      draft.handisportPracticeLevel === "competition")
-  ) {
-    const hs =
-      HANDISPORT_PRACTICE_OPTIONS.find(
-        (o) => o.id === draft.handisportPracticeLevel
-      )?.label ?? null;
-    if (hs) {
-      parts.push(hs);
-    }
   }
   return parts.length > 0 ? parts.join(" · ") : null;
 }
@@ -138,6 +129,7 @@ function SidebarContent({
   activeStepIndex,
   pinHeader = false,
 }: Props & { pinHeader?: boolean }) {
+  const config = useRegistrationConfigValue();
   const age = computeAgeAt(draft.birthDate);
 
   const fullName =
@@ -152,7 +144,9 @@ function SidebarContent({
     slotsCount > 0 ||
     draft.additionalSectionIds.length > 0 ||
     draft.wantsCompetitorExtras;
-  const practiceLine = hasPracticeSummary ? buildPracticeLine(draft, slotsCount) : null;
+  const practiceLine = hasPracticeSummary
+    ? buildPracticeLine(config, draft, slotsCount)
+    : null;
   const identityLine =
     fullName || hasLicense
       ? [fullName, hasLicense ? `n° ${draft.ffttLicense}` : null]
@@ -201,7 +195,7 @@ function SidebarContent({
                     key={id}
                     size="small"
                     variant="outlined"
-                    label={findReductionLabel(id)}
+                    label={findReductionLabel(config, id)}
                     sx={{ height: 22, "& .MuiChip-label": { px: 0.75, fontSize: "0.7rem" } }}
                   />
                 ))}

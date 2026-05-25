@@ -19,7 +19,8 @@ import DownloadIcon from "@mui/icons-material/Download";
 import NextLink from "next/link";
 import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/ui";
-import { SECTION_PRINCIPALE_OPTIONS } from "@/lib/club-registration/constants";
+import { getEnabledSections } from "@/lib/club-registration-config/helpers";
+import { getDefaultRegistrationConfig } from "@/lib/club-registration-config/default-config";
 import {
   MEDICAL_CERTIFICATE_STATUS_LABELS,
   type MedicalCertificateStatus,
@@ -100,7 +101,7 @@ function formatDate(iso: string | null | undefined): string {
 
 function findSectionLabel(id: string | undefined): string {
   if (!id) return "";
-  const found = SECTION_PRINCIPALE_OPTIONS.find((s) => s.id === id);
+  const found = getEnabledSections(getDefaultRegistrationConfig()).find((s) => s.id === id);
   return found?.label ?? id;
 }
 

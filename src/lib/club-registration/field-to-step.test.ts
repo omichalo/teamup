@@ -51,7 +51,7 @@ describe("REGISTRATION_FIELD_TO_STEP_ID", () => {
 
   it("mappe la déclaration médicale et le Pass Sport sur l'étape admin", () => {
     expect(REGISTRATION_FIELD_TO_STEP_ID.medicalCertificateDeclaration).toBe("admin");
-    expect(REGISTRATION_FIELD_TO_STEP_ID.passSportCode).toBe("admin");
+    expect(REGISTRATION_FIELD_TO_STEP_ID.reductionReferenceCodes).toBe("admin");
     expect(REGISTRATION_FIELD_TO_STEP_ID.familyRegistrationOrder).toBe("admin");
   });
 
@@ -113,7 +113,8 @@ describe("stepsWithError", () => {
           photoConsent: ["err"],
           firstName: ["err"],
           slotIds: ["err"],
-          passSportCode: ["err"],
+          reductionReferenceCodes: ["err"],
+          "reductionReferenceCodes.pass_sport": ["err"],
         },
         SEQUENCE_ADULT
       )

@@ -1,4 +1,4 @@
-import type { FamilyRegistrationOrder, HandisportPracticeLevel, PricingContext } from "./types";
+import type { FamilyRegistrationOrder, PricingContext } from "./types";
 
 type RegistrationPricingRecord = {
   birthDate?: string;
@@ -26,15 +26,6 @@ function parseSex(value: string | undefined): PricingContext["sex"] {
   return "other";
 }
 
-function parseHandisportLevel(
-  value: string | undefined
-): HandisportPracticeLevel | undefined {
-  if (value === "leisure" || value === "competition") {
-    return value;
-  }
-  return undefined;
-}
-
 /** Construit un contexte tarifaire à partir d'un document Firestore ou d'un patch admin. */
 export function buildPricingContextFromRecord(
   record: RegistrationPricingRecord
@@ -43,11 +34,20 @@ export function buildPricingContextFromRecord(
     return null;
   }
 
+  let wantsCompetitorExtras = Boolean(record.wantsCompetitorExtras);
+  if (
+    !wantsCompetitorExtras &&
+    record.mainSectionId === "handisport" &&
+    record.handisportPracticeLevel === "competition"
+  ) {
+    wantsCompetitorExtras = true;
+  }
+
   const ctx: PricingContext = {
     birthDate: record.birthDate,
     mainSectionId:
       typeof record.mainSectionId === "string" ? record.mainSectionId : "voisins",
-    wantsCompetitorExtras: Boolean(record.wantsCompetitorExtras),
+    wantsCompetitorExtras,
     competitionIds: Array.isArray(record.competitionIds)
       ? record.competitionIds.filter((id): id is string => typeof id === "string")
       : [],
@@ -57,11 +57,6 @@ export function buildPricingContextFromRecord(
 
   if (record.firstFemaleRegistrationSqy !== undefined) {
     ctx.firstFemaleRegistrationSqy = Boolean(record.firstFemaleRegistrationSqy);
-  }
-
-  const handisportLevel = parseHandisportLevel(record.handisportPracticeLevel);
-  if (handisportLevel) {
-    ctx.handisportPracticeLevel = handisportLevel;
   }
 
   if (Array.isArray(record.reductionTypes) && record.reductionTypes.length > 0) {

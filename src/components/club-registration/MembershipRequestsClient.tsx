@@ -13,20 +13,14 @@ import {
   CircularProgress,
   Container,
   Divider,
-  FormControl,
   FormControlLabel,
   Grid,
   InputAdornment,
-  InputLabel,
-  ListItemText,
   MenuItem,
-  OutlinedInput,
-  Select,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
-import type { SelectChangeEvent } from "@mui/material/Select";
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
@@ -36,14 +30,11 @@ import {
   Save as SaveIcon,
 } from "@mui/icons-material";
 import { PageHeader } from "@/components/ui";
-import {
-  CLUB_REGISTRATION_SITES,
-  COMPETITION_OPTIONS,
-  JERSEY_SIZES,
-  REDUCTION_OPTIONS,
-  HANDISPORT_PRACTICE_OPTIONS,
-  SECTION_PRINCIPALE_OPTIONS,
-} from "@/lib/club-registration/constants";
+import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
+import { getEnabledSections, getEnabledSites } from "@/lib/club-registration-config/helpers";
+import { formatRegistrationSiteLabel } from "@/lib/club-registration-config/site-display";
+import { normalizeReductionReferenceCodes } from "@/lib/club-registration/reduction-reference-codes";
+import { useRegistrationConfigValue } from "@/hooks/useRegistrationConfig";
 import {
   MEDICAL_CERTIFICATE_STATUS_LABELS,
   MEDICAL_CERTIFICATE_STATUS_VALUES,
@@ -52,7 +43,7 @@ import {
   type MedicalCertificateStatus,
 } from "@/lib/club-registration/medical-certificate";
 import type { Representative } from "@/lib/club-registration/schema";
-import { normalizeCompetitionIds } from "@/lib/club-registration/competition-ids";
+import { expandCompetitionIdsForForm } from "@/lib/club-registration/competition-ids";
 import {
   calculateQuote,
   buildPricingContext,
@@ -61,6 +52,9 @@ import {
   type PriceQuote,
 } from "@/lib/pricing";
 import { PricingBreakdown } from "./PricingBreakdown";
+import { ReductionReferenceCodeAdminFields } from "./ReductionReferenceCodeAdminFields";
+import { RegistrationMultiSelectField } from "./RegistrationMultiSelectField";
+import { SchoolPickupAdminFields } from "./SchoolPickupAdminFields";
 import type { RegistrationDraft } from "./registration-defaults";
 
 type RegistrationSummary = {
@@ -76,6 +70,7 @@ type RegistrationSummary = {
   pricingQuote?: PriceQuote;
   pricingQuoteStatus?: string;
   pricingQuoteComputedAt?: string | null;
+  /** Ancien champ — lecture seule pour dossiers déjà enregistrés. */
   handisportPracticeLevel?: "leisure" | "competition";
   paymentStatus?: string;
   submittedAt?: string | null;
@@ -97,11 +92,13 @@ type RegistrationDetail = RegistrationSummary & {
   representatives?: Representative[];
   additionalSectionIds?: string[];
   slotIds?: string[];
+  schoolPickupSlotIds?: string[];
   medicalCertificateStatusUpdatedAt?: string | null;
   medicalCertificateStatusUpdatedBy?: string;
   wantsRegistrationCertificate?: boolean;
   familyRegistrationOrder?: string;
   reductionTypes?: string[];
+  reductionReferenceCodes?: Record<string, string>;
   passSportCode?: string;
   firstFemaleRegistrationSqy?: boolean;
   photoConsent?: "accept" | "refuse";
@@ -134,12 +131,13 @@ type EditableRegistration = {
   mainSectionId: string;
   additionalSectionIds: string[];
   slotIds: string[];
+  schoolPickupSlotIds: string[];
   medicalCertificateDeclaration: string;
   medicalCertificateStatus: MedicalCertificateStatus;
   wantsRegistrationCertificate: boolean;
   familyRegistrationOrder: string;
   reductionTypes: string[];
-  passSportCode: string;
+  reductionReferenceCodes: Record<string, string>;
   firstFemaleRegistrationSqy: boolean | undefined;
   photoConsent: "accept" | "refuse";
   emergencyMedicalAuthorization: "yes" | "not_applicable_adult";
@@ -150,7 +148,6 @@ type EditableRegistration = {
   competitionIds: string[];
   reviewNotes: string;
   amountEuros: string;
-  handisportPracticeLevel: "" | "leisure" | "competition";
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -234,12 +231,16 @@ const BOOLEAN_CONSENT_OPTIONS = [
   { value: "not_applicable_adult", label: "Non applicable adulte" },
 ] as const;
 
-const ALL_SLOT_OPTIONS = CLUB_REGISTRATION_SITES.flatMap((site) =>
-  site.slots.map((slot) => ({
-    value: slot.id,
-    label: `${site.label} - ${slot.label}`,
-  }))
-);
+function buildSlotOptions(config: RegistrationConfigV1) {
+  return getEnabledSites(config).flatMap((site) =>
+    site.slots
+      .filter((slot) => slot.enabled)
+      .map((slot) => ({
+        value: slot.id,
+        label: `${formatRegistrationSiteLabel(site)} — ${slot.label}`,
+      }))
+  );
+}
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return "-";
@@ -264,7 +265,10 @@ function createEmptyRepresentative(): Representative {
   };
 }
 
-function toEditable(registration: RegistrationDetail): EditableRegistration {
+function toEditable(
+  registration: RegistrationDetail,
+  config: RegistrationConfigV1
+): EditableRegistration {
   return {
     adherentRole: registration.adherentRole ?? "self",
     firstName: registration.firstName ?? "",
@@ -280,9 +284,13 @@ function toEditable(registration: RegistrationDetail): EditableRegistration {
     postalCode: registration.postalCode ?? "",
     city: registration.city ?? "",
     representatives: registration.representatives ?? [],
-    mainSectionId: registration.mainSectionId ?? SECTION_PRINCIPALE_OPTIONS[0].id,
+    mainSectionId:
+      registration.mainSectionId ??
+      getEnabledSections(config)[0]?.id ??
+      "voisins",
     additionalSectionIds: registration.additionalSectionIds ?? [],
     slotIds: registration.slotIds ?? [],
+    schoolPickupSlotIds: registration.schoolPickupSlotIds ?? [],
     medicalCertificateDeclaration:
       registration.medicalCertificateDeclaration ?? "under_40_all_no",
     medicalCertificateStatus: normalizeMedicalCertificateStatus(
@@ -292,7 +300,10 @@ function toEditable(registration: RegistrationDetail): EditableRegistration {
     wantsRegistrationCertificate: registration.wantsRegistrationCertificate ?? false,
     familyRegistrationOrder: registration.familyRegistrationOrder ?? "none",
     reductionTypes: registration.reductionTypes ?? [],
-    passSportCode: registration.passSportCode ?? "",
+    reductionReferenceCodes: normalizeReductionReferenceCodes(
+      registration.reductionReferenceCodes,
+      registration.passSportCode
+    ),
     firstFemaleRegistrationSqy: registration.firstFemaleRegistrationSqy,
     photoConsent: registration.photoConsent ?? "refuse",
     emergencyMedicalAuthorization:
@@ -300,15 +311,16 @@ function toEditable(registration: RegistrationDetail): EditableRegistration {
     supervisionAcknowledgement:
       registration.supervisionAcknowledgement ?? "not_applicable_adult",
     internalRulesAccepted: registration.internalRulesAccepted ?? false,
-    wantsCompetitorExtras: registration.wantsCompetitorExtras ?? false,
+    wantsCompetitorExtras:
+      registration.wantsCompetitorExtras ??
+      registration.handisportPracticeLevel === "competition",
     competitionJerseySize: registration.competitionJerseySize ?? "",
-    competitionIds: normalizeCompetitionIds(registration.competitionIds ?? []),
+    competitionIds: expandCompetitionIdsForForm(registration.competitionIds ?? []),
     reviewNotes: registration.reviewNotes ?? "",
     amountEuros:
       typeof registration.paymentAmountCents === "number"
         ? String(registration.paymentAmountCents / 100)
         : "",
-    handisportPracticeLevel: registration.handisportPracticeLevel ?? "",
   };
 }
 
@@ -326,10 +338,6 @@ function formToPricingInput(form: EditableRegistration) {
   if (form.firstFemaleRegistrationSqy !== undefined) {
     input.firstFemaleRegistrationSqy = form.firstFemaleRegistrationSqy;
   }
-  if (form.handisportPracticeLevel === "leisure" || form.handisportPracticeLevel === "competition") {
-    input.handisportPracticeLevel = form.handisportPracticeLevel;
-  }
-
   return input;
 }
 
@@ -349,48 +357,13 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-function MultiSelectField({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string[];
-  options: Array<{ value: string; label: string }>;
-  onChange: (value: string[]) => void;
-}) {
-  const labelId = `${label.replace(/\s+/g, "-").toLowerCase()}-label`;
-  return (
-    <FormControl fullWidth>
-      <InputLabel id={labelId}>{label}</InputLabel>
-      <Select<string[]>
-        multiple
-        labelId={labelId}
-        value={value}
-        input={<OutlinedInput label={label} />}
-        renderValue={(selected: string[]) =>
-          selected
-            .map((id) => options.find((option) => option.value === id)?.label ?? id)
-            .join(", ")
-        }
-        onChange={(event: SelectChangeEvent<string[]>) => {
-          const next = event.target.value;
-          onChange(typeof next === "string" ? next.split(",") : next);
-        }}
-      >
-        {options.map((option) => (
-          <MenuItem key={option.value} value={option.value}>
-            <Checkbox checked={value.includes(option.value)} />
-            <ListItemText primary={option.label} />
-          </MenuItem>
-        ))}
-      </Select>
-    </FormControl>
-  );
-}
-
 export function MembershipRequestsClient() {
+  const config = useRegistrationConfigValue();
+  const sectionOptions = getEnabledSections(config);
+  const competitionOptions = config.competitions.filter((c) => c.enabled);
+  const reductionOptions = config.aidRules;
+  const jerseySizes = config.uiCopy.jerseySizes;
+  const allSlotOptions = buildSlotOptions(config);
   const [registrations, setRegistrations] = useState<RegistrationSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selected, setSelected] = useState<RegistrationDetail | null>(null);
@@ -437,7 +410,7 @@ export function MembershipRequestsClient() {
         throw new Error(json.error || "Impossible de charger le dossier.");
       }
       setSelected(json.registration);
-      setForm(toEditable(json.registration));
+      setForm(toEditable(json.registration, config));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur de chargement.");
       setSelected(null);
@@ -445,7 +418,7 @@ export function MembershipRequestsClient() {
     } finally {
       setLoadingDetail(false);
     }
-  }, []);
+  }, [config]);
 
   useEffect(() => {
     void fetchRegistrations();
@@ -466,8 +439,8 @@ export function MembershipRequestsClient() {
     if (!form?.birthDate) {
       return null;
     }
-    return calculateQuote(buildPricingContext(formToPricingInput(form)));
-  }, [form]);
+    return calculateQuote(buildPricingContext(formToPricingInput(form)), config);
+  }, [form, config]);
 
   const enteredAmountCents = useMemo(() => {
     if (!form) return null;
@@ -576,12 +549,15 @@ export function MembershipRequestsClient() {
           mainSectionId: form.mainSectionId,
           additionalSectionIds: form.additionalSectionIds,
           slotIds: form.slotIds,
+          schoolPickupSlotIds: form.schoolPickupSlotIds.filter((id) =>
+            form.slotIds.includes(id)
+          ),
           medicalCertificateDeclaration: form.medicalCertificateDeclaration,
           medicalCertificateStatus: form.medicalCertificateStatus,
           wantsRegistrationCertificate: form.wantsRegistrationCertificate,
           familyRegistrationOrder: form.familyRegistrationOrder,
           reductionTypes: form.reductionTypes,
-          passSportCode: form.passSportCode,
+          reductionReferenceCodes: form.reductionReferenceCodes,
           firstFemaleRegistrationSqy:
             form.sex === "female" ? form.firstFemaleRegistrationSqy ?? false : undefined,
           photoConsent: form.photoConsent,
@@ -592,10 +568,6 @@ export function MembershipRequestsClient() {
           competitionJerseySize: form.competitionJerseySize || undefined,
           competitionIds: form.competitionIds,
           reviewNotes: form.reviewNotes,
-          handisportPracticeLevel:
-            form.mainSectionId === "handisport" && form.handisportPracticeLevel
-              ? form.handisportPracticeLevel
-              : undefined,
           ...(amountCents !== null ? { paymentAmountCents: amountCents } : {}),
         }),
       });
@@ -640,10 +612,6 @@ export function MembershipRequestsClient() {
             ...formToPricingInput(form),
             persist: true,
             applyPaymentAmount: true,
-            handisportPracticeLevel:
-              form.mainSectionId === "handisport" && form.handisportPracticeLevel
-                ? form.handisportPracticeLevel
-                : undefined,
           }),
         }
       );
@@ -947,7 +915,7 @@ export function MembershipRequestsClient() {
                     <Grid container spacing={2}>
                       <Grid size={{ xs: 12, sm: 6 }}>
                         <TextField select label="Section principale" value={form.mainSectionId} onChange={(e) => updateField("mainSectionId", e.target.value)} fullWidth>
-                          {SECTION_PRINCIPALE_OPTIONS.map((section) => (
+                          {sectionOptions.map((section) => (
                             <MenuItem key={section.id} value={section.id}>
                               {section.label}
                             </MenuItem>
@@ -955,24 +923,26 @@ export function MembershipRequestsClient() {
                         </TextField>
                       </Grid>
                       <Grid size={{ xs: 12, sm: 6 }}>
-                        <MultiSelectField
+                        <RegistrationMultiSelectField
                           label="Sections additionnelles"
                           value={form.additionalSectionIds}
-                          options={SECTION_PRINCIPALE_OPTIONS.map((section) => ({
+                          options={sectionOptions.map((section) => ({
                             value: section.id,
                             label: section.label,
                           }))}
                           onChange={(value) => updateField("additionalSectionIds", value)}
                         />
                       </Grid>
-                      <Grid size={{ xs: 12 }}>
-                        <MultiSelectField
-                          label="Créneaux"
-                          value={form.slotIds}
-                          options={ALL_SLOT_OPTIONS}
-                          onChange={(value) => updateField("slotIds", value)}
-                        />
-                      </Grid>
+                      <SchoolPickupAdminFields
+                        slotIds={form.slotIds}
+                        schoolPickupSlotIds={form.schoolPickupSlotIds}
+                        allSlotOptions={allSlotOptions}
+                        onSlotIdsChange={(value) => updateField("slotIds", value)}
+                        onSchoolPickupSlotIdsChange={(value) =>
+                          updateField("schoolPickupSlotIds", value)
+                        }
+                        MultiSelectField={RegistrationMultiSelectField}
+                      />
                     </Grid>
 
                     <SectionTitle>Dossier administratif</SectionTitle>
@@ -1026,19 +996,24 @@ export function MembershipRequestsClient() {
                         </TextField>
                       </Grid>
                       <Grid size={{ xs: 12, sm: 6 }}>
-                        <MultiSelectField
+                        <RegistrationMultiSelectField
                           label="Aides / réductions"
                           value={form.reductionTypes}
-                          options={REDUCTION_OPTIONS.map((reduction) => ({
+                          options={reductionOptions.map((reduction) => ({
                             value: reduction.id,
                             label: reduction.label,
                           }))}
                           onChange={(value) => updateField("reductionTypes", value)}
                         />
                       </Grid>
-                      <Grid size={{ xs: 12, sm: 6 }}>
-                        <TextField label="Code Pass Sport" value={form.passSportCode} onChange={(e) => updateField("passSportCode", e.target.value)} fullWidth />
-                      </Grid>
+                      <ReductionReferenceCodeAdminFields
+                        config={config}
+                        reductionTypes={form.reductionTypes}
+                        reductionReferenceCodes={form.reductionReferenceCodes}
+                        onReferenceCodesChange={(codes) =>
+                          setForm((prev) => (prev ? { ...prev, reductionReferenceCodes: codes } : prev))
+                        }
+                      />
                       <Grid size={{ xs: 12, sm: 6 }}>
                         <FormControlLabel
                           control={<Checkbox checked={form.wantsRegistrationCertificate} onChange={(e) => updateField("wantsRegistrationCertificate", e.target.checked)} />}
@@ -1088,18 +1063,18 @@ export function MembershipRequestsClient() {
                       <Grid size={{ xs: 12, sm: 6 }}>
                         <TextField select label="Taille maillot compétition" value={form.competitionJerseySize} onChange={(e) => updateField("competitionJerseySize", e.target.value)} fullWidth>
                           <MenuItem value="">Non renseignée</MenuItem>
-                          {JERSEY_SIZES.map((size) => (
+                          {jerseySizes.map((size) => (
                             <MenuItem key={size} value={size}>{size}</MenuItem>
                           ))}
                         </TextField>
                       </Grid>
                       <Grid size={{ xs: 12 }}>
-                        <MultiSelectField
+                        <RegistrationMultiSelectField
                           label="Compétitions demandées"
                           value={form.competitionIds}
-                          options={COMPETITION_OPTIONS.map((competition) => ({
+                          options={competitionOptions.map((competition) => ({
                             value: competition.id,
-                            label: competition.label,
+                            label: competition.formLabel,
                           }))}
                           onChange={(value) => updateField("competitionIds", value)}
                         />
@@ -1108,29 +1083,6 @@ export function MembershipRequestsClient() {
 
                     <SectionTitle>Tarification</SectionTitle>
                     <Stack spacing={2}>
-                      {form.mainSectionId === "handisport" ? (
-                        <TextField
-                          select
-                          label="Pratique handisport"
-                          value={form.handisportPracticeLevel}
-                          onChange={(e) =>
-                            updateField(
-                              "handisportPracticeLevel",
-                              e.target.value as EditableRegistration["handisportPracticeLevel"]
-                            )
-                          }
-                          fullWidth
-                          helperText="Requis pour calculer le tarif handisport."
-                        >
-                          <MenuItem value="">Non renseigné</MenuItem>
-                          {HANDISPORT_PRACTICE_OPTIONS.map((option) => (
-                            <MenuItem key={option.id} value={option.id}>
-                              {option.label}
-                            </MenuItem>
-                          ))}
-                        </TextField>
-                      ) : null}
-
                       <PricingBreakdown
                         draft={{
                           birthDate: form.birthDate,
@@ -1141,7 +1093,6 @@ export function MembershipRequestsClient() {
                             form.familyRegistrationOrder as RegistrationDraft["familyRegistrationOrder"],
                           sex: form.sex,
                           firstFemaleRegistrationSqy: form.firstFemaleRegistrationSqy,
-                          handisportPracticeLevel: form.handisportPracticeLevel,
                           reductionTypes: form.reductionTypes,
                         }}
                         variant="full"

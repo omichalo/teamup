@@ -11,9 +11,7 @@ type RegistrationPricingInput = Pick<
   | "sex"
   | "firstFemaleRegistrationSqy"
   | "reductionTypes"
-  | "handisportPracticeLevel"
 > & {
-  handisportPracticeLevel?: PricingContext["handisportPracticeLevel"];
   pricingDate?: string;
 };
 
@@ -35,9 +33,6 @@ export function buildPricingContext(
   }
   if (input.firstFemaleRegistrationSqy !== undefined) {
     ctx.firstFemaleRegistrationSqy = input.firstFemaleRegistrationSqy;
-  }
-  if (input.handisportPracticeLevel) {
-    ctx.handisportPracticeLevel = input.handisportPracticeLevel;
   }
   if (input.reductionTypes && input.reductionTypes.length > 0) {
     ctx.reductionTypes = input.reductionTypes;

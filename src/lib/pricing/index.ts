@@ -33,7 +33,6 @@ export { resolveBaseRates } from "./resolve-base-rates";
 export {
   PRICING_CATALOG_VERSION,
   type FamilyRegistrationOrder,
-  type HandisportPracticeLevel,
   type PriceLine,
   type PriceLineKind,
   type PriceLineSource,

@@ -13,8 +13,11 @@ import {
   createMembershipCheckoutSession,
   getAppBaseUrl,
 } from "@/lib/club-registration/stripe";
-import { calculateQuote } from "@/lib/pricing/calculate-quote";
-import { buildPricingContextFromRecord } from "@/lib/pricing/from-registration-record";
+import {
+  calculateQuoteForRecord,
+  resolveRegistrationConfigForRecord,
+} from "@/lib/club-registration-config/pricing-resolve";
+import { renderInvoiceHeader } from "@/lib/club-registration-config/helpers";
 import { hashPriceQuote } from "@/lib/pricing/quote-hash";
 import {
   assertStripeLinesMatchQuote,
@@ -71,12 +74,10 @@ function resolvePaymentEmail(data: DocumentData): string | null {
   return null;
 }
 
-function resolveQuoteFromRegistration(data: DocumentData): PriceQuote | null {
-  const ctx = buildPricingContextFromRecord(data);
-  if (!ctx) {
-    return null;
-  }
-  return calculateQuote(ctx);
+async function resolveQuoteFromRegistration(
+  data: DocumentData
+): Promise<PriceQuote | null> {
+  return calculateQuoteForRecord(data as Record<string, unknown>);
 }
 
 export async function POST(
@@ -134,7 +135,10 @@ export async function POST(
     const successUrl = `${baseUrl}/club/mes-inscriptions?payment=success&registration=${encodeURIComponent(id)}`;
     const cancelUrl = `${baseUrl}/club/mes-inscriptions?payment=cancelled&registration=${encodeURIComponent(id)}`;
 
-    const quote = resolveQuoteFromRegistration(data);
+    const quote = await resolveQuoteFromRegistration(data);
+    const pricingConfig = await resolveRegistrationConfigForRecord(
+      data as Record<string, unknown>
+    );
     let session;
 
     if (quote && quote.totalCents > 0) {
@@ -149,15 +153,20 @@ export async function POST(
         );
       }
 
-      const stripeLineItems = buildStripeCheckoutLineItems(quote);
-      const invoiceCustomFields = buildStripeInvoiceCustomFields(quote);
+      const stripePresentation = pricingConfig.stripePresentation;
+      const stripeLineItems = buildStripeCheckoutLineItems(quote, stripePresentation);
+      const invoiceCustomFields = buildStripeInvoiceCustomFields(quote, stripePresentation);
       assertStripeLinesMatchQuote(quote, stripeLineItems);
 
       session = await createMembershipCheckoutSession({
         registrationId: id,
         lineItems: stripeLineItems,
         customerEmail: paymentEmail,
-        invoiceDescription: `Adhésion SQY Ping — dossier ${id}`,
+        invoiceDescription: renderInvoiceHeader(stripePresentation.invoiceHeaderTemplate, {
+          clubName: pricingConfig.meta.clubName,
+          registrationId: id,
+          adherentName,
+        }),
         catalogVersion: quote.catalogVersion,
         quoteHash: hashPriceQuote(quote),
         invoiceCustomFields,

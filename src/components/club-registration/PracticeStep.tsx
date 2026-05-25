@@ -2,44 +2,41 @@
 
 import { useEffect, useState } from "react";
 import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
-  Alert,
+  Box,
   Checkbox,
   FormControl,
   FormControlLabel,
   FormGroup,
   InputLabel,
   MenuItem,
-  Radio,
-  RadioGroup,
   Select,
   Stack,
   Switch,
   Typography,
 } from "@mui/material";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import {
-  CLUB_REGISTRATION_SITES,
-  COMPETITION_OPTIONS,
-  HANDISPORT_PRACTICE_OPTIONS,
-  JERSEY_SIZES,
-  SECTION_PRINCIPALE_OPTIONS,
-} from "@/lib/club-registration/constants";
+  getEnabledSections,
+  getEnabledSites,
+} from "@/lib/club-registration-config/helpers";
+import { formatSectionPracticeLabel } from "@/lib/club-registration-config/site-display";
+import { useRegistrationConfigValue } from "@/hooks/useRegistrationConfig";
 import type { RegistrationDraft } from "./registration-defaults";
-
-const ADAPTED_SECTIONS = new Set(["handisport", "sport-adapte"]);
+import { PracticeSlotPicker } from "./PracticeSlotPicker";
 
 type Props = {
   draft: RegistrationDraft;
   onChange: (patch: Partial<RegistrationDraft>) => void;
 };
 
-function siteIdsMatchingMainSection(mainSectionId: string): Set<string> {
+function siteIdsMatchingMainSection(
+  mainSectionId: string,
+  sites: ReturnType<typeof getEnabledSites>
+): Set<string> {
   const ids = new Set<string>();
-  for (const site of CLUB_REGISTRATION_SITES) {
-    if (site.id === mainSectionId) ids.add(site.id);
+  for (const site of sites) {
+    if (site.id === mainSectionId || site.linkedSectionIds.includes(mainSectionId)) {
+      ids.add(site.id);
+    }
   }
   return ids;
 }
@@ -59,29 +56,29 @@ function siteIdsMatchingMainSection(mainSectionId: string): Set<string> {
  * proposées dans la même liste.
  */
 export function PracticeStep({ draft, onChange }: Props) {
+  const config = useRegistrationConfigValue();
+  const sectionOptions = getEnabledSections(config);
+  const youthCompetitions = config.competitions.filter(
+    (c) => c.enabled && c.formGroup === "youth"
+  );
+  const otherCompetitions = config.competitions.filter(
+    (c) => c.enabled && c.formGroup === "other"
+  );
+  const youthBundle = config.competitionBundles[0];
+
   const [expandedSiteIds, setExpandedSiteIds] = useState<Set<string>>(() =>
-    siteIdsMatchingMainSection(draft.mainSectionId)
+    siteIdsMatchingMainSection(draft.mainSectionId, getEnabledSites(config))
   );
 
   /** À chaque changement de lieu principal : un seul bloc de créneaux ouvert
    * (celui qui correspond à l’id). */
   useEffect(() => {
-    setExpandedSiteIds(siteIdsMatchingMainSection(draft.mainSectionId));
-  }, [draft.mainSectionId]);
+    setExpandedSiteIds(
+      siteIdsMatchingMainSection(draft.mainSectionId, getEnabledSites(config))
+    );
+  }, [draft.mainSectionId, config]);
 
-  const toggleSlot = (id: string) => {
-    const set = new Set(draft.slotIds);
-    if (set.has(id)) {
-      set.delete(id);
-    } else {
-      set.add(id);
-    }
-    onChange({ slotIds: Array.from(set) });
-  };
-
-  const toggleAdditionalSection = (
-    id: (typeof SECTION_PRINCIPALE_OPTIONS)[number]["id"]
-  ) => {
+  const toggleAdditionalSection = (id: string) => {
     if (id === draft.mainSectionId) return;
     const set = new Set(draft.additionalSectionIds);
     if (set.has(id)) {
@@ -92,9 +89,7 @@ export function PracticeStep({ draft, onChange }: Props) {
     onChange({ additionalSectionIds: Array.from(set) });
   };
 
-  const toggleCompetition = (
-    id: (typeof COMPETITION_OPTIONS)[number]["id"]
-  ) => {
+  const toggleCompetition = (id: string) => {
     const set = new Set(draft.competitionIds);
     if (set.has(id)) {
       set.delete(id);
@@ -103,8 +98,6 @@ export function PracticeStep({ draft, onChange }: Props) {
     }
     onChange({ competitionIds: Array.from(set) });
   };
-
-  const isAdaptedMainSection = ADAPTED_SECTIONS.has(draft.mainSectionId);
 
   return (
     <Stack spacing={2}>
@@ -126,63 +119,19 @@ export function PracticeStep({ draft, onChange }: Props) {
           onChange={(e) => {
             const next = e.target.value as RegistrationDraft["mainSectionId"];
             const cleaned = draft.additionalSectionIds.filter((x) => x !== next);
-            const patch: Partial<RegistrationDraft> = {
+            onChange({
               mainSectionId: next,
               additionalSectionIds: cleaned,
-            };
-            if (next !== "handisport") {
-              patch.handisportPracticeLevel = "";
-            }
-            onChange(patch);
+            });
           }}
         >
-          {SECTION_PRINCIPALE_OPTIONS.map((s) => (
+          {sectionOptions.map((s) => (
             <MenuItem key={s.id} value={s.id}>
-              {s.label}
+              {formatSectionPracticeLabel(config, s)}
             </MenuItem>
           ))}
         </Select>
       </FormControl>
-
-      {draft.mainSectionId === "handisport" ? (
-        <FormControl
-          component="fieldset"
-          required
-          data-field="handisportPracticeLevel"
-        >
-          <Typography
-            variant="subtitle2"
-            component="legend"
-            id="handisport-practice-label"
-            sx={{ mb: 0.5 }}
-          >
-            Type de pratique handisport
-          </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: "block" }}>
-            Ce choix détermine le tarif (loisirs ou compétition selon l’âge).
-          </Typography>
-          <RadioGroup
-            aria-labelledby="handisport-practice-label"
-            name="handisportPracticeLevel"
-            value={draft.handisportPracticeLevel}
-            onChange={(e) =>
-              onChange({
-                handisportPracticeLevel: e.target
-                  .value as RegistrationDraft["handisportPracticeLevel"],
-              })
-            }
-          >
-            {HANDISPORT_PRACTICE_OPTIONS.map((option) => (
-              <FormControlLabel
-                key={option.id}
-                value={option.id}
-                control={<Radio />}
-                label={option.label}
-              />
-            ))}
-          </RadioGroup>
-        </FormControl>
-      ) : null}
 
       <Stack spacing={0.5}>
         <Typography
@@ -193,7 +142,7 @@ export function PracticeStep({ draft, onChange }: Props) {
           Autres lieux fréquentés (optionnel)
         </Typography>
         <FormGroup>
-          {SECTION_PRINCIPALE_OPTIONS.filter((s) => s.id !== draft.mainSectionId).map(
+          {sectionOptions.filter((s) => s.id !== draft.mainSectionId).map(
             (s) => (
               <FormControlLabel
                 key={s.id}
@@ -203,51 +152,19 @@ export function PracticeStep({ draft, onChange }: Props) {
                     onChange={() => toggleAdditionalSection(s.id)}
                   />
                 }
-                label={s.label}
+                label={formatSectionPracticeLabel(config, s)}
               />
             )
           )}
         </FormGroup>
       </Stack>
 
-      <Typography variant="subtitle2" data-field="slotIds" tabIndex={-1}>
-        Créneaux souhaités
-      </Typography>
-      {CLUB_REGISTRATION_SITES.map((site) => (
-        <Accordion
-          key={site.id}
-          disableGutters
-          expanded={expandedSiteIds.has(site.id)}
-          onChange={(_, expanded) => {
-            setExpandedSiteIds((prev) => {
-              const next = new Set(prev);
-              if (expanded) next.add(site.id);
-              else next.delete(site.id);
-              return next;
-            });
-          }}
-        >
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Typography fontWeight={600}>{site.label}</Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            <FormGroup>
-              {site.slots.map((slot) => (
-                <FormControlLabel
-                  key={slot.id}
-                  control={
-                    <Checkbox
-                      checked={draft.slotIds.includes(slot.id)}
-                      onChange={() => toggleSlot(slot.id)}
-                    />
-                  }
-                  label={slot.label}
-                />
-              ))}
-            </FormGroup>
-          </AccordionDetails>
-        </Accordion>
-      ))}
+      <PracticeSlotPicker
+        draft={draft}
+        expandedSiteIds={expandedSiteIds}
+        onExpandedSiteIdsChange={setExpandedSiteIds}
+        onChange={onChange}
+      />
 
       <Typography
         variant="subtitle1"
@@ -257,29 +174,20 @@ export function PracticeStep({ draft, onChange }: Props) {
         Pratique compétiteur
       </Typography>
 
-      {isAdaptedMainSection ? (
-        <Alert severity="info">
-          La section compétiteur classique (maillot, championnats fédéraux) ne
-          s’applique pas aux sections handisport et sport adapté. L’option
-          « Compétition handisport » reste disponible dans les compétitions
-          envisagées, sans extension compétiteur.
-        </Alert>
-      ) : (
-        <FormControlLabel
-          data-field="wantsCompetitorExtras"
-          control={
-            <Switch
-              checked={draft.wantsCompetitorExtras}
-              onChange={(e) =>
-                onChange({ wantsCompetitorExtras: e.target.checked })
-              }
-            />
-          }
-          label="Je souhaite m’inscrire en section compétiteur (maillot et compétitions)"
-        />
-      )}
+      <FormControlLabel
+        data-field="wantsCompetitorExtras"
+        control={
+          <Switch
+            checked={draft.wantsCompetitorExtras}
+            onChange={(e) =>
+              onChange({ wantsCompetitorExtras: e.target.checked })
+            }
+          />
+        }
+        label="Je souhaite m’inscrire en section compétiteur (maillot et compétitions)"
+      />
 
-      {!isAdaptedMainSection && draft.wantsCompetitorExtras && (
+      {draft.wantsCompetitorExtras && (
         <Stack spacing={2}>
           <FormControl fullWidth required={draft.wantsCompetitorExtras}>
             <InputLabel id="jersey-label">
@@ -300,7 +208,7 @@ export function PracticeStep({ draft, onChange }: Props) {
               <MenuItem value="">
                 <em>Choisir…</em>
               </MenuItem>
-              {JERSEY_SIZES.map((size) => (
+              {config.uiCopy.jerseySizes.map((size) => (
                 <MenuItem key={size} value={size}>
                   {size}
                 </MenuItem>
@@ -315,8 +223,63 @@ export function PracticeStep({ draft, onChange }: Props) {
           >
             Compétitions envisagées
           </Typography>
+
+          <Box
+            component="fieldset"
+            sx={{
+              border: 1,
+              borderColor: "divider",
+              borderRadius: 1,
+              p: 1.5,
+              m: 0,
+            }}
+          >
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="baseline"
+              component="legend"
+              sx={{ mb: 0.5, width: "100%" }}
+            >
+              <Typography variant="subtitle2" component="span">
+                Compétitions jeunes
+              </Typography>
+              <Typography
+                variant="body2"
+                component="span"
+                fontWeight={700}
+                color="primary.main"
+              >
+                {youthBundle
+                  ? `${(youthBundle.priceCents / 100).toFixed(0)} €`
+                  : ""}
+              </Typography>
+            </Stack>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: "block", mb: 1 }}
+            >
+              Forfait unique — cochez une ou les deux compétitions ci-dessous.
+            </Typography>
+            <FormGroup>
+              {youthCompetitions.map((c) => (
+                <FormControlLabel
+                  key={c.id}
+                  control={
+                    <Checkbox
+                      checked={draft.competitionIds.includes(c.id)}
+                      onChange={() => toggleCompetition(c.id)}
+                    />
+                  }
+                  label={c.formLabel}
+                />
+              ))}
+            </FormGroup>
+          </Box>
+
           <FormGroup>
-            {COMPETITION_OPTIONS.map((c) => (
+            {otherCompetitions.map((c) => (
               <FormControlLabel
                 key={c.id}
                 control={
@@ -325,7 +288,7 @@ export function PracticeStep({ draft, onChange }: Props) {
                     onChange={() => toggleCompetition(c.id)}
                   />
                 }
-                label={c.label}
+                label={c.formLabel}
               />
             ))}
           </FormGroup>

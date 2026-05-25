@@ -46,7 +46,7 @@ export function EngagementsStep({ draft, onChange }: Props) {
         Diffusion d’images
       </Typography>
       <Typography variant="body2" color="text.secondary">
-        Le club diffuse informations et photos sur{" "}
+        Le club SQY PING diffuse sur{" "}
         <a
           href={CLUB_REGISTRATION_EXTERNAL_LINKS.siteClub}
           target="_blank"
@@ -54,9 +54,14 @@ export function EngagementsStep({ draft, onChange }: Props) {
         >
           sqyping.fr
         </a>{" "}
-        et sur ses réseaux sociaux. Le RGPD impose un consentement explicite ;
-        ce choix peut être modifié à tout moment par simple demande auprès du
-        club.
+        et sur ses réseaux sociaux des informations, résultats et photographies
+        à caractère sportif.
+      </Typography>
+      <Typography variant="body2" color="text.secondary">
+        Conformément au RGPD, indiquez ci-dessous si vous acceptez ou refusez
+        la diffusion de votre image, ou de celle de l&apos;enfant mineur que
+        vous inscrivez. Ce choix peut être modifié à tout moment en contactant
+        le club.
       </Typography>
       <FormControl component="fieldset" required>
         <Typography
@@ -64,8 +69,7 @@ export function EngagementsStep({ draft, onChange }: Props) {
           gutterBottom
           id="photo-consent-label"
         >
-          Acceptez-vous une diffusion d&apos;images à caractère sportif vous
-          concernant (ou votre enfant mineur)&nbsp;?
+          Acceptez-vous cette diffusion d&apos;images&nbsp;?
         </Typography>
         <RadioGroup
           aria-labelledby="photo-consent-label"
@@ -81,12 +85,12 @@ export function EngagementsStep({ draft, onChange }: Props) {
           <FormControlLabel
             value="accept"
             control={<Radio />}
-            label="J’accepte"
+            label="J’accepte la diffusion de mon image / de celle de mon enfant mineur"
           />
           <FormControlLabel
             value="refuse"
             control={<Radio />}
-            label="Je refuse"
+            label="Je refuse la diffusion de mon image / de celle de mon enfant mineur"
           />
         </RadioGroup>
       </FormControl>
@@ -120,8 +124,12 @@ export function EngagementsStep({ draft, onChange }: Props) {
               }
               label={
                 <Typography variant="body2" component="span">
-                  J’autorise les actes médicaux ou chirurgicaux en urgence pour
-                  mon enfant mineur.
+                  En cochant cette case, j&apos;autorise tout dirigeant ou
+                  responsable de l&apos;association SQY PING à donner en mon
+                  nom, lieu et place toute autorisation nécessaire pour tout
+                  acte médical ou chirurgical qui, le cas échéant, serait à
+                  effectuer en urgence par le corps médical, concernant mon
+                  enfant.
                 </Typography>
               }
             />
@@ -142,8 +150,11 @@ export function EngagementsStep({ draft, onChange }: Props) {
               }
               label={
                 <Typography variant="body2" component="span">
-                  Je m’engage à ce que mon enfant soit pris en charge par le
-                  responsable à l’heure des cours.
+                  En cochant cette case, je m&apos;engage à vérifier que, à
+                  l&apos;heure des cours, mon enfant est bien pris en charge par
+                  le responsable de l&apos;association SQY PING. Mon enfant sera
+                  alors sous la responsabilité de l&apos;association jusqu&apos;à
+                  l&apos;heure de fin du créneau d&apos;entrainement
                 </Typography>
               }
             />
@@ -167,17 +178,27 @@ export function EngagementsStep({ draft, onChange }: Props) {
           />
         }
         label={
-          <Typography variant="body2" component="span">
-            J&apos;ai lu et j&apos;accepte le{" "}
-            <a
-              href={CLUB_REGISTRATION_EXTERNAL_LINKS.reglementInterieur}
-              target="_blank"
-              rel="noreferrer"
-            >
-              règlement intérieur
-            </a>
-            , et je reconnais que les données nécessaires à la licence sont
-            transmises à la FFTT conformément aux usages du club.
+          <Typography variant="body2" component="span" sx={{ display: "block" }}>
+            En cochant cette case, je reconnais approuver sans dérogation les
+            points suivants&nbsp;:
+            <Box component="ul" sx={{ m: 0, mt: 0.5, pl: 2.5 }}>
+              <Box component="li" sx={{ mb: 0.5 }}>
+                Le{" "}
+                <a
+                  href={CLUB_REGISTRATION_EXTERNAL_LINKS.reglementInterieur}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  règlement intérieur de SQY PING
+                </a>
+              </Box>
+              <Box component="li">
+                Les données personnelles de l&apos;adhérent sont transmises à la
+                Fédération Française de Tennis de Table lors de la prise de
+                licence. SQY PING s&apos;engage à ne pas transmettre, vendre ou
+                utiliser ces informations à d&apos;autres fins.
+              </Box>
+            </Box>
           </Typography>
         }
       />

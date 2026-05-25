@@ -3,6 +3,7 @@
 import { Box, CircularProgress, Container } from "@mui/material";
 import { ClubRegistrationWizard } from "@/components/club-registration/ClubRegistrationWizard";
 import { useAuth } from "@/hooks/useAuth";
+import { isClubRegistrationManager } from "@/lib/club-registration/registration-access";
 
 /**
  * Page d'inscription au club (parcours hybride).
@@ -27,7 +28,12 @@ export default function ClubInscriptionPage() {
 
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 3, sm: 5 } }}>
-      <ClubRegistrationWizard accountEmail={user?.email ?? null} />
+      <ClubRegistrationWizard
+        accountEmail={user?.email ?? null}
+        isRegistrationManager={
+          user?.role != null && isClubRegistrationManager(user.role)
+        }
+      />
     </Container>
   );
 }

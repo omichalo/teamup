@@ -3,25 +3,22 @@
 import {
   Alert,
   Button,
-  Checkbox,
-  Collapse,
   FormControl,
   FormControlLabel,
-  FormGroup,
   InputLabel,
   MenuItem,
   Radio,
   RadioGroup,
   Select,
   Stack,
-  Switch,
   TextField,
   Typography,
 } from "@mui/material";
 import {
   CLUB_REGISTRATION_EXTERNAL_LINKS,
-  REDUCTION_OPTIONS,
 } from "@/lib/club-registration/constants";
+import { useRegistrationConfigValue } from "@/hooks/useRegistrationConfig";
+import { AidReductionFields } from "./AidReductionFields";
 import { isMedicalCertificateRequired } from "@/lib/club-registration/medical-certificate";
 import {
   createEmptyMedicalQuestionnaire,
@@ -38,15 +35,6 @@ import { buildMedicalDossierPatch } from "./medical-dossier-patch";
 
 const IS_DEV = process.env.NODE_ENV === "development";
 const DEV_TEST_AGES = [15, 25, 39, 40, 50] as const;
-
-/* Pass Sport est piloté par un switch dédié (UX) mais reste persistant via la
-   liste `reductionTypes` (pour ne pas modifier le schéma serveur). On filtre
-   donc l'option Pass Sport de la liste « autres réductions » : elle n'a
-   qu'une seule source de vérité côté UI. */
-const PASS_SPORT_ID = "pass_sport" as const;
-const OTHER_REDUCTION_OPTIONS = REDUCTION_OPTIONS.filter(
-  (r) => r.id !== PASS_SPORT_ID
-);
 
 function medicalConclusion(id: RegistrationDraft["medicalCertificateDeclaration"]) {
   if (!id) return null;
@@ -86,7 +74,7 @@ type Props = {
  * - attestation d'inscription (livrable demandé ou non) ;
  * - rang dans la famille (`familyRegistrationOrder`) — donnée tarifaire ;
  * - Pass Sport unifié (switch + champ code) ;
- * - autres réductions.
+ * - autres réductions (cases à cocher, pilotées par la config des aides).
  *
  * Le composant fusionne et clarifie ce qui était auparavant éparpillé entre
  * `MedicalFamilyStep` (anciennes étapes 2) et différents libellés flous
@@ -94,31 +82,7 @@ type Props = {
  * récap). Une seule source de vérité d'étape = `admin`.
  */
 export function AdminStep({ draft, onChange }: Props) {
-  const toggleReduction = (id: (typeof REDUCTION_OPTIONS)[number]["id"]) => {
-    const set = new Set(draft.reductionTypes);
-    if (set.has(id)) {
-      set.delete(id);
-    } else {
-      set.add(id);
-    }
-    onChange({ reductionTypes: Array.from(set) });
-  };
-
-  const hasPassSport = draft.reductionTypes.includes(PASS_SPORT_ID);
-
-  const handlePassSportToggle = (next: boolean) => {
-    const set = new Set(draft.reductionTypes);
-    if (next) {
-      set.add(PASS_SPORT_ID);
-      onChange({ reductionTypes: Array.from(set) });
-    } else {
-      set.delete(PASS_SPORT_ID);
-      onChange({
-        reductionTypes: Array.from(set),
-        passSportCode: "",
-      });
-    }
-  };
+  const config = useRegistrationConfigValue();
 
   const patchMedical = (patch: Parameters<typeof buildMedicalDossierPatch>[1]) => {
     onChange(buildMedicalDossierPatch(draft, patch));
@@ -437,50 +401,7 @@ export function AdminStep({ draft, onChange }: Props) {
         Aides et réductions
       </Typography>
 
-      <FormControlLabel
-        control={
-          <Switch
-            checked={hasPassSport}
-            onChange={(e) => handlePassSportToggle(e.target.checked)}
-          />
-        }
-        label="J’ai un Pass Sport"
-      />
-
-      <Collapse in={hasPassSport} timeout={{ enter: 300, exit: 200 }}>
-        <TextField
-          label="Code Pass Sport"
-          value={draft.passSportCode ?? ""}
-          onChange={(e) => onChange({ passSportCode: e.target.value })}
-          fullWidth
-          inputProps={{ "data-field": "passSportCode" }}
-          helperText="Code à 10 caractères communiqué par les services jeunesse / sport."
-        />
-      </Collapse>
-
-      <Stack spacing={0.5}>
-        <Typography
-          variant="subtitle2"
-          data-field="reductionTypes"
-          tabIndex={-1}
-        >
-          Autres aides et réductions
-        </Typography>
-        <FormGroup>
-          {OTHER_REDUCTION_OPTIONS.map((r) => (
-            <FormControlLabel
-              key={r.id}
-              control={
-                <Checkbox
-                  checked={draft.reductionTypes.includes(r.id)}
-                  onChange={() => toggleReduction(r.id)}
-                />
-              }
-              label={r.label}
-            />
-          ))}
-        </FormGroup>
-      </Stack>
+      <AidReductionFields config={config} draft={draft} onChange={onChange} />
 
       <Typography
         variant="subtitle1"

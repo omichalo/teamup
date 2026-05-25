@@ -23,20 +23,11 @@ import {
 } from "@mui/material";
 import {
   AccountCircle,
-  AdminPanelSettings,
-  Assignment,
   Close as CloseIcon,
-  Event,
-  FactCheck,
-  Groups,
-  Home,
-  HowToReg,
   Logout,
   Menu as MenuIcon,
-  Person,
-  PlaylistAddCheck,
-  RateReview,
 } from "@mui/icons-material";
+import { buildLayoutNavigationItems } from "@/components/layout-navigation";
 import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
 import Image from "next/image";
@@ -45,12 +36,6 @@ import { validateInternalRedirect } from "@/lib/auth/redirect-utils";
 
 interface LayoutProps {
   children: React.ReactNode;
-}
-
-interface NavigationItem {
-  label: string;
-  href: string;
-  icon: React.ReactNode;
 }
 
 /* Breakpoint à partir duquel la navigation horizontale tient sans déborder.
@@ -75,56 +60,16 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
 
-  const navigationItems = useMemo<NavigationItem[]>(() => {
-    if (!user) {
-      return [];
-    }
-
-    if (isPlayer) {
-      return [
-        { label: "Accueil joueur", href: "/joueur", icon: <Home /> },
-        { label: "Inscription club", href: "/club/inscription", icon: <HowToReg /> },
-        { label: "Mes inscriptions", href: "/club/mes-inscriptions", icon: <FactCheck /> },
-      ];
-    }
-
-    if (isSecretary) {
-      return [
-        {
-          label: "Demandes d’adhésion",
-          href: "/club/demandes-adhesion",
-          icon: <RateReview />,
-        },
-        { label: "Inscription club", href: "/club/inscription", icon: <HowToReg /> },
-        { label: "Mes inscriptions", href: "/club/mes-inscriptions", icon: <FactCheck /> },
-      ];
-    }
-
-    const items: NavigationItem[] = [
-      { label: "Inscription club", href: "/club/inscription", icon: <HowToReg /> },
-      { label: "Mes inscriptions", href: "/club/mes-inscriptions", icon: <FactCheck /> },
-      { label: "Joueurs", href: "/joueurs", icon: <Person /> },
-      { label: "Équipes", href: "/equipes", icon: <Groups /> },
-      { label: "Disponibilités", href: "/disponibilites", icon: <Event /> },
-      { label: "Compositions", href: "/compositions", icon: <Assignment /> },
-      {
-        label: "Compo. par défaut",
-        href: "/compositions/defaults",
-        icon: <PlaylistAddCheck />,
-      },
-    ];
-
-    if (isAdmin) {
-      items.push({
-        label: "Demandes d’adhésion",
-        href: "/club/demandes-adhesion",
-        icon: <RateReview />,
-      });
-      items.push({ label: "Admin", href: "/admin", icon: <AdminPanelSettings /> });
-    }
-
-    return items;
-  }, [isAdmin, isPlayer, isSecretary, user]);
+  const navigationItems = useMemo(
+    () =>
+      buildLayoutNavigationItems({
+        hasUser: Boolean(user),
+        isAdmin,
+        isPlayer,
+        isSecretary,
+      }),
+    [isAdmin, isPlayer, isSecretary, user]
+  );
 
   const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);

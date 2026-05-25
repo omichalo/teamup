@@ -1,3 +1,5 @@
+import type { StripePresentationConfig } from "@/lib/club-registration-config/types";
+import { getDefaultRegistrationConfig } from "@/lib/club-registration-config/default-config";
 import type { PriceLine, PriceQuote } from "./types";
 import { formatCentsAsEuros, stripeCheckoutLines } from "./format";
 
@@ -13,12 +15,14 @@ export type StripeInvoiceCustomField = {
   value: string;
 };
 
-const MEMBERSHIP_LABEL = "Adhésion club";
-const MEMBERSHIP_LABEL_WITH_DISCOUNTS = "Adhésion club (net après remises)";
 const STRIPE_CUSTOM_FIELD_VALUE_MAX = 500;
 
 function isMembershipDiscount(line: PriceLine): boolean {
-  return line.kind === "discount_family" || line.kind === "discount_female_first";
+  return (
+    line.kind === "discount_family" ||
+    line.kind === "discount_female_first" ||
+    line.kind === "discount_aid"
+  );
 }
 
 function truncateForStripe(value: string, max: number): string {
@@ -42,7 +46,8 @@ export function formatDiscountBreakdown(quote: PriceQuote): string | null {
 function buildMembershipStripeLine(
   membership: PriceLine,
   discountCents: number,
-  quote: PriceQuote
+  quote: PriceQuote,
+  stripe: StripePresentationConfig
 ): StripeCheckoutLineItem | null {
   const netMembership = membership.amountCents + discountCents;
   if (netMembership <= 0) {
@@ -63,7 +68,9 @@ function buildMembershipStripeLine(
   }
 
   return {
-    name: hasDiscounts ? MEMBERSHIP_LABEL_WITH_DISCOUNTS : MEMBERSHIP_LABEL,
+    name: hasDiscounts
+      ? stripe.membershipLabelWithDiscounts
+      : stripe.membershipLabel,
     amountCents: netMembership,
     description,
   };
@@ -72,7 +79,12 @@ function buildMembershipStripeLine(
 /**
  * Champs personnalisés facture Stripe (bloc informatif, hors lignes négatives).
  */
-export function buildStripeInvoiceCustomFields(quote: PriceQuote): StripeInvoiceCustomField[] {
+export function buildStripeInvoiceCustomFields(
+  quote: PriceQuote,
+  stripePresentation?: StripePresentationConfig
+): StripeInvoiceCustomField[] {
+  const stripe =
+    stripePresentation ?? getDefaultRegistrationConfig().stripePresentation;
   const discountText = formatDiscountBreakdown(quote);
   if (!discountText) {
     return [];
@@ -80,7 +92,7 @@ export function buildStripeInvoiceCustomFields(quote: PriceQuote): StripeInvoice
 
   return [
     {
-      name: "Remises sur adhésion",
+      name: stripe.discountCustomFieldName,
       value: truncateForStripe(discountText, STRIPE_CUSTOM_FIELD_VALUE_MAX),
     },
   ];
@@ -91,7 +103,12 @@ export function buildStripeInvoiceCustomFields(quote: PriceQuote): StripeInvoice
  * Les remises catalogue sont intégrées au net de la ligne adhésion, avec libellé
  * et description détaillant le brut, les remises et le net facturé.
  */
-export function buildStripeCheckoutLineItems(quote: PriceQuote): StripeCheckoutLineItem[] {
+export function buildStripeCheckoutLineItems(
+  quote: PriceQuote,
+  stripePresentation?: StripePresentationConfig
+): StripeCheckoutLineItem[] {
+  const stripe =
+    stripePresentation ?? getDefaultRegistrationConfig().stripePresentation;
   const lines = stripeCheckoutLines(quote);
   const membership = lines.find((line) => line.kind === "membership");
   const discountCents = lines
@@ -101,18 +118,19 @@ export function buildStripeCheckoutLineItems(quote: PriceQuote): StripeCheckoutL
   const items: StripeCheckoutLineItem[] = [];
 
   if (membership) {
-    const membershipLine = buildMembershipStripeLine(membership, discountCents, quote);
+    const membershipLine = buildMembershipStripeLine(
+      membership,
+      discountCents,
+      quote,
+      stripe
+    );
     if (membershipLine) {
       items.push(membershipLine);
     }
   }
 
   for (const line of lines) {
-    if (
-      line.kind === "membership" ||
-      line.kind === "discount_family" ||
-      line.kind === "discount_female_first"
-    ) {
+    if (isMembershipDiscount(line) || line.kind === "membership") {
       continue;
     }
     if (line.amountCents > 0) {

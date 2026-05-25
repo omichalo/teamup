@@ -207,16 +207,6 @@ export function validateStep(
     if (draft.slotIds.length === 0) {
       return invalid("Sélectionnez au moins un créneau.", '[data-field="slotIds"]');
     }
-    if (
-      draft.mainSectionId === "handisport" &&
-      draft.handisportPracticeLevel !== "leisure" &&
-      draft.handisportPracticeLevel !== "competition"
-    ) {
-      return invalid(
-        "Indiquez si la pratique handisport est en loisir ou en compétition.",
-        '[data-field="handisportPracticeLevel"]'
-      );
-    }
     if (draft.wantsCompetitorExtras && !draft.competitionJerseySize) {
       return invalid(
         "Indiquez une taille de maillot pour la section compétiteur.",
@@ -265,14 +255,14 @@ export function validateStep(
   if (stepId === "engagements") {
     if (!draft.photoConsent) {
       return invalid(
-        "Indiquez votre choix sur la diffusion d’images (acte de consentement explicite).",
+        "Indiquez si vous acceptez ou refusez la diffusion d’images.",
         '[name="photoConsent"]'
       );
     }
     if (isMinorAt(draft.birthDate)) {
       if (draft.emergencyMedicalAuthorization !== "yes") {
         return invalid(
-          "Cochez l’autorisation d’actes médicaux d’urgence (obligatoire pour un mineur).",
+          "Cochez l’autorisation médicale d’urgence pour votre enfant (obligatoire pour un mineur).",
           '[data-field="emergencyMedicalAuthorization"]'
         );
       }
@@ -285,7 +275,7 @@ export function validateStep(
     }
     if (!draft.rulesAccepted) {
       return invalid(
-        "Vous devez accepter le règlement intérieur pour continuer.",
+        "Cochez la case pour approuver le règlement intérieur et la transmission des données à la FFTT.",
         '[data-field="internalRulesAccepted"]'
       );
     }

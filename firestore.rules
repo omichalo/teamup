@@ -228,6 +228,14 @@ service cloud.firestore {
     }
 
     // ============================================
+    // Collection: clubRegistrationConfig
+    // ============================================
+    // Accès Admin SDK uniquement (pas d'accès client direct).
+    match /clubRegistrationConfig/{document} {
+      allow read, write: if false;
+    }
+
+    // ============================================
     // Règle par défaut : refuser tout accès non explicitement autorisé
     // ============================================
     match /{document=**} {

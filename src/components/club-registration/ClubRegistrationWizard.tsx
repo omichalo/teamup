@@ -23,11 +23,17 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import "dayjs/locale/fr";
 import { PageHeader, SectionCard, StepProgressBar } from "@/components/ui";
-import { normalizeCompetitionIds } from "@/lib/club-registration/competition-ids";
 import { scrollToFormTarget } from "@/lib/club-registration/scroll-to-form-target";
 import type { ClubRegistrationPayload } from "@/lib/club-registration/schema";
-import { clubRegistrationPayloadSchema } from "@/lib/club-registration/schema";
+import { buildRegistrationPayloadSchema } from "@/lib/club-registration/schema";
+import { useRegistrationConfigValue } from "@/hooks/useRegistrationConfig";
 import { isAtLeast40At, isMinorAt } from "@/lib/club-registration/age";
+import {
+  shouldAutofillAdherentEmailFromAccount,
+  shouldAutofillRepresentativeEmailFromAccount,
+  shouldClearAdherentEmailFromAccount,
+  shouldClearRepresentativeEmailFromAccount,
+} from "@/lib/club-registration/contact-autofill";
 import {
   deriveMedicalCertificateDeclaration,
   effectiveHadFfttLicense,
@@ -39,6 +45,7 @@ import {
   type RegistrationStepId,
 } from "@/lib/club-registration/field-to-step";
 import { submitRegistration } from "@/lib/club-registration/submit";
+import { sanitizeSchoolPickupSlotIds } from "@/lib/club-registration/school-pickup";
 import type { RegistrationDraft } from "./registration-defaults";
 import { AudienceStep } from "./AudienceStep";
 import { AdherentStep } from "./AdherentStep";
@@ -122,9 +129,15 @@ function canNavigateToStep(
 type Props = {
   /** Email du compte connecté, ou null en mode anonyme. */
   accountEmail: string | null;
+  /** Admin / secrétariat : inscription pour un tiers, pas de préremplissage contact. */
+  isRegistrationManager?: boolean;
 };
 
-export function ClubRegistrationWizard({ accountEmail }: Props) {
+export function ClubRegistrationWizard({
+  accountEmail,
+  isRegistrationManager = false,
+}: Props) {
+  const config = useRegistrationConfigValue();
   const { draft, actions } = useRegistrationDraft();
   const storage = useRegistrationDraftStorage();
   const [activeStep, setActiveStep] = useState(0);
@@ -220,29 +233,86 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
   /* Préremplissage non destructif depuis le compte connecté. L'utilisateur
      peut ensuite modifier ou vider le champ sans qu'on le remplisse à nouveau. */
   useEffect(() => {
-    if (!accountEmail) return;
     if (
-      draft.adherentRole === "self" &&
-      !draft.adherentEmail?.trim() &&
-      accountEmailAutofillRef.current.selfContact !== accountEmail
+      !accountEmail ||
+      !shouldAutofillAdherentEmailFromAccount({
+        isRegistrationManager,
+        adherentRole: draft.adherentRole,
+        birthDate: draft.birthDate,
+      }) ||
+      draft.adherentEmail?.trim() ||
+      accountEmailAutofillRef.current.selfContact === accountEmail
     ) {
-      accountEmailAutofillRef.current.selfContact = accountEmail;
-      actions.patchFields({ adherentEmail: accountEmail });
+      return;
     }
-  }, [accountEmail, actions, draft.adherentEmail, draft.adherentRole]);
+    accountEmailAutofillRef.current.selfContact = accountEmail;
+    actions.patchFields({ adherentEmail: accountEmail });
+  }, [
+    accountEmail,
+    actions,
+    draft.adherentEmail,
+    draft.adherentRole,
+    draft.birthDate,
+    isRegistrationManager,
+  ]);
 
   useEffect(() => {
-    if (!accountEmail || draft.adherentRole !== "minor_dependent") return;
+    if (
+      !accountEmail ||
+      !shouldAutofillRepresentativeEmailFromAccount({
+        isRegistrationManager,
+        adherentRole: draft.adherentRole,
+      })
+    ) {
+      return;
+    }
+    const first = draft.representatives[0];
+    if (
+      !first ||
+      first.email.trim() ||
+      accountEmailAutofillRef.current.representativeContact === accountEmail
+    ) {
+      return;
+    }
+    accountEmailAutofillRef.current.representativeContact = accountEmail;
+    actions.updateRepresentative(0, { email: accountEmail });
+  }, [
+    accountEmail,
+    actions,
+    draft.adherentRole,
+    draft.representatives,
+    isRegistrationManager,
+  ]);
+
+  useEffect(() => {
+    if (!accountEmail) return;
+    if (
+      draft.adherentEmail?.trim() === accountEmail &&
+      shouldClearAdherentEmailFromAccount({
+        isRegistrationManager,
+        adherentRole: draft.adherentRole,
+        birthDate: draft.birthDate,
+      })
+    ) {
+      actions.patchFields({ adherentEmail: "" });
+    }
     const first = draft.representatives[0];
     if (
       first &&
-      !first.email.trim() &&
-      accountEmailAutofillRef.current.representativeContact !== accountEmail
+      first.email.trim() === accountEmail &&
+      shouldClearRepresentativeEmailFromAccount({ isRegistrationManager })
     ) {
-      accountEmailAutofillRef.current.representativeContact = accountEmail;
-      actions.updateRepresentative(0, { email: accountEmail });
+      actions.updateRepresentative(0, { email: "" });
     }
-  }, [accountEmail, actions, draft.adherentRole, draft.representatives]);
+  }, [
+    accountEmail,
+    actions,
+    draft.adherentEmail,
+    draft.adherentRole,
+    draft.birthDate,
+    draft.representatives,
+    isRegistrationManager,
+  ]);
 
   /* Sur fieldErrors serveur, on saute à la 1ʳᵉ étape qui contient une erreur
      et on fait défiler la vue vers le premier champ concerné. */
@@ -405,11 +475,7 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
       medicalVeteranPath,
       hasVerifiedFfttLicense
     );
-    const isAdaptedMainSection =
-      draft.mainSectionId === "handisport" ||
-      draft.mainSectionId === "sport-adapte";
-    const effectiveCompetitorExtras =
-      !isAdaptedMainSection && draft.wantsCompetitorExtras;
+    const effectiveCompetitorExtras = draft.wantsCompetitorExtras;
     const minor = isMinorAt(draft.birthDate);
     const emergencyMedicalAuthorization = minor
       ? draft.emergencyMedicalAuthorization
@@ -446,15 +512,11 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
         effectiveCompetitorExtras && draft.competitionJerseySize
           ? draft.competitionJerseySize
           : undefined,
-      competitionIds: effectiveCompetitorExtras
-        ? normalizeCompetitionIds(draft.competitionIds)
-        : [],
-      handisportPracticeLevel:
-        draft.mainSectionId === "handisport" &&
-        (draft.handisportPracticeLevel === "leisure" ||
-          draft.handisportPracticeLevel === "competition")
-          ? draft.handisportPracticeLevel
-          : undefined,
+      competitionIds: effectiveCompetitorExtras ? draft.competitionIds : [],
+      schoolPickupSlotIds: sanitizeSchoolPickupSlotIds(
+        draft.slotIds,
+        draft.schoolPickupSlotIds
+      ),
     };
   };
 
@@ -512,7 +574,7 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
       setSubmitError("Certaines informations obligatoires sont manquantes.");
       return;
     }
-    const parsed = clubRegistrationPayloadSchema.safeParse(payload);
+    const parsed = buildRegistrationPayloadSchema(config).safeParse(payload);
     if (!parsed.success) {
       setFieldErrors(
         parsed.error.flatten().fieldErrors as Record<string, string[] | undefined>
@@ -550,10 +612,11 @@ export function ClubRegistrationWizard({ accountEmail }: Props) {
       ? "Envoi en cours…"
       : "Envoyer ma demande au club"
     : "Se connecter pour envoyer";
+  const contactFallbackEmail = isRegistrationManager ? undefined : accountEmail ?? undefined;
   const authInitialEmail =
     draft.adherentRole === "minor_dependent"
-      ? draft.representatives[0]?.email || accountEmail || undefined
-      : draft.adherentEmail || accountEmail || undefined;
+      ? draft.representatives[0]?.email || contactFallbackEmail
+      : draft.adherentEmail || contactFallbackEmail;
 
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="fr">

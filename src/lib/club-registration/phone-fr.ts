@@ -41,8 +41,8 @@ export function formatFrenchPhoneMask(digits: string): string {
  * Interprète la saisie ou un collage : renvoie uniquement les chiffres nationaux (max 10).
  * Reconnait +33 / 0033 ; sinon ne garde que les chiffres.
  */
-export function extractNationalDigitsForMask(raw: string): string {
-  const t = raw.trim();
+export function extractNationalDigitsForMask(raw: string | undefined): string {
+  const t = (raw ?? "").trim();
   if (t === "") return "";
   if (t.startsWith("+") || t.startsWith("00")) {
     const n = normalizeFrenchPhoneInput(t);
@@ -52,6 +52,6 @@ export function extractNationalDigitsForMask(raw: string): string {
 }
 
 /** Valeur stockée → affichage masqué (rechargement API, valeurs sans espaces). */
-export function toFrenchPhoneMaskedDisplay(stored: string): string {
+export function toFrenchPhoneMaskedDisplay(stored: string | undefined): string {
   return formatFrenchPhoneMask(extractNationalDigitsForMask(stored));
 }

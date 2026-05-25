@@ -25,12 +25,10 @@ export type RegistrationDraft = Omit<
   | "medicalCertificateDeclaration"
   | "medicalQuestionnaire"
   | "medicalVeteranPath"
-  | "handisportPracticeLevel"
 > & {
   rulesAccepted: boolean;
   sex: ClubRegistrationPayload["sex"] | "";
   photoConsent: ClubRegistrationPayload["photoConsent"] | "";
-  handisportPracticeLevel: "leisure" | "competition" | "";
   medicalQuestionnaire: MedicalQuestionnaire;
   medicalVeteranPath: MedicalVeteranPath;
   medicalCertificateDeclaration:
@@ -49,6 +47,27 @@ export function createEmptyRepresentative(): Representative {
     email: "",
     phone: "",
   };
+}
+
+/** Garantit des chaînes vides pour les champs optionnels manquants (brouillon local, API). */
+export function normalizeRepresentative(
+  rep: Partial<Representative> | undefined
+): Representative {
+  const base = createEmptyRepresentative();
+  if (!rep) return base;
+  return {
+    role: rep.role ?? base.role,
+    firstName: rep.firstName ?? "",
+    lastName: rep.lastName ?? "",
+    email: rep.email ?? "",
+    phone: rep.phone ?? "",
+  };
+}
+
+export function normalizeRepresentatives(
+  reps: Partial<Representative>[] | undefined
+): Representative[] {
+  return (reps ?? []).map(normalizeRepresentative);
 }
 
 export function createEmptyDraft(): RegistrationDraft {
@@ -72,13 +91,14 @@ export function createEmptyDraft(): RegistrationDraft {
     mainSectionId: "voisins",
     additionalSectionIds: [],
     slotIds: [],
+    schoolPickupSlotIds: [],
     medicalQuestionnaire: createEmptyMedicalQuestionnaire(),
     medicalVeteranPath: createEmptyMedicalVeteranPath(),
     medicalCertificateDeclaration: "",
     wantsRegistrationCertificate: false,
     familyRegistrationOrder: "none",
     reductionTypes: [],
-    passSportCode: "",
+    reductionReferenceCodes: {},
     firstFemaleRegistrationSqy: undefined,
     photoConsent: "",
     emergencyMedicalAuthorization: "not_applicable_adult",
@@ -87,6 +107,5 @@ export function createEmptyDraft(): RegistrationDraft {
     wantsCompetitorExtras: false,
     competitionJerseySize: undefined,
     competitionIds: [],
-    handisportPracticeLevel: "",
   };
 }

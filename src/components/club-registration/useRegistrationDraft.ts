@@ -6,10 +6,15 @@ import {
   inferMedicalDossierFromDeclaration,
   syncMedicalCertificateDeclaration,
 } from "@/lib/club-registration/medical-dossier";
-import { normalizeCompetitionIds } from "@/lib/club-registration/competition-ids";
+import { expandCompetitionIdsForForm } from "@/lib/club-registration/competition-ids";
+import {
+  normalizeReductionReferenceCodes,
+} from "@/lib/club-registration/reduction-reference-codes";
 import {
   createEmptyDraft,
   createEmptyRepresentative,
+  normalizeRepresentative,
+  normalizeRepresentatives,
   type RegistrationDraft,
 } from "./registration-defaults";
 
@@ -38,14 +43,22 @@ export function registrationDraftReducer(
   action: RegistrationDraftAction
 ): RegistrationDraft {
   switch (action.type) {
-    case "PATCH_FIELDS":
-      return { ...state, ...action.patch };
+    case "PATCH_FIELDS": {
+      const patch = { ...action.patch };
+      if (patch.representatives) {
+        patch.representatives = normalizeRepresentatives(patch.representatives);
+      }
+      return { ...state, ...patch };
+    }
 
     case "SET_ADHERENT_ROLE": {
       const next: RegistrationDraft = { ...state, adherentRole: action.role };
       if (action.role === "minor_dependent") {
+        next.adherentEmail = "";
         if (state.representatives.length === 0) {
           next.representatives = [createEmptyRepresentative()];
+        } else {
+          next.representatives = normalizeRepresentatives(state.representatives);
         }
       } else {
         /* Adultes (self / other_adult) : pas de représentant légal dans le dossier. */
@@ -69,8 +82,8 @@ export function registrationDraftReducer(
       return {
         ...state,
         representatives: [
-          ...state.representatives,
-          action.representative ?? createEmptyRepresentative(),
+          ...normalizeRepresentatives(state.representatives),
+          normalizeRepresentative(action.representative),
         ],
       };
     }
@@ -79,7 +92,10 @@ export function registrationDraftReducer(
       const list = state.representatives.slice();
       const target = list[action.index];
       if (!target) return state;
-      list[action.index] = { ...target, ...action.patch };
+      list[action.index] = normalizeRepresentative({
+        ...target,
+        ...action.patch,
+      });
       return { ...state, representatives: list };
     }
 
@@ -107,7 +123,12 @@ export function registrationDraftReducer(
         merged.medicalQuestionnaire = inferred.questionnaire;
         merged.medicalVeteranPath = inferred.veteranPath;
       }
-      merged.competitionIds = normalizeCompetitionIds(merged.competitionIds);
+      merged.competitionIds = expandCompetitionIdsForForm(merged.competitionIds);
+      merged.representatives = normalizeRepresentatives(merged.representatives);
+      merged.reductionReferenceCodes = normalizeReductionReferenceCodes(
+        merged.reductionReferenceCodes,
+        (merged as RegistrationDraft & { passSportCode?: string }).passSportCode
+      );
       return syncMedicalCertificateDeclaration(merged);
     }
 

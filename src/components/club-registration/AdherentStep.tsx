@@ -210,7 +210,7 @@ export function AdherentStep({ draft, accountEmail, onPatch, onSetSex }: Props) 
         component="h3"
         sx={{ color: "primary.main", fontWeight: 700, pt: 1 }}
       >
-        Contact de l’adhérent
+        {minor ? "Contact de l’adhérent mineur" : "Contact de l’adhérent"}
       </Typography>
 
       <TextField
@@ -236,7 +236,11 @@ export function AdherentStep({ draft, accountEmail, onPatch, onSetSex }: Props) 
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
         <TextField
           required
-          label="Téléphone principal de l’adhérent"
+          label={
+            minor
+              ? "Téléphone principal de l’adhérent mineur"
+              : "Téléphone principal de l’adhérent"
+          }
           value={toFrenchPhoneMaskedDisplay(draft.adherentPhonePrimary)}
           onChange={handlePhoneChange("adherentPhonePrimary")}
           onBlur={() => markTouched("adherentPhonePrimary")}
@@ -249,7 +253,11 @@ export function AdherentStep({ draft, accountEmail, onPatch, onSetSex }: Props) 
           inputProps={{ "data-field": "adherentPhonePrimary" }}
         />
         <TextField
-          label="Téléphone secondaire (optionnel)"
+          label={
+            minor
+              ? "Téléphone secondaire de l’adhérent mineur (optionnel)"
+              : "Téléphone secondaire (optionnel)"
+          }
           value={toFrenchPhoneMaskedDisplay(draft.adherentPhoneSecondary ?? "")}
           onChange={handlePhoneChange("adherentPhoneSecondary")}
           onBlur={() => markTouched("adherentPhoneSecondary")}

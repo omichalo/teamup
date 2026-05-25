@@ -10,15 +10,9 @@ import {
 } from "@mui/material";
 import EditIcon from "@mui/icons-material/Edit";
 import { SectionCard } from "@/components/ui";
-import { normalizeCompetitionIds } from "@/lib/club-registration/competition-ids";
-import {
-  CLUB_REGISTRATION_SITES,
-  COMPETITION_OPTIONS,
-  HANDISPORT_PRACTICE_OPTIONS,
-  REDUCTION_OPTIONS,
-  SECTION_PRINCIPALE_OPTIONS,
-} from "@/lib/club-registration/constants";
-import { COMPETITION_LABELS } from "@/lib/pricing/catalog/sqyping-2025";
+import { getEnabledSections, getEnabledSites } from "@/lib/club-registration-config/helpers";
+import { formatRegistrationSiteLabel } from "@/lib/club-registration-config/site-display";
+import { useRegistrationConfigValue } from "@/hooks/useRegistrationConfig";
 import { toFrenchPhoneMaskedDisplay } from "@/lib/club-registration/phone-fr";
 import { isMinorAt } from "@/lib/club-registration/age";
 import type { RegistrationStepId } from "@/lib/club-registration/field-to-step";
@@ -26,6 +20,8 @@ import type {
   RegistrationDraft,
   Representative,
 } from "./registration-defaults";
+import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
+import { buildAdminAidRecapFields } from "@/lib/club-registration/recap-aids";
 import { PricingBreakdown } from "./PricingBreakdown";
 
 type Props = {
@@ -85,49 +81,40 @@ const FAMILY_ORDER_LABELS: Record<
 
 const PHOTO_LABELS: Record<RegistrationDraft["photoConsent"], string> = {
   "": "—",
-  accept: "J’accepte la diffusion d’images",
-  refuse: "Je refuse la diffusion d’images",
+  accept: "J’accepte la diffusion de mon image / de celle de mon enfant mineur",
+  refuse: "Je refuse la diffusion de mon image / de celle de mon enfant mineur",
 };
 
-const CONSENT_LABELS: Record<
-  RegistrationDraft["emergencyMedicalAuthorization"],
-  string
-> = {
-  yes: "Oui",
-  not_applicable_adult: "Adhérent majeur — non concerné",
-};
-
-const PASS_SPORT_ID = "pass_sport" as const;
-
-function findSectionLabel(id: string): string {
-  return SECTION_PRINCIPALE_OPTIONS.find((s) => s.id === id)?.label ?? id;
+function minorAuthorizationRecap(
+  value: RegistrationDraft["emergencyMedicalAuthorization"],
+  kind: "medical" | "supervision"
+): string {
+  if (value === "yes") return kind === "medical" ? "Autorisée" : "Engagement confirmé";
+  return kind === "medical" ? "Non autorisée" : "Non confirmé";
 }
 
-function findSlotLabel(id: string): string {
-  for (const site of CLUB_REGISTRATION_SITES) {
+function findSectionLabel(config: RegistrationConfigV1, id: string): string {
+  return getEnabledSections(config).find((s) => s.id === id)?.label ?? id;
+}
+
+function findSlotLabel(config: RegistrationConfigV1, id: string): string {
+  for (const site of getEnabledSites(config)) {
     const found = site.slots.find((s) => s.id === id);
-    if (found) return `${site.label} — ${found.label}`;
+    if (found) return `${formatRegistrationSiteLabel(site)} — ${found.label}`;
   }
   return id;
 }
 
-function findReductionLabel(id: string): string {
-  return REDUCTION_OPTIONS.find((r) => r.id === id)?.label ?? id;
+function findReductionLabel(config: RegistrationConfigV1, id: string): string {
+  return config.aidRules.find((r) => r.id === id)?.label ?? id;
 }
 
-function findCompetitionLabel(id: string): string {
+function findCompetitionLabel(config: RegistrationConfigV1, id: string): string {
   return (
-    COMPETITION_OPTIONS.find((c) => c.id === id)?.label ??
-    COMPETITION_LABELS[id] ??
+    config.competitions.find((c) => c.id === id)?.formLabel ??
+    config.competitions.find((c) => c.id === id)?.stripeLabel ??
     id
   );
-}
-
-function findHandisportPracticeLabel(
-  level: RegistrationDraft["handisportPracticeLevel"]
-): string {
-  if (level === "") return "—";
-  return HANDISPORT_PRACTICE_OPTIONS.find((o) => o.id === level)?.label ?? level;
 }
 
 type Field = { label: string; value: React.ReactNode };
@@ -212,15 +199,11 @@ function RecapBlock({
 }
 
 export function RecapStep({ draft, accountEmail, onEditStep }: Props) {
-  const additionalSections = draft.additionalSectionIds.map(findSectionLabel);
-  const slotLabels = draft.slotIds.map(findSlotLabel);
-  const otherReductions = draft.reductionTypes
-    .filter((id) => id !== PASS_SPORT_ID)
-    .map(findReductionLabel);
-  const hasPassSport = draft.reductionTypes.includes(PASS_SPORT_ID);
-  const competitions = normalizeCompetitionIds(draft.competitionIds).map(
-    findCompetitionLabel
+  const config = useRegistrationConfigValue();
+  const additionalSections = draft.additionalSectionIds.map((id) =>
+    findSectionLabel(config, id)
   );
+  const competitions = draft.competitionIds.map((id) => findCompetitionLabel(config, id));
   const isMinor = isMinorAt(draft.birthDate);
   const primaryContactLabel = isMinor
     ? "Représentant légal principal"
@@ -352,16 +335,8 @@ export function RecapStep({ draft, accountEmail, onEditStep }: Props) {
         fields={[
           {
             label: "Lieu principal",
-            value: findSectionLabel(draft.mainSectionId),
+            value: findSectionLabel(config, draft.mainSectionId),
           },
-          ...(draft.mainSectionId === "handisport"
-            ? ([
-                {
-                  label: "Pratique handisport",
-                  value: findHandisportPracticeLabel(draft.handisportPracticeLevel),
-                },
-              ] as Field[])
-            : []),
           {
             label: "Autres lieux",
             value:
@@ -378,11 +353,14 @@ export function RecapStep({ draft, accountEmail, onEditStep }: Props) {
           {
             label: "Créneaux",
             value:
-              slotLabels.length > 0 ? (
+              draft.slotIds.length > 0 ? (
                 <Stack spacing={0.5}>
-                  {slotLabels.map((label) => (
-                    <Typography key={label} variant="body2">
-                      • {label}
+                  {draft.slotIds.map((id) => (
+                    <Typography key={id} variant="body2">
+                      • {findSlotLabel(config, id)}
+                      {draft.schoolPickupSlotIds.includes(id)
+                        ? " — récupération à la sortie de l’école"
+                        : ""}
                     </Typography>
                   ))}
                 </Stack>
@@ -434,27 +412,7 @@ export function RecapStep({ draft, accountEmail, onEditStep }: Props) {
             label: "Inscription dans la famille",
             value: FAMILY_ORDER_LABELS[draft.familyRegistrationOrder],
           },
-          {
-            label: "Pass Sport",
-            value: hasPassSport
-              ? draft.passSportCode
-                ? `Oui — code ${draft.passSportCode}`
-                : "Oui (code à transmettre)"
-              : "Non",
-          },
-          {
-            label: "Autres aides et réductions",
-            value:
-              otherReductions.length > 0 ? (
-                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                  {otherReductions.map((label) => (
-                    <Chip key={label} label={label} size="small" />
-                  ))}
-                </Stack>
-              ) : (
-                "—"
-              ),
-          },
+          ...buildAdminAidRecapFields(config, draft, (id) => findReductionLabel(config, id)),
           {
             label: "Attestation d’inscription",
             value: draft.wantsRegistrationCertificate ? "Oui" : "Non",
@@ -474,11 +432,11 @@ export function RecapStep({ draft, accountEmail, onEditStep }: Props) {
             ? ([
                 {
                   label: "Acte médical d’urgence",
-                  value: CONSENT_LABELS[draft.emergencyMedicalAuthorization],
+                  value: minorAuthorizationRecap(draft.emergencyMedicalAuthorization, "medical"),
                 },
                 {
                   label: "Prise en charge à l’heure des cours",
-                  value: CONSENT_LABELS[draft.supervisionAcknowledgement],
+                  value: minorAuthorizationRecap(draft.supervisionAcknowledgement, "supervision"),
                 },
               ] as Field[])
             : []),

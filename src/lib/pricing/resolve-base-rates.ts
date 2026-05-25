@@ -21,15 +21,7 @@ export function resolveBaseRates(ctx: PricingContext): ResolveBaseRatesResult {
   const at = ctx.pricingDate;
 
   if (ctx.mainSectionId === "handisport") {
-    const level = ctx.handisportPracticeLevel;
-    if (!level) {
-      return {
-        ok: false,
-        warning:
-          "Précisez le type de pratique handisport (loisir ou compétition) pour calculer le tarif.",
-      };
-    }
-    if (level === "leisure") {
+    if (!ctx.wantsCompetitorExtras) {
       return { ok: true, rates: getHandisportLeisureRates() };
     }
     const ageBand = resolveHandisportCompetitionAgeBand(ctx.birthDate, at);

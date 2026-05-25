@@ -4,11 +4,9 @@
 
 export const PRICING_CATALOG_VERSION = "sqyping-2025-05" as const;
 
-export type PricingCatalogVersion = typeof PRICING_CATALOG_VERSION;
+export type PricingCatalogVersion = string;
 
 export type FamilyRegistrationOrder = "none" | "second" | "third_or_more";
-
-export type HandisportPracticeLevel = "leisure" | "competition";
 
 export type PriceLineKind =
   | "membership"
@@ -16,6 +14,7 @@ export type PriceLineKind =
   | "competition"
   | "discount_family"
   | "discount_female_first"
+  | "discount_aid"
   | "info";
 
 export type PriceLineSource = "catalog" | "pending_validation";
@@ -39,8 +38,6 @@ export type PricingContext = {
   familyRegistrationOrder: FamilyRegistrationOrder;
   sex: "female" | "male" | "other";
   firstFemaleRegistrationSqy?: boolean;
-  /** Obligatoire si `mainSectionId === "handisport"`. */
-  handisportPracticeLevel?: HandisportPracticeLevel;
   /** Aides déclarées — informatif en V1 (pas de montant). */
   reductionTypes?: string[];
 };

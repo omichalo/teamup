@@ -1,5 +1,5 @@
 /**
- * Grille tarifaire publique SQY Ping — https://www.sqyping.fr/tarifs
+ * Grille tarifaire publique SQY Ping — https://www.sqyping.fr/rejoindre-en-tant-que-joueurs
  * Montants en centimes d'euro (EUR).
  */
 
@@ -13,6 +13,8 @@ export const COMPETITION_PRICE_CENTS: Readonly<Record<string, number>> = {
 
 /** Libellés facture / devis (sqyping.fr/tarifs). */
 export const COMPETITION_LABELS: Readonly<Record<string, string>> = {
+  championnat_jeunes: "Championnat des jeunes",
+  criterium_federal_jeunes: "Critérium fédéral jeunes",
   competitions_jeunes: "Compétitions jeunes",
   championnat_equipe: "Championnat par équipes",
   criterium_federal_seniors: "Critérium fédéral seniors",
@@ -78,14 +80,14 @@ const COMPETITOR: Record<"baby_ping" | "under_15" | "adult_15_plus", BaseRates> 
 
 const HANDISPORT_LEISURE: BaseRates = {
   membershipCents: 16_000,
-  licenseCents: 3_200,
+  licenseCents: 3_100,
   segmentLabel: "Handisport — Loisirs",
 };
 
 const HANDISPORT_COMPETITION: Record<"under_20" | "adult_20_plus", BaseRates> = {
   under_20: {
     membershipCents: 17_500,
-    licenseCents: 3_200,
+    licenseCents: 3_000,
     segmentLabel: "Handisport — Moins de 20 ans",
   },
   adult_20_plus: {
@@ -98,12 +100,12 @@ const HANDISPORT_COMPETITION: Record<"under_20" | "adult_20_plus", BaseRates> = 
 const SPORT_ADAPTE_LEISURE: Record<"under_21" | "adult_21_plus", BaseRates> = {
   under_21: {
     membershipCents: 16_000,
-    licenseCents: 5_000,
+    licenseCents: 3_500,
     segmentLabel: "Sport adapté — Loisirs (moins de 21 ans)",
   },
   adult_21_plus: {
     membershipCents: 16_000,
-    licenseCents: 5_000,
+    licenseCents: 4_000,
     segmentLabel: "Sport adapté — Loisirs (21 ans et plus)",
   },
 };
@@ -111,12 +113,12 @@ const SPORT_ADAPTE_LEISURE: Record<"under_21" | "adult_21_plus", BaseRates> = {
 const SPORT_ADAPTE_COMPETITOR: Record<"under_21" | "adult_21_plus", BaseRates> = {
   under_21: {
     membershipCents: 17_500,
-    licenseCents: 5_000,
+    licenseCents: 3_500,
     segmentLabel: "Sport adapté — Compétiteur (moins de 21 ans)",
   },
   adult_21_plus: {
     membershipCents: 17_500,
-    licenseCents: 5_000,
+    licenseCents: 4_000,
     segmentLabel: "Sport adapté — Compétiteur (21 ans et plus)",
   },
 };

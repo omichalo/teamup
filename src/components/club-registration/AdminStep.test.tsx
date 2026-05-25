@@ -199,10 +199,10 @@ describe("AdminStep — questionnaire de santé conditionnel", () => {
   });
 });
 
-describe("AdminStep — Pass Sport unifié", () => {
-  it("active Pass Sport ajoute la réduction et affiche le champ code", () => {
+describe("AdminStep — aides avec code (config)", () => {
+  it("active une aide interrupteur ajoute la réduction et affiche le champ code", () => {
     const { onChange } = renderStep({ reductionTypes: [] });
-    const toggle = screen.getByLabelText(/j’ai un pass sport/i);
+    const toggle = screen.getByLabelText(/j'ai un pass sport/i);
     fireEvent.click(toggle);
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -211,31 +211,23 @@ describe("AdminStep — Pass Sport unifié", () => {
     );
   });
 
-  it("désactiver Pass Sport vide le code", () => {
+  it("désactiver une aide interrupteur vide le code", () => {
     const { onChange } = renderStep({
       reductionTypes: ["pass_sport"],
-      passSportCode: "ABC123",
+      reductionReferenceCodes: { pass_sport: "ABC123" },
     });
-    const toggle = screen.getByLabelText(/j’ai un pass sport/i);
+    const toggle = screen.getByLabelText(/j'ai un pass sport/i);
     fireEvent.click(toggle);
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({
-        passSportCode: "",
+        reductionReferenceCodes: {},
         reductionTypes: expect.not.arrayContaining(["pass_sport"]),
       })
     );
   });
 
-  it("Pass Sport n’apparaît pas dans la liste « autres aides et réductions »", () => {
+  it("Pass Sport n'apparaît pas dans les cases à cocher", () => {
     renderStep({ reductionTypes: [] });
-    /* Le toggle Pass Sport est dédié, donc l'option « Pass Sport » des
-       autres réductions ne doit pas exister en parallèle (source de vérité
-       unique côté UI). */
-    const allPassSportControls = screen.getAllByLabelText(/pass sport/i);
-    /* On s'attend à exactement 2 contrôles : le toggle « J'ai un Pass Sport »
-       et son champ texte associé « Code Pass Sport » (qui est aussi rendu
-       par MUI via le label). Si une 3ᵉ case à cocher apparaissait dans la
-       liste des autres réductions, ce compte passerait à 3. */
-    expect(allPassSportControls.length).toBeLessThanOrEqual(2);
+    expect(screen.queryByRole("checkbox", { name: /^pass sport$/i })).not.toBeInTheDocument();
   });
 });

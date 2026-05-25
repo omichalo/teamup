@@ -13,12 +13,13 @@ describe("registrationDraftReducer", () => {
   });
 
   it("SET_ADHERENT_ROLE vers minor_dependent ajoute un représentant si vide", () => {
-    const s = createEmptyDraft();
+    const s = { ...createEmptyDraft(), adherentEmail: "parent@example.com" };
     const next = registrationDraftReducer(s, {
       type: "SET_ADHERENT_ROLE",
       role: "minor_dependent",
     });
     expect(next.adherentRole).toBe("minor_dependent");
+    expect(next.adherentEmail).toBe("");
     expect(next.representatives).toHaveLength(1);
   });
 
@@ -135,6 +136,37 @@ describe("registrationDraftReducer", () => {
     s = registrationDraftReducer(s, { type: "REMOVE_REPRESENTATIVE", index: 0 });
     expect(s.representatives).toHaveLength(1);
     expect(s.representatives[0].firstName).toBe("B");
+  });
+
+  it("HYDRATE normalise les représentants incomplets (brouillon local)", () => {
+    const s = createEmptyDraft();
+    const hydrated = {
+      ...createEmptyDraft(),
+      representatives: [
+        {
+          role: "mother" as const,
+          firstName: "Marie",
+          lastName: "Dupont",
+          email: "marie@example.com",
+        },
+      ],
+    };
+    const next = registrationDraftReducer(s, { type: "HYDRATE", draft: hydrated });
+    expect(next.representatives[0].phone).toBe("");
+  });
+
+  it("ADD_REPRESENTATIVE normalise un représentant partiel", () => {
+    let s = createEmptyDraft();
+    s = registrationDraftReducer(s, {
+      type: "ADD_REPRESENTATIVE",
+      representative: {
+        role: "father",
+        firstName: "Paul",
+        lastName: "Dupont",
+        email: "paul@example.com",
+      },
+    });
+    expect(s.representatives[0].phone).toBe("");
   });
 
   it("HYDRATE remplace tout l'état par le draft fourni", () => {

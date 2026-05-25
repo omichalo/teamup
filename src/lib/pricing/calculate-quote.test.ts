@@ -72,26 +72,26 @@ describe("calculateQuote — grille compétiteur", () => {
 });
 
 describe("calculateQuote — handisport", () => {
-  it("Loisirs : 160 + 32 = 192 €", () => {
+  it("Loisirs : 160 + 31 = 191 €", () => {
     const quote = calculateQuote(
       ctx({
         birthDate: "1990-01-01",
         mainSectionId: "handisport",
-        handisportPracticeLevel: "leisure",
+        wantsCompetitorExtras: false,
       })
     );
-    expectTotals(quote, { membership: 16_000, license: 3_200, total: 19_200 });
+    expectTotals(quote, { membership: 16_000, license: 3_100, total: 19_100 });
   });
 
-  it("Compétition moins de 20 ans : 175 + 32 = 207 €", () => {
+  it("Compétition moins de 20 ans : 175 + 30 = 205 €", () => {
     const quote = calculateQuote(
       ctx({
         birthDate: "2010-01-01",
         mainSectionId: "handisport",
-        handisportPracticeLevel: "competition",
+        wantsCompetitorExtras: true,
       })
     );
-    expectTotals(quote, { membership: 17_500, license: 3_200, total: 20_700 });
+    expectTotals(quote, { membership: 17_500, license: 3_000, total: 20_500 });
   });
 
   it("Compétition 20 ans et plus : 175 + 70 = 245 €", () => {
@@ -99,31 +99,47 @@ describe("calculateQuote — handisport", () => {
       ctx({
         birthDate: "1990-01-01",
         mainSectionId: "handisport",
-        handisportPracticeLevel: "competition",
+        wantsCompetitorExtras: true,
       })
     );
     expectTotals(quote, { membership: 17_500, license: 7_000, total: 24_500 });
   });
 
-  it("exige le niveau handisport", () => {
+  it("sans compétiteur : tarif loisirs handisport par défaut", () => {
     const quote = calculateQuote(
-      ctx({ birthDate: "1990-01-01", mainSectionId: "handisport" })
+      ctx({ birthDate: "1990-01-01", mainSectionId: "handisport", wantsCompetitorExtras: false })
     );
-    expect(quote.totalCents).toBe(0);
-    expect(quote.requiresAdminReview).toBe(true);
-    expect(quote.warnings.some((w) => w.includes("handisport"))).toBe(true);
+    expectTotals(quote, { membership: 16_000, license: 3_100, total: 19_100 });
   });
 });
 
 describe("calculateQuote — sport adapté", () => {
-  it("Loisirs -21 ans : 210 €", () => {
+  it("Loisirs -21 ans : 160 + 35 = 195 €", () => {
     const quote = calculateQuote(
       ctx({ birthDate: "2010-01-01", mainSectionId: "sport-adapte" })
     );
-    expectTotals(quote, { membership: 16_000, license: 5_000, total: 21_000 });
+    expectTotals(quote, { membership: 16_000, license: 3_500, total: 19_500 });
   });
 
-  it("Compétiteur +21 ans : 225 €", () => {
+  it("Loisirs +21 ans : 160 + 40 = 200 €", () => {
+    const quote = calculateQuote(
+      ctx({ birthDate: "1990-01-01", mainSectionId: "sport-adapte" })
+    );
+    expectTotals(quote, { membership: 16_000, license: 4_000, total: 20_000 });
+  });
+
+  it("Compétiteur -21 ans : 175 + 35 = 210 €", () => {
+    const quote = calculateQuote(
+      ctx({
+        birthDate: "2010-01-01",
+        mainSectionId: "sport-adapte",
+        wantsCompetitorExtras: true,
+      })
+    );
+    expectTotals(quote, { membership: 17_500, license: 3_500, total: 21_000 });
+  });
+
+  it("Compétiteur +21 ans : 175 + 40 = 215 €", () => {
     const quote = calculateQuote(
       ctx({
         birthDate: "1990-01-01",
@@ -131,7 +147,7 @@ describe("calculateQuote — sport adapté", () => {
         wantsCompetitorExtras: true,
       })
     );
-    expectTotals(quote, { membership: 17_500, license: 5_000, total: 22_500 });
+    expectTotals(quote, { membership: 17_500, license: 4_000, total: 21_500 });
   });
 });
 

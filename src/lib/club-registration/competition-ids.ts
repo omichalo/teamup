@@ -3,17 +3,22 @@
  * (section « Les compétitions »).
  */
 
-/** Id canonique (grille publique). */
+/** Id canonique pour la facturation (forfait unique 25 €). */
 export const COMPETITIONS_JEUNES_ID = "competitions_jeunes" as const;
 
-/** Anciennes valeurs formulaire papier / Webflow (rétrocompatibilité dossiers). */
-export const LEGACY_COMPETITIONS_JEUNES_IDS = [
+/** Ids sélectionnables indépendamment dans le formulaire. */
+export const YOUTH_COMPETITION_FORM_IDS = [
   "championnat_jeunes",
   "criterium_federal_jeunes",
 ] as const;
 
-export type LegacyCompetitionsJeunesId =
-  (typeof LEGACY_COMPETITIONS_JEUNES_IDS)[number];
+/** @deprecated Utiliser `YOUTH_COMPETITION_FORM_IDS`. */
+export const LEGACY_COMPETITIONS_JEUNES_IDS = YOUTH_COMPETITION_FORM_IDS;
+
+export type YouthCompetitionFormId =
+  (typeof YOUTH_COMPETITION_FORM_IDS)[number];
+
+export type LegacyCompetitionsJeunesId = YouthCompetitionFormId;
 
 export function isYouthCompetitionId(id: string): boolean {
   return (
@@ -23,8 +28,32 @@ export function isYouthCompetitionId(id: string): boolean {
 }
 
 /**
- * Une seule entrée « Compétitions jeunes » à 25 € même si plusieurs ids jeunes
- * coexistent dans un dossier historique.
+ * Déplie l’id de facturation historique vers les deux options formulaire
+ * (dossiers créés avant la séparation des compétitions jeunes).
+ */
+export function expandCompetitionIdsForForm(ids: string[]): string[] {
+  const expanded: string[] = [];
+
+  for (const id of ids) {
+    if (id === COMPETITIONS_JEUNES_ID) {
+      for (const youthId of YOUTH_COMPETITION_FORM_IDS) {
+        if (!expanded.includes(youthId)) {
+          expanded.push(youthId);
+        }
+      }
+      continue;
+    }
+    if (!expanded.includes(id)) {
+      expanded.push(id);
+    }
+  }
+
+  return expanded;
+}
+
+/**
+ * Une seule ligne « Compétitions jeunes » à 25 € pour la facturation,
+ * même si une ou les deux compétitions jeunes sont cochées.
  */
 export function normalizeCompetitionIds(ids: string[]): string[] {
   const normalized: string[] = [];
