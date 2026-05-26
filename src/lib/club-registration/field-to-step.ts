@@ -78,6 +78,9 @@ export const REGISTRATION_FIELD_TO_STEP_ID: Readonly<
   emergencyMedicalAuthorization: "engagements",
   supervisionAcknowledgement: "engagements",
   internalRulesAccepted: "engagements",
+
+  /* Étape 7 — Récapitulatif */
+  applicantNotes: "recap",
 };
 
 function resolveFieldStepId(fieldKey: string, sequence: ReadonlyArray<RegistrationStepId>): RegistrationStepId {

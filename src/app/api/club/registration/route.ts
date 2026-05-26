@@ -23,6 +23,11 @@ import {
   ensureRegistrationConfigSeeded,
 } from "@/lib/club-registration-config/store";
 import { calculateQuoteWithConfig } from "@/lib/club-registration-config/pricing-resolve";
+import {
+  APPLICANT_NOTES_MAX_LENGTH,
+  isApplicantNotesTooLong,
+  normalizeApplicantNotes,
+} from "@/lib/club-registration/applicant-notes";
 
 const COLLECTION = "clubRegistrations";
 const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
@@ -67,6 +72,7 @@ const REGISTRATION_CLIENT_FIELDS = [
   "wantsCompetitorExtras",
   "competitionJerseySize",
   "competitionIds",
+  "applicantNotes",
   "isMinor",
   "submitterUid",
   "submitterAccountEmail",
@@ -126,6 +132,7 @@ const MANAGER_EDITABLE_FIELDS = [
   "wantsCompetitorExtras",
   "competitionJerseySize",
   "competitionIds",
+  "applicantNotes",
   "reviewNotes",
   "paymentAmountCents",
   "handisportPracticeLevel",
@@ -242,6 +249,26 @@ export async function PATCH(req: Request) {
 
     if (Object.keys(updates).length === 0) {
       return jsonNoStore({ error: "Aucun champ modifiable fourni" }, { status: 400 });
+    }
+
+    if (updates.applicantNotes !== undefined) {
+      if (typeof updates.applicantNotes !== "string") {
+        return jsonNoStore({ error: "Précisions de l'inscrit invalides" }, { status: 400 });
+      }
+      if (isApplicantNotesTooLong(updates.applicantNotes)) {
+        return jsonNoStore(
+          {
+            error: `Les précisions de l'inscrit ne peuvent pas dépasser ${APPLICANT_NOTES_MAX_LENGTH} caractères`,
+          },
+          { status: 400 }
+        );
+      }
+      const normalized = normalizeApplicantNotes(updates.applicantNotes);
+      if (normalized) {
+        updates.applicantNotes = normalized;
+      } else {
+        updates.applicantNotes = FieldValue.delete();
+      }
     }
 
     if (

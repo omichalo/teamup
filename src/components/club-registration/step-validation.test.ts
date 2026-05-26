@@ -1,3 +1,4 @@
+import { APPLICANT_NOTES_MAX_LENGTH } from "@/lib/club-registration/applicant-notes";
 import { createEmptyDraft } from "./registration-defaults";
 import { validateStep } from "./step-validation";
 
@@ -10,6 +11,16 @@ describe("validateStep focusSelector", () => {
     if (!result.valid) {
       expect(result.message).toContain("déclaration médicale");
       expect(result.focusSelector).toMatch(/medical/);
+    }
+  });
+
+  it("refuse des précisions trop longues sur l'étape récap", () => {
+    const draft = createEmptyDraft();
+    draft.applicantNotes = "x".repeat(APPLICANT_NOTES_MAX_LENGTH + 1);
+    const result = validateStep("recap", draft);
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.focusSelector).toBe("#applicant-notes-field");
     }
   });
 });

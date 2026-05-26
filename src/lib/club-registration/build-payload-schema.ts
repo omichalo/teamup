@@ -17,6 +17,7 @@ import {
   type MedicalQuestionnaire,
   type MedicalVeteranPath,
 } from "./medical-dossier";
+import { APPLICANT_NOTES_MAX_LENGTH } from "./applicant-notes";
 import { isValidFrenchPhoneSurface, normalizeFrenchPhoneInput } from "./phone-fr";
 import {
   adherentRoleSchema,
@@ -122,6 +123,10 @@ export function buildRegistrationPayloadSchema(config: RegistrationConfigV1) {
       wantsCompetitorExtras: z.boolean(),
       competitionJerseySize: z.enum(jerseySizes).optional(),
       competitionIds: z.array(z.enum(competitionIds)).default([]),
+      applicantNotes: z.preprocess(
+        (val) => (typeof val === "string" && val.trim() === "" ? undefined : val),
+        z.string().trim().max(APPLICANT_NOTES_MAX_LENGTH).optional()
+      ),
     })
     .superRefine((data, ctx) => {
       for (const id of data.slotIds) {

@@ -25,8 +25,11 @@ export type RegistrationDraft = Omit<
   | "medicalCertificateDeclaration"
   | "medicalQuestionnaire"
   | "medicalVeteranPath"
+  | "applicantNotes"
 > & {
   rulesAccepted: boolean;
+  /** Précisions libres pour le club (facultatif à l'envoi). */
+  applicantNotes: string;
   sex: ClubRegistrationPayload["sex"] | "";
   photoConsent: ClubRegistrationPayload["photoConsent"] | "";
   medicalQuestionnaire: MedicalQuestionnaire;
@@ -107,5 +110,6 @@ export function createEmptyDraft(): RegistrationDraft {
     wantsCompetitorExtras: false,
     competitionJerseySize: undefined,
     competitionIds: [],
+    applicantNotes: "",
   };
 }

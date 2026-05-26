@@ -4,6 +4,7 @@ import {
   effectiveHadFfttLicense,
   isMedicalAdminStepComplete,
 } from "@/lib/club-registration/medical-dossier";
+import { isApplicantNotesTooLong } from "@/lib/club-registration/applicant-notes";
 import { isValidFrenchPhoneSurface } from "@/lib/club-registration/phone-fr";
 import type { RegistrationDraft } from "./registration-defaults";
 
@@ -282,7 +283,15 @@ export function validateStep(
     return { valid: true };
   }
 
-  if (stepId === "recap") return { valid: true };
+  if (stepId === "recap") {
+    if (isApplicantNotesTooLong(draft.applicantNotes)) {
+      return invalid(
+        "Les précisions pour le club dépassent la longueur autorisée.",
+        "#applicant-notes-field"
+      );
+    }
+    return { valid: true };
+  }
   return { valid: true };
 }
 

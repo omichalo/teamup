@@ -23,6 +23,7 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import "dayjs/locale/fr";
 import { PageHeader, SectionCard, StepProgressBar } from "@/components/ui";
+import { normalizeApplicantNotes } from "@/lib/club-registration/applicant-notes";
 import { scrollToFormTarget } from "@/lib/club-registration/scroll-to-form-target";
 import type { ClubRegistrationPayload } from "@/lib/club-registration/schema";
 import { buildRegistrationPayloadSchema } from "@/lib/club-registration/schema";
@@ -96,7 +97,8 @@ const STEP_DESCRIPTIONS: Record<RegistrationStepId, string> = {
     "Déclaration médicale, inscription familiale, Pass Sport et autres aides, demande d’attestation.",
   engagements:
     "Diffusion d’images, autorisations légales pour les mineurs et acceptation du règlement intérieur.",
-  recap: "Vérifiez votre dossier avant envoi au club.",
+  recap:
+    "Vérifiez votre dossier, ajoutez éventuellement des précisions pour le club, puis envoyez.",
 };
 
 /** Étape conditionnelle pour les inscriptions de mineurs uniquement. */
@@ -446,10 +448,12 @@ export function ClubRegistrationWizard({
       medicalCertificateDeclaration: _decl,
       medicalQuestionnaire,
       medicalVeteranPath,
+      applicantNotes: _applicantNotes,
       ...rest
     } = draft;
     void _rulesAccepted;
     void _decl;
+    void _applicantNotes;
     const hasVerifiedFfttLicense = Boolean(draft.ffttLicenseLookup?.licence);
     const medicalCertificateDeclaration = deriveMedicalCertificateDeclaration({
       birthDate: draft.birthDate,
@@ -517,6 +521,9 @@ export function ClubRegistrationWizard({
         draft.slotIds,
         draft.schoolPickupSlotIds
       ),
+      ...(normalizeApplicantNotes(draft.applicantNotes)
+        ? { applicantNotes: normalizeApplicantNotes(draft.applicantNotes) }
+        : {}),
     };
   };
 
@@ -843,6 +850,7 @@ export function ClubRegistrationWizard({
                   draft={draft}
                   accountEmail={accountEmail}
                   onEditStep={handleGoToStepId}
+                  onChange={actions.patchFields}
                 />
               )}
             </SectionCard>

@@ -1,3 +1,4 @@
+import { APPLICANT_NOTES_MAX_LENGTH } from "./applicant-notes";
 import { clubRegistrationPayloadSchema } from "./schema";
 import { inferMedicalDossierFromDeclaration } from "./medical-dossier";
 
@@ -476,5 +477,32 @@ describe("clubRegistrationPayloadSchema", () => {
     );
     expect(young.success).toBe(true);
     expect(old.success).toBe(true);
+  });
+
+  it("accepte des précisions facultatives pour le club", () => {
+    const r = clubRegistrationPayloadSchema.safeParse(
+      buildPayload({ applicantNotes: "Certificat médical envoyé par mail la semaine prochaine." })
+    );
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.applicantNotes).toBe(
+        "Certificat médical envoyé par mail la semaine prochaine."
+      );
+    }
+  });
+
+  it("ignore une chaîne vide pour les précisions du club", () => {
+    const r = clubRegistrationPayloadSchema.safeParse(buildPayload({ applicantNotes: "" }));
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.applicantNotes).toBeUndefined();
+    }
+  });
+
+  it("refuse des précisions dépassant la longueur maximale", () => {
+    const r = clubRegistrationPayloadSchema.safeParse(
+      buildPayload({ applicantNotes: "x".repeat(APPLICANT_NOTES_MAX_LENGTH + 1) })
+    );
+    expect(r.success).toBe(false);
   });
 });

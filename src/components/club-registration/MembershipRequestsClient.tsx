@@ -43,6 +43,7 @@ import {
   type MedicalCertificateStatus,
 } from "@/lib/club-registration/medical-certificate";
 import type { Representative } from "@/lib/club-registration/schema";
+import { APPLICANT_NOTES_MAX_LENGTH } from "@/lib/club-registration/applicant-notes";
 import { expandCompetitionIdsForForm } from "@/lib/club-registration/competition-ids";
 import {
   calculateQuote,
@@ -108,6 +109,7 @@ type RegistrationDetail = RegistrationSummary & {
   wantsCompetitorExtras?: boolean;
   competitionJerseySize?: string;
   competitionIds?: string[];
+  applicantNotes?: string;
   reviewNotes?: string;
   paymentEmailSentTo?: string;
   stripeCheckoutUrl?: string;
@@ -146,6 +148,7 @@ type EditableRegistration = {
   wantsCompetitorExtras: boolean;
   competitionJerseySize: string;
   competitionIds: string[];
+  applicantNotes: string;
   reviewNotes: string;
   amountEuros: string;
 };
@@ -316,6 +319,7 @@ function toEditable(
       registration.handisportPracticeLevel === "competition",
     competitionJerseySize: registration.competitionJerseySize ?? "",
     competitionIds: expandCompetitionIdsForForm(registration.competitionIds ?? []),
+    applicantNotes: registration.applicantNotes ?? "",
     reviewNotes: registration.reviewNotes ?? "",
     amountEuros:
       typeof registration.paymentAmountCents === "number"
@@ -567,6 +571,7 @@ export function MembershipRequestsClient() {
           wantsCompetitorExtras: form.wantsCompetitorExtras,
           competitionJerseySize: form.competitionJerseySize || undefined,
           competitionIds: form.competitionIds,
+          applicantNotes: form.applicantNotes.trim() || undefined,
           reviewNotes: form.reviewNotes,
           ...(amountCents !== null ? { paymentAmountCents: amountCents } : {}),
         }),
@@ -1141,6 +1146,22 @@ export function MembershipRequestsClient() {
                         </Button>
                       </Stack>
                     </Stack>
+
+                    <SectionTitle>Précisions de l&apos;inscrit</SectionTitle>
+                    <Grid container spacing={2}>
+                      <Grid size={{ xs: 12 }}>
+                        <TextField
+                          label="Message transmis avec le dossier"
+                          value={form.applicantNotes}
+                          onChange={(e) => updateField("applicantNotes", e.target.value)}
+                          fullWidth
+                          multiline
+                          minRows={3}
+                          inputProps={{ maxLength: APPLICANT_NOTES_MAX_LENGTH }}
+                          helperText="Saisi par l'inscrit en fin de parcours (facultatif)."
+                        />
+                      </Grid>
+                    </Grid>
 
                     <SectionTitle>Paiement et notes internes</SectionTitle>
                     <Grid container spacing={2}>

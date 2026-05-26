@@ -22,12 +22,14 @@ import type {
 } from "./registration-defaults";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import { buildAdminAidRecapFields } from "@/lib/club-registration/recap-aids";
+import { ApplicantNotesSection } from "./ApplicantNotesSection";
 import { PricingBreakdown } from "./PricingBreakdown";
 
 type Props = {
   draft: RegistrationDraft;
   accountEmail: string | null;
   onEditStep: (stepId: RegistrationStepId) => void;
+  onChange: (patch: Partial<RegistrationDraft>) => void;
 };
 
 const ROLE_LABELS: Record<Representative["role"], string> = {
@@ -198,7 +200,7 @@ function RecapBlock({
   );
 }
 
-export function RecapStep({ draft, accountEmail, onEditStep }: Props) {
+export function RecapStep({ draft, accountEmail, onEditStep, onChange }: Props) {
   const config = useRegistrationConfigValue();
   const additionalSections = draft.additionalSectionIds.map((id) =>
     findSectionLabel(config, id)
@@ -445,6 +447,11 @@ export function RecapStep({ draft, accountEmail, onEditStep }: Props) {
             value: draft.rulesAccepted ? "Accepté" : "Non accepté",
           },
         ]}
+      />
+
+      <ApplicantNotesSection
+        value={draft.applicantNotes ?? ""}
+        onChange={(applicantNotes) => onChange({ applicantNotes })}
       />
 
       <SectionCard
