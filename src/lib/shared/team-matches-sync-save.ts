@@ -1,38 +1,17 @@
 import type { Firestore } from "firebase-admin/firestore";
 import { Timestamp } from "firebase-admin/firestore";
 import type { MatchData } from "./team-matches-sync-types";
+import {
+  buildSqyRosterFromMatch,
+  hasMatchCompositionData,
+  playerNameKey,
+} from "./team-matches-roster-utils";
 
 type SyncPlayer = NonNullable<MatchData["joueursSQY"]>[number];
 type ResultPlayer = { nom: string; prenom: string; points?: number };
 
-function normalizeName(value: string | undefined): string {
-  return (value ?? "").trim().toUpperCase().replace(/\s+/g, " ");
-}
-
-function playerNameKey(player: { nom?: string; prenom?: string }): string {
-  return `${normalizeName(player.prenom)}|${normalizeName(player.nom)}`;
-}
-
 function buildPlayersFromResults(match: MatchData): ResultPlayer[] {
-  const details = match.resultatsIndividuels;
-  if (!details) return [];
-
-  const joueursA = Object.values(details.joueursA ?? {});
-  const joueursB = Object.values(details.joueursB ?? {});
-  if (joueursA.length === 0 && joueursB.length === 0) return [];
-
-  const nomEquipeA = normalizeName(details.nomEquipeA);
-  const nomEquipeB = normalizeName(details.nomEquipeB);
-
-  if (nomEquipeA.includes("SQY PING") && !nomEquipeB.includes("SQY PING")) {
-    return joueursA;
-  }
-  if (nomEquipeB.includes("SQY PING") && !nomEquipeA.includes("SQY PING")) {
-    return joueursB;
-  }
-
-  // Fallback défensif si les noms équipes sont absents/incohérents.
-  return joueursA.length >= joueursB.length ? joueursA : joueursB;
+  return buildSqyRosterFromMatch(match);
 }
 
 function reconcileJoueursSQY(match: MatchData): SyncPlayer[] {
@@ -56,15 +35,53 @@ function reconcileJoueursSQY(match: MatchData): SyncPlayer[] {
   return resultPlayers.map((player, index) => {
     const key = playerNameKey(player);
     const existing = existingByName.get(key);
+    const phantomKey = key === "|";
     return {
       id: existing?.id || `${key || "unknown"}_${index + 1}`,
       nom: player.nom || existing?.nom || "",
       prenom: player.prenom || existing?.prenom || "",
-      licence: existing?.licence || "",
+      licence: phantomKey ? "" : existing?.licence || "",
       points: typeof existing?.points === "number" ? existing.points : (player.points ?? 0),
       sexe: existing?.sexe || "M",
     };
   });
+}
+
+function mergeCompositionWithExisting(
+  match: MatchData,
+  reconciledJoueursSQY: SyncPlayer[],
+  existing: Record<string, unknown> | undefined
+): { joueursSQY: SyncPlayer[]; resultatsIndividuels: MatchData["resultatsIndividuels"] } {
+  const incomingHasComposition = hasMatchCompositionData({
+    joueursSQY: reconciledJoueursSQY,
+    resultatsIndividuels: match.resultatsIndividuels,
+  });
+
+  if (incomingHasComposition || !existing) {
+    return {
+      joueursSQY: reconciledJoueursSQY,
+      resultatsIndividuels: match.resultatsIndividuels,
+    };
+  }
+
+  const existingJoueursSQY = existing.joueursSQY as MatchData["joueursSQY"];
+  const existingResultats = existing.resultatsIndividuels as MatchData["resultatsIndividuels"];
+  const existingHasComposition = hasMatchCompositionData({
+    joueursSQY: existingJoueursSQY,
+    resultatsIndividuels: existingResultats,
+  });
+
+  if (existingHasComposition) {
+    return {
+      joueursSQY: (existingJoueursSQY ?? []) as SyncPlayer[],
+      resultatsIndividuels: existingResultats ?? match.resultatsIndividuels,
+    };
+  }
+
+  return {
+    joueursSQY: reconciledJoueursSQY,
+    resultatsIndividuels: match.resultatsIndividuels,
+  };
 }
 
 export async function saveMatchesToTeamSubcollections(
@@ -149,6 +166,22 @@ export async function saveMatchesToTeamSubcollections(
         `💾 Préparation de ${teamMatches.length} matchs pour ${safeTeamId}...`
       );
 
+      const existingByMatchId = new Map<string, Record<string, unknown>>();
+      const matchRefs = teamMatches
+        .map((m) => (typeof m.id === "string" ? m.id.trim() : ""))
+        .filter((id) => id.length > 0)
+        .map((id) =>
+          db.collection("teams").doc(safeTeamId).collection("matches").doc(id)
+        );
+      if (matchRefs.length > 0) {
+        const existingDocs = await db.getAll(...matchRefs);
+        existingDocs.forEach((doc) => {
+          if (doc.exists) {
+            existingByMatchId.set(doc.id, doc.data() as Record<string, unknown>);
+          }
+        });
+      }
+
       for (let i = 0; i < teamMatches.length; i += batchSize) {
         const batch = db.batch();
         const batchEnd = Math.min(i + batchSize, teamMatches.length);
@@ -170,9 +203,16 @@ export async function saveMatchesToTeamSubcollections(
             .doc(matchId);
 
           const reconciledJoueursSQY = reconcileJoueursSQY(match);
+          const mergedComposition = mergeCompositionWithExisting(
+            match,
+            reconciledJoueursSQY,
+            existingByMatchId.get(matchId)
+          );
 
           const matchData = {
             ...match,
+            joueursSQY: mergedComposition.joueursSQY,
+            resultatsIndividuels: mergedComposition.resultatsIndividuels,
             date: Timestamp.fromDate(match.date),
             createdAt: Timestamp.fromDate(match.createdAt),
             updatedAt: Timestamp.fromDate(match.updatedAt),

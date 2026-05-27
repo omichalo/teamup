@@ -21,6 +21,12 @@ import {
   type MatchCompositionRow,
 } from "@/components/compositions/CompositionsTable";
 import {
+  compareMatchesByJourneeThenDate,
+  compositionPlayerKey,
+  getSQYCompositionPlayers,
+  isPlayedTeamMatch,
+} from "@/lib/shared/match-composition-utils";
+import {
   computeVictoiresDefaitesFromParties,
   playerNameMatches,
 } from "@/lib/shared/victoires-defaites";
@@ -77,39 +83,6 @@ type CompositionPlayer = {
   points?: number | null;
 };
 
-function hasNamedPlayers(players: CompositionPlayer[]): boolean {
-  return players.some(
-    (p) => ((p.nom ?? "").trim().length > 0 || (p.prenom ?? "").trim().length > 0)
-  );
-}
-
-function getSQYCompositionPlayers(match: Match): CompositionPlayer[] {
-  const joueursSQY = (match.joueursSQY ?? []) as CompositionPlayer[];
-  if (joueursSQY.length > 0 && hasNamedPlayers(joueursSQY)) {
-    return joueursSQY;
-  }
-
-  const resultats = match.resultatsIndividuels;
-  if (!resultats) return [];
-
-  const joueursA = Object.values(resultats.joueursA ?? {});
-  const joueursB = Object.values(resultats.joueursB ?? {});
-  if (joueursA.length === 0 && joueursB.length === 0) {
-    return [];
-  }
-
-  const nomEquipeA = (resultats.nomEquipeA ?? "").toUpperCase();
-  const nomEquipeB = (resultats.nomEquipeB ?? "").toUpperCase();
-  const sqyInA = nomEquipeA.includes("SQY PING");
-  const sqyInB = nomEquipeB.includes("SQY PING");
-
-  if (sqyInA && !sqyInB) return joueursA;
-  if (sqyInB && !sqyInA) return joueursB;
-
-  // Fallback défensif si les noms d'équipe sont absents/incohérents.
-  return ourSideIsA(match) ? joueursA : joueursB;
-}
-
 /**
  * Calcule victoires/défaites par joueur pour un match (simples uniquement, logique partagée avec l'API).
  */
@@ -133,7 +106,7 @@ function computeVictoiresDefaitesForMatch(
       playerNameMatches(playerName, j.nom ?? "", j.prenom ?? "")
     );
     if (!joueur) return null;
-    return (joueur.licence ?? "").trim() || `${(joueur.nom ?? "").trim()}|${(joueur.prenom ?? "").trim()}`;
+    return compositionPlayerKey(joueur);
   };
   return computeVictoiresDefaitesFromParties(
     partieLike,
@@ -164,9 +137,10 @@ export function EquipeAccordion({
         : equipeWithMatches.matches;
 
   const matchesForTable: MatchCompositionRow[] = React.useMemo(() => {
-    const sorted = [...displayMatches].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    const playedMatches = displayMatches.filter(
+      (m) => isPlayedTeamMatch(m) && getSQYCompositionPlayers(m).length > 0
     );
+    const sorted = [...playedMatches].sort(compareMatchesByJourneeThenDate);
     return sorted.map((m) => {
       const compositionPlayers = getSQYCompositionPlayers(m);
       const vdByPlayer = computeVictoiresDefaitesForMatch(m, compositionPlayers);
@@ -179,9 +153,7 @@ export function EquipeAccordion({
         otherTeamName: m.opponent || "Adversaire",
         ...(m.score ? { score: m.score } : {}),
         composition: compositionPlayers.map((j) => {
-          const key =
-            (j.licence ?? "").trim() ||
-            `${(j.nom ?? "").trim()}|${(j.prenom ?? "").trim()}`;
+          const key = compositionPlayerKey(j);
           const vd = vdByPlayer.get(key) ?? { victoires: 0, defaites: 0 };
           return {
             nom: j.nom ?? "",
