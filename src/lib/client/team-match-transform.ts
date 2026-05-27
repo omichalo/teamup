@@ -115,7 +115,10 @@ export const transformAggregatedTeamEntry = (
       isExempt: Boolean(match.isExempt),
       isForfeit: Boolean(match.isForfeit),
       phase: (match.phase as string) || "aller",
-      journee: (match.journee as number) || 0,
+      journee:
+        typeof match.journee === "number" && match.journee > 0
+          ? match.journee
+          : 0,
       createdAt: toDate(match.createdAt),
       updatedAt: toDate(match.updatedAt),
     };

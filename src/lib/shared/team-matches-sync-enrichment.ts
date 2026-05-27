@@ -1,5 +1,6 @@
 import type { Firestore } from "firebase-admin/firestore";
 import type { MatchData, PlayerSearch } from "./team-matches-sync-types";
+import { hasUsablePlayerName } from "./team-matches-roster-utils";
 
 /**
  * Extrait l'ID du club depuis le lien de rencontre.
@@ -38,7 +39,10 @@ export async function enrichSQYPlayersFromClub(
     }
 
     const enrichedJoueursSQY = match.joueursSQY.map((joueur) => {
-      if (!joueur.licence || joueur.licence.trim() === "") {
+      if (
+        (!joueur.licence || joueur.licence.trim() === "") &&
+        hasUsablePlayerName(joueur)
+      ) {
         const normalizeName = (name: string) =>
           name
             .toLowerCase()
