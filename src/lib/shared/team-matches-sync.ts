@@ -18,6 +18,7 @@ import {
 } from "./team-matches-sync-enrichment";
 import { recalculateJourneesByDate } from "./team-matches-sync-journee";
 import { saveMatchesToTeamSubcollections } from "./team-matches-sync-save";
+import { listLicensedSqyPlayersInMatch } from "./match-composition-utils";
 
 export type {
   TeamMatchesSyncResult,
@@ -507,11 +508,10 @@ export class TeamMatchesSyncService {
           // Note: resultatsIndividuels ne contient pas de licence, on utilise joueursSQY
 
           // Vérifier aussi joueursSQY (nouveau format)
-          if (hasPlayers) {
-            for (const joueur of match.joueursSQY!) {
-              if (joueur.licence && joueur.licence.trim() !== "") {
-                participatingPlayers.add(joueur.licence);
-              }
+          for (const player of listLicensedSqyPlayersInMatch(match)) {
+            const licence = player.licence?.trim();
+            if (licence) {
+              participatingPlayers.add(licence);
             }
           }
         }
@@ -541,11 +541,10 @@ export class TeamMatchesSyncService {
 
         if (hasPlayers || hasResults || hasScore) {
           // Vérifier aussi joueursSQY (nouveau format)
-          if (hasPlayers) {
-            for (const joueur of match.joueursSQY!) {
-              if (joueur.licence && joueur.licence.trim() !== "") {
-                participatingPlayersParis.add(joueur.licence);
-              }
+          for (const player of listLicensedSqyPlayersInMatch(match)) {
+            const licence = player.licence?.trim();
+            if (licence) {
+              participatingPlayersParis.add(licence);
             }
           }
         }
@@ -604,35 +603,28 @@ export class TeamMatchesSyncService {
         const phase = match.phase || "aller";
         const teamNumber = match.teamNumber;
 
-        // Parcourir les joueurs SQY de ce match
-        if (match.joueursSQY && Array.isArray(match.joueursSQY)) {
-          for (const joueur of match.joueursSQY) {
-            const playerLicence = joueur.licence;
-
-            // Ignorer les joueurs sans licence
-            if (!playerLicence || playerLicence.trim() === "") {
-              continue;
-            }
-
-            // Initialiser les structures si nécessaire
-            if (!matchCountMap.has(playerLicence)) {
-              matchCountMap.set(playerLicence, new Map());
-            }
-
-            const phaseMap = matchCountMap.get(playerLicence)!;
-            if (!phaseMap.has(phase)) {
-              phaseMap.set(phase, new Map());
-            }
-
-            const teamMap = phaseMap.get(phase)!;
-            if (!teamMap.has(teamNumber)) {
-              teamMap.set(teamNumber, 0);
-            }
-
-            // Incrémenter le compteur
-            const currentCount = teamMap.get(teamNumber)!;
-            teamMap.set(teamNumber, currentCount + 1);
+        for (const joueur of listLicensedSqyPlayersInMatch(match)) {
+          const playerLicence = joueur.licence?.trim();
+          if (!playerLicence) {
+            continue;
           }
+
+          if (!matchCountMap.has(playerLicence)) {
+            matchCountMap.set(playerLicence, new Map());
+          }
+
+          const phaseMap = matchCountMap.get(playerLicence)!;
+          if (!phaseMap.has(phase)) {
+            phaseMap.set(phase, new Map());
+          }
+
+          const teamMap = phaseMap.get(phase)!;
+          if (!teamMap.has(teamNumber)) {
+            teamMap.set(teamNumber, 0);
+          }
+
+          const currentCount = teamMap.get(teamNumber)!;
+          teamMap.set(teamNumber, currentCount + 1);
         }
       }
 
@@ -712,7 +704,6 @@ export class TeamMatchesSyncService {
               // Règle FFTT championnat par équipes : Un joueur est brûlé dans l'équipe où il a joué son 2ème match
               // (en comptant tous les matchs dans l'ordre croissant des numéros d'équipe)
               // Exemple : {1: 3, 2: 1} -> liste triée : [1, 1, 1, 2] -> 2ème match = équipe 1
-              
               // Créer une liste de tous les matchs triés par numéro d'équipe croissant
               const allMatches: number[] = [];
               for (const [teamNumber, matchCount] of matchesByTeamInPhase) {
@@ -867,6 +858,41 @@ export class TeamMatchesSyncService {
         }
       }
 
+      type BurnoutTeamByPhase = { aller?: number; retour?: number };
+      type BurnoutPhaseFieldUpdate =
+        | BurnoutTeamByPhase
+        | FieldValue
+        | undefined;
+
+      /** Recalcule le champ brûlé par phase ; supprime les valeurs obsolètes (ex. 1 seul match). */
+      const resolveBurnoutByPhaseFieldUpdate = (
+        computedByPhase: Map<string, number> | undefined,
+        existing: BurnoutTeamByPhase | undefined
+      ): BurnoutPhaseFieldUpdate => {
+        if (computedByPhase && computedByPhase.size > 0) {
+          const next: BurnoutTeamByPhase = {};
+          for (const [phase, teamNumber] of computedByPhase) {
+            if (phase === "aller" || phase === "retour") {
+              next[phase] = teamNumber;
+            }
+          }
+          if (Object.keys(next).length === 0) {
+            return existing !== undefined ? FieldValue.delete() : undefined;
+          }
+          if (
+            existing?.aller === next.aller &&
+            existing?.retour === next.retour
+          ) {
+            return undefined;
+          }
+          return next;
+        }
+        if (existing !== undefined) {
+          return FieldValue.delete();
+        }
+        return undefined;
+      };
+
       for (const playerId of playerIds) {
         try {
           const playerData = playerDataMap.get(playerId);
@@ -908,118 +934,24 @@ export class TeamMatchesSyncService {
               updates["participation.championnatParis"] = true;
             }
 
-            // Mettre à jour highestMasculineTeamNumberByPhase si le joueur est brûlé en masculin
-            const highestMasculineBurnedTeamByPhase =
-              highestMasculineBurnedTeamByPlayerByPhase.get(playerId);
-            const hasMasculineMatches =
-              masculineMatchesByTeamByPlayerByPhase.has(playerId);
-
-            if (highestMasculineBurnedTeamByPhase) {
-              // Le joueur est brûlé en masculin pour au moins une phase
-              const currentHighestByPhase =
-                (playerData?.highestMasculineTeamNumberByPhase as
-                  | { aller?: number; retour?: number }
-                  | undefined) || {};
-
-              const newHighestByPhase: {
-                aller?: number;
-                retour?: number;
-              } = { ...currentHighestByPhase };
-
-              // Mettre à jour pour chaque phase
-              for (const [
-                phase,
-                burnedTeam,
-              ] of highestMasculineBurnedTeamByPhase) {
-                if (phase === "aller" || phase === "retour") {
-                  const currentHighest = currentHighestByPhase[phase] ?? null;
-
-                  // Mettre à jour si la valeur actuelle est absente ou si la nouvelle valeur est différente
-                  // La valeur calculée est la source de vérité basée sur les matchs réels
-                  if (
-                    currentHighest === null ||
-                    burnedTeam !== currentHighest
-                  ) {
-                    newHighestByPhase[phase] = burnedTeam;
-                  }
-                }
-              }
-
-              // Si au moins une phase a été mise à jour, sauvegarder
-              const hasChanges = Object.keys(newHighestByPhase).some(
-                (phase) =>
-                  newHighestByPhase[phase as "aller" | "retour"] !==
-                  currentHighestByPhase[phase as "aller" | "retour"]
-              );
-
-              if (hasChanges || Object.keys(newHighestByPhase).length > 0) {
-                updates.highestMasculineTeamNumberByPhase = newHighestByPhase;
-              }
-            } else if (!hasMasculineMatches) {
-              // Le joueur n'a plus de matchs masculins, supprimer le brûlage si le champ existe
-              if (
-                (playerData?.highestMasculineTeamNumberByPhase as unknown) !==
-                undefined
-              ) {
-                updates.highestMasculineTeamNumberByPhase = FieldValue.delete();
-              }
+            const masculineBurnUpdate = resolveBurnoutByPhaseFieldUpdate(
+              highestMasculineBurnedTeamByPlayerByPhase.get(playerId),
+              playerData?.highestMasculineTeamNumberByPhase as
+                | BurnoutTeamByPhase
+                | undefined
+            );
+            if (masculineBurnUpdate !== undefined) {
+              updates.highestMasculineTeamNumberByPhase = masculineBurnUpdate;
             }
 
-            // Mettre à jour highestFeminineTeamNumberByPhase si le joueur est brûlé en féminin
-            const highestFeminineBurnedTeamByPhase =
-              highestFeminineBurnedTeamByPlayerByPhase.get(playerId);
-            const hasFeminineMatches =
-              feminineMatchesByTeamByPlayerByPhase.has(playerId);
-
-            if (highestFeminineBurnedTeamByPhase) {
-              // Le joueur est brûlé en féminin pour au moins une phase
-              const currentHighestByPhase =
-                (playerData?.highestFeminineTeamNumberByPhase as
-                  | { aller?: number; retour?: number }
-                  | undefined) || {};
-
-              const newHighestByPhase: {
-                aller?: number;
-                retour?: number;
-              } = { ...currentHighestByPhase };
-
-              // Mettre à jour pour chaque phase
-              for (const [
-                phase,
-                burnedTeam,
-              ] of highestFeminineBurnedTeamByPhase) {
-                if (phase === "aller" || phase === "retour") {
-                  const currentHighest = currentHighestByPhase[phase] ?? null;
-
-                  // Mettre à jour si la valeur actuelle est absente ou si la nouvelle valeur est différente
-                  // La valeur calculée est la source de vérité basée sur les matchs réels
-                  if (
-                    currentHighest === null ||
-                    burnedTeam !== currentHighest
-                  ) {
-                    newHighestByPhase[phase] = burnedTeam;
-                  }
-                }
-              }
-
-              // Si au moins une phase a été mise à jour, sauvegarder
-              const hasChanges = Object.keys(newHighestByPhase).some(
-                (phase) =>
-                  newHighestByPhase[phase as "aller" | "retour"] !==
-                  currentHighestByPhase[phase as "aller" | "retour"]
-              );
-
-              if (hasChanges || Object.keys(newHighestByPhase).length > 0) {
-                updates.highestFeminineTeamNumberByPhase = newHighestByPhase;
-              }
-            } else if (!hasFeminineMatches) {
-              // Le joueur n'a plus de matchs féminins, supprimer le brûlage si le champ existe
-              if (
-                (playerData?.highestFeminineTeamNumberByPhase as unknown) !==
-                undefined
-              ) {
-                updates.highestFeminineTeamNumberByPhase = FieldValue.delete();
-              }
+            const feminineBurnUpdate = resolveBurnoutByPhaseFieldUpdate(
+              highestFeminineBurnedTeamByPlayerByPhase.get(playerId),
+              playerData?.highestFeminineTeamNumberByPhase as
+                | BurnoutTeamByPhase
+                | undefined
+            );
+            if (feminineBurnUpdate !== undefined) {
+              updates.highestFeminineTeamNumberByPhase = feminineBurnUpdate;
             }
 
             // Mettre à jour masculineMatchesByTeamByPhase pour l'affichage dans le tooltip
@@ -1068,55 +1000,14 @@ export class TeamMatchesSyncService {
               updates.feminineMatchesByTeamByPhase = matchesByTeamByPhaseObj;
             }
 
-            // Mettre à jour highestTeamNumberByPhaseParis si le joueur est brûlé au championnat de Paris (mixte)
-            const highestBurnedTeamByPhaseParis =
-              highestBurnedTeamByPlayerByPhaseParis.get(playerId);
-            const hasMatchesParis =
-              matchesByTeamByPlayerByPhaseParis.has(playerId);
-
-            if (highestBurnedTeamByPhaseParis) {
-              // Le joueur est brûlé pour au moins une phase (Paris)
-              const currentHighestByPhase =
-                (playerData?.highestTeamNumberByPhaseParis as
-                  | { aller?: number; retour?: number }
-                  | undefined) || {};
-
-              const newHighestByPhase: {
-                aller?: number;
-                retour?: number;
-              } = { ...currentHighestByPhase };
-
-              // Mettre à jour pour chaque phase
-              for (const [phase, burnedTeam] of highestBurnedTeamByPhaseParis) {
-                if (phase === "aller" || phase === "retour") {
-                  const currentHighest = currentHighestByPhase[phase] ?? null;
-
-                  if (
-                    currentHighest === null ||
-                    burnedTeam !== currentHighest
-                  ) {
-                    newHighestByPhase[phase] = burnedTeam;
-                  }
-                }
-              }
-
-              const hasChanges = Object.keys(newHighestByPhase).some(
-                (phase) =>
-                  newHighestByPhase[phase as "aller" | "retour"] !==
-                  currentHighestByPhase[phase as "aller" | "retour"]
-              );
-
-              if (hasChanges || Object.keys(newHighestByPhase).length > 0) {
-                updates.highestTeamNumberByPhaseParis = newHighestByPhase;
-              }
-            } else if (!hasMatchesParis) {
-              // Le joueur n'a plus de matchs Paris, supprimer le brûlage si le champ existe
-              if (
-                (playerData?.highestTeamNumberByPhaseParis as unknown) !==
-                undefined
-              ) {
-                updates.highestTeamNumberByPhaseParis = FieldValue.delete();
-              }
+            const parisBurnUpdate = resolveBurnoutByPhaseFieldUpdate(
+              highestBurnedTeamByPlayerByPhaseParis.get(playerId),
+              playerData?.highestTeamNumberByPhaseParis as
+                | BurnoutTeamByPhase
+                | undefined
+            );
+            if (parisBurnUpdate !== undefined) {
+              updates.highestTeamNumberByPhaseParis = parisBurnUpdate;
             }
 
             // Mettre à jour matchesByTeamByPhaseParis pour l'affichage dans le tooltip

@@ -40,19 +40,7 @@ function formatDate(dateStr: string): string {
   return dateStr;
 }
 
-type PlayerKey = string;
-
-function isMissingPlayer(j: { nom: string; prenom: string }): boolean {
-  const nomTrim = (j.nom ?? "").trim();
-  const prenomTrim = (j.prenom ?? "").trim();
-  return nomTrim === "" && prenomTrim === "";
-}
-
-function playerKey(j: { nom: string; prenom: string; licence?: string }): PlayerKey {
-  const licence = (j.licence ?? "").trim();
-  if (licence) return licence;
-  return `${(j.nom ?? "").trim()}|${(j.prenom ?? "").trim()}`;
-}
+import { buildPlayersByMatchIndex } from "./compositions-table-utils";
 
 function formatPlayerLabel(j: {
   nom: string;
@@ -71,62 +59,16 @@ function formatPlayerLabel(j: {
   return `${namePart}${pts}`;
 }
 
-function findPlayerPositionInMatch(
-  key: PlayerKey,
-  composition: MatchCompositionRow["composition"]
-): number {
-  return composition.findIndex((j) => playerKey(j) === key);
-}
-
 export interface CompositionsTableProps {
   matches: MatchCompositionRow[];
 }
 
 /** Tableau joueurs × journées : une ligne par joueur, une colonne par match. */
 export function CompositionsTable({ matches }: CompositionsTableProps) {
-  const { allPlayers, cellByPlayerAndMatch } = React.useMemo(() => {
-    const keyToPlayer = new Map<
-      PlayerKey,
-      { nom: string; prenom: string; points: number | null; licence?: string }
-    >();
-    for (const m of matches) {
-      for (const j of m.composition) {
-        if (isMissingPlayer(j)) continue;
-        const k = playerKey(j);
-        if (!keyToPlayer.has(k)) {
-          keyToPlayer.set(k, {
-            nom: j.nom,
-            prenom: j.prenom,
-            points: j.points ?? null,
-            ...(j.licence ? { licence: j.licence } : {}),
-          });
-        }
-      }
-    }
-    const allPlayers = Array.from(keyToPlayer.entries()).map(([key, p]) => ({ key, ...p }));
-    const cellByPlayerAndMatch = new Map<
-      string,
-      { position: number; victoires: number; defaites: number }
-    >();
-    for (const { key } of allPlayers) {
-      for (let matchIdx = 0; matchIdx < matches.length; matchIdx++) {
-        const compo = matches[matchIdx].composition;
-        const pos = findPlayerPositionInMatch(key, compo);
-        const cellKey = `${key}|${matchIdx}`;
-        if (pos >= 0) {
-          const j = compo[pos];
-          const victoires = typeof j.victoires === "number" ? j.victoires : 0;
-          const defaites = typeof j.defaites === "number" ? j.defaites : 0;
-          cellByPlayerAndMatch.set(cellKey, {
-            position: pos + 1,
-            victoires,
-            defaites,
-          });
-        }
-      }
-    }
-    return { allPlayers, cellByPlayerAndMatch };
-  }, [matches]);
+  const { allPlayers, cellByPlayerAndMatch } = React.useMemo(
+    () => buildPlayersByMatchIndex(matches),
+    [matches]
+  );
 
   if (allPlayers.length === 0) {
     return (
@@ -161,12 +103,15 @@ export function CompositionsTable({ matches }: CompositionsTableProps) {
                     <br />
                     {formatDate(m.date)}
                     {m.score != null ? ` — ${m.score}` : ""}
+                    {m.journee && m.journee > 0 && m.journee !== idx + 1
+                      ? ` (journée FFTT ${m.journee})`
+                      : ""}
                   </Box>
                 }
                 placement="top"
               >
                 <span style={{ cursor: "help", textDecoration: "underline dotted" }}>
-                  J{m.journee ?? idx + 1}
+                  J{idx + 1}
                 </span>
               </Tooltip>
             </TableCell>
@@ -178,9 +123,9 @@ export function CompositionsTable({ matches }: CompositionsTableProps) {
           <TableRow key={key} hover sx={{ "&:nth-of-type(even)": { bgcolor: "grey.50" } }}>
             <TableCell sx={{ fontWeight: 500 }}>
               {formatPlayerLabel({
-                nom,
-                prenom,
-                points,
+                nom: nom ?? "",
+                prenom: prenom ?? "",
+                ...(points !== undefined ? { points } : {}),
                 ...(licence ? { licence } : {}),
               })}
             </TableCell>
