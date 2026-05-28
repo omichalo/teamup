@@ -1,38 +1,17 @@
 import { jsonNoStore } from "@/lib/http/cache-headers";
-import { cookies } from "next/headers";
-import { adminAuth, adminDb } from "@/lib/firebase-admin";
-import { hasAnyRole, resolveRole, USER_ROLES } from "@/lib/auth/roles";
+import { adminDb } from "@/lib/firebase-admin";
+import { USER_ROLES } from "@/lib/auth/roles";
+import { withAuth } from "@/lib/auth/api-utils";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+/**
+ * GET /api/locations
+ * Récupère la liste des lieux (villes) configurés.
+ * Accès réservé aux administrateurs et coachs.
+ */
+export const GET = withAuth(async () => {
   try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-
-    if (!sessionCookie) {
-      return jsonNoStore(
-        { success: false, error: "Authentification requise" },
-        { status: 401 }
-      );
-    }
-
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    if (!decoded.email_verified) {
-      return jsonNoStore(
-        { success: false, error: "Email non vérifié" },
-        { status: 403 }
-      );
-    }
-
-    const role = resolveRole(decoded.role as string | undefined);
-    if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
-      return jsonNoStore(
-        { success: false, error: "Accès refusé" },
-        { status: 403 }
-      );
-    }
-
     const locationsRef = adminDb.collection("locations");
     const snapshot = await locationsRef.orderBy("name", "asc").get();
 
@@ -55,4 +34,4 @@ export async function GET() {
       { status: 500 }
     );
   }
-}
+}, [USER_ROLES.ADMIN, USER_ROLES.COACH]);
