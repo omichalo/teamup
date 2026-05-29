@@ -1,10 +1,10 @@
 import { jsonNoStore } from "@/lib/http/cache-headers";
-import { adminAuth } from "@/lib/firebase-admin";
+import { adminAuth, initializeFirebaseAdmin } from "@/lib/firebase-admin";
 import { sendMail } from "@/lib/mailer";
 import { readFile } from "fs/promises";
 import path from "path";
-import { getFirebaseErrorMessage } from "@/lib/firebase-error-utils";
 import { checkRateLimit } from "@/lib/auth/rate-limit";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
 
 export const runtime = "nodejs";
 
@@ -19,16 +19,26 @@ function getAuthErrorCode(error: unknown): string {
 
 export async function POST(req: Request) {
   try {
+    await initializeFirebaseAdmin();
+
+    // Protection CSRF
+    if (!validateOrigin(req)) {
+      return jsonNoStore(
+        { success: false, error: "Requête non autorisée" },
+        { status: 403 }
+      );
+    }
+
     const { email } = await req.json();
     if (!email || typeof email !== "string") {
-      return jsonNoStore({ error: "Email requis" }, { status: 400 });
+      return jsonNoStore({ success: false, error: "Email requis" }, { status: 400 });
     }
 
     // Validation du format email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return jsonNoStore(
-        { error: "Format d'email invalide" },
+        { success: false, error: "Format d'email invalide" },
         { status: 400 }
       );
     }
@@ -38,6 +48,7 @@ export async function POST(req: Request) {
     if (!rateLimitResult.allowed) {
       return jsonNoStore(
         {
+          success: false,
           error: "Trop de requêtes",
           message: `Veuillez patienter avant de renvoyer un email. Prochaine tentative possible dans ${Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000 / 60)} minutes.`,
         },
@@ -109,19 +120,17 @@ export async function POST(req: Request) {
         errorMessage.includes("USER_NOT_FOUND") ||
         errorMessage.includes("no user record")
       ) {
-        return jsonNoStore(
-          { error: "Utilisateur non trouvé", message: "Aucun compte n'est associé à cet email" },
-          { status: 404 }
-        );
+        // Sécurité : Ne pas révéler si l'utilisateur existe
+        return jsonNoStore({ success: true, ok: true });
       }
-      
+
       if (
         authCode === "auth/invalid-email" ||
         errorMessage.includes("invalid-email") ||
         errorMessage.includes("INVALID_EMAIL")
       ) {
         return jsonNoStore(
-          { error: "Email invalide", message: "L'adresse email n'est pas valide" },
+          { success: false, error: "Email invalide", message: "L'adresse email n'est pas valide" },
           { status: 400 }
         );
       }
@@ -129,7 +138,7 @@ export async function POST(req: Request) {
       // Autres erreurs Firebase
       console.error("[send-verification] Erreur Firebase:", error);
       return jsonNoStore(
-        { error: "Erreur lors de la génération du lien", message: getFirebaseErrorMessage(error) },
+        { success: false, error: "Une erreur est survenue lors de la génération du lien" },
         { status: 500 }
       );
     }
@@ -175,24 +184,23 @@ export async function POST(req: Request) {
     } catch (error) {
       console.error("[send-verification] Erreur lors de l'envoi de l'email:", error);
       return jsonNoStore(
-        { error: "Erreur lors de l'envoi de l'email", message: "Impossible d'envoyer l'email de vérification" },
+        { success: false, error: "Impossible d'envoyer l'email de vérification" },
         { status: 500 }
       );
     }
 
-    return jsonNoStore({ ok: true });
+    return jsonNoStore({ success: true, ok: true });
   } catch (error) {
     // Logger l'erreur complète côté serveur pour le débogage
     console.error("[send-verification] error", error);
     
-    // Retourner un message filtré au client avec le bon code HTTP
-    const errorMessage = getFirebaseErrorMessage(error);
     const errorString = error instanceof Error ? error.message : String(error);
     
     // Déterminer le code HTTP approprié
     let statusCode = 500;
     if (errorString.includes("user-not-found") || errorString.includes("USER_NOT_FOUND")) {
-      statusCode = 404;
+      // Sécurité : Ne pas révéler si l'utilisateur existe
+      return jsonNoStore({ success: true, ok: true });
     } else if (errorString.includes("invalid-email") || errorString.includes("INVALID_EMAIL")) {
       statusCode = 400;
     } else if (errorString.includes("too-many-requests") || errorString.includes("TOO_MANY_REQUESTS")) {
@@ -200,7 +208,7 @@ export async function POST(req: Request) {
     }
 
     return jsonNoStore(
-      { error: errorMessage },
+      { success: false, error: "Une erreur est survenue lors de la demande de vérification" },
       { status: statusCode }
     );
   }
