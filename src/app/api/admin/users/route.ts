@@ -1,34 +1,14 @@
-export const runtime = "nodejs";
-
 import { jsonNoStore } from "@/lib/http/cache-headers";
-import { cookies } from "next/headers";
 import type { DocumentData, QueryDocumentSnapshot, Query } from "firebase-admin/firestore";
-import { adminAuth, getFirestoreAdmin } from "@/lib/firebase-admin";
-import { hasAnyRole, USER_ROLES, resolveRole, resolveCoachRequestStatus } from "@/lib/auth/roles";
+import { adminAuth, adminDb } from "@/lib/firebase-admin";
+import { USER_ROLES, resolveRole, resolveCoachRequestStatus } from "@/lib/auth/roles";
+import { withAuth } from "@/lib/auth/api-utils";
 import type { User } from "@/types";
 
-export async function GET() {
+export const runtime = "nodejs";
+
+export const GET = withAuth(async () => {
   try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-    if (!sessionCookie) {
-      return jsonNoStore(
-        { success: false, error: "Session cookie requis" },
-        { status: 401 }
-      );
-    }
-
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    const role = resolveRole(decoded.role as string | undefined);
-    if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
-      return jsonNoStore(
-        { success: false, error: "Accès refusé" },
-        { status: 403 }
-      );
-    }
-
-    const firestore = getFirestoreAdmin();
-
     // Récupérer tous les utilisateurs avec pagination
     const authUsersList: Awaited<ReturnType<typeof adminAuth.listUsers>>["users"] = [];
     let nextPageToken: string | undefined;
@@ -48,9 +28,9 @@ export async function GET() {
     const userProfilesMap = new Map<string, DocumentData>();
     let lastDoc: QueryDocumentSnapshot | null = null;
     let hasMore = true;
-    
+
     while (hasMore) {
-      let usersQuery: Query<DocumentData> = firestore.collection("users");
+      let usersQuery: Query<DocumentData> = adminDb.collection("users");
       if (lastDoc) {
         usersQuery = usersQuery.startAfter(lastDoc);
       }
@@ -173,6 +153,6 @@ export async function GET() {
       { status: 500 }
     );
   }
-}
+}, [USER_ROLES.ADMIN]);
 
 
