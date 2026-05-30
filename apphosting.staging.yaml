@@ -1,0 +1,131 @@
+# Overrides App Hosting pour le backend staging (sqyping-teamup-dev).
+# Fusionné avec apphosting.yaml lorsque Environment name = "staging".
+# Firebase client : FIREBASE_WEBAPP_CONFIG est injecté au build (voir src/lib/firebase.ts).
+
+runConfig:
+  minInstances: 0
+  cpu: 1
+  memoryMiB: 512
+  concurrency: 80
+
+env:
+  # Firebase client (sqyping-teamup-dev) — override apphosting.yaml (prod) après fusion
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: AIzaSyDFcEfGk4_-OENR-SWy29QnoC5I9wMmbC0
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: sqyping-teamup-dev.firebaseapp.com
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: sqyping-teamup-dev
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: sqyping-teamup-dev.firebasestorage.app
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "544871588374"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: 1:544871588374:web:095f855304c8684c78cb37
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # URL publique du backend staging (teamup-staging sur sqyping-teamup-dev)
+  - variable: NEXT_PUBLIC_APP_URL
+    value: https://teamup-staging--sqyping-teamup-dev.us-east4.hosted.app
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: APP_URL
+    value: https://teamup-staging--sqyping-teamup-dev.us-east4.hosted.app
+    availability:
+      - RUNTIME
+
+  - variable: DEBUG
+    value: "true"
+    availability:
+      - RUNTIME
+
+  # Secrets : mêmes noms que prod, valeurs distinctes dans Secret Manager (projet teamup-dev).
+  # Créer / copier via : firebase apphosting:secrets:set SECRET_NAME --project sqyping-teamup-dev
+  - variable: ID_FFTT
+    secret: fftt-id-secret
+    availability:
+      - RUNTIME
+
+  - variable: PWD_FFTT
+    secret: fftt-pwd-secret
+    availability:
+      - RUNTIME
+
+  - variable: SMTP_USER
+    secret: SMTP_USER
+    availability:
+      - RUNTIME
+
+  - variable: SMTP_PASS
+    secret: SMTP_PASS
+    availability:
+      - RUNTIME
+
+  - variable: SMTP_HOST
+    secret: SMTP_HOST
+    availability:
+      - RUNTIME
+
+  - variable: SMTP_PORT
+    secret: SMTP_PORT
+    availability:
+      - RUNTIME
+
+  - variable: DISCORD_TOKEN
+    secret: DISCORD_TOKEN
+    availability:
+      - RUNTIME
+
+  - variable: DISCORD_PUBLIC_KEY
+    secret: DISCORD_PUBLIC_KEY
+    availability:
+      - RUNTIME
+
+  - variable: DISCORD_APPLICATION_ID
+    secret: DISCORD_APPLICATION_ID
+    availability:
+      - RUNTIME
+
+  - variable: DISCORD_SERVER_ID
+    secret: DISCORD_SERVER_ID
+    availability:
+      - RUNTIME
+
+  - variable: CSRF_SECRET
+    secret: CSRF_SECRET
+    availability:
+      - RUNTIME
+
+  - variable: STRIPE_SECRET_KEY
+    secret: STRIPE_SECRET_KEY
+    availability:
+      - RUNTIME
+
+  - variable: STRIPE_WEBHOOK_SECRET
+    secret: STRIPE_WEBHOOK_SECRET
+    availability:
+      - RUNTIME
