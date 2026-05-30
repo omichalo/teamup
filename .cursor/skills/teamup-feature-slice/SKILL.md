@@ -20,8 +20,8 @@ description: >-
 3. **Rôles** : `AuthGuard` côté page aligné avec `hasAnyRole` / admin-only sur les routes concernées.
 4. **Firestore** : nouvelle collection → mettre à jour `firestore.rules` + index si requêtes composées ; principe du moindre privilège.
 5. **Paiement / webhook** : signature, idempotence, pas de secrets en logs ; état métier dérivé des événements fiables.
-6. **UI** : préférer composants petits + primitives sous `components/ui/` ou domaine ; éviter les pages > ~400 lignes sur le **nouveau** code.
-7. **Qualité** : `npm run check:dev` en boucle ; avant push `npm run check` ; pas de `TODO` dans le code (CI).
+6. **UI** : composants petits + primitives (`components/ui/` ou domaine). Plafonds **universels** sur tout `src/` : `npm run check:file-sizes`, règle `21-react-component-size.mdc` (pages ≤ 250, composants ≤ 400, etc.). Ne pas grossir les fichiers de `scripts/legacy-oversized-files.json`.
+7. **Qualité** : `npm run check:dev` en boucle (lint + `check:file-sizes` + type-check) ; avant push `npm run check` ; pas de `TODO` dans le code (CI).
 8. **Tests** : ajouter ou adapter des tests Jest sur la règle métier ou handler la plus risquée si la suite du projet couvre ce périmètre.
 
 ## Documents de référence du repo

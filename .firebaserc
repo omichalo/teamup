@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "sqyping-teamup-dev"
+    "default": "sqyping-teamup-dev",
+    "staging": "sqyping-teamup-dev",
+    "production": "sqyping-teamup"
   }
 }

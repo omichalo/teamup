@@ -26,6 +26,7 @@ Ces principes complètent les règles générales (`00`–`70`, `90`) pour tout 
 
 - Pour les **nouveaux parcours**, préférer **extraire** des primitives réutilisables (`components/ui/`, petits modules `lib/`) en s’inspirant du code existant, plutôt que d’imposer un refactor des pages historiques.
 - Les écrans actuels peuvent conserver leurs composants locaux ; **recâbler** vers une primitive partagée seulement si la duplication ou les bugs le justifient (**extract alongside**).
+- **Plafonds universels** (cf. `21-react-component-size.mdc`, `npm run check:file-sizes`) : tout fichier sous `src/` est soumis aux mêmes limites. La dette déjà présente est figée dans `scripts/legacy-oversized-files.json` (pas de croissance). **Interdit** de livrer un nouveau composant ou une nouvelle page au-dessus du plafond — même si un écran legacy du repo est plus gros.
 
 ## Cohérence auth (inchangé mais rappel)
 

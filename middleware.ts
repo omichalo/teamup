@@ -13,22 +13,32 @@ const PROTECTED_PREFIXES = [
   "/joueurs",
   "/joueur",
   "/settings",
+  "/club",
 ];
 
-// Routes publiques qui ne nécessitent pas d'authentification
+// Routes publiques (préfixe) qui ne nécessitent pas d'authentification.
+// Inclut le formulaire d'inscription au club, qui adopte un parcours hybride :
+// remplissage anonyme autorisé, l'authentification ne sera exigée qu'à la soumission.
 const PUBLIC_ROUTES = [
   "/login",
   "/signup",
   "/reset",
   "/reset-password",
   "/auth/verify-email",
+  "/club/inscription",
 ];
+
+// Routes publiques en match exact (utile pour les pages-redirections).
+const PUBLIC_EXACT_ROUTES = ["/club"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Exclure les routes publiques
-  if (PUBLIC_ROUTES.some((route) => pathname.startsWith(route))) {
+  if (
+    PUBLIC_EXACT_ROUTES.includes(pathname) ||
+    PUBLIC_ROUTES.some((route) => pathname.startsWith(route))
+  ) {
     return NextResponse.next();
   }
 

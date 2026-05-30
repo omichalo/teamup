@@ -1,0 +1,28 @@
+{
+  "description": "Dette technique Epic G : fichiers au-dessus des plafonds universels (scripts/file-size-policy.mjs). Chaque valeur est un plafond maximal — interdit de dépasser ce nombre de lignes. Retirer une entrée après découpage du fichier.",
+  "files": {
+    "src/app/admin/page.tsx": 1256,
+    "src/app/compositions/_containers/CompositionsPageContainer.tsx": 1430,
+    "src/app/compositions/_containers/DefaultCompositionsContainer.tsx": 1063,
+    "src/app/demo-theme/page.tsx": 1178,
+    "src/app/disponibilites/page.tsx": 1016,
+    "src/app/equipes/page.tsx": 791,
+    "src/app/joueurs/page.tsx": 1104,
+    "src/app/joueurs-firestore/page.tsx": 265,
+    "src/app/page.tsx": 270,
+    "src/components/Layout.tsx": 460,
+    "src/components/auth/AuthForm.tsx": 578,
+    "src/components/club-registration/AdminStep.tsx": 526,
+    "src/components/club-registration/ClubRegistrationWizard.tsx": 1017,
+    "src/components/club-registration/MembershipRequestsClient.tsx": 1258,
+    "src/components/club-registration/RecapStep.tsx": 585,
+    "src/components/compositions/TeamCompositionCard.tsx": 413,
+    "src/components/disponibilites/DiscordPollManager.tsx": 847,
+    "src/components/disponibilites/PlayerAvailabilityList.tsx": 632,
+    "src/lib/discord/poll-interactions.ts": 1267,
+    "src/lib/openapi.ts": 561,
+    "src/lib/services/firestore-player-service.ts": 543,
+    "src/lib/shared/fftt-utils.ts": 755,
+    "src/lib/shared/team-matches-sync.ts": 1218
+  }
+}

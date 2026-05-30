@@ -1,4 +1,6 @@
-# Settings for Backend (on Cloud Run).
+# Configuration App Hosting — production (backend teamup, projet sqyping-teamup).
+# Staging : apphosting.staging.yaml (backend teamup-staging, projet sqyping-teamup-dev).
+# Sur App Hosting, FIREBASE_WEBAPP_CONFIG peut fournir la config client Firebase au build.
 # See https://firebase.google.com/docs/app-hosting/configure#cloud-run
 runConfig:
   minInstances: 0
@@ -123,5 +125,15 @@ env:
   # CSRF Protection (privé, côté serveur uniquement)
   - variable: CSRF_SECRET
     secret: CSRF_SECRET
+    availability:
+      - RUNTIME
+
+  - variable: STRIPE_SECRET_KEY
+    secret: STRIPE_SECRET_KEY
+    availability:
+      - RUNTIME
+
+  - variable: STRIPE_WEBHOOK_SECRET
+    secret: STRIPE_WEBHOOK_SECRET
     availability:
       - RUNTIME

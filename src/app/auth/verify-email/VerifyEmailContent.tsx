@@ -3,20 +3,18 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  Alert,
   Box,
-  Card,
-  CardContent,
-  Typography,
   Button,
   CircularProgress,
-  Alert,
-  Container,
+  Stack,
+  Typography,
 } from "@mui/material";
 import { CheckCircle, Error as ErrorIcon } from "@mui/icons-material";
-import Image from "next/image";
-import { clientAuth } from "@/lib/firebase.client";
 import { applyActionCode, checkActionCode } from "firebase/auth";
+import { clientAuth } from "@/lib/firebase.client";
 import { getFirebaseErrorMessage } from "@/lib/firebase-error-utils";
+import { AuthCardSurface } from "@/components/auth/AuthCardSurface";
 
 export function VerifyEmailContent() {
   const router = useRouter();
@@ -25,11 +23,14 @@ export function VerifyEmailContent() {
   const [message, setMessage] = useState<string>("");
 
   useEffect(() => {
-    const verifyEmail = async () => {
+    let cancelled = false;
+    (async () => {
       const oobCode = searchParams?.get("oobCode");
       if (!oobCode) {
-        setStatus("error");
-        setMessage("Lien de vérification invalide ou expiré.");
+        if (!cancelled) {
+          setStatus("error");
+          setMessage("Lien de vérification invalide ou expiré.");
+        }
         return;
       }
 
@@ -45,89 +46,65 @@ export function VerifyEmailContent() {
         }
 
         await applyActionCode(clientAuth, oobCode);
+        if (cancelled) return;
         setStatus("success");
-        setMessage("Votre email a été vérifié avec succès !");
+        setMessage("Votre email a été vérifié avec succès.");
 
         setTimeout(() => {
           router.push("/login?next=/joueur");
         }, 2000);
-      } catch (error: unknown) {
-        console.error("[Verify Email] Error:", error);
-        setStatus("error");
-        setMessage(getFirebaseErrorMessage(error));
+      } catch (e: unknown) {
+        if (!cancelled) {
+          setStatus("error");
+          setMessage(getFirebaseErrorMessage(e));
+        }
       }
+    })();
+    return () => {
+      cancelled = true;
     };
-
-    verifyEmail();
   }, [searchParams, router]);
 
   return (
-    <Container maxWidth="sm" sx={{ mt: 8, mb: 4 }}>
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          mb: 4,
-        }}
-      >
-        <Image
-          src="/sqyping-logo.jpg"
-          alt="SQY Ping Logo"
-          width={120}
-          height={120}
-          style={{ marginBottom: 24 }}
-        />
-        <Typography variant="h4" component="h1" gutterBottom>
-          Vérification de l&apos;email
-        </Typography>
-      </Box>
+    <AuthCardSurface title="Vérification de l’email">
+      <Box sx={{ textAlign: "center" }}>
+        {status === "loading" ? (
+          <Stack spacing={2} alignItems="center">
+            <CircularProgress />
+            <Typography variant="body1">
+              Vérification de votre email en cours…
+            </Typography>
+          </Stack>
+        ) : null}
 
-      <Card>
-        <CardContent sx={{ p: 4, textAlign: "center" }}>
-          {status === "loading" && (
-            <>
-              <CircularProgress sx={{ mb: 2 }} />
-              <Typography variant="body1">
-                Vérification de votre email en cours...
-              </Typography>
-            </>
-          )}
+        {status === "success" ? (
+          <Stack spacing={2} alignItems="center">
+            <CheckCircle sx={{ fontSize: 64, color: "success.main" }} />
+            <Alert severity="success">{message}</Alert>
+            <Typography variant="body2" color="text.secondary">
+              Redirection vers la page de connexion…
+            </Typography>
+          </Stack>
+        ) : null}
 
-          {status === "success" && (
-            <>
-              <CheckCircle sx={{ fontSize: 64, color: "success.main", mb: 2 }} />
-              <Alert severity="success" sx={{ mb: 2 }}>
-                {message}
-              </Alert>
-              <Typography variant="body2" color="text.secondary">
-                Redirection vers la page de connexion...
-              </Typography>
-            </>
-          )}
-
-          {status === "error" && (
-            <>
-              <ErrorIcon sx={{ fontSize: 64, color: "error.main", mb: 2 }} />
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {message}
-              </Alert>
+        {status === "error" ? (
+          <Stack spacing={2} alignItems="center">
+            <ErrorIcon sx={{ fontSize: 64, color: "error.main" }} />
+            <Alert severity="error">{message}</Alert>
+            <Stack spacing={1}>
               <Button
                 variant="contained"
                 onClick={() => router.push("/resend-verification")}
-                sx={{ mt: 2 }}
               >
                 Demander un nouveau lien
               </Button>
-              <Box sx={{ mt: 2 }}>
-                <Button variant="text" onClick={() => router.push("/login")}>
-                  Retour à la connexion
-                </Button>
-              </Box>
-            </>
-          )}
-        </CardContent>
-      </Card>
-    </Container>
+              <Button variant="text" onClick={() => router.push("/login")}>
+                Retour à la connexion
+              </Button>
+            </Stack>
+          </Stack>
+        ) : null}
+      </Box>
+    </AuthCardSurface>
   );
 }

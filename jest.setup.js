@@ -51,6 +51,14 @@ jest.mock("react-beautiful-dnd", () => ({
   Draggable: ({ children }) => children({}, {}),
 }));
 
+// jsdom does not provide ResizeObserver (used by sticky layout hooks)
+class ResizeObserverMock {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+global.ResizeObserver = ResizeObserverMock;
+
 // Mock Next.js router
 jest.mock("next/navigation", () => ({
   useRouter: () => ({

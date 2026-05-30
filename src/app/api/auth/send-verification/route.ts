@@ -5,6 +5,7 @@ import { readFile } from "fs/promises";
 import path from "path";
 import { getFirebaseErrorMessage } from "@/lib/firebase-error-utils";
 import { checkRateLimit } from "@/lib/auth/rate-limit";
+import { validateOrigin } from "@/lib/auth/csrf-utils";
 
 export const runtime = "nodejs";
 
@@ -19,6 +20,10 @@ function getAuthErrorCode(error: unknown): string {
 
 export async function POST(req: Request) {
   try {
+    if (!validateOrigin(req)) {
+      return jsonNoStore({ error: "Invalid origin" }, { status: 403 });
+    }
+
     const { email } = await req.json();
     if (!email || typeof email !== "string") {
       return jsonNoStore({ error: "Email requis" }, { status: 400 });

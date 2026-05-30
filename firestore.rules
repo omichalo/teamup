@@ -26,6 +26,15 @@ service cloud.firestore {
     function isCoach() {
       return isAdmin() || authRole() == "coach";
     }
+
+    // Secrétariat (gestion des dossiers d'inscription côté client limitée ; API Admin SDK en prod)
+    function isSecretary() {
+      return authRole() == "secretary";
+    }
+
+    function isClubRegistrationManager() {
+      return isAdmin() || isSecretary();
+    }
     
     // ============================================
     // Collection: users
@@ -187,7 +196,45 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isCoach();
     }
-    
+
+    // ============================================
+    // Collection: clubRegistrations
+    // ============================================
+    // Dossier d'inscription au club. Un soumettant (parent ou adulte qui s'inscrit lui-même)
+    // peut créer plusieurs dossiers (ex. inscription de 2 enfants). Le couplage 1 dossier ↔ 1 uid
+    // est volontairement abandonné.
+    //
+    // - read   : owner (submitterUid == uid), admin ou secrétariat
+    // - create : owner se déclare comme submitterUid, schemaVersion strict
+    // - update : owner uniquement, tant que status != 'approved'
+    // - delete : interdit côté client (l'admin gère via Admin SDK)
+    match /clubRegistrations/{registrationId} {
+      allow read: if isAuthenticated()
+                  && (isClubRegistrationManager()
+                      || resource.data.submitterUid == request.auth.uid);
+      allow create: if isAuthenticated()
+                    && request.resource.data.submitterUid == request.auth.uid
+                    && request.resource.data.schemaVersion == 1;
+      allow update: if isAuthenticated()
+                    && resource.data.submitterUid == request.auth.uid
+                    && request.resource.data.submitterUid == request.auth.uid
+                    && resource.data.get('status', 'draft') != 'approved';
+      allow delete: if false;
+    }
+    // List queries : autorisées aux utilisateurs authentifiés. Les requêtes sont filtrées
+    // côté serveur API par submitterUid (admin SDK contourne les rules de toute façon).
+    match /clubRegistrations/{document=**} {
+      allow list: if isAuthenticated();
+    }
+
+    // ============================================
+    // Collection: clubRegistrationConfig
+    // ============================================
+    // Accès Admin SDK uniquement (pas d'accès client direct).
+    match /clubRegistrationConfig/{document} {
+      allow read, write: if false;
+    }
+
     // ============================================
     // Règle par défaut : refuser tout accès non explicitement autorisé
     // ============================================

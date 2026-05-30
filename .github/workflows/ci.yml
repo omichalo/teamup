@@ -3,26 +3,30 @@ name: CI - Lint, Type-check and Build
 on:
   pull_request:
     branches:
+      - staging
       - main
   push:
     branches:
+      - staging
       - main
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
 jobs:
   check:
     name: Lint, Type-check and Build
     runs-on: ubuntu-latest
     env:
-      NEXT_PUBLIC_FIREBASE_API_KEY: ${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
-      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
-      NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
-      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ vars.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
-      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
-      NEXT_PUBLIC_FIREBASE_APP_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}
-      NEXT_PUBLIC_APP_URL: ${{ vars.NEXT_PUBLIC_APP_URL }}
-      APP_URL: ${{ vars.APP_URL }}
+      NEXT_PUBLIC_FIREBASE_API_KEY: ${{ ((github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging') || (github.event_name == 'push' && github.ref_name == 'staging')) && vars.NEXT_PUBLIC_FIREBASE_API_KEY_DEV || vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ ((github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging') || (github.event_name == 'push' && github.ref_name == 'staging')) && vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN_DEV || vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ ((github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging') || (github.event_name == 'push' && github.ref_name == 'staging')) && vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID_DEV || vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ ((github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging') || (github.event_name == 'push' && github.ref_name == 'staging')) && vars.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET_DEV || vars.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ ((github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging') || (github.event_name == 'push' && github.ref_name == 'staging')) && vars.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID_DEV || vars.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+      NEXT_PUBLIC_FIREBASE_APP_ID: ${{ ((github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging') || (github.event_name == 'push' && github.ref_name == 'staging')) && vars.NEXT_PUBLIC_FIREBASE_APP_ID_DEV || vars.NEXT_PUBLIC_FIREBASE_APP_ID }}
+      NEXT_PUBLIC_APP_URL: ${{ ((github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging') || (github.event_name == 'push' && github.ref_name == 'staging')) && vars.NEXT_PUBLIC_APP_URL_STAGING || vars.NEXT_PUBLIC_APP_URL }}
+      APP_URL: ${{ ((github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'staging') || (github.event_name == 'push' && github.ref_name == 'staging')) && vars.APP_URL_STAGING || vars.APP_URL }}
 
     steps:
       - name: Checkout code
@@ -39,6 +43,9 @@ jobs:
 
       - name: Run linter
         run: npm run lint
+
+      - name: Check file size policy (src/)
+        run: npm run check:file-sizes
 
       - name: Run type-check
         run: npm run type-check
