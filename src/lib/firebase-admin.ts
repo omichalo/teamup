@@ -4,16 +4,42 @@ import { getAuth } from "firebase-admin/auth";
 import * as fs from "fs";
 import * as path from "path";
 
+/** Projet Firebase côté serveur : aligné sur le projet hébergé (App Hosting / Cloud Run). */
+function resolveFirebaseAdminProjectId(): string {
+  if (process.env.FIREBASE_WEBAPP_CONFIG) {
+    try {
+      const parsed = JSON.parse(process.env.FIREBASE_WEBAPP_CONFIG) as {
+        projectId?: string;
+      };
+      if (parsed.projectId?.trim()) {
+        return parsed.projectId.trim();
+      }
+    } catch {
+      // ignore invalid JSON
+    }
+  }
+
+  const cloudProject =
+    process.env.GCLOUD_PROJECT?.trim() ||
+    process.env.GOOGLE_CLOUD_PROJECT?.trim();
+  if (cloudProject) {
+    return cloudProject;
+  }
+
+  return (
+    process.env.FB_PROJECT_ID?.trim() ||
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim() ||
+    "sqyping-teamup"
+  );
+}
+
 // Initialiser Firebase Admin (une seule fois)
 const app = (() => {
   if (getApps().length > 0) {
     return getApps()[0];
   }
 
-  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 
-    process.env.GCLOUD_PROJECT || 
-    process.env.GOOGLE_CLOUD_PROJECT || 
-    "sqyping-teamup";
+  const projectId = resolveFirebaseAdminProjectId();
 
   // Vérifier si un fichier de service account est spécifié via GOOGLE_APPLICATION_CREDENTIALS
   const rawServiceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
@@ -74,10 +100,7 @@ const app = (() => {
     process.env.FB_PRIVATE_KEY?.replace(/\\n/g, "\n") ||
     process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
   const clientEmail = process.env.FB_CLIENT_EMAIL || process.env.FIREBASE_CLIENT_EMAIL;
-  const explicitProjectId =
-    process.env.FB_PROJECT_ID ||
-    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
-    projectId;
+  const explicitProjectId = process.env.FB_PROJECT_ID?.trim() || projectId;
 
   if (privateKey && clientEmail) {
     // Log uniquement en mode debug (sans exposer la présence de la clé privée)
