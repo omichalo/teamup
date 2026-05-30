@@ -166,6 +166,28 @@ export function pickInvoiceDownloadUrl(links: StripeInvoiceLinks): string | null
   return links.invoicePdf ?? links.hostedInvoiceUrl ?? null;
 }
 
+/**
+ * Point d'extension pour le paiement CB multi-échéances.
+ * V1 : paiement unique via Checkout ; installments > 1 → suivi manuel secrétariat.
+ */
+export async function createStripePaymentForRegistration(params: {
+  registrationId: string;
+  amountToPayCents: number;
+  installments: number;
+}): Promise<{ supported: boolean; reason?: string }> {
+  if (params.amountToPayCents <= 0) {
+    return { supported: false, reason: "Aucun montant à régler" };
+  }
+  if (params.installments > 1) {
+    return {
+      supported: false,
+      reason:
+        "Paiement carte en plusieurs fois : pas encore de lien automatique. Le secrétariat suit les échéances dans le tableau ci-dessus.",
+    };
+  }
+  return { supported: true };
+}
+
 export function verifyStripeWebhookSignature(
   payload: string,
   signatureHeader: string | null

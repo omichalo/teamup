@@ -18,6 +18,9 @@ import {
   calculateQuote,
   formatCentsAsEuros,
 } from "@/lib/pricing";
+import type { PriceQuote } from "@/lib/pricing/types";
+import { calculatePaymentSummary } from "@/lib/club-registration/payment/calculate-payment-summary";
+import { normalizePaymentAidList } from "@/lib/club-registration/payment/payment-draft-helpers";
 import type { RegistrationDraft } from "./registration-defaults";
 
 export type PricingBreakdownDraft = Pick<
@@ -30,7 +33,9 @@ export type PricingBreakdownDraft = Pick<
   | "sex"
   | "firstFemaleRegistrationSqy"
   | "reductionTypes"
->;
+> & {
+  paymentAids?: RegistrationDraft["paymentAids"];
+};
 
 function toPricingContextInput(draft: PricingBreakdownDraft) {
   const input = {
@@ -65,8 +70,34 @@ export function usePricingQuote(draft: PricingBreakdownDraft) {
   }, [draft, config]);
 }
 
+function useDeclarativeAidSummary(
+  quote: PriceQuote | null,
+  draft: PricingBreakdownDraft
+) {
+  return useMemo(() => {
+    if (!quote) return null;
+    const aids = normalizePaymentAidList(draft.paymentAids ?? []);
+    const hasDeclarativeAids =
+      (draft.reductionTypes?.length ?? 0) > 0 || aids.length > 0;
+    if (!hasDeclarativeAids) return null;
+    return calculatePaymentSummary({
+      totalAmountCents: quote.totalCents,
+      aids,
+      receivedPayments: [],
+    });
+  }, [quote, draft.reductionTypes, draft.paymentAids]);
+}
+
 export function PricingBreakdown({ draft, variant = "full" }: Props) {
   const quote = usePricingQuote(draft);
+  const aidSummary = useDeclarativeAidSummary(quote, draft);
+  const declaredAids = useMemo(
+    () =>
+      normalizePaymentAidList(draft.paymentAids ?? []).filter(
+        (a) => a.amountCents > 0
+      ),
+    [draft.paymentAids]
+  );
 
   if (!canEstimate(draft)) {
     return (
@@ -105,6 +136,17 @@ export function PricingBreakdown({ draft, variant = "full" }: Props) {
         <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
           Total estimé : {formatCentsAsEuros(quote.totalCents)}
         </Typography>
+        {aidSummary ? (
+          <>
+            <Typography variant="caption" color="text.secondary">
+              Aides déclarées :{" "}
+              {formatCentsAsEuros(aidSummary.assistanceTotalAmountCents)}
+            </Typography>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+              Reste à payer estimé : {formatCentsAsEuros(aidSummary.amountToPayCents)}
+            </Typography>
+          </>
+        ) : null}
         {quote.warnings.map((w) => (
           <Typography key={w} variant="caption" color="warning.main">
             {w}
@@ -176,9 +218,67 @@ export function PricingBreakdown({ draft, variant = "full" }: Props) {
                 {formatCentsAsEuros(quote.totalCents)}
               </TableCell>
             </TableRow>
+            {aidSummary ? (
+              <>
+                {declaredAids.map((aid) => (
+                  <TableRow key={aid.type}>
+                    <TableCell sx={{ ...cellSx, pl: 0, pt: 0.5 }}>
+                      Aide — {aid.label}
+                    </TableCell>
+                    <TableCell
+                      align="right"
+                      sx={{
+                        ...cellSx,
+                        pr: 0,
+                        pt: 0.5,
+                        fontWeight: 600,
+                        color: "success.dark",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {formatCentsAsEuros(-aid.amountCents)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                <TableRow>
+                  <TableCell
+                    sx={{
+                      ...cellSx,
+                      pl: 0,
+                      pb: 0.25,
+                      pt: 0.5,
+                      fontWeight: 700,
+                      fontSize: isSidebar ? "0.875rem" : undefined,
+                    }}
+                  >
+                    Reste à payer estimé
+                  </TableCell>
+                  <TableCell
+                    align="right"
+                    sx={{
+                      ...cellSx,
+                      pr: 0,
+                      pb: 0.25,
+                      pt: 0.5,
+                      fontWeight: 700,
+                      fontSize: isSidebar ? "0.875rem" : undefined,
+                    }}
+                  >
+                    {formatCentsAsEuros(aidSummary.amountToPayCents)}
+                  </TableCell>
+                </TableRow>
+              </>
+            ) : null}
           </TableBody>
         </Table>
       </Box>
+
+      {aidSummary?.aidsExceedTotal ? (
+        <Alert severity="error" variant="outlined" sx={{ py: 0.5 }}>
+          Le total des aides dépasse le montant estimé. Ajustez les montants dans
+          le dossier administratif.
+        </Alert>
+      ) : null}
 
       {!isSidebar
         ? infoLines.map((line) => (
@@ -206,10 +306,16 @@ export function PricingBreakdown({ draft, variant = "full" }: Props) {
         )
       )}
 
+      {isSidebar && quote.requiresAdminReview ? (
+        <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.35 }}>
+          Les aides et réductions restent soumises à validation du secrétariat.
+        </Typography>
+      ) : null}
+
       {!isSidebar ? (
         <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.4 }}>
-          Montant indicatif : le secrétariat valide le total définitif avant tout
-          paiement (aides Pass Sport, Labaz, etc.).
+          Montant indicatif : les montants d&apos;aides sont saisis au dossier
+          administratif ; le secrétariat valide le total définitif avant tout paiement.
         </Typography>
       ) : null}
     </Stack>

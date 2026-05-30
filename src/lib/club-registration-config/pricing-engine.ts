@@ -243,9 +243,6 @@ function applyAidRules(
 
     if (rule.effect.type === "admin_review") {
       requiresAdminReview = true;
-      warnings.push(
-        `Une aide ou réduction déclarée (${rule.label}) sera validée par le secrétariat — non incluse dans l'estimation automatique.`
-      );
       continue;
     }
 

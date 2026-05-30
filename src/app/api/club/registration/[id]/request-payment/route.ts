@@ -11,8 +11,18 @@ import { AUDIT_ACTIONS, logAuditAction } from "@/lib/auth/audit-logger";
 import {
   createLegacySingleLineCheckoutSession,
   createMembershipCheckoutSession,
+  createStripePaymentForRegistration,
   getAppBaseUrl,
 } from "@/lib/club-registration/stripe";
+import {
+  normalizeRegistrationPayment,
+  paymentToFirestoreUpdate,
+} from "@/lib/club-registration/payment/normalize-payment";
+import {
+  recalculateRegistrationPayment,
+  regenerateExpectedPayments,
+  setManualFollowUp,
+} from "@/lib/club-registration/payment/payment-mutations";
 import {
   calculateQuoteForRecord,
   resolveRegistrationConfigForRecord,
@@ -139,20 +149,105 @@ export async function POST(
     const pricingConfig = await resolveRegistrationConfigForRecord(
       data as Record<string, unknown>
     );
-    let session;
 
-    if (quote && quote.totalCents > 0) {
-      if (requestedAmount !== quote.totalCents) {
-        return jsonNoStore(
-          {
-            error:
-              "Le montant à régler ne correspond pas au devis calculé. Enregistrez le devis ou alignez le montant.",
-            expectedAmountCents: quote.totalCents,
-          },
-          { status: 400 }
-        );
+    let payment = normalizeRegistrationPayment(data);
+    if (payment && quote) {
+      payment = recalculateRegistrationPayment({
+        ...payment,
+        totalAmountCents: quote.totalCents,
+      });
+      if (
+        payment.paymentMethod === "card" ||
+        payment.paymentMethod === "cheque"
+      ) {
+        payment = regenerateExpectedPayments(payment);
       }
+    }
 
+    const amountToPayCents =
+      payment?.amountToPayCents ??
+      quote?.totalCents ??
+      (typeof requestedAmount === "number" ? requestedAmount : 0);
+
+    if (amountToPayCents <= 0) {
+      const zeroPayment = payment
+        ? recalculateRegistrationPayment({ ...payment, paymentStatus: "paid" })
+        : null;
+      await docRef.set(
+        {
+          ...(zeroPayment ? paymentToFirestoreUpdate(zeroPayment) : {}),
+          status: "approved",
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+      return jsonNoStore(
+        {
+          success: true,
+          message: "Aucun paiement n'est dû pour ce dossier.",
+        },
+        { status: 200 }
+      );
+    }
+
+    if (requestedAmount !== amountToPayCents) {
+      return jsonNoStore(
+        {
+          error:
+            "Le montant à régler ne correspond pas au solde attendu. Enregistrez le devis ou alignez le montant.",
+          expectedAmountCents: amountToPayCents,
+        },
+        { status: 400 }
+      );
+    }
+
+    const installments = payment?.paymentInstallments ?? 1;
+    const stripeCapability = await createStripePaymentForRegistration({
+      registrationId: id,
+      amountToPayCents,
+      installments,
+    });
+
+    if (!stripeCapability.supported) {
+      const manualPayment = setManualFollowUp(
+        payment ?? {
+          totalAmountCents: quote?.totalCents ?? amountToPayCents,
+          assistanceTotalAmountCents: 0,
+          amountToPayCents,
+          aids: [],
+          paymentMethod: "card",
+          paymentInstallments: installments,
+          expectedPayments: [],
+          receivedPayments: [],
+          paidAmountCents: 0,
+          remainingAmountCents: amountToPayCents,
+          paymentStatus: "waiting_payment",
+        }
+      );
+      await docRef.set(
+        {
+          ...paymentToFirestoreUpdate(manualPayment),
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+      return jsonNoStore(
+        {
+          success: true,
+          manualFollowUp: true,
+          message: stripeCapability.reason,
+        },
+        { status: 200 }
+      );
+    }
+
+    let session;
+    const useQuoteLineItems =
+      quote &&
+      quote.totalCents > 0 &&
+      amountToPayCents === quote.totalCents;
+
+    if (useQuoteLineItems && quote) {
       const stripePresentation = pricingConfig.stripePresentation;
       const stripeLineItems = buildStripeCheckoutLineItems(quote, stripePresentation);
       const invoiceCustomFields = buildStripeInvoiceCustomFields(quote, stripePresentation);
@@ -174,10 +269,18 @@ export async function POST(
         cancelUrl,
       });
 
+      const waitingPayment = payment
+        ? recalculateRegistrationPayment({
+            ...payment,
+            paymentStatus: "waiting_payment",
+          })
+        : null;
+
       await docRef.set(
         {
           status: "payment_requested",
-          paymentAmountCents: quote.totalCents,
+          ...(waitingPayment ? paymentToFirestoreUpdate(waitingPayment) : {}),
+          paymentAmountCents: amountToPayCents,
           paymentStatus: "pending",
           paymentRequestedAt: FieldValue.serverTimestamp(),
           paymentRequestedBy: decoded.uid,
@@ -204,7 +307,7 @@ export async function POST(
           `Détail :`,
           breakdownText,
           ``,
-          `Montant à régler : ${formatEuros(quote.totalCents)}.`,
+          `Montant à régler : ${formatEuros(amountToPayCents)}.`,
           ``,
           `Paiement sécurisé Stripe : ${session.url}`,
           ``,
@@ -227,7 +330,7 @@ export async function POST(
         resource: "clubRegistration",
         resourceId: id,
         details: {
-          amountCents: quote.totalCents,
+          amountCents: amountToPayCents,
           stripeCheckoutSessionId: session.id,
           lineCount: stripeLineItems.length,
           catalogVersion: quote.catalogVersion,
@@ -237,17 +340,25 @@ export async function POST(
     } else {
       session = await createLegacySingleLineCheckoutSession({
         registrationId: id,
-        amountCents: requestedAmount,
+        amountCents: amountToPayCents,
         customerEmail: paymentEmail,
         adherentName,
         successUrl,
         cancelUrl,
       });
 
+      const waitingPayment = payment
+        ? recalculateRegistrationPayment({
+            ...payment,
+            paymentStatus: "waiting_payment",
+          })
+        : null;
+
       await docRef.set(
         {
           status: "payment_requested",
-          paymentAmountCents: requestedAmount,
+          ...(waitingPayment ? paymentToFirestoreUpdate(waitingPayment) : {}),
+          paymentAmountCents: amountToPayCents,
           paymentStatus: "pending",
           paymentRequestedAt: FieldValue.serverTimestamp(),
           paymentRequestedBy: decoded.uid,
@@ -266,7 +377,7 @@ export async function POST(
           `Bonjour,`,
           ``,
           `Votre dossier d'adhésion SQY Ping a été relu et validé administrativement.`,
-          `Montant à régler : ${formatEuros(requestedAmount)}.`,
+          `Montant à régler : ${formatEuros(amountToPayCents)}.`,
           ``,
           `Paiement sécurisé Stripe : ${session.url}`,
           ``,
@@ -275,7 +386,7 @@ export async function POST(
         html: `
           <p>Bonjour,</p>
           <p>Votre dossier d'adhésion SQY Ping a été relu et validé administrativement.</p>
-          <p><strong>Montant à régler : ${formatEuros(requestedAmount)}</strong></p>
+          <p><strong>Montant à régler : ${formatEuros(amountToPayCents)}</strong></p>
           <p><a href="${session.url}">Procéder au paiement sécurisé Stripe</a></p>
           <p>SQY Ping TeamUp</p>
         `,
@@ -284,7 +395,11 @@ export async function POST(
       logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_PAYMENT_REQUESTED, decoded.uid, {
         resource: "clubRegistration",
         resourceId: id,
-        details: { amountCents: requestedAmount, stripeCheckoutSessionId: session.id, legacy: true },
+        details: {
+          amountCents: amountToPayCents,
+          stripeCheckoutSessionId: session.id,
+          legacy: true,
+        },
         success: true,
       });
     }

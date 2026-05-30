@@ -45,10 +45,16 @@ else
   check_fail "Fichier .github/workflows/ci.yml manquant"
 fi
 
-if [ -f ".github/workflows/deploy-production.yml" ]; then
-  check_pass "Fichier .github/workflows/deploy-production.yml existe"
+if [ ! -f ".github/workflows/deploy-production.yml" ]; then
+  check_pass "deploy-production.yml supprimé (déploiement via Firebase App Hosting)"
 else
-  check_fail "Fichier .github/workflows/deploy-production.yml manquant"
+  check_warn "deploy-production.yml encore présent — risque de double deploy avec App Hosting"
+fi
+
+if [ -f "apphosting.staging.yaml" ]; then
+  check_pass "Fichier apphosting.staging.yaml existe"
+else
+  check_warn "Fichier apphosting.staging.yaml manquant (staging App Hosting)"
 fi
 
 if [ -f ".github/workflows/deploy-firestore.yml" ]; then

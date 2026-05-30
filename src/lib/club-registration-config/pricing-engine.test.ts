@@ -85,12 +85,12 @@ describe("calculateQuoteFromConfig — handisport", () => {
 });
 
 describe("calculateQuoteFromConfig — aides admin_review", () => {
-  it("marque Pass Sport pour validation secrétariat", () => {
+  it("marque Pass Sport pour validation secrétariat sans message répété par aide", () => {
     const quote = calculateQuoteFromConfig(
       ctx({ birthDate: "2005-01-01", reductionTypes: ["pass_sport"] }),
       config
     );
     expect(quote.requiresAdminReview).toBe(true);
-    expect(quote.warnings.some((w) => w.includes("Pass Sport"))).toBe(true);
+    expect(quote.warnings).toHaveLength(0);
   });
 });

@@ -5,6 +5,8 @@ import {
   isMedicalAdminStepComplete,
 } from "@/lib/club-registration/medical-dossier";
 import { isApplicantNotesTooLong } from "@/lib/club-registration/applicant-notes";
+import { validatePaymentDraft } from "@/lib/club-registration/payment/validate-payment-draft";
+import { validateAdminAids } from "@/lib/club-registration/validate-admin-aids";
 import { isValidFrenchPhoneSurface } from "@/lib/club-registration/phone-fr";
 import type { RegistrationDraft } from "./registration-defaults";
 
@@ -250,6 +252,10 @@ export function validateStep(
         "#medical-dossier-section"
       );
     }
+    const aidIssue = validateAdminAids(draft);
+    if (aidIssue) {
+      return invalid(aidIssue.message, aidIssue.focusSelector);
+    }
     return { valid: true };
   }
 
@@ -279,6 +285,14 @@ export function validateStep(
         "Cochez la case pour approuver le règlement intérieur et la transmission des données à la FFTT.",
         '[data-field="internalRulesAccepted"]'
       );
+    }
+    return { valid: true };
+  }
+
+  if (stepId === "payment") {
+    const paymentIssue = validatePaymentDraft(draft);
+    if (paymentIssue) {
+      return invalid(paymentIssue.message, paymentIssue.focusSelector);
     }
     return { valid: true };
   }

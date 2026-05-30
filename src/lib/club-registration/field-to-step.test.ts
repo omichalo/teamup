@@ -13,6 +13,7 @@ const SEQUENCE_ADULT: RegistrationStepId[] = [
   "practice",
   "admin",
   "engagements",
+  "payment",
   "recap",
 ];
 
@@ -23,6 +24,7 @@ const SEQUENCE_MINOR: RegistrationStepId[] = [
   "practice",
   "admin",
   "engagements",
+  "payment",
   "recap",
 ];
 

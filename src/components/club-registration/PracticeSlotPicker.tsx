@@ -74,6 +74,11 @@ export function PracticeSlotPicker({
       <Typography variant="subtitle2" data-field="slotIds" tabIndex={-1}>
         Créneaux souhaités
       </Typography>
+      <Alert severity="warning" variant="outlined">
+        Il est possible de s&apos;inscrire sur plusieurs créneaux, sous réserve
+        d&apos;une participation régulière à chacun d&apos;eux, afin de ne pas
+        bloquer inutilement des places.
+      </Alert>
       {sites.map((site) => {
         const gymnasiumLabel = registrationSiteGymnasiumLabel(site);
         return (

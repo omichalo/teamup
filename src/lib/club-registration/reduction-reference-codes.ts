@@ -76,5 +76,8 @@ export function resolveRegistrationFieldStepKey(fieldKey: string): string {
   if (fieldKey.startsWith("reductionReferenceCodes.")) {
     return "reductionReferenceCodes";
   }
+  if (fieldKey.startsWith("paymentAid.")) {
+    return "paymentAids";
+  }
   return fieldKey;
 }

@@ -14,6 +14,20 @@ describe("validateStep focusSelector", () => {
     }
   });
 
+  it("exige un montant pour chaque aide cochée à l'étape admin", () => {
+    const draft = createEmptyDraft();
+    draft.birthDate = "2010-05-15";
+    draft.medicalQuestionnaire = { summary: "all_no", answers: {} };
+    draft.medicalCertificateDeclaration = "under_40_all_no";
+    draft.reductionTypes = ["pass_sport"];
+    draft.paymentAids = [];
+    const result = validateStep("admin", draft);
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.message).toMatch(/montant/i);
+    }
+  });
+
   it("refuse des précisions trop longues sur l'étape récap", () => {
     const draft = createEmptyDraft();
     draft.applicantNotes = "x".repeat(APPLICANT_NOTES_MAX_LENGTH + 1);

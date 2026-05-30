@@ -5,6 +5,11 @@ import { jsonNoStore } from "@/lib/http/cache-headers";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { AUDIT_ACTIONS, logAuditAction } from "@/lib/auth/audit-logger";
 import { verifyStripeWebhookSignature } from "@/lib/club-registration/stripe";
+import {
+  normalizeRegistrationPayment,
+  paymentToFirestoreUpdate,
+} from "@/lib/club-registration/payment/normalize-payment";
+import { addManualReceivedPayment } from "@/lib/club-registration/payment/payment-mutations";
 
 type StripeWebhookEvent = {
   id: string;
@@ -40,14 +45,38 @@ export async function POST(req: Request) {
     }
 
     const db = getFirestoreAdmin();
-    await db.collection("clubRegistrations").doc(registrationId).set(
+    const docRef = db.collection("clubRegistrations").doc(registrationId);
+    const snap = await docRef.get();
+    const existing = snap.data() ?? {};
+
+    const basePayment = normalizeRegistrationPayment(existing);
+    const amountCents =
+      typeof existing.paymentAmountCents === "number"
+        ? existing.paymentAmountCents
+        : basePayment?.amountToPayCents ?? 0;
+
+    let payment = basePayment;
+    if (payment && amountCents > 0) {
+      payment = addManualReceivedPayment(payment, {
+        method: "card",
+        label: "Paiement Stripe",
+        amountCents,
+        receivedAt: new Date().toISOString(),
+        recordedBy: "stripe",
+        ...(session?.id ? { note: `Checkout ${session.id}` } : {}),
+      });
+    }
+
+    await docRef.set(
       {
         status: "paid",
         paymentStatus: session?.payment_status ?? "paid",
         stripeCheckoutSessionId: session?.id ?? null,
         stripeInvoiceId: session?.invoice ?? null,
+        stripePaymentUrl: null,
         paidAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
+        ...(payment ? paymentToFirestoreUpdate(payment) : {}),
       },
       { merge: true }
     );

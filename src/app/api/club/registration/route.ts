@@ -28,6 +28,7 @@ import {
   isApplicantNotesTooLong,
   normalizeApplicantNotes,
 } from "@/lib/club-registration/applicant-notes";
+import { buildRegistrationSubmitDocument } from "@/lib/club-registration/persist-registration-on-submit";
 
 const COLLECTION = "clubRegistrations";
 const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
@@ -93,6 +94,14 @@ const REGISTRATION_CLIENT_FIELDS = [
   "pricingQuoteComputedAt",
   "handisportPracticeLevel",
   "paymentStripeLineItems",
+  "payment",
+  "paymentMethod",
+  "paymentInstallments",
+  "paymentAids",
+  "holidayVoucherAmountCents",
+  "remainingPaymentMethod",
+  "paymentNote",
+  "specialPaymentNote",
 ] as const;
 
 const MANAGER_EDITABLE_FIELDS = [
@@ -416,24 +425,23 @@ export async function POST(req: Request) {
 
     const payload = parsed.data;
     const db = getFirestoreAdmin();
-
-    const baseFields = stripUndefined({ ...payload });
     const now = FieldValue.serverTimestamp();
 
-    const docRef = await db.collection(COLLECTION).add({
-      ...baseFields,
-      isMinor: isMinorAt(payload.birthDate),
-      medicalCertificateStatus: initialMedicalCertificateStatus(
-        payload.medicalCertificateDeclaration
-      ),
-      submitterUid: decoded.uid,
-      submitterAccountEmail: decoded.email ?? null,
-      schemaVersion: 1,
-      status: "submitted",
-      submittedAt: now,
-      updatedAt: now,
-      createdAt: now,
-    });
+    const docRef = await db.collection(COLLECTION).add(
+      stripUndefined(
+        buildRegistrationSubmitDocument({
+          payload,
+          config: activeConfig,
+          submitterUid: decoded.uid,
+          submitterAccountEmail: decoded.email ?? null,
+          isMinor: isMinorAt(payload.birthDate),
+          medicalCertificateStatus: initialMedicalCertificateStatus(
+            payload.medicalCertificateDeclaration
+          ),
+          now,
+        })
+      )
+    );
 
     logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_SUBMITTED, decoded.uid, {
       resource: "clubRegistration",

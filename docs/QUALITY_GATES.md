@@ -80,9 +80,9 @@ La CI GitHub Actions exécute automatiquement:
 5. **TODO Check**: Vérifie qu'il n'y a pas de TODO dans le code
 6. **Security Audit**: Audit npm des dépendances (`continue-on-error` — signal sans bloquer le merge)
 
-Le déploiement production ([`.github/workflows/deploy-production.yml`](../.github/workflows/deploy-production.yml)) enchaîne les mêmes étapes **lint → type-check → tests → build** avant `firebase deploy`.
+Le déploiement App Hosting (staging / prod) est déclenché par Firebase au merge sur `staging` ou `main` (option C). La CI GitHub ne déploie pas l’application.
 
-Voir [.github/workflows/ci.yml](../.github/workflows/ci.yml) pour les détails.
+Voir [.github/workflows/ci.yml](../.github/workflows/ci.yml) et [docs/APP_HOSTING_STAGING_SETUP.md](./APP_HOSTING_STAGING_SETUP.md).
 
 ## Checklist avant PR
 

@@ -251,12 +251,12 @@ describe("calculateQuote — remises sur adhésion", () => {
 });
 
 describe("calculateQuote — aides déclarées (V1)", () => {
-  it("signale Pass Sport sans montant", () => {
+  it("marque Pass Sport pour revue secrétariat sans avertissement par aide", () => {
     const quote = calculateQuote(
       ctx({ birthDate: "2014-06-01", reductionTypes: ["pass_sport"] })
     );
     expect(quote.requiresAdminReview).toBe(true);
-    expect(quote.warnings.some((w) => w.includes("secrétariat"))).toBe(true);
+    expect(quote.warnings.filter((w) => w.includes("secrétariat"))).toHaveLength(0);
     expect(quote.totalCents).toBe(20_500);
   });
 });

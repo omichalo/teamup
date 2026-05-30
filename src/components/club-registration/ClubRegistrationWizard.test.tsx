@@ -43,13 +43,11 @@ describe("ClubRegistrationWizard — focus management", () => {
 
     render(<ClubRegistrationWizard accountEmail={null} />);
     flushRaf();
-    /* Pour un majeur (date par défaut vide → adherentRole "self" sans
-       représentants requis), la séquence est 6 étapes (audience → adherent →
-       practice → admin → engagements → recap). Le titre invisible <h2> doit
-       annoncer « Étape 1 sur 6 » avec le libellé « Pour qui ? ». */
+    /* Pour un majeur, la séquence est 7 étapes (… → engagements → paiement → récap).
+       Le titre invisible <h2> doit annoncer « Étape 1 sur 7 » avec le libellé « Pour qui ? ». */
     const heading = screen.getByRole("heading", {
       level: 2,
-      name: /étape 1 sur 6 .* pour qui/i,
+      name: /étape 1 sur 7 .* pour qui/i,
     });
     expect(heading).toBeInTheDocument();
     expect(heading.tagName.toLowerCase()).toBe("h2");

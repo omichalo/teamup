@@ -41,6 +41,14 @@ function siteIdsMatchingMainSection(
   return ids;
 }
 
+/** Supplément compétition affiché à côté de la case (catalogue `priceCents`). */
+function formatCompetitionAddonEuros(priceCents: number): string {
+  if (priceCents <= 0) {
+    return "Sans supplément";
+  }
+  return `${(priceCents / 100).toFixed(0)} €`;
+}
+
 /**
  * Étape 4 — « Pratique sportive ».
  *
@@ -266,6 +274,7 @@ export function PracticeStep({ draft, onChange }: Props) {
               {youthCompetitions.map((c) => (
                 <FormControlLabel
                   key={c.id}
+                  sx={{ mx: 0 }}
                   control={
                     <Checkbox
                       checked={draft.competitionIds.includes(c.id)}
@@ -278,20 +287,55 @@ export function PracticeStep({ draft, onChange }: Props) {
             </FormGroup>
           </Box>
 
-          <FormGroup>
-            {otherCompetitions.map((c) => (
-              <FormControlLabel
-                key={c.id}
-                control={
-                  <Checkbox
-                    checked={draft.competitionIds.includes(c.id)}
-                    onChange={() => toggleCompetition(c.id)}
-                  />
-                }
-                label={c.formLabel}
-              />
-            ))}
-          </FormGroup>
+          <Box
+            sx={(theme) => ({
+              /* Même retrait horizontal que le contenu du fieldset (bordure 1px + p: 1.5). */
+              paddingLeft: `calc(${theme.spacing(1.5)} + 1px)`,
+              paddingRight: `calc(${theme.spacing(1.5)} + 1px)`,
+            })}
+          >
+            <FormGroup>
+              {otherCompetitions.map((c) => (
+                <FormControlLabel
+                  key={c.id}
+                  sx={{
+                    alignItems: "center",
+                    mx: 0,
+                    width: "100%",
+                    "& .MuiFormControlLabel-label": { flex: 1, minWidth: 0 },
+                  }}
+                  control={
+                    <Checkbox
+                      checked={draft.competitionIds.includes(c.id)}
+                      onChange={() => toggleCompetition(c.id)}
+                    />
+                  }
+                  label={
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      justifyContent="space-between"
+                      spacing={1}
+                      sx={{ width: "100%" }}
+                    >
+                      <Typography component="span" variant="body2">
+                        {c.formLabel}
+                      </Typography>
+                      <Typography
+                        component="span"
+                        variant="body2"
+                        fontWeight={700}
+                        color="primary.main"
+                        sx={{ flexShrink: 0 }}
+                      >
+                        {formatCompetitionAddonEuros(c.priceCents)}
+                      </Typography>
+                    </Stack>
+                  }
+                />
+              ))}
+            </FormGroup>
+          </Box>
         </Stack>
       )}
     </Stack>

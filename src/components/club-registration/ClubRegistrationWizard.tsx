@@ -46,14 +46,20 @@ import {
   type RegistrationStepId,
 } from "@/lib/club-registration/field-to-step";
 import { submitRegistration } from "@/lib/club-registration/submit";
+import {
+  formatZodIssuesForDebug,
+  logRegistrationFieldErrors,
+  logRegistrationWizardDebug,
+  summarizeRepresentativesForDebug,
+} from "@/lib/club-registration/registration-wizard-debug";
 import { sanitizeSchoolPickupSlotIds } from "@/lib/club-registration/school-pickup";
-import type { RegistrationDraft } from "./registration-defaults";
 import { AudienceStep } from "./AudienceStep";
 import { AdherentStep } from "./AdherentStep";
 import { RepresentativesStep } from "./RepresentativesStep";
 import { PracticeStep } from "./PracticeStep";
 import { AdminStep } from "./AdminStep";
 import { EngagementsStep } from "./EngagementsStep";
+import { PaymentStep } from "./PaymentStep";
 import { RecapStep } from "./RecapStep";
 import { RegistrationSidebar } from "./RegistrationSidebar";
 import { validateStep, validateStepById } from "./step-validation";
@@ -63,70 +69,13 @@ import { useRegistrationDraftStorage } from "./useRegistrationDraftStorage";
 import { DraftStorageDisclosure } from "./DraftStorageDisclosure";
 import { AccountEmailTransparencyBanner } from "./AccountEmailTransparencyBanner";
 import { AuthDialog } from "@/components/auth/AuthDialog";
-
-const STEP_TITLES: Record<RegistrationStepId, string> = {
-  audience: "Pour qui ?",
-  adherent: "L’adhérent",
-  representatives: "Représentants légaux",
-  practice: "Pratique sportive",
-  admin: "Dossier administratif",
-  engagements: "Engagements à signer",
-  recap: "Récapitulatif",
-};
-
-const STEP_SHORT_LABELS: Record<RegistrationStepId, string> = {
-  audience: "Profil",
-  adherent: "Adhérent",
-  representatives: "Représentants",
-  practice: "Pratique",
-  admin: "Dossier",
-  engagements: "Engagements",
-  recap: "Récap",
-};
-
-const STEP_DESCRIPTIONS: Record<RegistrationStepId, string> = {
-  audience:
-    "Indiquez pour qui est l’inscription et, si vous en avez une, votre licence FFTT.",
-  adherent:
-    "Identité, contact et adresse postale de la personne qui pratiquera au club.",
-  representatives:
-    "Coordonnées du ou des représentants légaux (un obligatoire, un second facultatif).",
-  practice:
-    "Lieu principal, lieux complémentaires, créneaux et extension compétiteur si vous le souhaitez.",
-  admin:
-    "Déclaration médicale, inscription familiale, Pass Sport et autres aides, demande d’attestation.",
-  engagements:
-    "Diffusion d’images, autorisations légales pour les mineurs et acceptation du règlement intérieur.",
-  recap:
-    "Vérifiez votre dossier, ajoutez éventuellement des précisions pour le club, puis envoyez.",
-};
-
-/** Étape conditionnelle pour les inscriptions de mineurs uniquement. */
-function buildSequence(draft: RegistrationDraft): RegistrationStepId[] {
-  const needsRepresentatives =
-    draft.adherentRole === "minor_dependent" || isMinorAt(draft.birthDate);
-  const base: RegistrationStepId[] = ["audience", "adherent"];
-  if (needsRepresentatives) base.push("representatives");
-  base.push("practice", "admin", "engagements", "recap");
-  return base;
-}
-
-/**
- * Permet d'accéder à l'étape cible : retour libre ; étapes suivantes seulement
- * si les étapes intermédiaires sont valides.
- */
-function canNavigateToStep(
-  targetIndex: number,
-  activeStep: number,
-  sequence: ReadonlyArray<RegistrationStepId>,
-  draft: RegistrationDraft
-): boolean {
-  if (targetIndex <= activeStep) return true;
-  for (let s = activeStep; s < targetIndex; s++) {
-    if (validateStepById(sequence[s], draft) !== null) return false;
-  }
-  return true;
-}
+import {
+  STEP_DESCRIPTIONS,
+  STEP_SHORT_LABELS,
+  STEP_TITLES,
+  buildRegistrationWizardSequence,
+  canNavigateToRegistrationStep,
+} from "./club-registration-wizard-steps";
 
 type Props = {
   /** Email du compte connecté, ou null en mode anonyme. */
@@ -179,7 +128,7 @@ export function ClubRegistrationWizard({
      toutes hors récap). La séquence est reconstruite à chaque changement de
      `adherentRole` ou de `birthDate`. */
   const sequence = useMemo<RegistrationStepId[]>(
-    () => buildSequence(draft),
+    () => buildRegistrationWizardSequence(draft),
     [draft]
   );
   const totalSteps = sequence.length;
@@ -358,6 +307,11 @@ export function ClubRegistrationWizard({
     };
   }, [fieldErrors, activeStep, sequence]);
 
+  useEffect(() => {
+    if (!fieldErrors || Object.keys(fieldErrors).length === 0) return;
+    logRegistrationFieldErrors("fieldErrors (état UI)", fieldErrors, sequence);
+  }, [fieldErrors, sequence]);
+
   /* Focus management au changement d'étape. */
   useEffect(() => {
     const previous = prevActiveStepRef.current;
@@ -465,6 +419,7 @@ export function ClubRegistrationWizard({
       sex === "" ||
       photoConsent === "" ||
       medicalCertificateDeclaration === "" ||
+      !draft.paymentMethod ||
       !isMedicalAdminStepComplete({
         birthDate: draft.birthDate,
         questionnaire: medicalQuestionnaire,
@@ -524,6 +479,20 @@ export function ClubRegistrationWizard({
       ...(normalizeApplicantNotes(draft.applicantNotes)
         ? { applicantNotes: normalizeApplicantNotes(draft.applicantNotes) }
         : {}),
+      paymentMethod: draft.paymentMethod as ClubRegistrationPayload["paymentMethod"],
+      paymentInstallments: draft.paymentInstallments,
+      paymentAids: draft.paymentAids,
+      holidayVoucherAmountCents: draft.holidayVoucherAmountCents,
+      remainingPaymentMethod:
+        draft.remainingPaymentMethod === ""
+          ? undefined
+          : draft.remainingPaymentMethod,
+      ...((draft.paymentNote ?? "").trim()
+        ? { paymentNote: (draft.paymentNote ?? "").trim() }
+        : {}),
+      ...((draft.specialPaymentNote ?? "").trim()
+        ? { specialPaymentNote: (draft.specialPaymentNote ?? "").trim() }
+        : {}),
     };
   };
 
@@ -544,25 +513,48 @@ export function ClubRegistrationWizard({
           return;
         }
         if (result.fieldErrors) {
+          logRegistrationFieldErrors(
+            "submitRegistration: erreurs serveur",
+            result.fieldErrors,
+            sequence
+          );
           setFieldErrors(result.fieldErrors);
         }
+        logRegistrationWizardDebug("submitRegistration: échec", {
+          error: result.error,
+        });
         setSubmitError(result.error);
       } finally {
         setSubmitting(false);
       }
     },
-    [actions, storage]
+    [actions, sequence, storage]
   );
 
   const handleSubmit = async () => {
     setSubmitError(null);
     setFieldErrors(null);
+    logRegistrationWizardDebug("handleSubmit: début", {
+      representativesCount: draft.representatives.length,
+      representatives: summarizeRepresentativesForDebug(draft.representatives),
+      slotIdsCount: draft.slotIds.length,
+      wantsCompetitorExtras: draft.wantsCompetitorExtras,
+      competitionJerseySize: draft.competitionJerseySize ?? null,
+      adherentRole: draft.adherentRole,
+    });
     /* On rejoue la validation de toutes les étapes (hors récap) pour rattraper
        les cas de navigation libre via le stepper. */
     for (let i = 0; i < sequence.length - 1; i++) {
       const stepId = sequence[i];
       const result = validateStep(stepId, draft);
       if (!result.valid) {
+        logRegistrationWizardDebug("handleSubmit: validateStep échoué", {
+          stepIndex: i,
+          stepId,
+          message: result.message,
+          focusSelector: result.focusSelector,
+          representativesCount: draft.representatives.length,
+        });
         setActiveStep(i);
         setSubmitError(result.message);
         scrollToFormTarget(result.focusSelector, {
@@ -578,17 +570,37 @@ export function ClubRegistrationWizard({
     }
     const payload = buildPayload();
     if (!payload) {
+      logRegistrationWizardDebug("handleSubmit: buildPayload null", {
+        sex: draft.sex,
+        photoConsent: draft.photoConsent,
+        paymentMethod: draft.paymentMethod,
+      });
       setSubmitError("Certaines informations obligatoires sont manquantes.");
       return;
     }
     const parsed = buildRegistrationPayloadSchema(config).safeParse(payload);
     if (!parsed.success) {
-      setFieldErrors(
-        parsed.error.flatten().fieldErrors as Record<string, string[] | undefined>
-      );
+      const flat = parsed.error.flatten().fieldErrors as Record<
+        string,
+        string[] | undefined
+      >;
+      logRegistrationWizardDebug("handleSubmit: Zod safeParse échoué", {
+        zodIssues: formatZodIssuesForDebug(parsed.error.issues),
+        flattenFieldErrors: flat,
+        representativesInPayload: summarizeRepresentativesForDebug(
+          payload.representatives
+        ),
+        slotIds: payload.slotIds,
+        schoolPickupSlotIds: payload.schoolPickupSlotIds,
+      });
+      logRegistrationFieldErrors("handleSubmit: étapes en erreur", flat, sequence);
+      setFieldErrors(flat);
       setSubmitError("Certaines informations sont invalides ou incomplètes.");
       return;
     }
+    logRegistrationWizardDebug("handleSubmit: validation OK", {
+      representativesCount: parsed.data.representatives.length,
+    });
     if (!accountEmail) {
       pendingPayloadRef.current = payload;
       setAuthDialogOpen(true);
@@ -667,7 +679,7 @@ export function ClubRegistrationWizard({
                     <StepButton
                       color="inherit"
                       disabled={
-                        !canNavigateToStep(index, activeStep, sequence, draft)
+                        !canNavigateToRegistrationStep(index, activeStep, sequence, draft)
                       }
                       onClick={() => handleGoToStep(index)}
                       icon={
@@ -706,7 +718,7 @@ export function ClubRegistrationWizard({
                     color={isPast && stepInvalid ? "error" : "primary"}
                     variant={activeStep === index ? "contained" : "outlined"}
                     disabled={
-                      !canNavigateToStep(index, activeStep, sequence, draft)
+                      !canNavigateToRegistrationStep(index, activeStep, sequence, draft)
                     }
                     onClick={() => handleGoToStep(index)}
                     aria-current={activeStep === index ? "step" : undefined}
@@ -844,6 +856,9 @@ export function ClubRegistrationWizard({
                   draft={draft}
                   onChange={actions.patchFields}
                 />
+              )}
+              {currentStepId === "payment" && (
+                <PaymentStep draft={draft} onChange={actions.patchFields} />
               )}
               {currentStepId === "recap" && (
                 <RecapStep

@@ -26,6 +26,8 @@ const LIST_FIELDS = [
   "paymentStatus",
   "paymentRequestedAt",
   "paidAt",
+  "payment",
+  "pricingQuote",
 ] as const;
 
 /** GET /api/club/registrations — liste personnelle ou, avec scope=managed, liste à traiter. */

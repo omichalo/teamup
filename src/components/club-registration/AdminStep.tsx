@@ -430,17 +430,6 @@ export function AdminStep({ draft, onChange }: Props) {
           </MenuItem>
         </Select>
       </FormControl>
-
-      <Alert severity="info">
-        Site du club :{" "}
-        <a
-          href={CLUB_REGISTRATION_EXTERNAL_LINKS.siteClub}
-          target="_blank"
-          rel="noreferrer"
-        >
-          sqyping.fr
-        </a>
-      </Alert>
     </Stack>
   );
 }

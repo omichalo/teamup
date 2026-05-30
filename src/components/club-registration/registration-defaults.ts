@@ -1,4 +1,9 @@
 import type { ClubRegistrationPayload, Representative } from "@/lib/club-registration/schema";
+import type { PaymentAid } from "@/lib/club-registration/payment/types";
+import type {
+  PaymentMethodId,
+  RemainingPaymentMethodId,
+} from "@/lib/club-registration/payment-constants";
 import {
   createEmptyMedicalQuestionnaire,
   createEmptyMedicalVeteranPath,
@@ -26,6 +31,9 @@ export type RegistrationDraft = Omit<
   | "medicalQuestionnaire"
   | "medicalVeteranPath"
   | "applicantNotes"
+  | "paymentMethod"
+  | "remainingPaymentMethod"
+  | "paymentAids"
 > & {
   rulesAccepted: boolean;
   /** Précisions libres pour le club (facultatif à l'envoi). */
@@ -37,6 +45,9 @@ export type RegistrationDraft = Omit<
   medicalCertificateDeclaration:
     | ClubRegistrationPayload["medicalCertificateDeclaration"]
     | "";
+  paymentMethod: PaymentMethodId | "";
+  remainingPaymentMethod: RemainingPaymentMethodId | "";
+  paymentAids: PaymentAid[];
 };
 
 export type { Representative };
@@ -111,5 +122,12 @@ export function createEmptyDraft(): RegistrationDraft {
     competitionJerseySize: undefined,
     competitionIds: [],
     applicantNotes: "",
+    paymentMethod: "" as PaymentMethodId | "",
+    paymentInstallments: 1,
+    paymentAids: [] as PaymentAid[],
+    holidayVoucherAmountCents: null as number | null,
+    remainingPaymentMethod: "" as RemainingPaymentMethodId | "",
+    paymentNote: "",
+    specialPaymentNote: "",
   };
 }

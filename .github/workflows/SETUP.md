@@ -1,243 +1,90 @@
 # Configuration GitHub Actions - Guide complet
 
-Ce guide couvre toute la configuration nécessaire pour les workflows GitHub Actions du projet TeamUp.
-
-## 📋 Table des matières
-
-1. [Workflows disponibles](#workflows-disponibles)
-2. [Configuration initiale](#configuration-initiale)
-3. [Protection de branche](#protection-de-branche)
-4. [Tests et validation](#tests-et-validation)
-5. [Dépannage](#dépannage)
-
----
+Ce guide couvre la configuration des workflows GitHub Actions du projet TeamUp (option C : CI GitHub + App Hosting Firebase).
 
 ## Workflows disponibles
 
 ### 1. CI - Lint, Type-check and Build (`ci.yml`)
 
 **Déclenchement** :
-- Sur chaque Pull Request vers `main`
-- Sur chaque push sur `main`
 
-**Actions** :
-- ✅ Vérification du lint (ESLint)
-- ✅ Vérification du type-check (TypeScript)
-- ✅ Build de l'application (Next.js)
-- ✅ Vérification de l'absence de TODO dans le code
+- Pull Request vers `staging` ou `main`
+- Push sur `staging` ou `main`
 
-**Objectif** : S'assurer que le code est valide avant le merge.
+**Actions** : lint, file-sizes, type-check, tests, build, détection TODO.
 
----
+**Variables** : pour les builds ciblant `staging`, définir des variables de dépôt `*_DEV` et `*_STAGING` (voir ci-dessous). Si absentes, repli sur les variables prod.
 
-### 2. Deploy to Production (`deploy-production.yml`)
+### 2. Deploy Firestore (`deploy-firestore.yml`)
 
 **Déclenchement** :
-- Sur chaque push sur `main` (sauf les commits de merge automatiques)
-- Ignore les modifications de documentation (`.md`)
 
-**Actions** :
-- ✅ Vérification du code (lint, type-check, build)
-- ✅ Déploiement automatique sur Firebase App Hosting
-- ✅ Nettoyage des fichiers sensibles
+- Push sur `staging` si `firestore.rules` / `firestore.indexes.json` modifiés → projet **sqyping-teamup-dev**
+- Push sur `main` (mêmes paths) → projet **sqyping-teamup**
+- `workflow_dispatch` avec choix `staging` ou `production`
 
-**Objectif** : Déployer automatiquement chaque modification sur `main` en production.
+**Secret** : `FIREBASE_SERVICE_ACCOUNT` (compte de service avec accès aux **deux** projets Firebase).
 
-**Configuration requise** :
-- Secret GitHub : `FIREBASE_SERVICE_ACCOUNT`
+### 3. App Hosting (Firebase, hors GHA)
 
----
+Les déploiements Next.js ne passent **plus** par GitHub Actions. Au merge :
 
-### 3. Deploy Firestore Rules and Indexes (`deploy-firestore.yml`)
+- `staging` → backend `teamup-staging` (`sqyping-teamup-dev`)
+- `main` → backend `teamup` (`sqyping-teamup`)
 
-**Déclenchement** :
-- Sur chaque push sur `main` ou `master` si les fichiers suivants sont modifiés :
-  - `firestore.rules`
-  - `firestore.indexes.json`
-  - `.github/workflows/deploy-firestore.yml`
-- Peut être déclenché manuellement via `workflow_dispatch`
+Configuration : [docs/APP_HOSTING_STAGING_SETUP.md](../../docs/APP_HOSTING_STAGING_SETUP.md)
 
-**Actions** :
-- ✅ Déploiement des règles Firestore
-- ✅ Déploiement des index Firestore
+~~Deploy to Production (`deploy-production.yml`)~~ — **supprimé** (option C).
 
-**Objectif** : Maintenir les règles et index Firestore à jour en production.
+## Variables GitHub (Settings → Secrets and variables → Actions → Variables)
 
-**Configuration requise** :
-- Secret GitHub : `FIREBASE_SERVICE_ACCOUNT`
+### Production (existantes)
 
----
+- `NEXT_PUBLIC_FIREBASE_*`, `NEXT_PUBLIC_APP_URL`, `APP_URL` — projet `sqyping-teamup`
 
-## Configuration initiale
+### Staging / CI (à ajouter)
 
-### Étape 1 : Créer un service account dans Google Cloud
+Copier les valeurs du projet **sqyping-teamup-dev** (console Firebase ou `.env.local`) :
 
-1. **Ouvrez la console Google Cloud** :
-   - Allez sur [Google Cloud Console - Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts?project=sqyping-teamup)
-   - Assurez-vous que le projet `sqyping-teamup` est sélectionné
+| Variable | Exemple |
+|----------|---------|
+| `NEXT_PUBLIC_FIREBASE_API_KEY_DEV` | clé web dev |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN_DEV` | `sqyping-teamup-dev.firebaseapp.com` |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID_DEV` | `sqyping-teamup-dev` |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET_DEV` | `sqyping-teamup-dev.firebasestorage.app` |
+| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID_DEV` | … |
+| `NEXT_PUBLIC_FIREBASE_APP_ID_DEV` | … |
+| `NEXT_PUBLIC_APP_URL_STAGING` | `https://teamup-staging--sqyping-teamup-dev.us-east4.hosted.app` |
+| `APP_URL_STAGING` | idem |
 
-2. **Créez un nouveau service account** :
-   - Cliquez sur **Créer un compte de service**
-   - **Nom** : `github-actions-firestore-deploy`
-   - **Description** : `Service account pour déployer les règles Firestore via GitHub Actions`
-   - Cliquez sur **Créer et continuer**
+## Secret `FIREBASE_SERVICE_ACCOUNT`
 
-3. **Ajoutez les rôles nécessaires** :
-   - Recherchez et sélectionnez **Administrateur Firebase** (`roles/firebase.admin`)
-   - ⚠️ **Important** : Ce rôle inclut tous les rôles nécessaires (recommandé)
-   - Cliquez sur **Continuer** puis **Terminer**
-
-### Étape 2 : Générer une clé JSON
-
-1. **Trouvez votre service account** dans la liste
-2. **Créez une clé JSON** :
-   - Allez dans l'onglet **Clés**
-   - Cliquez sur **Ajouter une clé** → **Créer une nouvelle clé**
-   - Sélectionnez **JSON**
-   - Cliquez sur **Créer**
-   - ⚠️ **Important** : Le fichier JSON sera téléchargé. Gardez-le en sécurité !
-
-### Étape 3 : Configurer le secret dans GitHub
-
-1. **Ouvrez les paramètres de votre dépôt GitHub** :
-   - Allez sur votre dépôt GitHub
-   - Cliquez sur **Settings** → **Secrets and variables** → **Actions**
-
-2. **Créez un nouveau secret** :
-   - Cliquez sur **New repository secret**
-   - **Name** : `FIREBASE_SERVICE_ACCOUNT` (respectez la casse)
-   - **Secret** : Collez le contenu complet du fichier JSON téléchargé
-   - ⚠️ **Important** : Assurez-vous qu'il n'y a pas d'espaces avant ou après le JSON
-   - Cliquez sur **Add secret**
-
----
+1. Service account avec **Administrateur Firebase** sur `sqyping-teamup` **et** `sqyping-teamup-dev`
+2. Clé JSON → secret GitHub `FIREBASE_SERVICE_ACCOUNT`
 
 ## Protection de branche
 
-### Configuration de la protection pour `main`
+### `staging`
 
-1. **Accéder aux paramètres** :
-   - GitHub → **Settings** → **Branches**
+- Require PR before merging
+- Require status check : `check / check`
 
-2. **Ajouter une règle de protection** :
-   - Cliquez sur **Add rule**
-   - **Branch name pattern** : `main`
+### `main`
 
-3. **Configurer les options** :
+- Require PR before merging (depuis `staging` en release)
+- Require status check : `check / check`
+- Optionnel : GitHub Environment `production` avec reviewers
 
-   #### ✅ Require a pull request before merging
-   - ✅ Cocher **Require a pull request before merging**
-   - ✅ **Require approvals** : `1` (minimum)
-   - ✅ **Dismiss stale pull request approvals when new commits are pushed**
+## Checklist
 
-   #### ✅ Require status checks to pass before merging
-   - ✅ Cocher **Require status checks to pass before merging**
-   - ✅ Cocher **Require branches to be up to date before merging**
-   - Dans la liste, cocher : `check / check`
+- [ ] Secret `FIREBASE_SERVICE_ACCOUNT` (multi-projet)
+- [ ] Variables `*_DEV` et `*_STAGING` pour la CI
+- [ ] Backend `teamup-staging` lié à GitHub, live branch `staging`, environment `staging`
+- [ ] Backend `teamup` prod : live branch `main`
+- [ ] Branche `staging` créée sur GitHub
+- [ ] Protections `staging` et `main`
 
-   #### ✅ Autres options recommandées
-   - ✅ **Require conversation resolution before merging**
-   - ✅ **Require linear history**
-   - ✅ **Include administrators**
+## Ressources
 
-4. **Sauvegarder** : Cliquez sur **Create**
-
-### Vérification
-
-Pour vérifier que la protection est active :
-1. Créez une branche de test : `git checkout -b test-branch-protection`
-2. Faites un commit : `git commit --allow-empty -m "test"`
-3. Essayez de push directement sur `main` : `git push origin test-branch-protection:main`
-4. GitHub devrait refuser le push ou demander une PR
-
----
-
-## Tests et validation
-
-### Test 1 : Workflow CI sur une PR
-
-1. **Créer une branche de test** :
-   ```bash
-   git checkout -b test/ci-workflow-validation
-   ```
-
-2. **Faire une modification mineure** (ex: ajouter un commentaire)
-
-3. **Commiter et pousser** :
-   ```bash
-   git add .
-   git commit -m "test: validation du workflow CI"
-   git push origin test/ci-workflow-validation
-   ```
-
-4. **Créer une PR sur GitHub**
-
-5. **Vérifier** :
-   - ✅ Le workflow CI se déclenche automatiquement
-   - ✅ Les checks apparaissent dans la PR
-   - ✅ Tous les checks passent (lint, type-check, build)
-
-### Test 2 : Déploiement Firestore
-
-1. **Déclenchez le workflow manuellement** :
-   - GitHub → **Actions** → **Deploy Firestore Rules and Indexes**
-   - Cliquez sur **Run workflow**
-   - Sélectionnez la branche `main`
-   - Cliquez sur **Run workflow**
-
-2. **Surveillez l'exécution** :
-   - ✅ Si tout fonctionne : "✅ Règles et index Firestore déployés avec succès"
-   - ❌ Si erreur : Consultez la section "Dépannage"
-
-### Checklist de validation
-
-- [ ] Protection de branche main activée
-- [ ] Secret `FIREBASE_SERVICE_ACCOUNT` configuré
-- [ ] Workflow CI s'exécute sur les PR
-- [ ] Workflow de déploiement s'exécute sur merge
-- [ ] Workflow Firestore fonctionne
-
----
-
-## Dépannage
-
-### Le workflow CI échoue
-
-1. Vérifier les logs dans l'onglet **Actions** de GitHub
-2. Exécuter localement : `npm run check`
-3. Corriger les erreurs de lint, type-check ou build
-
-### Le déploiement échoue
-
-1. Vérifier que le secret `FIREBASE_SERVICE_ACCOUNT` est bien configuré
-2. Vérifier que le service account a les permissions nécessaires
-3. Vérifier les logs dans l'onglet **Actions** de GitHub
-
-### Erreur : "403, The caller does not have permission"
-
-**Solution** :
-- Vérifier que le service account a le rôle **Administrateur Firebase** dans Google Cloud Console
-- Allez dans [Google Cloud Console - IAM](https://console.cloud.google.com/iam-admin/iam?project=sqyping-teamup)
-- Trouvez votre service account et ajoutez le rôle si nécessaire
-
-### Erreur : "403, Permission denied to get service [firestore.googleapis.com]"
-
-**Solution** :
-- Le service account n'a pas les permissions pour activer les APIs
-- Ajoutez le rôle **Administrateur Service Usage** (`roles/serviceusage.serviceUsageAdmin`)
-- **OU** utilisez le rôle **Administrateur Firebase** qui inclut cette permission (recommandé)
-
-### Les checks ne s'affichent pas dans la PR
-
-- Attendez quelques secondes (GitHub peut prendre du temps)
-- Les checks n'apparaissent qu'après la première exécution
-- Créez une PR de test pour déclencher le workflow CI
-
----
-
-## 📚 Ressources supplémentaires
-
-- [Documentation Firebase - Service Accounts](https://firebase.google.com/docs/admin/setup)
-- [Documentation GitHub Actions - Secrets](https://docs.github.com/en/actions/security-guides/encrypted-secrets)
-- [Documentation Google Cloud - IAM](https://cloud.google.com/iam/docs)
-- [Guide du workflow Git/GitHub](./GIT_WORKFLOW.md)
+- [Workflow Git](../GIT_WORKFLOW.md)
+- [App Hosting staging](../../docs/APP_HOSTING_STAGING_SETUP.md)

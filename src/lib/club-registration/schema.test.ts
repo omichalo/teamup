@@ -55,6 +55,13 @@ function buildPayload(
     internalRulesAccepted: true,
     wantsCompetitorExtras: false,
     competitionIds: [],
+    paymentMethod: "card" as const,
+    paymentInstallments: 1,
+    paymentAids: [],
+    holidayVoucherAmountCents: null,
+    remainingPaymentMethod: "",
+    paymentNote: "",
+    specialPaymentNote: "",
   };
   const merged = { ...base, ...overrides };
   if (

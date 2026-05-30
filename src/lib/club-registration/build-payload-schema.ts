@@ -18,7 +18,13 @@ import {
   type MedicalVeteranPath,
 } from "./medical-dossier";
 import { APPLICANT_NOTES_MAX_LENGTH } from "./applicant-notes";
+import {
+  paymentPayloadFieldsSchema,
+  refinePaymentPayload,
+} from "./payment-payload-schema";
 import { isValidFrenchPhoneSurface, normalizeFrenchPhoneInput } from "./phone-fr";
+import { calculateQuoteFromConfig } from "@/lib/club-registration-config/pricing-engine";
+import { buildPricingContext } from "@/lib/pricing/build-context";
 import {
   adherentRoleSchema,
   ffttLicenseLookupSchema,
@@ -127,6 +133,7 @@ export function buildRegistrationPayloadSchema(config: RegistrationConfigV1) {
         (val) => (typeof val === "string" && val.trim() === "" ? undefined : val),
         z.string().trim().max(APPLICANT_NOTES_MAX_LENGTH).optional()
       ),
+      ...paymentPayloadFieldsSchema,
     })
     .superRefine((data, ctx) => {
       for (const id of data.slotIds) {
@@ -378,6 +385,19 @@ export function buildRegistrationPayloadSchema(config: RegistrationConfigV1) {
           });
         }
       }
+
+      const pricingCtx = buildPricingContext({
+        birthDate: data.birthDate,
+        mainSectionId: data.mainSectionId,
+        wantsCompetitorExtras: data.wantsCompetitorExtras,
+        competitionIds: data.competitionIds,
+        familyRegistrationOrder: data.familyRegistrationOrder,
+        sex: data.sex,
+        firstFemaleRegistrationSqy: data.firstFemaleRegistrationSqy,
+        reductionTypes: data.reductionTypes,
+      });
+      const quote = calculateQuoteFromConfig(pricingCtx, config);
+      refinePaymentPayload(data, ctx, quote.totalCents);
     })
   );
 }

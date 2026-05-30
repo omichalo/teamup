@@ -23,7 +23,8 @@ import type {
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import { buildAdminAidRecapFields } from "@/lib/club-registration/recap-aids";
 import { ApplicantNotesSection } from "./ApplicantNotesSection";
-import { PricingBreakdown } from "./PricingBreakdown";
+import { RecapPaymentBlock } from "./RecapPaymentBlock";
+import { PricingBreakdown, usePricingQuote } from "./PricingBreakdown";
 
 type Props = {
   draft: RegistrationDraft;
@@ -202,6 +203,7 @@ function RecapBlock({
 
 export function RecapStep({ draft, accountEmail, onEditStep, onChange }: Props) {
   const config = useRegistrationConfigValue();
+  const quote = usePricingQuote(draft);
   const additionalSections = draft.additionalSectionIds.map((id) =>
     findSectionLabel(config, id)
   );
@@ -447,6 +449,13 @@ export function RecapStep({ draft, accountEmail, onEditStep, onChange }: Props) 
             value: draft.rulesAccepted ? "Accepté" : "Non accepté",
           },
         ]}
+      />
+
+      <RecapPaymentBlock
+        draft={draft}
+        quote={quote}
+        onEditStep={onEditStep}
+        RecapBlock={RecapBlock}
       />
 
       <ApplicantNotesSection

@@ -27,6 +27,7 @@ export type RegistrationStepId =
   | "practice"
   | "admin"
   | "engagements"
+  | "payment"
   | "recap";
 
 export const REGISTRATION_FIELD_TO_STEP_ID: Readonly<
@@ -72,14 +73,24 @@ export const REGISTRATION_FIELD_TO_STEP_ID: Readonly<
   familyRegistrationOrder: "admin",
   reductionTypes: "admin",
   reductionReferenceCodes: "admin",
+  paymentAids: "admin",
 
   /* Étape 6 — Engagements à signer */
   photoConsent: "engagements",
   emergencyMedicalAuthorization: "engagements",
   supervisionAcknowledgement: "engagements",
   internalRulesAccepted: "engagements",
+  rulesAccepted: "engagements",
 
-  /* Étape 7 — Récapitulatif */
+  /* Étape 7 — Paiement */
+  paymentMethod: "payment",
+  paymentInstallments: "payment",
+  holidayVoucherAmountCents: "payment",
+  remainingPaymentMethod: "payment",
+  paymentNote: "payment",
+  specialPaymentNote: "payment",
+
+  /* Étape 8 — Récapitulatif */
   applicantNotes: "recap",
 };
 

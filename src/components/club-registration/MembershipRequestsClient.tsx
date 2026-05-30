@@ -15,7 +15,6 @@ import {
   Divider,
   FormControlLabel,
   Grid,
-  InputAdornment,
   MenuItem,
   Stack,
   TextField,
@@ -24,10 +23,7 @@ import {
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
-  Euro as EuroIcon,
-  MarkEmailRead as MarkEmailReadIcon,
   Refresh as RefreshIcon,
-  Save as SaveIcon,
 } from "@mui/icons-material";
 import { PageHeader } from "@/components/ui";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
@@ -57,6 +53,13 @@ import { ReductionReferenceCodeAdminFields } from "./ReductionReferenceCodeAdmin
 import { RegistrationMultiSelectField } from "./RegistrationMultiSelectField";
 import { SchoolPickupAdminFields } from "./SchoolPickupAdminFields";
 import type { RegistrationDraft } from "./registration-defaults";
+import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
+import { calculatePaymentSummary } from "@/lib/club-registration/payment/calculate-payment-summary";
+import { normalizePaymentAidList } from "@/lib/club-registration/payment/payment-draft-helpers";
+import type { PaymentAid, RegistrationPayment } from "@/lib/club-registration/payment/types";
+import { PaymentSummaryCard } from "./secretariat/PaymentSummaryCard";
+import { PaymentTrackingSection } from "./secretariat/PaymentTrackingSection";
+import { SecretariatPaymentNotesSection } from "./secretariat/SecretariatPaymentNotesSection";
 
 type RegistrationSummary = {
   id: string;
@@ -74,6 +77,7 @@ type RegistrationSummary = {
   /** Ancien champ — lecture seule pour dossiers déjà enregistrés. */
   handisportPracticeLevel?: "leisure" | "competition";
   paymentStatus?: string;
+  payment?: RegistrationPayment;
   submittedAt?: string | null;
   updatedAt?: string | null;
 };
@@ -113,6 +117,8 @@ type RegistrationDetail = RegistrationSummary & {
   reviewNotes?: string;
   paymentEmailSentTo?: string;
   stripeCheckoutUrl?: string;
+  payment?: RegistrationPayment;
+  paymentAids?: PaymentAid[];
 };
 
 type EditableRegistration = {
@@ -151,6 +157,7 @@ type EditableRegistration = {
   applicantNotes: string;
   reviewNotes: string;
   amountEuros: string;
+  paymentAids: PaymentAid[];
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -250,14 +257,6 @@ function formatDate(iso: string | null | undefined): string {
   return new Date(iso).toLocaleString("fr-FR");
 }
 
-function formatAmount(cents: number | undefined): string {
-  if (!Number.isFinite(cents)) return "-";
-  return new Intl.NumberFormat("fr-FR", {
-    style: "currency",
-    currency: "EUR",
-  }).format((cents ?? 0) / 100);
-}
-
 function createEmptyRepresentative(): Representative {
   return {
     role: "mother",
@@ -325,6 +324,9 @@ function toEditable(
       typeof registration.paymentAmountCents === "number"
         ? String(registration.paymentAmountCents / 100)
         : "",
+    paymentAids: normalizePaymentAidList(
+      (registration.paymentAids as PaymentAid[] | undefined) ?? []
+    ),
   };
 }
 
@@ -439,6 +441,14 @@ export function MembershipRequestsClient() {
     [registrations, selectedId]
   );
 
+  const selectedPayment = useMemo(() => {
+    if (!selected) return null;
+    return (
+      selected.payment ??
+      normalizeRegistrationPayment(selected as unknown as Record<string, unknown>)
+    );
+  }, [selected]);
+
   const liveQuote = useMemo(() => {
     if (!form?.birthDate) {
       return null;
@@ -451,11 +461,22 @@ export function MembershipRequestsClient() {
     return parseAmountCents(form.amountEuros);
   }, [form]);
 
+  /** Montant attendu après aides déclarées (aligné sur le détail tarifaire). */
+  const expectedPayableAfterAidsCents = useMemo(() => {
+    if (!form || !liveQuote || liveQuote.totalCents <= 0) return null;
+    return calculatePaymentSummary({
+      totalAmountCents: liveQuote.totalCents,
+      aids: normalizePaymentAidList(form.paymentAids ?? []),
+      receivedPayments: [],
+    }).amountToPayCents;
+  }, [form, liveQuote]);
+
   const amountDiffersFromQuote =
     liveQuote !== null &&
     liveQuote.totalCents > 0 &&
     enteredAmountCents !== null &&
-    enteredAmountCents !== liveQuote.totalCents;
+    expectedPayableAfterAidsCents !== null &&
+    enteredAmountCents !== expectedPayableAfterAidsCents;
 
   const updateField = <K extends keyof EditableRegistration>(
     field: K,
@@ -596,8 +617,13 @@ export function MembershipRequestsClient() {
       setError("Impossible d'appliquer un montant : devis incomplet ou nul.");
       return;
     }
-    updateField("amountEuros", String(liveQuote.totalCents / 100));
-    setSuccess("Montant aligné sur le devis calculé.");
+    const payable = calculatePaymentSummary({
+      totalAmountCents: liveQuote.totalCents,
+      aids: normalizePaymentAidList(form.paymentAids ?? []),
+      receivedPayments: [],
+    }).amountToPayCents;
+    updateField("amountEuros", String(payable / 100));
+    setSuccess("Montant aligné sur le reste à payer estimé (après aides déclarées).");
   };
 
   const persistQuote = async () => {
@@ -663,7 +689,13 @@ export function MembershipRequestsClient() {
       if (!res.ok || json.error) {
         throw new Error(json.error || "Impossible d'envoyer la demande de paiement.");
       }
-      setSuccess("Demande de paiement envoyée par e-mail.");
+      if (json.manualFollowUp === true && typeof json.message === "string") {
+        setSuccess(json.message);
+      } else {
+        setSuccess(
+          "Un e-mail avec un lien de paiement sécurisé a été envoyé au contact du dossier."
+        );
+      }
       await Promise.all([fetchRegistrations(), fetchDetail(selectedId)]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur lors de la demande de paiement.");
@@ -678,7 +710,7 @@ export function MembershipRequestsClient() {
         <PageHeader
           eyebrow="Secrétariat"
           title="Demandes d'adhésion"
-          subtitle="Relisez et corrigez le dossier complet avant d'envoyer la demande de paiement Stripe."
+          subtitle="Relisez le dossier, vérifiez le montant, puis demandez le paiement : un e-mail avec lien sécurisé part si le mode le permet (carte en une fois). Sinon, suivez les encaissements depuis le tableau ci-dessous."
           actions={
             <Button
               variant="outlined"
@@ -756,10 +788,15 @@ export function MembershipRequestsClient() {
                           ) : null}
                         </Stack>
                       </CardContent>
-                      <CardActions sx={{ px: 2, pt: 0, pb: 1.5 }}>
-                        <Typography variant="caption" color="text.secondary">
-                          {formatAmount(registration.paymentAmountCents)}
-                        </Typography>
+                      <CardActions sx={{ px: 2, pt: 0, pb: 1.5, flexDirection: "column", alignItems: "stretch" }}>
+                        <PaymentSummaryCard
+                          payment={
+                            registration.payment ??
+                            normalizeRegistrationPayment(
+                              registration as unknown as Record<string, unknown>
+                            )
+                          }
+                        />
                       </CardActions>
                     </Card>
                   );
@@ -1099,6 +1136,7 @@ export function MembershipRequestsClient() {
                           sex: form.sex,
                           firstFemaleRegistrationSqy: form.firstFemaleRegistrationSqy,
                           reductionTypes: form.reductionTypes,
+                          paymentAids: form.paymentAids,
                         }}
                         variant="full"
                       />
@@ -1116,8 +1154,13 @@ export function MembershipRequestsClient() {
                       {amountDiffersFromQuote ? (
                         <Alert severity="warning">
                           Le montant saisi (
-                          {formatCentsAsEuros(enteredAmountCents ?? 0)}) diffère du devis
-                          calculé ({formatCentsAsEuros(liveQuote?.totalCents ?? 0)}).
+                          {formatCentsAsEuros(enteredAmountCents ?? 0)}) diffère du reste à
+                          payer estimé (
+                          {formatCentsAsEuros(expectedPayableAfterAidsCents ?? 0)}
+                          {liveQuote
+                            ? `, total devis ${formatCentsAsEuros(liveQuote.totalCents)}`
+                            : ""}
+                          ).
                         </Alert>
                       ) : null}
 
@@ -1163,60 +1206,33 @@ export function MembershipRequestsClient() {
                       </Grid>
                     </Grid>
 
-                    <SectionTitle>Paiement et notes internes</SectionTitle>
-                    <Grid container spacing={2}>
-                      <Grid size={{ xs: 12, sm: 6 }}>
-                        <TextField
-                          label="Montant à régler"
-                          value={form.amountEuros}
-                          onChange={(e) => updateField("amountEuros", e.target.value)}
-                          fullWidth
-                          InputProps={{
-                            startAdornment: (
-                              <InputAdornment position="start">
-                                <EuroIcon fontSize="small" />
-                              </InputAdornment>
-                            ),
-                          }}
-                        />
-                      </Grid>
-                      <Grid size={{ xs: 12 }}>
-                        <TextField
-                          label="Notes internes"
-                          value={form.reviewNotes}
-                          onChange={(e) => updateField("reviewNotes", e.target.value)}
-                          fullWidth
-                          multiline
-                          minRows={3}
-                        />
-                      </Grid>
-                    </Grid>
-
-                    {selected.paymentEmailSentTo ? (
-                      <Alert severity="info">
-                        Dernière demande de paiement envoyée à {selected.paymentEmailSentTo}.
-                      </Alert>
+                    {selectedId && selectedPayment ? (
+                      <PaymentTrackingSection
+                        registrationId={selectedId}
+                        payment={selectedPayment}
+                        onRefresh={async () => {
+                          if (selectedId) await fetchDetail(selectedId);
+                          await fetchRegistrations();
+                        }}
+                      />
                     ) : null}
 
-                    <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} justifyContent="flex-end">
-                      <Button
-                        variant="outlined"
-                        startIcon={<SaveIcon />}
-                        onClick={save}
-                        disabled={saving || requestingPayment || persistingQuote}
-                      >
-                        {saving ? "Enregistrement..." : "Enregistrer"}
-                      </Button>
-                      <Button
-                        variant="contained"
-                        color="secondary"
-                        startIcon={<MarkEmailReadIcon />}
-                        onClick={requestPayment}
-                        disabled={saving || requestingPayment || persistingQuote}
-                      >
-                        {requestingPayment ? "Envoi..." : "Valider et demander le paiement"}
-                      </Button>
-                    </Stack>
+                    <SecretariatPaymentNotesSection
+                      amountEuros={form.amountEuros}
+                      reviewNotes={form.reviewNotes}
+                      onAmountEurosChange={(value) => updateField("amountEuros", value)}
+                      onReviewNotesChange={(value) => updateField("reviewNotes", value)}
+                      paymentEmailSentTo={selected.paymentEmailSentTo ?? null}
+                      paymentMethod={selectedPayment?.paymentMethod}
+                      paymentInstallments={selectedPayment?.paymentInstallments}
+                      saving={saving}
+                      requestingPayment={requestingPayment}
+                      persistingQuote={persistingQuote}
+                      onSave={async () => {
+                        await save();
+                      }}
+                      onRequestPayment={requestPayment}
+                    />
                   </Stack>
                 )}
               </CardContent>
