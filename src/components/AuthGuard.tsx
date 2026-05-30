@@ -52,6 +52,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
       const role = user.role;
       const fallbackByRole: Record<string, string> = {
         [USER_ROLES.PLAYER]: "/joueur",
+        [USER_ROLES.SECRETARY]: "/club/demandes-adhesion",
         [USER_ROLES.COACH]: "/",
         [USER_ROLES.ADMIN]: "/",
       };
@@ -117,4 +118,3 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
 
   return <>{children}</>;
 };
-

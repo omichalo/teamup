@@ -9,7 +9,9 @@ alwaysApply: true
 
 ### Structure des branches
 
-- NE JAMAIS commiter directement sur `main` ou `master` pour du code de fonctionnalité
+- NE JAMAIS commiter directement sur `main`, `master` ou `staging` pour du code de fonctionnalité
+- Flux standard : branche `feature/*` (ou `fix/*`) → **PR vers `staging`** → après validation, **PR release `staging` → `main`**
+- `staging` déploie sur App Hosting (`sqyping-teamup-dev`) ; `main` sur la prod (`sqyping-teamup`) — voir `docs/APP_HOSTING_STAGING_SETUP.md`
 - TOUJOURS créer une branche dédiée avant de développer une fonctionnalité :
   - `feature/nom-fonctionnalite` pour les nouvelles fonctionnalités
   - `fix/nom-correction` pour les corrections de bugs
@@ -29,7 +31,7 @@ alwaysApply: true
 
 ### Pull Requests obligatoires
 
-- AVANT de pousser sur main, TOUJOURS créer une Pull Request
+- AVANT de merger sur `staging` ou `main`, TOUJOURS créer une Pull Request (vers `staging` pour le dev courant ; vers `main` uniquement pour une release)
 - Rappeler à l'utilisateur de :
   1. Pousser sa branche feature/fix/etc
   2. Créer une PR sur GitHub
@@ -51,9 +53,10 @@ alwaysApply: true
 
 ### Déploiement
 
-- Rappeler que chaque merge sur main déclenche un déploiement automatique en production
-- Ne jamais suggérer de push direct sur main pour du code de fonctionnalité
-- Pour les hotfixes urgents, utiliser une branche `hotfix/nom-hotfix` avec PR accélérée
+- Merge sur `staging` : rollout App Hosting dev (Firebase GitHub, pas de workflow GHA deploy)
+- Merge sur `main` : rollout App Hosting production
+- Ne jamais suggérer de push direct sur `staging` ou `main` pour du code de fonctionnalité
+- Hotfix urgent : branche `hotfix/*` → PR vers `staging`, puis release vers `main` (ou processus accéléré documenté)
 
 ## Tests & Robustesse
 

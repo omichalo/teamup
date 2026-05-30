@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <title>Demandes d'adhésion — SQY Ping Team Up</title>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;900&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "Figtree", sans-serif; background: #f6f7fb; color: #1f2233; min-height: 100vh; font-size: 14px; }
+    .appbar { background: linear-gradient(90deg, #f1861f, #ff6b35, #f1861f); padding: 2px 0; }
+    .appbar-inner { background: #28306d; color: #fff; padding: 12px 32px; display: flex; justify-content: space-between; }
+    .container { max-width: 1280px; margin: 0 auto; padding: 40px 24px; }
+    .eyebrow { color: #f1861f; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+    h1 { font-size: 2rem; font-weight: 900; color: #28306d; margin: 8px 0; }
+    .subtitle { color: #525871; margin-bottom: 24px; }
+    .grid { display: grid; grid-template-columns: 340px 1fr; gap: 24px; }
+    .list-card { background: #fff; border-radius: 12px; border: 1px solid rgba(40,48,109,0.08); padding: 16px; margin-bottom: 12px; cursor: pointer; }
+    .list-card.active { border-color: #28306d; box-shadow: 0 4px 16px rgba(40,48,109,0.12); }
+    .chip { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; }
+    .chip-warn { background: #fff3e0; color: #e65100; }
+    .chip-info { background: #e3f2fd; color: #1565c0; }
+    .detail { background: #fff; border: 1px solid rgba(40,48,109,0.08); border-radius: 12px; padding: 24px; }
+    .section-title { font-size: 0.8rem; font-weight: 700; color: #28306d; text-transform: uppercase; letter-spacing: 0.05em; margin: 20px 0 12px; padding-bottom: 8px; border-bottom: 1px solid rgba(40,48,109,0.08); }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .field { border: 1px solid rgba(40,48,109,0.2); border-radius: 8px; padding: 10px 12px; font-size: 0.85rem; }
+    .field label { display: block; font-size: 0.7rem; color: #525871; margin-bottom: 4px; }
+    .pricing { background: #f6f7fb; border-radius: 8px; padding: 16px; margin: 12px 0; }
+    .pricing-line { display: flex; justify-content: space-between; padding: 4px 0; font-size: 0.85rem; }
+    .pricing-total { font-weight: 700; border-top: 1px solid rgba(40,48,109,0.15); margin-top: 8px; padding-top: 8px; }
+    .actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; flex-wrap: wrap; }
+    .btn { padding: 10px 18px; border-radius: 10px; font-weight: 600; border: none; font-size: 0.9rem; }
+    .btn-outlined { background: #fff; border: 1px solid #28306d; color: #28306d; }
+    .btn-secondary { background: #f1861f; color: #fff; }
+    .btn-refresh { background: #fff; border: 1px solid rgba(40,48,109,0.2); color: #28306d; float: right; }
+  </style>
+</head>
+<body>
+  <div class="appbar"><div class="appbar-inner"><span>SQY Ping — Team Up</span><span>Secrétariat</span></div></div>
+  <div class="container">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;">
+      <div>
+        <div class="eyebrow">Secrétariat</div>
+        <h1>Demandes d'adhésion</h1>
+        <p class="subtitle">Relisez et corrigez le dossier complet avant d'envoyer la demande de paiement Stripe.</p>
+      </div>
+      <button class="btn btn-refresh">↻ Actualiser</button>
+    </div>
+    <div class="grid">
+      <div>
+        <div class="list-card active">
+          <div style="display:flex;justify-content:space-between;"><strong>Camille DevTest</strong><span class="chip chip-warn">A relire</span></div>
+          <div style="color:#525871;font-size:0.8rem;margin-top:6px;">olivier.michalo@gm.fr</div>
+          <div style="color:#525871;font-size:0.75rem;">Envoyé le 15/05/2026</div>
+          <div style="margin-top:8px;font-size:0.8rem;">287,00 €</div>
+        </div>
+        <div class="list-card">
+          <div style="display:flex;justify-content:space-between;"><strong>Léa Martin</strong><span class="chip chip-info">Paiement demandé</span></div>
+          <div style="color:#525871;font-size:0.8rem;margin-top:6px;">parent@example.fr</div>
+          <div style="color:#525871;font-size:0.75rem;">Envoyé le 02/05/2026</div>
+        </div>
+      </div>
+      <div class="detail">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div><h2 style="font-size:1.4rem;color:#28306d;">Camille DevTest</h2><p style="color:#525871;font-size:0.85rem;">Référence : x0BZpF0iWUDTtWO1VozN</p></div>
+          <span class="chip chip-warn">A relire</span>
+        </div>
+        <div class="section-title">Identité et type d'inscription</div>
+        <div class="field-row">
+          <div class="field"><label>Inscription pour</label>L'adhérent lui-même</div>
+          <div class="field"><label>Date de naissance</label>1976-05-17</div>
+          <div class="field"><label>Prénom</label>Camille</div>
+          <div class="field"><label>Nom</label>DevTest</div>
+        </div>
+        <div class="section-title">Tarification</div>
+        <div class="pricing">
+          <div class="pricing-line"><span>Adhésion club</span><span>175,00 €</span></div>
+          <div class="pricing-line"><span>Licence FFTT</span><span>62,00 €</span></div>
+          <div class="pricing-line"><span>Compétitions jeunes</span><span>25,00 €</span></div>
+          <div class="pricing-line"><span>Championnat par équipes</span><span>25,00 €</span></div>
+          <div class="pricing-line pricing-total"><span>Total calculé</span><span>287,00 €</span></div>
+        </div>
+        <div class="field" style="max-width:240px;"><label>Montant à régler</label>287,00 €</div>
+        <div class="actions">
+          <button class="btn btn-outlined">Enregistrer</button>
+          <button class="btn btn-secondary">✉ Valider et demander le paiement</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

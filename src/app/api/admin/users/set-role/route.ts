@@ -31,6 +31,7 @@ interface SetRolePayload {
 const ADMIN_ONLY_ROLES: readonly UserRole[] = [USER_ROLES.ADMIN];
 const MANAGED_ROLES: readonly UserRole[] = [
   USER_ROLES.ADMIN,
+  USER_ROLES.SECRETARY,
   USER_ROLES.COACH,
   USER_ROLES.PLAYER,
 ];
@@ -206,5 +207,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-
 

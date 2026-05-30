@@ -1,0 +1,48 @@
+---
+description: Plafonds de taille fichiers React/Next (src/) — politique universelle
+globs: src/**/*.tsx, src/**/*.ts
+alwaysApply: false
+---
+
+# Taille des fichiers React / Next.js
+
+Politique **universelle** sur tout `src/` (pas de règle « seulement les fichiers nouveaux vs main »).
+
+## Plafonds (lignes physiques, fichier entier)
+
+| Catégorie | Chemin | Plafond |
+|-----------|--------|---------|
+| Page App Router | `**/page.tsx` | **250** |
+| Composant UI | `src/components/**/*.tsx` | **400** |
+| Conteneur page | `src/app/**/_containers/**/*.tsx` | **450** |
+| Tests | `**/*.test.ts`, `**/*.test.tsx` | **650** |
+| Bibliothèque | `src/lib/**` (hors tests) | **500** |
+| Autre sous `src/` | défaut | **500** |
+
+Source machine : `scripts/file-size-policy.mjs`. Vérification **bloquante** : `npm run check:file-sizes` (intégré à `check:dev`, `check`, CI et pre-commit). Les plafonds ne sont pas dupliqués dans ESLint pour éviter des centaines d’avertissements sur la dette legacy déjà listée.
+
+## Dette legacy
+
+Les fichiers déjà hors plafond au moment de l’introduction du gate sont listés dans `scripts/legacy-oversized-files.json` avec un **plafond figé** (nombre de lignes maximal). Règles :
+
+- **Interdit** d’augmenter le nombre de lignes d’un fichier listé.
+- **Interdit** d’ajouter un nouveau fichier hors plafond sans le découper d’abord.
+- Après découpage sous le plafond de la catégorie : **retirer** l’entrée du manifeste.
+
+## Comment structurer (obligatoire pour tout nouveau code)
+
+1. **`page.tsx`** : coquille fine (`AuthGuard`, layout, composition) — cible **&lt; 150** lignes.
+2. **Logique métier** : `src/lib/<domaine>/` ou hooks `src/hooks/`, `src/components/<domaine>/use*.ts`.
+3. **UI** : sous-composants par section (liste, détail, formulaire, actions).
+4. **Validation** : Zod / helpers partagés — pas de règles dupliquées dans un wizard.
+5. **Fetch API** : module `lib/api/` ou hook dédié (cf. Epic G.2 du plan d’audit).
+
+## Agent Cursor
+
+- Avant d’ajouter **&gt; ~80 lignes** à un fichier existant : vérifier `wc -l` et le plafond de catégorie.
+- Si un fichier approche **80 %** du plafond : extraire avant de continuer.
+- Ne pas créer de « god component » même si un écran legacy du repo est volumineux — la dette legacy n’est pas un modèle à reproduire.
+
+## Extension club (règle 80)
+
+« Extract alongside » **n’autorise pas** de créer un nouveau fichier hors plafond. Elle évite seulement de **refactorer d’urgence** les écrans historiques déjà listés dans le manifeste legacy.

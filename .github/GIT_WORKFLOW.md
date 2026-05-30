@@ -1,193 +1,93 @@
-# Workflow Git/GitHub pour la Production
+# Workflow Git/GitHub — staging et production
 
-Ce document décrit le workflow Git/GitHub recommandé pour gérer les versions et déploiements en production, ainsi que comment les règles `.cursorrules` appliquent ce workflow.
+Ce document décrit le workflow Git/GitHub pour les environnements **staging** (App Hosting sur `sqyping-teamup-dev`) et **production** (`sqyping-teamup`).
 
-## 📋 Principes
+## Principes
 
-1. **Un commit par fonctionnalité** : Chaque fonctionnalité est développée dans une branche dédiée
-2. **Pull Requests obligatoires** : Toutes les fonctionnalités passent par une PR avant d'être mergées
-3. **Main = Production** : La branche `main` est toujours déployable et correspond à la production
-4. **Déploiement automatique** : Chaque merge sur `main` déclenche un déploiement automatique
-5. **Tags de version** : Les versions importantes sont taguées pour faciliter le suivi
+1. **Un commit par fonctionnalité** : développement sur une branche dédiée (`feature/*`, `fix/*`, etc.)
+2. **Pull Requests obligatoires** : aucun merge direct sur `staging` ou `main`
+3. **`staging` = intégration** : chaque merge déclenche le rollout App Hosting sur le projet dev
+4. **`main` = production** : release uniquement via PR `staging` → `main`
+5. **Qualité** : CI GitHub (`ci.yml`) sur les PR ; **déploiement app** : Firebase App Hosting au push sur la live branch
 
-## 🌿 Structure des branches
+## Structure des branches
 
-### Branche principale
-- **`main`** : Branche de production, toujours stable et déployable
+| Branche | Rôle |
+|---------|------|
+| `staging` | Intégration, déploiement automatique sur https://teamup-staging--sqyping-teamup-dev.us-east4.hosted.app |
+| `main` | Production, déploiement automatique sur https://teamup.sqyping.fr (App Hosting prod) |
+| `feature/*`, `fix/*`, … | Travail en cours → PR vers `staging` |
 
-### Branches de fonctionnalités
-- **`feature/nom-fonctionnalite`** : Développement d'une nouvelle fonctionnalité
-- **`fix/nom-correction`** : Correction d'un bug
-- **`refactor/nom-refactoring`** : Refactoring de code
-- **`docs/nom-documentation`** : Amélioration de la documentation
+## Workflow de développement
 
-### Exemples de noms de branches
-```
-feature/discord-integration
-feature/player-burnout-calculation
-fix/discord-message-permissions
-refactor/composition-validation
-docs/api-documentation
-```
-
-## 🔄 Workflow de développement
-
-### 1. Créer une branche de fonctionnalité
+### 1. Créer une branche depuis `staging`
 
 ```bash
-# Mettre à jour main
-git checkout main
-git pull origin main
-
-# Créer et basculer sur une nouvelle branche
+git checkout staging
+git pull origin staging
 git checkout -b feature/nom-fonctionnalite
 ```
 
-### 2. Développer la fonctionnalité
-
-- Faire des commits atomiques et descriptifs
-- Chaque commit doit être fonctionnel (pas de commits cassés)
-- Utiliser des messages de commit clairs (voir section "Messages de commit")
-
-### 3. Pousser la branche et créer une PR
+### 2. Développer, pousser, ouvrir une PR vers `staging`
 
 ```bash
-# Pousser la branche
 git push origin feature/nom-fonctionnalite
 ```
 
-Ensuite, sur GitHub :
-1. Cliquez sur **"Compare & pull request"**
-2. Remplissez le titre et la description
-3. Attendez que les checks CI passent
-4. Obtenez une approbation si nécessaire
-5. Merge la PR
+Sur GitHub : PR **base = `staging`** → attendre le check `check / check` → review → merge.
 
-### 4. Merge sur main
+Le merge sur `staging` déclenche le rollout App Hosting (projet dev) si le backend est connecté à GitHub.
 
-Une fois la PR approuvée et les checks passés :
-- Merge la PR sur `main`
-- Le déploiement automatique se déclenche
-- Supprimez la branche de fonctionnalité (optionnel)
+### 3. Release vers la production
 
-## 📝 Messages de commit (Conventional Commits)
-
-### Format
-
-```
-<type>(<scope>): <description>
-
-[corps optionnel]
-
-[pied de page optionnel]
-```
-
-### Types autorisés
-
-- **`feat`** : Nouvelle fonctionnalité
-- **`fix`** : Correction de bug
-- **`docs`** : Documentation
-- **`style`** : Formatage, point-virgules manquants, etc. (pas de changement de code)
-- **`refactor`** : Refactoring de code
-- **`test`** : Ajout ou modification de tests
-- **`chore`** : Tâches de maintenance (dépendances, config, etc.)
-
-### Exemples
+Quand `staging` est validé (QA, métier) :
 
 ```bash
-feat(discord): ajout de la vérification de signature Ed25519
-fix(compositions): correction du calcul de brûlage
-refactor(validation): simplification de la logique
-docs(api): ajout de la documentation des routes
-chore(deps): mise à jour des dépendances
+# Sur GitHub : PR staging → main (release)
 ```
 
-## 🛡️ Comment les .cursorrules appliquent le workflow
+Après merge sur `main` : rollout App Hosting prod + déploiement Firestore prod si `firestore.rules` / index modifiés.
 
-Les règles dans `.cursorrules` font en sorte que l'IA :
-- ✅ Vous rappelle toujours de créer une branche avant de développer
-- ✅ Vous incite à utiliser des messages de commit conventionnels
-- ✅ Vous rappelle de créer une PR avant de merge sur main
-- ✅ Vérifie que le code est prêt avant commit/push
+### 4. Resynchroniser `staging` après une release (recommandé)
 
-### Protection de la branche main
-
-**Règle** : "NE JAMAIS commiter directement sur `main` ou `master`"
-
-**Comportement** :
-- Si vous demandez de commiter/pousser sur main, l'IA va :
-  - ❌ Refuser poliment
-  - ✅ Vous rappeler de créer une branche d'abord
-  - ✅ Vous proposer la commande pour créer la branche
-
-### Structure des branches
-
-**Règle** : "TOUJOURS créer une branche dédiée avant de développer"
-
-**Comportement** :
-- L'IA suggère toujours de créer une branche avec le bon préfixe :
-  - `feature/` pour les nouvelles fonctionnalités
-  - `fix/` pour les bugs
-  - `refactor/` pour les refactorings
-  - `docs/` pour la documentation
-
-### Messages de commit conventionnels
-
-**Règle** : "TOUJOURS utiliser le format Conventional Commits"
-
-**Comportement** :
-- Si vous proposez un message non conforme, l'IA va :
-  - ✅ Vous suggérer un message conforme
-  - ✅ Expliquer le format attendu
-
-### Pull Requests obligatoires
-
-**Règle** : "AVANT de pousser sur main, TOUJOURS créer une Pull Request"
-
-**Comportement** :
-- Avant chaque push, l'IA va :
-  - ✅ Vérifier que vous êtes sur une branche feature/fix/etc
-  - ✅ Vous rappeler de créer une PR après le push
-  - ✅ Vous donner les étapes pour créer la PR
-
-### Vérifications avant commit/push
-
-**Règle** : "AVANT chaque commit/push, vérifier que tout est OK"
-
-**Comportement** :
-- L'IA exécute toujours :
-  - ✅ `npm run check:dev` avant commit
-  - ✅ `npm run check` avant push
-  - ✅ Vérifie qu'il n'y a pas de TODO
-  - ✅ Vérifie que les messages de commit sont conformes
-
-## 🔄 Flux de travail complet
-
-```
-┌─────────────────┐
-│  Feature Branch │
-└────────┬────────┘
-         │
-         │ Push + PR
-         ▼
-┌─────────────────┐
-│  Pull Request   │───► CI Workflow (lint, type-check, build)
-└────────┬────────┘
-         │
-         │ Review + Approve
-         ▼
-┌─────────────────┐
-│  Merge to main  │
-└────────┬────────┘
-         │
-         ├──► CI Workflow (vérification)
-         ├──► Deploy Production (App Hosting)
-         └──► Deploy Firestore (si règles modifiées)
+```bash
+git checkout staging
+git pull origin staging
+git merge origin/main
+git push origin staging
 ```
 
-## 📚 Ressources
+## Messages de commit (Conventional Commits)
 
-- [Conventional Commits](https://www.conventionalcommits.org/)
-- [GitHub Flow](https://guides.github.com/introduction/flow/)
+Format : `<type>(<scope>): <description>`
+
+Types : `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
+
+## Flux complet
+
+```
+Feature Branch
+      │
+      │ PR + CI
+      ▼
+   staging ──────► App Hosting (sqyping-teamup-dev)
+      │
+      │ PR release + CI
+      ▼
+    main ─────────► App Hosting (sqyping-teamup)
+      │
+      └──► Firestore rules/index (si fichiers modifiés)
+```
+
+## Protections de branche (à configurer sur GitHub)
+
+- **`staging`** : PR requise ; status check `check / check`
+- **`main`** : PR requise depuis `staging` ; status check `check / check` ; optionnel : environment `production` avec approbateurs
+
+Voir [docs/APP_HOSTING_STAGING_SETUP.md](../docs/APP_HOSTING_STAGING_SETUP.md) pour la console Firebase et les secrets.
+
+## Ressources
+
 - [Configuration GitHub Actions](./workflows/SETUP.md)
-
+- [App Hosting staging](../docs/APP_HOSTING_STAGING_SETUP.md)
+- [Conventional Commits](https://www.conventionalcommits.org/)

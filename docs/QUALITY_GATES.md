@@ -9,14 +9,25 @@ Ce document décrit les quality gates du projet et comment les valider.
 npm run check:dev
 ```
 - Lint (ESLint)
+- Plafonds de taille fichiers (`check:file-sizes`, politique universelle sur `src/`)
 - Type-check (TypeScript)
 - **Utilisation**: Pendant le développement, fréquemment
+
+### check:file-sizes (Structure React / Next)
+```bash
+npm run check:file-sizes
+```
+- Parcourt **tout** `src/**/*.ts(x)` (pas de filtre git vs `main`)
+- Plafonds par catégorie : pages, composants, `_containers`, `lib/`, tests — voir `scripts/file-size-policy.mjs` et `.cursor/rules/21-react-component-size.mdc`
+- Fichiers historiques hors plafond : `scripts/legacy-oversized-files.json` (plafond **figé** par fichier ; interdiction d’augmenter la taille)
+- **Échec** si un fichier non listé dépasse son plafond, ou si un fichier listé dépasse son plafond legacy
 
 ### check (Complet)
 ```bash
 npm run check
 ```
 - Lint (ESLint)
+- Plafonds de taille (`check:file-sizes`)
 - Type-check (TypeScript)
 - Tests unitaires Jest (`jest --ci`, aligné sur la CI)
 - Build (Next.js), avec **ESLint exécuté pendant `next build`** (`eslint.ignoreDuringBuilds: false` dans `next.config.ts`). Une divergence entre lint CLI et build est donc impossible si `npm run check` passe.
@@ -54,6 +65,7 @@ npm run emulators:smoke
 - **Règles modulaires** : `.cursor/rules/*.mdc` contiennent le détail des standards (frontmatter `alwaysApply: true` sauf `99-legacy`). C’est la **source de vérité**.
 - **`.cursorrules` (racine)** : court pointeur vers `.cursor/rules/` — ne pas y réintroduire de longues copies ; modifier les `.mdc` concernés.
 - **Extension club / nouvelles features** : `.cursor/rules/80-club-platform-extension.mdc` regroupe les principes pour bounded contexts, Firestore, paiements, extraction UI (**sans** imposer le refactor des écrans existants).
+- **Taille fichiers React/Next** : `.cursor/rules/21-react-component-size.mdc` + `npm run check:file-sizes` (universel sur `src/`, manifeste `scripts/legacy-oversized-files.json`).
 - **Skill projet** : `.cursor/skills/teamup-feature-slice/SKILL.md` — checklist pour une livraison verticale (API, rôles, Firestore, qualité). À invoquer ou à associer aux agents Cursor lors du développement des parcours adhésion, présences, tarifs, etc.
 
 ## Quality Gates CI
@@ -61,19 +73,21 @@ npm run emulators:smoke
 La CI GitHub Actions exécute automatiquement:
 
 1. **Lint**: Vérifie le code avec ESLint (`eslint` en ligne de commande)
-2. **Type-check**: Vérifie les types TypeScript
+2. **File sizes**: `npm run check:file-sizes` (plafonds universels `src/`, manifeste legacy)
+3. **Type-check**: Vérifie les types TypeScript
 3. **Tests**: `npm test -- --ci` (Jest, sans collecte de coverage — rapidité ; seuils coverage pour `npm run test:coverage` en local ou job dédié si besoin)
 4. **Build**: Compile l'application Next.js (**inclut ESLint** comme ci-dessus, doublon acceptable pour une détection précoce dans les logs de job)
 5. **TODO Check**: Vérifie qu'il n'y a pas de TODO dans le code
 6. **Security Audit**: Audit npm des dépendances (`continue-on-error` — signal sans bloquer le merge)
 
-Le déploiement production ([`.github/workflows/deploy-production.yml`](../.github/workflows/deploy-production.yml)) enchaîne les mêmes étapes **lint → type-check → tests → build** avant `firebase deploy`.
+Le déploiement App Hosting (staging / prod) est déclenché par Firebase au merge sur `staging` ou `main` (option C). La CI GitHub ne déploie pas l’application.
 
-Voir [.github/workflows/ci.yml](../.github/workflows/ci.yml) pour les détails.
+Voir [.github/workflows/ci.yml](../.github/workflows/ci.yml) et [docs/APP_HOSTING_STAGING_SETUP.md](./APP_HOSTING_STAGING_SETUP.md).
 
 ## Checklist avant PR
 
 - [ ] `npm run check:dev` passe
+- [ ] `npm run check:file-sizes` passe (aucun fichier hors plafond hors manifeste legacy ; pas de croissance des entrées legacy)
 - [ ] `npm run check` passe
 - [ ] Pas de TODO dans le code
 - [ ] Tests existants passent

@@ -85,6 +85,12 @@ export const AUDIT_ACTIONS = {
   COACH_REQUEST_SUBMITTED: "coach.request.submitted",
   COACH_REQUEST_APPROVED: "coach.request.approved",
   COACH_REQUEST_REJECTED: "coach.request.rejected",
+  CLUB_REGISTRATION_SUBMITTED: "club.registration.submitted",
+  CLUB_REGISTRATION_UPDATED: "club.registration.updated",
+  CLUB_REGISTRATION_PAYMENT_REQUESTED: "club.registration.payment_requested",
+  CLUB_REGISTRATION_PAYMENT_CONFIRMED: "club.registration.payment_confirmed",
+  CLUB_REGISTRATION_CONFIG_PUBLISHED: "club.registration.config_published",
+  CLUB_REGISTRATION_CONFIG_IMPORTED: "club.registration.config_imported",
   TEAM_CREATED: "team.created",
   TEAM_UPDATED: "team.updated",
   TEAM_DELETED: "team.deleted",
@@ -93,4 +99,3 @@ export const AUDIT_ACTIONS = {
   PLAYER_DELETED: "player.deleted",
   DATA_SYNCED: "data.synced",
 } as const;
-
