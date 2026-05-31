@@ -8,14 +8,33 @@ export const withAuth = (handler: (req: Request, context: unknown) => Promise<Ne
   async (req: Request, context: unknown) => {
     try {
       const session = (await cookies()).get("__session")?.value;
-      if (!session) return jsonNoStore({ error: "Authentification requise" }, { status: 401 });
+      if (!session) {
+        return jsonNoStore(
+          { success: false, error: "Authentication required" },
+          { status: 401 }
+        );
+      }
       const decoded = await adminAuth.verifySessionCookie(session, true);
-      if (!decoded.email_verified) return jsonNoStore({ error: "Email non vérifié" }, { status: 403 });
+      if (!decoded.email_verified) {
+        return jsonNoStore(
+          { success: false, error: "Email not verified" },
+          { status: 403 }
+        );
+      }
       const role = resolveRole(decoded.role as string);
-      if (allowedRoles && !hasAnyRole(role, allowedRoles)) return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
+      if (allowedRoles && !hasAnyRole(role, allowedRoles)) {
+        return jsonNoStore(
+          { success: false, error: "Access denied" },
+          { status: 403 }
+        );
+      }
       const res = await handler(req, { ... (context as object), decoded, role });
       return applyNoStoreHeaders(res);
-    } catch {
-      return jsonNoStore({ error: "Session invalide" }, { status: 401 });
+    } catch (error) {
+      console.error("[withAuth] Security error:", error instanceof Error ? error.message : "Unknown error");
+      return jsonNoStore(
+        { success: false, error: "Session invalid or expired" },
+        { status: 401 }
+      );
     }
   };

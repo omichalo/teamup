@@ -9,6 +9,11 @@ service cloud.firestore {
     function isAuthenticated() {
       return request.auth != null;
     }
+
+    // Vérifie si l'email de l'utilisateur est vérifié
+    function isVerified() {
+      return isAuthenticated() && request.auth.token.email_verified == true;
+    }
     
     // Récupère le rôle de l'utilisateur depuis les custom claims
     function authRole() {
@@ -19,12 +24,17 @@ service cloud.firestore {
     
     // Vérifie si l'utilisateur est admin
     function isAdmin() {
-      return authRole() == "admin";
+      return isVerified() && authRole() == "admin";
     }
     
     // Vérifie si l'utilisateur est coach ou admin
     function isCoach() {
-      return isAdmin() || authRole() == "coach";
+      return isAdmin() || (isVerified() && authRole() == "coach");
+    }
+
+    // Récupère l'ID de joueur associé à l'utilisateur
+    function getPlayerId() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('playerId', null);
     }
     
     // ============================================
@@ -130,7 +140,15 @@ service cloud.firestore {
     // Écriture pour tous les utilisateurs authentifiés (les joueurs peuvent mettre à jour leurs disponibilités)
     match /availabilities/{availabilityId} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      // Les admins et coachs peuvent tout modifier
+      allow write: if isCoach();
+      // Les joueurs peuvent créer ou mettre à jour uniquement leur propre entrée dans la map 'players'
+      // Cela empêche l'IDOR (Insecure Direct Object Reference) sur les disponibilités des autres joueurs
+      allow create: if isVerified() && getPlayerId() != null
+                    && request.resource.data.players.keys().hasOnly([getPlayerId()]);
+      allow update: if isVerified() && getPlayerId() != null
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['players', 'updatedAt'])
+                    && request.resource.data.players.diff(resource.data.players).affectedKeys().hasOnly([getPlayerId()]);
     }
     
     // ============================================
