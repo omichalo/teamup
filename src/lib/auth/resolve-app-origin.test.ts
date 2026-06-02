@@ -50,6 +50,8 @@ describe("resolveAppOrigin", () => {
 
   it("uses Origin when env is localhost", () => {
     process.env.APP_URL = "http://localhost:3000";
+    delete process.env.NEXT_PUBLIC_APP_URL;
+
     expect(
       resolveAppOrigin(
         requestWithHeaders({
