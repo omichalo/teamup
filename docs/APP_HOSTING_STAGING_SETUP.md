@@ -92,12 +92,18 @@ Accorder l’accès au backend :
 firebase apphosting:secrets:grantaccess SECRET_NAME --backend teamup-staging --project sqyping-teamup-dev
 ```
 
-## 4. Firebase Auth — domaines autorisés
+## 4. Firebase Auth — domaines autorisés et callback email
 
 Dans **sqyping-teamup-dev** → **Authentication** → **Settings** → **Authorized domains**, ajouter :
 
 - `teamup-staging--sqyping-teamup-dev.us-east4.hosted.app`
 - Domaine custom si configuré (ex. `staging.teamup.sqyping.fr`)
+
+Dans **Authentication** → **Templates** (ou paramètres email du projet), vérifier que l’**URL de redirection par défaut** (`callbackUri`) n’est plus `http://localhost:3000/...` mais l’URL staging :
+
+- `https://teamup-staging--sqyping-teamup-dev.us-east4.hosted.app/auth/verify-email`
+
+Sans cela, les liens générés par Firebase peuvent contenir `continueUrl=localhost` même depuis staging. Le code serveur force aussi le `continueUrl` dans les liens oob (`resolve-app-origin` + `withActionContinueUrl`).
 
 ## 5. Stripe (mode test)
 

@@ -6,6 +6,11 @@ import path from "path";
 import { getFirebaseErrorMessage } from "@/lib/firebase-error-utils";
 import { checkRateLimit } from "@/lib/auth/rate-limit";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
+import {
+  isAuthOriginDebugEnabled,
+  resolveAppOrigin,
+  withActionContinueUrl,
+} from "@/lib/auth/resolve-app-origin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,38 +56,10 @@ export async function POST(req: Request) {
       );
     }
 
-    // Déterminer l'URL de base
-    // Priorité: APP_URL (serveur) > NEXT_PUBLIC_APP_URL > headers > localhost
-    const appUrl = process.env.APP_URL; // Variable serveur (sans NEXT_PUBLIC_)
-    const envBase = process.env.NEXT_PUBLIC_APP_URL; // Variable client (peut ne pas être disponible au runtime serveur)
-    const forwardedProto = req.headers.get("x-forwarded-proto") || "https";
-    const host = req.headers.get("host") || req.headers.get("x-forwarded-host");
-
-    let origin: string;
-
-    // Priorité 1: APP_URL (variable serveur, toujours disponible au runtime)
-    if (appUrl && appUrl.trim() !== "") {
-      origin = appUrl.trim().replace(/\/$/, "");
-    }
-    // Priorité 2: NEXT_PUBLIC_APP_URL (peut ne pas être disponible au runtime serveur)
-    else if (envBase && envBase.trim() !== "") {
-      origin = envBase.trim().replace(/\/$/, "");
-    }
-    // Priorité 3: Headers de la requête
-    else if (host) {
-      const proto = host.includes("localhost") ? "http" : forwardedProto;
-      origin = `${proto}://${host}`;
-    }
-    // Priorité 4: Fallback localhost uniquement en développement
-    else {
-      origin = "http://localhost:3000";
-    }
-
-    // S'assurer que l'URL est bien formatée
+    const origin = resolveAppOrigin(req);
     const redirectUrl = `${origin}/reset-password`;
 
-    // Logs uniquement en mode debug (développement)
-    if (process.env.NODE_ENV === "development" && process.env.DEBUG === "true") {
+    if (isAuthOriginDebugEnabled()) {
       console.log("[send-password-reset] Environment variables:", {
         APP_URL: process.env.APP_URL ? "***" : undefined,
         NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL ? "***" : undefined,
@@ -90,6 +67,7 @@ export async function POST(req: Request) {
       });
       console.log("[send-password-reset] Headers:", {
         host: req.headers.get("host"),
+        origin: req.headers.get("origin"),
         "x-forwarded-host": req.headers.get("x-forwarded-host"),
         "x-forwarded-proto": req.headers.get("x-forwarded-proto"),
       });
@@ -100,10 +78,13 @@ export async function POST(req: Request) {
     // Générer le lien de réinitialisation via Firebase Admin
     let link: string;
     try {
-      link = await adminAuth.generatePasswordResetLink(email, {
-        url: redirectUrl,
-        handleCodeInApp: false,
-      });
+      link = withActionContinueUrl(
+        await adminAuth.generatePasswordResetLink(email, {
+          url: redirectUrl,
+          handleCodeInApp: false,
+        }),
+        redirectUrl
+      );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       const authCode = getAuthErrorCode(error);
