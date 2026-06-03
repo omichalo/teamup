@@ -11,7 +11,11 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["../src/*"]
+    }
   },
   "compileOnSave": true,
   "include": ["src"]

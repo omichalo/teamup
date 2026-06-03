@@ -2,7 +2,12 @@ import { FFTTAPI } from "@omichalo/ffttapi-node";
 import { createFFTTAPI, getFFTTConfig } from "./fftt-utils";
 import { FFTTEquipe, FFTTRencontre } from "./fftt-types";
 import { createBaseMatch, isFemaleTeam, determinePhaseFromDivision } from "./fftt-utils";
-import type { Firestore, DocumentReference } from "firebase-admin/firestore";
+import type {
+  Firestore,
+  DocumentReference,
+  UpdateData,
+  DocumentData,
+} from "firebase-admin/firestore";
 import { Timestamp, FieldValue } from "firebase-admin/firestore";
 import type {
   MatchData,
@@ -1060,7 +1065,7 @@ export class TeamMatchesSyncService {
         for (let j = i; j < batchEnd; j++) {
           const { playerId, updates } = playersToUpdate[j];
           const playerRef = db.collection("players").doc(playerId);
-          batch.update(playerRef, updates);
+          batch.update(playerRef, updates as UpdateData<DocumentData>);
           updated++;
         }
 

@@ -13,7 +13,9 @@ import { ChampionshipType, Match } from "@/types";
 import { Player } from "@/types/team-management";
 import { TeamCompositionCard } from "@/components/compositions/TeamCompositionCard";
 import { PoolRankingPopover } from "@/components/compositions/PoolRankingPopover";
+import { PoolSchedulePopover } from "@/components/compositions/PoolSchedulePopover";
 import { PreviousMatchesOpponents } from "@/components/compositions/PreviousMatchesOpponents";
+import { TeamCompositionHistoryPopover } from "@/components/teams/TeamCompositionHistoryPopover";
 import { DiscordMatchMessageCard } from "@/components/compositions/DiscordMatchMessageCard";
 import { EpreuveType, isParisEpreuve } from "@/lib/shared/epreuve-utils";
 import { calculateFutureBurnout, extractTeamNumber, isMatchPlayed } from "@/lib/compositions/validators";
@@ -273,6 +275,23 @@ export function TeamCompositionRow({
                   </span>
                 </Tooltip>
               )}
+              <TeamCompositionHistoryPopover
+                equipe={equipe}
+                selectedPhase={selectedPhase}
+                iconSize="small"
+                iconColor="secondary"
+              />
+              <Tooltip title="Calendrier de la poule (journées à venir)">
+                <span>
+                  <PoolSchedulePopover
+                    teamId={equipe.team.id}
+                    teamName={equipe.team.name}
+                    phase={selectedPhase}
+                    iconSize="small"
+                    iconColor="success"
+                  />
+                </span>
+              </Tooltip>
               <Tooltip title="Voir le classement de la poule">
                 <span>
                   <PoolRankingPopover

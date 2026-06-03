@@ -1,37 +1,22 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import {
   Box,
   Typography,
-  Alert,
   Chip,
   IconButton,
-  Popover,
   Tooltip,
 } from "@mui/material";
-import { SportsTennis, Message, LocationOn, Event, People } from "@mui/icons-material";
+import { SportsTennis, Message, LocationOn } from "@mui/icons-material";
 import type { EquipeWithMatches } from "@/hooks/useTeamData";
 import type { Match } from "@/types";
 import { USER_ROLES } from "@/lib/auth/roles";
 import { getTeamPhase } from "@/lib/shared/fftt-utils";
 import { isParisEpreuve } from "@/lib/shared/epreuve-utils";
-import {
-  CompositionsTable,
-  type MatchCompositionRow,
-} from "@/components/compositions/CompositionsTable";
-import {
-  compareMatchesByJourneeThenDate,
-  compositionPlayerKey,
-  getSQYCompositionPlayers,
-  isPlayedTeamMatch,
-} from "@/lib/shared/match-composition-utils";
-import {
-  computeVictoiresDefaitesFromParties,
-  playerNameMatches,
-} from "@/lib/shared/victoires-defaites";
-import { MatchCardCompact } from "@/components/equipes/MatchCardCompact";
 import { PoolRankingPopover } from "@/components/compositions/PoolRankingPopover";
+import { TeamCompositionHistoryPopover } from "@/components/teams/TeamCompositionHistoryPopover";
+import { TeamMatchesCalendarPopover } from "@/components/teams/TeamMatchesCalendarPopover";
 
 export type MatchContextForPopover = {
   teamId: string;
@@ -57,64 +42,6 @@ function teamPhaseToApiPhase(
   return null;
 }
 
-/** Détermine si notre équipe est côté A à partir de joueursA/joueursB et joueursSQY. */
-function ourSideIsA(match: Match): boolean {
-  const joueursSQY = match.joueursSQY ?? [];
-  const joueursA = match.resultatsIndividuels?.joueursA ?? {};
-  const joueursB = match.resultatsIndividuels?.joueursB ?? {};
-  if (joueursSQY.length === 0) return true;
-  const sqyNormalized = new Set(
-    joueursSQY.map((j) =>
-      `${(j.prenom ?? "").trim()} ${(j.nom ?? "").trim()}`.trim().toUpperCase().replace(/\s+/g, " ")
-    )
-  );
-  const norm = (s: string) => (s ?? "").trim().toUpperCase().replace(/\s+/g, " ");
-  let countA = 0,
-    countB = 0;
-  for (const k of Object.keys(joueursA)) if (sqyNormalized.has(norm(k))) countA++;
-  for (const k of Object.keys(joueursB)) if (sqyNormalized.has(norm(k))) countB++;
-  return countA >= countB;
-}
-
-type CompositionPlayer = {
-  licence?: string;
-  nom?: string;
-  prenom?: string;
-  points?: number | null;
-};
-
-/**
- * Calcule victoires/défaites par joueur pour un match (simples uniquement, logique partagée avec l'API).
- */
-function computeVictoiresDefaitesForMatch(
-  match: Match,
-  compositionPlayers: CompositionPlayer[]
-): Map<string, { victoires: number; defaites: number }> {
-  const parties = match.resultatsIndividuels?.parties;
-  if (!parties || parties.length === 0 || compositionPlayers.length === 0) {
-    return new Map();
-  }
-  const partieLike = parties.map((p) => ({
-    joueurA: p.joueurA ?? "",
-    joueurB: p.joueurB ?? "",
-    scoreA: p.scoreA,
-    scoreB: p.scoreB,
-  }));
-  const sideACountsAsOurs = ourSideIsA(match);
-  const getPlayerKey = (playerName: string): string | null => {
-    const joueur = compositionPlayers.find((j) =>
-      playerNameMatches(playerName, j.nom ?? "", j.prenom ?? "")
-    );
-    if (!joueur) return null;
-    return compositionPlayerKey(joueur);
-  };
-  return computeVictoiresDefaitesFromParties(
-    partieLike,
-    sideACountsAsOurs,
-    getPlayerKey
-  );
-}
-
 export function EquipeAccordion({
   equipeWithMatches,
   epreuve,
@@ -126,54 +53,12 @@ export function EquipeAccordion({
 }: EquipeAccordionProps) {
   const phaseKind = getTeamPhase(equipeWithMatches);
   const poolPhase = teamPhaseToApiPhase(phaseKind);
-  const [matchsAnchor, setMatchsAnchor] = useState<HTMLElement | null>(null);
-  const [joueursAnchor, setJoueursAnchor] = useState<HTMLElement | null>(null);
 
-  const displayMatches =
-    phaseKind === "phase2"
-      ? equipeWithMatches.matches.filter((m) => (m.phase || "").toLowerCase() === "retour")
-      : phaseKind === "phase1"
-        ? equipeWithMatches.matches.filter((m) => (m.phase || "").toLowerCase() === "aller")
-        : equipeWithMatches.matches;
-
-  const matchesForTable: MatchCompositionRow[] = React.useMemo(() => {
-    const playedMatches = displayMatches.filter(
-      (m) => isPlayedTeamMatch(m) && getSQYCompositionPlayers(m).length > 0
-    );
-    const sorted = [...playedMatches].sort(compareMatchesByJourneeThenDate);
-    return sorted.map((m) => {
-      const compositionPlayers = getSQYCompositionPlayers(m);
-      const vdByPlayer = computeVictoiresDefaitesForMatch(m, compositionPlayers);
-      return {
-        date:
-          typeof m.date === "string"
-            ? m.date
-            : new Date(m.date).toISOString().slice(0, 10),
-        journee: m.journee,
-        otherTeamName: m.opponent || "Adversaire",
-        ...(m.score ? { score: m.score } : {}),
-        composition: compositionPlayers.map((j) => {
-          const key = compositionPlayerKey(j);
-          const vd = vdByPlayer.get(key) ?? { victoires: 0, defaites: 0 };
-          return {
-            nom: j.nom ?? "",
-            prenom: j.prenom ?? "",
-            points: j.points ?? null,
-            ...(j.licence ? { licence: j.licence } : {}),
-            victoires: vd.victoires,
-            defaites: vd.defaites,
-          };
-        }),
-      };
-    });
-  }, [displayMatches]);
-
-  const sortedMatches = React.useMemo(
-    () => [...displayMatches].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
-    [displayMatches]
-  );
-
-  const borderColor = isParisEpreuve(epreuve) ? "#9c27b0" : epreuve.includes("Féminin") ? "#f57c00" : "#1976d2";
+  const borderColor = isParisEpreuve(epreuve)
+    ? "#9c27b0"
+    : epreuve.includes("Féminin")
+      ? "#f57c00"
+      : "#1976d2";
 
   return (
     <Box
@@ -204,7 +89,8 @@ export function EquipeAccordion({
             <Typography variant="caption" color="text.secondary">
               Discord:{" "}
               {equipeWithMatches.team.discordChannelId
-                ? discordChannels.find((c) => c.id === equipeWithMatches.team.discordChannelId)?.name || "Canal configuré"
+                ? discordChannels.find((c) => c.id === equipeWithMatches.team.discordChannelId)
+                    ?.name || "Canal configuré"
                 : "Non configuré"}
             </Typography>
             {(!equipeWithMatches.team.location || !equipeWithMatches.team.discordChannelId) && (
@@ -244,32 +130,8 @@ export function EquipeAccordion({
               </Tooltip>
             </>
           )}
-          <Tooltip title="Voir les matchs">
-            <span>
-              <IconButton
-                size="medium"
-                onClick={(e) => setMatchsAnchor(e.currentTarget)}
-                aria-label="Voir les matchs"
-                disabled={displayMatches.length === 0}
-                color="success"
-              >
-                <Event fontSize="medium" />
-              </IconButton>
-            </span>
-          </Tooltip>
-          <Tooltip title="Joueurs par journée">
-            <span>
-              <IconButton
-                size="medium"
-                onClick={(e) => setJoueursAnchor(e.currentTarget)}
-                aria-label="Joueurs par journée"
-                disabled={matchesForTable.length === 0}
-                color="secondary"
-              >
-                <People fontSize="medium" />
-              </IconButton>
-            </span>
-          </Tooltip>
+          <TeamMatchesCalendarPopover equipe={equipeWithMatches} />
+          <TeamCompositionHistoryPopover equipe={equipeWithMatches} />
           <PoolRankingPopover
             teamId={equipeWithMatches.team.id}
             teamName={equipeWithMatches.team.name}
@@ -279,61 +141,6 @@ export function EquipeAccordion({
           />
         </Box>
       </Box>
-
-      <Popover
-        open={Boolean(matchsAnchor)}
-        anchorEl={matchsAnchor}
-        onClose={() => setMatchsAnchor(null)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-        transformOrigin={{ vertical: "top", horizontal: "left" }}
-        PaperProps={{
-          sx: { maxWidth: "95vw", width: 720, maxHeight: "85vh", overflow: "hidden", display: "flex", flexDirection: "column" },
-        }}
-      >
-        <Box sx={{ p: 2, overflow: "auto", flex: 1 }}>
-          <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
-            Matchs
-          </Typography>
-          {displayMatches.length === 0 ? (
-            <Alert severity="info">Aucun match trouvé pour cette équipe.</Alert>
-          ) : (
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-                gap: 1.5,
-              }}
-            >
-              {sortedMatches.map((match, index) => (
-                <MatchCardCompact key={`${match.ffttId}_${index}`} match={match} />
-              ))}
-            </Box>
-          )}
-        </Box>
-      </Popover>
-
-      <Popover
-        open={Boolean(joueursAnchor)}
-        anchorEl={joueursAnchor}
-        onClose={() => setJoueursAnchor(null)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-        transformOrigin={{ vertical: "top", horizontal: "left" }}
-        PaperProps={{
-          sx: { maxWidth: "95vw", maxHeight: "85vh", overflow: "hidden", display: "flex", flexDirection: "column" },
-        }}
-      >
-        <Box sx={{ p: 2, overflow: "auto", flex: 1 }}>
-          <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
-            Joueurs par journée
-          </Typography>
-          {matchesForTable.length === 0 ? (
-            <Alert severity="info">Aucune composition disponible.</Alert>
-          ) : (
-            <CompositionsTable matches={matchesForTable} />
-          )}
-        </Box>
-      </Popover>
     </Box>
   );
 }
-

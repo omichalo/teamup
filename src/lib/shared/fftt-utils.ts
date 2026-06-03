@@ -47,20 +47,10 @@ function patchXml2jsParseStringPromise(): void {
   xml2jsPatched = true;
 }
 
-// Configuration FFTT partagée
-export const getFFTTConfig = () => {
-  if (!process.env.ID_FFTT || !process.env.PWD_FFTT) {
-    throw new Error(
-      "FFTT credentials (ID_FFTT and PWD_FFTT) are required as environment variables"
-    );
-  }
+import { getFFTTConfig } from "./fftt-config";
 
-  return {
-    id: process.env.ID_FFTT,
-    pwd: process.env.PWD_FFTT,
-    clubCode: process.env.CLUB_CODE || "08781477",
-  };
-};
+export { getFFTTConfig } from "./fftt-config";
+export type { FFTTConfig } from "./fftt-config";
 
 // Instance FFTT API partagée
 export const createFFTTAPI = () => {
