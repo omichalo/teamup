@@ -1,78 +1,36 @@
-import type { NextRequest } from "next/server";
 import { jsonNoStore } from "@/lib/http/cache-headers";
-import { cookies } from "next/headers";
-import { initializeFirebaseAdmin, getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
+import { adminDb } from "@/lib/firebase-admin";
 import { getTeamMatches } from "@/lib/server/team-matches";
+import { withAuth } from "@/lib/auth/api-utils";
+import { USER_ROLES } from "@/lib/auth/roles";
 
 export const runtime = "nodejs";
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ teamId: string }> }
-) {
-  // Vérification d'authentification
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get("__session")?.value;
-  
-  if (!sessionCookie) {
-    return jsonNoStore(
-      { error: "Authentification requise" },
-      { status: 401 }
-    );
-  }
+export const GET = withAuth(async (_req, context) => {
+  const { teamId } = (context as { params: Promise<{ teamId: string }> }).params
+    ? await (context as { params: Promise<{ teamId: string }> }).params
+    : { teamId: undefined };
 
-  try {
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    if (!decoded.email_verified) {
-      return jsonNoStore(
-        { error: "Email non vérifié" },
-        { status: 403 }
-      );
-    }
-  } catch {
+  if (!teamId) {
     return jsonNoStore(
-      { error: "Session invalide" },
-      { status: 401 }
-    );
-  }
-
-  // Récupérer teamId depuis les paramètres de route
-  const { teamId } = await params;
-
-  if (!teamId || typeof teamId !== "string") {
-    return jsonNoStore(
-      { error: "Team ID parameter is required" },
+      { error: "L'identifiant de l'équipe est requis" },
       { status: 400 }
     );
   }
 
   try {
-    await initializeFirebaseAdmin();
-    const firestore = getFirestoreAdmin();
-    const matches = await getTeamMatches(firestore, teamId);
+    const matches = await getTeamMatches(adminDb, teamId);
 
-    console.log(
-      `📊 [app/api/teams/${teamId}/matches] ${matches.length} matchs récupérés pour l'équipe ${teamId}`
-    );
-
-    return jsonNoStore(
-      {
-        teamId,
-        matches,
-        total: matches.length,
-      },
-      { status: 200 }
-    );
+    return jsonNoStore({
+      teamId,
+      matches,
+      total: matches.length,
+    });
   } catch (error) {
-    console.error("[app/api/teams/[teamId]/matches] Firestore Error:", error);
+    console.error(`[app/api/teams/${teamId}/matches] GET error`, error);
     return jsonNoStore(
-      {
-        error: "Failed to fetch team matches",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
+      { error: "Erreur lors de la récupération des matchs de l'équipe" },
       { status: 500 }
     );
   }
-}
-
-
+}, [USER_ROLES.ADMIN, USER_ROLES.COACH]);
