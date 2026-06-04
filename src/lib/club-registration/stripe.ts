@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { resolveAppOrigin } from "@/lib/auth/resolve-app-origin";
 import type {
   StripeCheckoutLineItem,
   StripeInvoiceCustomField,
@@ -19,16 +20,9 @@ function requireEnv(name: string): string {
   return value;
 }
 
-export function getAppBaseUrl(req?: Request): string {
-  const configured = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
-  if (configured) {
-    return configured.replace(/\/$/, "");
-  }
-  if (req) {
-    const url = new URL(req.url);
-    return `${url.protocol}//${url.host}`;
-  }
-  throw new Error("Missing APP_URL or NEXT_PUBLIC_APP_URL");
+/** URL publique de l'app (Stripe success/cancel, etc.) — même logique que les mails Auth. */
+export function getAppBaseUrl(req: Request): string {
+  return resolveAppOrigin(req);
 }
 
 export async function createMembershipCheckoutSession(params: {

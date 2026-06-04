@@ -7,9 +7,9 @@ import { getFirebaseErrorMessage } from "@/lib/firebase-error-utils";
 import { checkRateLimit } from "@/lib/auth/rate-limit";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
 import {
+  buildDirectAppActionLink,
   isAuthOriginDebugEnabled,
   resolveAppOrigin,
-  withActionContinueUrl,
 } from "@/lib/auth/resolve-app-origin";
 
 export const runtime = "nodejs";
@@ -78,12 +78,13 @@ export async function POST(req: Request) {
     // Générer le lien de réinitialisation via Firebase Admin
     let link: string;
     try {
-      link = withActionContinueUrl(
+      link = buildDirectAppActionLink(
         await adminAuth.generatePasswordResetLink(email, {
           url: redirectUrl,
           handleCodeInApp: false,
         }),
-        redirectUrl
+        origin,
+        "/reset-password"
       );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";

@@ -7,9 +7,9 @@ import { getFirebaseErrorMessage } from "@/lib/firebase-error-utils";
 import { checkRateLimit } from "@/lib/auth/rate-limit";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
 import {
+  buildDirectAppActionLink,
   isAuthOriginDebugEnabled,
   resolveAppOrigin,
-  withActionContinueUrl,
 } from "@/lib/auth/resolve-app-origin";
 
 export const runtime = "nodejs";
@@ -77,12 +77,13 @@ export async function POST(req: Request) {
     // Générer le lien de vérification via Firebase Admin
     let link: string;
     try {
-      link = withActionContinueUrl(
+      link = buildDirectAppActionLink(
         await adminAuth.generateEmailVerificationLink(email, {
           url: redirectUrl,
           handleCodeInApp: false,
         }),
-        redirectUrl
+        origin,
+        "/auth/verify-email"
       );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
