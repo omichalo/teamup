@@ -1,10 +1,11 @@
 export const runtime = "nodejs";
 
 import { jsonNoStore } from "@/lib/http/cache-headers";
-import { cookies } from "next/headers";
-import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
-import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
+import { getFirestoreAdmin } from "@/lib/firebase-admin";
+import { hasAnyRole, USER_ROLES, type UserRole } from "@/lib/auth/roles";
 import { normalizeMedicalCertificateStatus } from "@/lib/club-registration/medical-certificate";
+import { withAuth } from "@/lib/auth/api-utils";
+import type { DecodedIdToken } from "firebase-admin/auth";
 
 const COLLECTION = "clubRegistrations";
 const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
@@ -31,34 +32,21 @@ const LIST_FIELDS = [
 ] as const;
 
 /** GET /api/club/registrations — liste personnelle ou, avec scope=managed, liste à traiter. */
-export async function GET(req: Request) {
-  try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-    if (!sessionCookie) {
-      return jsonNoStore({ error: "Authentification requise" }, { status: 401 });
-    }
+export const GET = withAuth(
+  async (req: Request, context: unknown) => {
+    try {
+      const { decoded, role } = context as {
+        decoded: DecodedIdToken;
+        role: UserRole;
+      };
 
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    const role = resolveRole(decoded.role as string | undefined);
-    if (
-      !hasAnyRole(role, [
-        USER_ROLES.PLAYER,
-        USER_ROLES.SECRETARY,
-        USER_ROLES.COACH,
-        USER_ROLES.ADMIN,
-      ])
-    ) {
-      return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
-    }
-
-    const db = getFirestoreAdmin();
-    const url = new URL(req.url);
-    const managedScope = url.searchParams.get("scope") === "managed";
-    const isManager = hasAnyRole(role, MANAGER_ROLES);
-    if (managedScope && !isManager) {
-      return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
-    }
+      const db = getFirestoreAdmin();
+      const url = new URL(req.url);
+      const managedScope = url.searchParams.get("scope") === "managed";
+      const isManager = hasAnyRole(role, MANAGER_ROLES);
+      if (managedScope && !isManager) {
+        return jsonNoStore({ error: "Access denied" }, { status: 403 });
+      }
 
     /* Tri en mémoire (un soumettant a typiquement <10 dossiers, on évite ainsi
        la dépendance à l'index composite `submitterUid + submittedAt desc`
@@ -105,6 +93,10 @@ export async function GET(req: Request) {
     return jsonNoStore({ registrations }, { status: 200 });
   } catch (error) {
     console.error("[api/club/registrations GET]", error);
-    return jsonNoStore({ error: "Impossible de charger les dossiers" }, { status: 500 });
+    return jsonNoStore(
+      { error: "Impossible de charger les dossiers" },
+      { status: 500 }
+    );
   }
-}
+},
+[USER_ROLES.PLAYER, USER_ROLES.SECRETARY, USER_ROLES.COACH, USER_ROLES.ADMIN]);
