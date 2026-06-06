@@ -2,9 +2,9 @@ export const runtime = "nodejs";
 
 import { jsonNoStore } from "@/lib/http/cache-headers";
 import { normalizeReductionReferenceCodes } from "@/lib/club-registration/reduction-reference-codes";
-import { cookies } from "next/headers";
-import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
-import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
+import { getFirestoreAdmin } from "@/lib/firebase-admin";
+import { withAuth } from "@/lib/auth/api-utils";
+import { USER_ROLES } from "@/lib/auth/roles";
 import { canAccessClubRegistration } from "@/lib/club-registration/registration-access";
 import { FieldValue } from "firebase-admin/firestore";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
@@ -158,22 +158,17 @@ function stripUndefined<T extends Record<string, unknown>>(obj: T): Record<strin
 }
 
 /** GET /api/club/registration?id={registrationId} — lecture d'un dossier (owner ou admin). */
-export async function GET(req: Request) {
+export const GET = withAuth(async (req: Request, context: unknown) => {
   try {
+    const { decoded, role } = context as {
+      decoded: import("firebase-admin/auth").DecodedIdToken;
+      role: import("@/lib/auth/roles").UserRole;
+    };
     const url = new URL(req.url);
     const id = url.searchParams.get("id");
     if (!id) {
       return jsonNoStore({ error: "Paramètre 'id' requis" }, { status: 400 });
     }
-
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-    if (!sessionCookie) {
-      return jsonNoStore({ error: "Authentification requise" }, { status: 401 });
-    }
-
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    const role = resolveRole(decoded.role as string | undefined);
 
     const db = getFirestoreAdmin();
     const snap = await db.collection(COLLECTION).doc(id).get();
@@ -221,31 +216,22 @@ export async function GET(req: Request) {
     console.error("[api/club/registration GET]", error);
     return jsonNoStore({ error: "Impossible de charger le dossier" }, { status: 500 });
   }
-}
+});
 
 /** PATCH /api/club/registration?id={registrationId} — correction d'un dossier par admin/secrétaire. */
-export async function PATCH(req: Request) {
+export const PATCH = withAuth(async (req: Request, context: unknown) => {
   try {
     if (!validateOrigin(req)) {
       return jsonNoStore({ error: "Invalid origin" }, { status: 403 });
     }
 
+    const { decoded } = context as {
+      decoded: import("firebase-admin/auth").DecodedIdToken;
+    };
     const url = new URL(req.url);
     const id = url.searchParams.get("id");
     if (!id) {
       return jsonNoStore({ error: "Paramètre 'id' requis" }, { status: 400 });
-    }
-
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-    if (!sessionCookie) {
-      return jsonNoStore({ error: "Authentification requise" }, { status: 401 });
-    }
-
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    const role = resolveRole(decoded.role as string | undefined);
-    if (!hasAnyRole(role, MANAGER_ROLES)) {
-      return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
     }
 
     const body = ((await req.json()) ?? {}) as Record<string, unknown>;
@@ -366,7 +352,7 @@ export async function PATCH(req: Request) {
     console.error("[api/club/registration PATCH]", error);
     return jsonNoStore({ error: "Impossible de mettre à jour le dossier" }, { status: 500 });
   }
-}
+}, [...MANAGER_ROLES]);
 
 /**
  * POST /api/club/registration — création d'un nouveau dossier (auto-id Firestore).
@@ -376,33 +362,22 @@ export async function PATCH(req: Request) {
  * forcément par un compte dont le rôle par défaut est `PLAYER`. Les `COACH` et
  * `ADMIN` sont également autorisés (ex. inscription par un encadrant).
  */
-export async function POST(req: Request) {
-  try {
-    if (!validateOrigin(req)) {
-      return jsonNoStore({ error: "Invalid origin" }, { status: 403 });
-    }
+export const POST = withAuth(
+  async (req: Request, context: unknown) => {
+    try {
+      if (!validateOrigin(req)) {
+        return jsonNoStore({ error: "Invalid origin" }, { status: 403 });
+      }
 
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-    if (!sessionCookie) {
-      return jsonNoStore({ error: "Authentification requise" }, { status: 401 });
-    }
+      const { decoded } = context as {
+        decoded: import("firebase-admin/auth").DecodedIdToken;
+      };
 
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    const role = resolveRole(decoded.role as string | undefined);
-
-    if (
-      !hasAnyRole(role, [
-        USER_ROLES.PLAYER,
-        USER_ROLES.SECRETARY,
-        USER_ROLES.COACH,
-        USER_ROLES.ADMIN,
-      ])
-    ) {
-      return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
-    }
-
-    const rate = checkRateLimit(`club-registration:${decoded.uid}`, 8, 60 * 60 * 1000);
+      const rate = checkRateLimit(
+        `club-registration:${decoded.uid}`,
+        8,
+        60 * 60 * 1000
+      );
     if (!rate.allowed) {
       return jsonNoStore(
         { error: "Trop de soumissions dans la période autorisée. Réessayez plus tard." },
@@ -454,4 +429,5 @@ export async function POST(req: Request) {
     console.error("[api/club/registration POST]", error);
     return jsonNoStore({ error: "Impossible d’enregistrer le dossier" }, { status: 500 });
   }
-}
+},
+[USER_ROLES.PLAYER, USER_ROLES.SECRETARY, USER_ROLES.COACH, USER_ROLES.ADMIN]);
