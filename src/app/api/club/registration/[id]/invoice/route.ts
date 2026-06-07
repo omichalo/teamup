@@ -1,14 +1,15 @@
 export const runtime = "nodejs";
 
-import { cookies } from "next/headers";
 import { jsonNoStore } from "@/lib/http/cache-headers";
-import { adminAuth, getFirestoreAdmin } from "@/lib/firebase-admin";
-import { resolveRole } from "@/lib/auth/roles";
+import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { canAccessClubRegistration } from "@/lib/club-registration/registration-access";
 import {
   pickInvoiceDownloadUrl,
   retrieveStripeInvoiceLinks,
 } from "@/lib/club-registration/stripe";
+import { withAuth } from "@/lib/auth/api-utils";
+import type { DecodedIdToken } from "firebase-admin/auth";
+import type { UserRole } from "@/lib/auth/roles";
 
 const COLLECTION = "clubRegistrations";
 
@@ -16,21 +17,15 @@ const COLLECTION = "clubRegistrations";
  * GET /api/club/registration/[id]/invoice
  * Facture Stripe : admin, secrétariat, ou soumettant du dossier uniquement.
  */
-export async function GET(
-  _req: Request,
-  context: { params: Promise<{ id: string }> }
-) {
+export const GET = withAuth(async (_req, context) => {
   try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-    if (!sessionCookie) {
-      return jsonNoStore({ error: "Authentification requise" }, { status: 401 });
-    }
+    const { params, decoded, role } = context as {
+      params: Promise<{ id: string }>;
+      decoded: DecodedIdToken;
+      role: UserRole;
+    };
 
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    const role = resolveRole(decoded.role as string | undefined);
-
-    const { id } = await context.params;
+    const { id } = await params;
     const db = getFirestoreAdmin();
     const snap = await db.collection(COLLECTION).doc(id).get();
     if (!snap.exists) {
@@ -91,4 +86,4 @@ export async function GET(
       { status: 500 }
     );
   }
-}
+});
