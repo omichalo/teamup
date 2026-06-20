@@ -115,6 +115,7 @@ describe("resolveAppOrigin", () => {
   it("keeps localhost when env is localhost and request is local", () => {
     process.env.APP_URL = "http://localhost:3000";
     process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID = "sqyping-teamup-dev";
+    delete process.env.NEXT_PUBLIC_APP_URL;
 
     expect(
       resolveAppOrigin(
