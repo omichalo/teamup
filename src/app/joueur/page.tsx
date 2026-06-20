@@ -1,203 +1,93 @@
 "use client";
 
-import React, { useState } from "react";
 import {
   Box,
   Typography,
   Card,
   CardContent,
   Button,
-  Alert,
-  TextField,
   Stack,
-  CircularProgress,
-  Chip,
-  Divider,
+  CardActions,
 } from "@mui/material";
+import Grid from "@mui/material/GridLegacy";
+import {
+  Description as DescriptionIcon,
+  EventAvailable as EventAvailableIcon,
+  SportsTennis as SportsTennisIcon,
+} from "@mui/icons-material";
+import Link from "next/link";
 import { AuthGuard } from "@/components/AuthGuard";
-import { useAuth } from "@/hooks/useAuth";
-import { USER_ROLES, COACH_REQUEST_STATUS } from "@/lib/auth/roles";
+import { USER_ROLES } from "@/lib/auth/roles";
 
 export default function PlayerHomePage() {
-  const { user, refreshUser } = useAuth();
-  const [message, setMessage] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-
-  const handleRequestCoach = async () => {
-    if (!user) {
-      return;
-    }
-
-    setSubmitting(true);
-    setError(null);
-    setSuccess(null);
-
-    try {
-      const response = await fetch("/api/coach/request", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ message }),
-      });
-
-      if (!response.ok) {
-        const payload = await response.json().catch(() => null);
-        throw new Error(payload?.error || "Impossible d'envoyer la demande");
-      }
-
-      setSuccess("Votre demande a bien été enregistrée.");
-      setMessage("");
-      await refreshUser();
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Une erreur est survenue. Veuillez réessayer."
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const isPending = user?.coachRequestStatus === COACH_REQUEST_STATUS.PENDING;
-  const isApproved =
-    user?.coachRequestStatus === COACH_REQUEST_STATUS.APPROVED ||
-    user?.role === USER_ROLES.COACH;
-  const isRejected = user?.coachRequestStatus === COACH_REQUEST_STATUS.REJECTED;
-  const hasRequest = user?.coachRequestStatus && user.coachRequestStatus !== COACH_REQUEST_STATUS.NONE;
+  const quickActions = [
+    {
+      title: "Nouvelle inscription",
+      description:
+        "Créer un nouveau dossier d'adhésion pour vous ou un membre de votre foyer.",
+      href: "/club/inscription",
+      cta: "Démarrer une inscription",
+      icon: <DescriptionIcon color="primary" />,
+    },
+    {
+      title: "Mes inscriptions",
+      description:
+        "Suivre l'avancement de vos dossiers et vérifier les informations transmises.",
+      href: "/club/mes-inscriptions",
+      cta: "Voir mes dossiers",
+      icon: <EventAvailableIcon color="primary" />,
+    },
+  ] as const;
 
   return (
-    <AuthGuard allowedRoles={[USER_ROLES.PLAYER, USER_ROLES.COACH, USER_ROLES.ADMIN]}>
-      <Box sx={{ p: 5, maxWidth: 720, mx: "auto" }}>
-          <Typography variant="h4" component="h1" gutterBottom>
-            Bienvenue sur l&apos;espace joueur
-          </Typography>
-
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-            Depuis cette page, vous pouvez suivre l&apos;actualité du club et, si
-            vous souhaitez participer à l&apos;organisation, demander des droits
-            d&apos;entraîneur.
-          </Typography>
-
-          <Card sx={{ mb: 3 }}>
-            <CardContent>
-              <Stack spacing={2}>
-                <Typography variant="subtitle1">
-                  Demander les droits d&apos;entraîneur
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Les droits coach permettent de gérer les compositions,
-                  disponibilités et l&apos;organisation des rencontres. Un
-                  administrateur examinera votre demande.
-                </Typography>
-
-                {hasRequest && (
-                  <>
-                    <Divider />
-                    <Box>
-                      <Typography variant="subtitle2" gutterBottom>
-                        Statut de votre demande
-                      </Typography>
-                      <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
-                        <Chip
-                          label={
-                            isPending
-                              ? "En attente"
-                              : isApproved
-                              ? "Acceptée"
-                              : isRejected
-                              ? "Refusée"
-                              : "Aucune demande"
-                          }
-                          color={
-                            isPending
-                              ? "warning"
-                              : isApproved
-                              ? "success"
-                              : isRejected
-                              ? "error"
-                              : "default"
-                          }
-                          variant="outlined"
-                        />
-                        {user?.coachRequestUpdatedAt && (
-                          <Typography variant="caption" color="text.secondary" sx={{ alignSelf: "center" }}>
-                            {new Date(user.coachRequestUpdatedAt).toLocaleDateString("fr-FR", {
-                              day: "numeric",
-                              month: "long",
-                              year: "numeric",
-                            })}
-                          </Typography>
-                        )}
-                      </Box>
-                      {user?.coachRequestMessage && (
-                        <Box sx={{ mt: 1, p: 2, bgcolor: "action.hover", borderRadius: 1 }}>
-                          <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
-                            Votre message :
-                          </Typography>
-                          <Typography variant="body2">{user.coachRequestMessage}</Typography>
-                        </Box>
-                      )}
-                    </Box>
-                    <Divider />
-                  </>
-                )}
-
-                {isApproved ? (
-                  <Alert severity="success">
-                    Votre demande de droits coach a été acceptée. Veuillez vous
-                    reconnecter pour accéder aux fonctionnalités avancées.
-                  </Alert>
-                ) : (
-                  <>
-                    {error && <Alert severity="error">{error}</Alert>}
-                    {success && <Alert severity="success">{success}</Alert>}
-
-                    <TextField
-                      label="Message (optionnel)"
-                      placeholder="Expliquez pourquoi vous souhaitez obtenir les droits coach"
-                      multiline
-                      minRows={3}
-                      value={message}
-                      onChange={(event) => setMessage(event.target.value)}
-                      disabled={submitting || isPending}
-                    />
-
-                    <Button
-                      variant="contained"
-                      onClick={handleRequestCoach}
-                      disabled={submitting || isPending || isApproved}
-                      startIcon={submitting ? <CircularProgress size={20} color="inherit" /> : null}
-                    >
-                      {submitting
-                        ? "Envoi en cours..."
-                        : isPending
-                        ? "Demande en cours de traitement"
-                        : "Demander les droits coach"}
-                    </Button>
-                  </>
-                )}
-              </Stack>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Que puis-je faire en tant que joueur ?
+    <AuthGuard
+      allowedRoles={[
+        USER_ROLES.PLAYER,
+        USER_ROLES.SECRETARY,
+        USER_ROLES.COACH,
+        USER_ROLES.ADMIN,
+      ]}
+    >
+      <Box sx={{ p: { xs: 3, sm: 4 }, maxWidth: 980, mx: "auto" }}>
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1.5 }}>
+              <SportsTennisIcon color="primary" />
+              <Typography variant="h4" component="h1">
+                Bienvenue sur TeamUp
               </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Pour le moment, l&apos;espace joueur est limité. Vous pouvez demander
-                des droits supplémentaires via le formulaire ci-dessus pour
-                accéder à l&apos;outil de préparation des compositions et suivre les
-                disponibilités.
-              </Typography>
-            </CardContent>
-          </Card>
-        </Box>
+            </Stack>
+            <Typography variant="body1" color="text.secondary">
+              Cet espace est votre point d&apos;entrée pour la vie du club. Vous pouvez
+              lancer une inscription, suivre vos dossiers et retrouver rapidement vos
+              démarches administratives.
+            </Typography>
+          </CardContent>
+        </Card>
+
+        <Grid container spacing={2}>
+          {quickActions.map((action) => (
+            <Grid item xs={12} md={6} key={action.title}>
+              <Card sx={{ height: "100%" }}>
+                <CardContent>
+                  <Stack spacing={1.5}>
+                    {action.icon}
+                    <Typography variant="h6">{action.title}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {action.description}
+                    </Typography>
+                  </Stack>
+                </CardContent>
+                <CardActions sx={{ px: 2, pb: 2 }}>
+                  <Button component={Link} href={action.href} variant="contained">
+                    {action.cta}
+                  </Button>
+                </CardActions>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      </Box>
     </AuthGuard>
   );
 }

@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
 import { normalizeMedicalCertificateStatus } from "@/lib/club-registration/medical-certificate";
+import { hasPaymentProofAvailable } from "@/lib/club-registration/payment-proof";
 
 const COLLECTION = "clubRegistrations";
 const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
@@ -94,8 +95,7 @@ export async function GET(req: Request) {
         summary.paymentRequestedAt =
           data.paymentRequestedAt?.toDate?.()?.toISOString?.() ?? null;
         summary.paidAt = data.paidAt?.toDate?.()?.toISOString?.() ?? null;
-        summary.invoiceAvailable =
-          typeof data.stripeInvoiceId === "string" && data.stripeInvoiceId.length > 0;
+        summary.invoiceAvailable = hasPaymentProofAvailable(data);
         return { summary, submittedAtMs };
       })
       .sort((a, b) => b.submittedAtMs - a.submittedAtMs)
