@@ -6,6 +6,7 @@ type RegistrationPricingInput = Pick<
   | "birthDate"
   | "mainSectionId"
   | "wantsCompetitorExtras"
+  | "wantsOptionalJersey"
   | "competitionIds"
   | "familyRegistrationOrder"
   | "sex"
@@ -23,6 +24,9 @@ export function buildPricingContext(
     birthDate: input.birthDate,
     mainSectionId: input.mainSectionId,
     wantsCompetitorExtras: input.wantsCompetitorExtras,
+    wantsOptionalJersey: input.wantsCompetitorExtras
+      ? false
+      : input.wantsOptionalJersey,
     competitionIds: input.competitionIds,
     familyRegistrationOrder: input.familyRegistrationOrder,
     sex: input.sex,

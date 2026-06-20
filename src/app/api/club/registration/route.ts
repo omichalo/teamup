@@ -29,6 +29,10 @@ import {
   normalizeApplicantNotes,
 } from "@/lib/club-registration/applicant-notes";
 import { buildRegistrationSubmitDocument } from "@/lib/club-registration/persist-registration-on-submit";
+import { buildRegistrationSubmittedEmail } from "@/lib/email/registration-submitted-email";
+import { getSqyPingLogoAttachment } from "@/lib/email/logo-attachment";
+import { sendMail } from "@/lib/mailer";
+import { getAppBaseUrl } from "@/lib/club-registration/stripe";
 
 const COLLECTION = "clubRegistrations";
 const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
@@ -72,6 +76,8 @@ const REGISTRATION_CLIENT_FIELDS = [
   "internalRulesAccepted",
   "wantsCompetitorExtras",
   "competitionJerseySize",
+  "wantsOptionalJersey",
+  "optionalJerseySize",
   "competitionIds",
   "applicantNotes",
   "isMinor",
@@ -140,6 +146,8 @@ const MANAGER_EDITABLE_FIELDS = [
   "internalRulesAccepted",
   "wantsCompetitorExtras",
   "competitionJerseySize",
+  "wantsOptionalJersey",
+  "optionalJerseySize",
   "competitionIds",
   "applicantNotes",
   "reviewNotes",
@@ -448,6 +456,30 @@ export async function POST(req: Request) {
       resourceId: docRef.id,
       success: true,
     });
+
+    const submitterEmail = decoded.email?.trim();
+    if (submitterEmail) {
+      const adherentName =
+        `${payload.firstName ?? ""} ${payload.lastName ?? ""}`.trim() || "adhérent";
+      const appOrigin = getAppBaseUrl(req);
+      const confirmationMail = buildRegistrationSubmittedEmail({
+        adherentName,
+        registrationId: docRef.id,
+        appOrigin,
+      });
+
+      try {
+        await sendMail({
+          to: submitterEmail,
+          subject: `Demande d'adhésion reçue — ${adherentName}`,
+          html: confirmationMail.html,
+          text: confirmationMail.text,
+          attachments: [getSqyPingLogoAttachment()],
+        });
+      } catch (emailError) {
+        console.error("[api/club/registration POST] confirmation email", emailError);
+      }
+    }
 
     return jsonNoStore({ success: true, id: docRef.id }, { status: 200 });
   } catch (error) {

@@ -4,6 +4,10 @@ import type {
   StripeCheckoutLineItem,
   StripeInvoiceCustomField,
 } from "@/lib/pricing/stripe-checkout-lines";
+import {
+  PAYMENT_METHOD_LABELS,
+  type PaymentMethodId,
+} from "@/lib/club-registration/payment-constants";
 
 export interface StripeCheckoutSession {
   id: string;
@@ -161,24 +165,34 @@ export function pickInvoiceDownloadUrl(links: StripeInvoiceLinks): string | null
 }
 
 /**
- * Point d'extension pour le paiement CB multi-échéances.
- * V1 : paiement unique via Checkout ; installments > 1 → suivi manuel secrétariat.
+ * Point d'extension pour le paiement CB en ligne via Checkout.
+ * V1 : carte en une seule fois uniquement ; les autres modes passent en suivi secrétariat.
  */
 export async function createStripePaymentForRegistration(params: {
   registrationId: string;
   amountToPayCents: number;
   installments: number;
+  paymentMethod: PaymentMethodId;
 }): Promise<{ supported: boolean; reason?: string }> {
   if (params.amountToPayCents <= 0) {
     return { supported: false, reason: "Aucun montant à régler" };
   }
+
+  if (params.paymentMethod !== "card") {
+    return {
+      supported: false,
+      reason: `Mode « ${PAYMENT_METHOD_LABELS[params.paymentMethod]} » : pas de lien de paiement en ligne. Suivez les encaissements dans le tableau ci-dessous.`,
+    };
+  }
+
   if (params.installments > 1) {
     return {
       supported: false,
       reason:
-        "Paiement carte en plusieurs fois : pas encore de lien automatique. Le secrétariat suit les échéances dans le tableau ci-dessus.",
+        "Carte en plusieurs fois : envoyez chaque lien Stripe manuellement, puis suivez les échéances dans le tableau ci-dessus.",
     };
   }
+
   return { supported: true };
 }
 

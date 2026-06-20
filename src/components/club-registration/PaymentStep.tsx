@@ -164,7 +164,9 @@ export function PaymentStep({ draft, onChange }: Props) {
         <Alert severity="info" variant="outlined">
           {summary.amountToPayCents <= 0
             ? "Aucun paiement n'est dû à ce stade. Le secrétariat validera votre dossier."
-            : "Le lien de paiement vous sera envoyé après validation de votre dossier par le secrétariat."}
+            : draft.paymentInstallments > 1
+              ? "Après validation de votre dossier, le secrétariat vous enverra un lien de paiement Stripe par e-mail pour chaque échéance (montants indiqués ci-dessus)."
+              : "Après validation de votre dossier, un lien de paiement Stripe vous sera envoyé par e-mail pour régler la totalité en une fois."}
         </Alert>
       ) : null}
 

@@ -5,6 +5,7 @@ import { ReceiptLongOutlined } from "@mui/icons-material";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import { renderInvoiceHeader } from "@/lib/club-registration-config/helpers";
 import { TemplateVariableField } from "./TemplateVariableField";
+import { EuroAmountField } from "./EuroAmountField";
 import {
   ConfigEditorCard,
   ConfigEditorHint,
@@ -27,6 +28,20 @@ export function StripePresentationEditor({ config, onChange }: Props) {
     onChange({
       ...config,
       stripePresentation: { ...stripe, ...patch },
+    });
+  };
+
+  const updateJersey = (patch: Partial<RegistrationConfigV1["jersey"]>) => {
+    onChange({
+      ...config,
+      jersey: { ...config.jersey, ...patch },
+    });
+  };
+
+  const updateUiCopy = (patch: Partial<RegistrationConfigV1["uiCopy"]>) => {
+    onChange({
+      ...config,
+      uiCopy: { ...config.uiCopy, ...patch },
     });
   };
 
@@ -75,13 +90,50 @@ export function StripePresentationEditor({ config, onChange }: Props) {
             onChange={(e) => update({ licenseLabel: e.target.value })}
             fullWidth
           />
+        </Stack>
+      </ConfigEditorCard>
+
+      <ConfigEditorCard>
+        <Typography variant="subtitle2" fontWeight={600}>
+          Maillot de compétition
+        </Typography>
+        <Stack spacing={1.5}>
+          <EuroAmountField
+            label="Prix maillot hors section compétiteur"
+            valueCents={config.jersey.optionalPriceCents}
+            onChangeCents={(optionalPriceCents) => updateJersey({ optionalPriceCents })}
+            fullWidth
+          />
           <TextField
-            label="Info maillot compétiteur"
+            label="Libellé Stripe — maillot optionnel"
+            size="small"
+            value={config.jersey.optionalStripeLabel}
+            onChange={(e) => updateJersey({ optionalStripeLabel: e.target.value })}
+            fullWidth
+          />
+          <TextField
+            label="Info maillot inclus (section compétiteur)"
             size="small"
             value={stripe.competitorJerseyInfoLabel}
             onChange={(e) => update({ competitorJerseyInfoLabel: e.target.value })}
             multiline
             minRows={2}
+            fullWidth
+          />
+          <TextField
+            label="Texte d'aide — section compétiteur (formulaire)"
+            size="small"
+            value={config.uiCopy.competitorJerseyHelper}
+            onChange={(e) => updateUiCopy({ competitorJerseyHelper: e.target.value })}
+            multiline
+            minRows={2}
+            fullWidth
+          />
+          <TextField
+            label="Libellé case à cocher — maillot optionnel"
+            size="small"
+            value={config.uiCopy.optionalJerseyOptInLabel}
+            onChange={(e) => updateUiCopy({ optionalJerseyOptInLabel: e.target.value })}
             fullWidth
           />
         </Stack>

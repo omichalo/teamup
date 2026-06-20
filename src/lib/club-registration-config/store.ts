@@ -72,12 +72,13 @@ export async function saveDraftRegistrationConfig(
   updatedBy: string
 ): Promise<void> {
   const db = getFirestoreAdmin();
+  const normalized = normalizeRegistrationConfigSortOrders(config);
   await db
     .collection(REGISTRATION_CONFIG_COLLECTION)
     .doc(REGISTRATION_CONFIG_DRAFT_ID)
     .set(
       {
-        config,
+        config: normalized,
         updatedAt: new Date().toISOString(),
         updatedBy,
       },
@@ -90,6 +91,7 @@ export async function publishRegistrationConfig(
   publishedBy: string
 ): Promise<void> {
   const db = getFirestoreAdmin();
+  const normalized = normalizeRegistrationConfigSortOrders(config);
   const now = new Date().toISOString();
   const batch = db.batch();
   const activeRef = db
@@ -100,7 +102,7 @@ export async function publishRegistrationConfig(
     .doc(REGISTRATION_CONFIG_DRAFT_ID);
 
   batch.set(activeRef, {
-    config,
+    config: normalized,
     updatedAt: now,
     updatedBy: publishedBy,
     publishedAt: now,
@@ -109,7 +111,7 @@ export async function publishRegistrationConfig(
   batch.set(
     draftRef,
     {
-      config,
+      config: normalized,
       updatedAt: now,
       updatedBy: publishedBy,
     },

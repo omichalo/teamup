@@ -90,6 +90,8 @@ function buildPracticeLine(
   }
   if (draft.wantsCompetitorExtras) {
     parts.push("Compétiteur");
+  } else if (draft.wantsOptionalJersey) {
+    parts.push("Maillot");
   }
   return parts.length > 0 ? parts.join(" · ") : null;
 }
@@ -143,7 +145,8 @@ function SidebarContent({
     hasReachedPractice ||
     slotsCount > 0 ||
     draft.additionalSectionIds.length > 0 ||
-    draft.wantsCompetitorExtras;
+    draft.wantsCompetitorExtras ||
+    draft.wantsOptionalJersey;
   const practiceLine = hasPracticeSummary
     ? buildPracticeLine(config, draft, slotsCount)
     : null;

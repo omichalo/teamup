@@ -32,6 +32,7 @@ function makePayload(): ClubRegistrationPayload {
     supervisionAcknowledgement: "not_applicable_adult",
     internalRulesAccepted: true,
     wantsCompetitorExtras: false,
+    wantsOptionalJersey: false,
     competitionIds: [],
   } as unknown as ClubRegistrationPayload;
 }

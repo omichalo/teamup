@@ -1,8 +1,8 @@
 import { jsonNoStore } from "@/lib/http/cache-headers";
 import { adminAuth } from "@/lib/firebase-admin";
+import { buildPasswordResetEmail } from "@/lib/email/auth-emails";
+import { getSqyPingLogoAttachment } from "@/lib/email/logo-attachment";
 import { sendMail } from "@/lib/mailer";
-import { readFile } from "fs/promises";
-import path from "path";
 import { getFirebaseErrorMessage } from "@/lib/firebase-error-utils";
 import { checkRateLimit } from "@/lib/auth/rate-limit";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
@@ -126,21 +126,10 @@ export async function POST(req: Request) {
       console.log("[send-password-reset] Generated link:", link);
     }
 
-    // Charger le template HTML et injecter le lien
-    const templatePath = path.join(
-      process.cwd(),
-      "emails",
-      "password-reset.html"
-    );
-    const logoPath = path.join(process.cwd(), "public", "sqyping-logo.jpg");
-    const htmlTemplate = await readFile(templatePath, "utf8");
-    const html = htmlTemplate
-      .replace(/{{actionUrl}}/g, link)
-      .replace(
-        /https:\/\/sqyping-live-scoring\.web\.app\/sqyping-logo\.jpg/g,
-        "cid:logo-sqyping"
-      )
-      .replace(/\/sqyping-logo\.jpg/g, "cid:logo-sqyping");
+    const { html, text } = buildPasswordResetEmail({
+      actionUrl: link,
+      appOrigin: origin,
+    });
 
     // Envoyer l'email
     try {
@@ -148,15 +137,8 @@ export async function POST(req: Request) {
         to: email,
         subject: "Réinitialisation de votre mot de passe",
         html,
-        attachments: [
-          {
-            filename: "sqyping-logo.jpg",
-            path: logoPath,
-            cid: "logo-sqyping",
-            contentType: "image/jpeg",
-          },
-        ],
-        text: `Bonjour,\n\nPour réinitialiser votre mot de passe, cliquez sur ce lien: ${link}\n\nSQY Ping TeamUp`,
+        text,
+        attachments: [getSqyPingLogoAttachment()],
       });
     } catch (error) {
       console.error("[send-password-reset] Erreur lors de l'envoi de l'email:", error);

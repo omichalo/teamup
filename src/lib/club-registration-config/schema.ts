@@ -4,6 +4,7 @@ import { CONFIG_EDITOR_ICON_KEYS } from "@/components/club-registration-config/c
 import { REGISTRATION_CONFIG_SCHEMA_VERSION } from "./types";
 import type { RegistrationConfigV1 } from "./types";
 import { repairPricingProfiles } from "./pricing-profiles";
+import { repairJerseyConfig } from "./repair-jersey";
 
 const pricingProfileBehaviorSchema = z.enum(["classic_like", "handisport", "sport_adapte"]);
 
@@ -36,10 +37,19 @@ const registrationSiteSlotSchema = z.object({
   enabled: z.boolean(),
 });
 
+/** Chaîne optionnelle : vide ou espaces → `undefined` (champ masqué côté formulaire). */
+const optionalTrimmedLabelSchema = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : undefined));
+
 const registrationSiteSchema = z.object({
   id: z.string().trim().min(1).max(80),
   label: z.string().trim().min(1).max(200),
-  gymnasiumName: z.string().trim().min(1).max(200).optional(),
+  gymnasiumName: optionalTrimmedLabelSchema(200),
   linkedSectionIds: z.array(z.string().trim().min(1)).default([]),
   sortOrder: z.number().int().min(0),
   slots: z.array(registrationSiteSlotSchema),
@@ -137,6 +147,11 @@ const stripePresentationSchema = z.object({
   discountCustomFieldName: z.string().trim().min(1).max(200),
 });
 
+const jerseyCatalogSchema = z.object({
+  optionalPriceCents: z.number().int().min(0),
+  optionalStripeLabel: z.string().trim().min(1).max(300),
+});
+
 const registrationUiCopySchema = z.object({
   schoolPickupService: z.object({
     title: z.string().trim().min(1).max(200),
@@ -153,6 +168,8 @@ const registrationUiCopySchema = z.object({
       })
     )
     .min(1),
+  competitorJerseyHelper: z.string().trim().min(1).max(500).optional(),
+  optionalJerseyOptInLabel: z.string().trim().min(1).max(500).optional(),
 });
 
 export const registrationConfigV1Schema = z
@@ -173,9 +190,11 @@ export const registrationConfigV1Schema = z
   discountRules: z.array(discountRuleSchema),
   aidRules: z.array(aidRuleSchema),
   stripePresentation: stripePresentationSchema,
+  jersey: jerseyCatalogSchema.optional(),
   uiCopy: registrationUiCopySchema,
 })
-  .transform((config) => repairPricingProfiles(config as RegistrationConfigV1));
+  .transform((config) => repairPricingProfiles(config as RegistrationConfigV1))
+  .transform((config) => repairJerseyConfig(config as RegistrationConfigV1));
 
 export const registrationConfigExportSchema = z.object({
   schemaVersion: z.literal(REGISTRATION_CONFIG_SCHEMA_VERSION),

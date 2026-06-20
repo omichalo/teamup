@@ -28,6 +28,7 @@ export type PricingBreakdownDraft = Pick<
   | "birthDate"
   | "mainSectionId"
   | "wantsCompetitorExtras"
+  | "wantsOptionalJersey"
   | "competitionIds"
   | "familyRegistrationOrder"
   | "sex"
@@ -42,6 +43,7 @@ function toPricingContextInput(draft: PricingBreakdownDraft) {
     birthDate: draft.birthDate,
     mainSectionId: draft.mainSectionId,
     wantsCompetitorExtras: draft.wantsCompetitorExtras,
+    wantsOptionalJersey: draft.wantsOptionalJersey,
     competitionIds: draft.competitionIds,
     familyRegistrationOrder: draft.familyRegistrationOrder,
     sex: draft.sex === "" ? ("other" as const) : draft.sex,

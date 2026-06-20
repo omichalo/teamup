@@ -398,7 +398,18 @@ export function RecapStep({ draft, accountEmail, onEditStep, onChange }: Props) 
                     ),
                 },
               ] as Field[])
-            : []),
+            : draft.wantsOptionalJersey
+              ? ([
+                  {
+                    label: "Maillot de compétition",
+                    value: draft.optionalJerseySize ?? "—",
+                  },
+                  {
+                    label: "Supplément maillot",
+                    value: `${(config.jersey.optionalPriceCents / 100).toFixed(0)} €`,
+                  },
+                ] as Field[])
+              : []),
         ]}
       />
 

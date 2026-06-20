@@ -141,7 +141,7 @@ export const openApiSpec = {
         tags: ["Auth"],
         summary: "Envoi d'un email de vérification",
         description:
-          "Génère un lien de vérification via Firebase Admin et envoie un email HTML via SMTP (Nodemailer) au format SQY Ping Team Up.",
+          "Génère un lien de vérification via Firebase Admin et envoie un email HTML via SMTP (Nodemailer) au format SQY Ping - Team Up.",
         requestBody: {
           required: true,
           content: {
