@@ -1,121 +1,29 @@
-# Firebase Functions - SQY Ping TeamUp
+# Firebase Functions — synchro FFTT
 
-Ce dossier contient les Firebase Functions pour la synchronisation automatique des données FFTT.
+Logique métier : **`../src/lib/shared/`** (via `sync-wrappers.ts`). Ne pas dupliquer dans `functions/shared/`.
 
-## 🚀 Fonctions disponibles
+## Fonctions
 
-### 1. `syncMatches` (Scheduled Function)
+| Export | Déclencheur |
+|--------|-------------|
+| `syncPlayersDaily` | Cron 6h00 Europe/Paris |
+| `syncTeamsDaily` | Cron 6h05 |
+| `syncTeamMatchesDaily` | Cron 6h10 |
+| `syncPlayersManual` | HTTP POST |
+| `syncTeamsManual` | HTTP POST |
+| `syncTeamMatchesManual` | HTTP POST |
+| `getSyncStatus` | HTTP POST |
+| `cleanupDuplicatePlayers` | HTTP POST |
+| `setUserRole` | HTTP POST (admin) |
 
-- **Déclenchement** : Automatique tous les jours à 2h du matin (heure de Paris)
-- **Rôle** : Synchronise tous les matchs et leurs détails depuis l'API FFTT
-- **Stockage** : Sauvegarde les données dans Firestore (`matches` collection)
-
-### 2. `triggerMatchSync` (HTTP Function)
-
-- **URL** : `https://us-central1-sqyping-teamup.cloudfunctions.net/triggerMatchSync`
-- **Méthode** : POST
-- **Rôle** : Déclenche manuellement la synchronisation des matchs
-- **Usage** : Pour forcer une mise à jour immédiate
-
-## 📋 Configuration
-
-Les variables d'environnement sont configurées via Firebase Functions Config :
+## Scripts (racine du repo)
 
 ```bash
-# Configuration FFTT
-fftt.id = "SW251"
-fftt.pwd = "XpZ31v56Jr"
-fftt.club_code = "08781477"
-```
-
-## 🛠️ Scripts disponibles
-
-```bash
-# Configuration des variables d'environnement
-npm run functions:setup
-
-# Compilation des Functions
+npm run functions:setup          # functions.config().fftt (secours)
+npm run functions:secrets:prod   # Secret Manager ID_FFTT, PWD_FFTT
 npm run functions:build
-
-# Test local avec émulateur
-npm run functions:test
-
-# Déploiement vers Firebase
-npm run functions:deploy
-
-# Voir les logs
+npm run functions:deploy:prod
 npm run functions:logs
 ```
 
-## 📊 Structure des données
-
-### Collection `matches`
-
-Chaque document contient :
-
-- `id` : Identifiant unique du match
-- `teamNumber` : Numéro de l'équipe SQY PING
-- `opponent` : Nom de l'équipe adverse
-- `date` : Date du match
-- `score` : Score du match (si terminé)
-- `result` : Résultat (VICTOIRE/DEFAITE/NUL/À VENIR)
-- `resultatsIndividuels` : Détails des compositions et résultats individuels
-- `isFemale` : true si équipe féminine
-- `division` : Division FFTT
-- `epreuve` : Libellé de l'épreuve FFTT
-
-### Collection `metadata`
-
-- `lastSync` : Timestamp de la dernière synchronisation
-- `count` : Nombre de matchs synchronisés
-
-## 🔄 Processus de synchronisation
-
-1. **Récupération des équipes** : Filtre les épreuves 15954 (Masculin) et 15955 (Féminin)
-2. **Parallélisation** : Récupère tous les matchs en parallèle
-3. **Traitement par batch** : Traite les détails des matchs terminés par groupes de 3
-4. **Enrichissement** : Complète les données manquantes (licences, points) via `getJoueursByClub`
-5. **Sauvegarde** : Stocke tout dans Firestore avec timestamps
-
-## 🚨 Gestion des erreurs
-
-- **API FFTT indisponible** : Création de détails basiques avec les informations disponibles
-- **Données manquantes** : Enrichissement automatique via la liste des joueurs du club
-- **Limitation de débit** : Traitement par batch avec délais pour éviter la surcharge
-
-## 📈 Performance
-
-- **Parallélisation** : Récupération initiale en parallèle (26 équipes)
-- **Batch processing** : Traitement des détails par groupes de 3 avec délai de 1s
-- **Cache Firestore** : Évite les appels API répétés
-- **Enrichissement intelligent** : Complète seulement les données manquantes
-
-## 🔧 Maintenance
-
-### Logs
-
-```bash
-# Voir les logs en temps réel
-npm run functions:logs
-
-# Logs spécifiques à une fonction
-firebase functions:log --only syncMatches
-firebase functions:log --only triggerMatchSync
-```
-
-### Synchronisation manuelle
-
-```bash
-# Via curl
-curl -X POST https://us-central1-sqyping-teamup.cloudfunctions.net/triggerMatchSync
-
-# Via l'interface Firebase Console
-# Functions > triggerMatchSync > Test
-```
-
-### Monitoring
-
-- **Firebase Console** : Functions > Monitoring
-- **Cloud Logging** : Logs détaillés de chaque exécution
-- **Métriques** : Temps d'exécution, erreurs, invocations
-
+Documentation ops : [`docs/technical/SYNC_CLOUD_FUNCTIONS.md`](../docs/technical/SYNC_CLOUD_FUNCTIONS.md).

@@ -1,64 +1,46 @@
 #!/usr/bin/env node
 
 /**
- * Script pour configurer les variables d'environnement Firebase Functions
- * Usage: node scripts/setup-functions-config.js
- * 
- * IMPORTANT: Les credentials FFTT doivent être fournis via des variables d'environnement
- * ou un fichier .env.local (non commité).
- * 
- * Variables d'environnement requises:
- * - ID_FFTT: Identifiant FFTT (secret)
- * - PWD_FFTT: Mot de passe FFTT (secret)
- * - CLUB_CODE: Code du club (optionnel, défaut: 08781477, non secret)
+ * Configure les credentials FFTT pour Cloud Functions.
+ *
+ * 1. Legacy : functions.config().fftt (lu par src/lib/shared/fftt-config.ts en secours)
+ * 2. Recommandé : secrets Secret Manager ID_FFTT / PWD_FFTT (liés via runWith dans functions/src/sync-runtime.ts)
+ *
+ * Usage: npm run functions:setup
+ * Puis (prod): npm run functions:secrets:prod
  */
 
 const { execSync } = require("child_process");
 require("dotenv").config({ path: ".env.local" });
 
-console.log(
-  "🔧 Configuration des variables d'environnement Firebase Functions..."
-);
+console.log("🔧 Configuration FFTT pour Cloud Functions...");
 
 try {
-  // Récupérer les credentials depuis les variables d'environnement
   const ffttId = process.env.ID_FFTT;
   const ffttPwd = process.env.PWD_FFTT;
   const ffttClubCode = process.env.CLUB_CODE || "08781477";
 
   if (!ffttId || !ffttPwd) {
-    console.error("❌ Erreur: Les variables d'environnement ID_FFTT et PWD_FFTT sont requises.");
-    console.error("");
-    console.error("💡 Pour configurer:");
-    console.error("   1. Créez un fichier .env.local (non commité) avec:");
-    console.error("      ID_FFTT=votre_id");
-    console.error("      PWD_FFTT=votre_mot_de_passe");
-    console.error("      # CLUB_CODE est optionnel (défaut: 08781477, non secret)");
-    console.error("");
-    console.error("   2. Ou exportez les variables d'environnement:");
-    console.error("      export ID_FFTT=votre_id");
-    console.error("      export PWD_FFTT=votre_mot_de_passe");
+    console.error("❌ ID_FFTT et PWD_FFTT requis (.env.local ou variables d'environnement).");
     process.exit(1);
   }
 
-  // Configuration FFTT
-  console.log("📋 Configuration des identifiants FFTT...");
+  console.log("📋 functions.config().fftt (secours legacy)...");
   execSync(
     `firebase functions:config:set fftt.id="${ffttId}" fftt.pwd="${ffttPwd}" fftt.club_code="${ffttClubCode}"`,
     { stdio: "inherit" }
   );
 
-  console.log("✅ Configuration terminée !");
   console.log("");
-  console.log("📋 Variables configurées :");
-  console.log(`  - fftt.id: ${ffttId.substring(0, 2)}*** (masqué)`);
-  console.log(`  - fftt.pwd: *** (masqué)`);
-  console.log(`  - fftt.club_code: ${ffttClubCode}`);
+  console.log("✅ functions.config() mis à jour.");
   console.log("");
-  console.log("🚀 Vous pouvez maintenant déployer les Functions avec :");
-  console.log("   npm run deploy:functions");
+  console.log("⚠️  Les crons utilisent surtout les secrets ID_FFTT / PWD_FFTT.");
+  console.log("   Exécutez ensuite :");
+  console.log("     npm run functions:secrets:prod");
+  console.log("   (saisie interactive des mêmes valeurs que App Hosting)");
+  console.log("");
+  console.log("🚀 Puis déployez : npm run functions:deploy:prod");
 } catch (error) {
-  console.error("❌ Erreur lors de la configuration :", error.message);
+  console.error("❌ Erreur:", error.message);
   process.exit(1);
 }
-

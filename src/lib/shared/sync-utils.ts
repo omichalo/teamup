@@ -73,6 +73,7 @@ export async function syncTeams(db: Firestore) {
   return {
     success: true,
     teamsCount: saveResult.saved,
+    errors: saveResult.errors,
     message: `Synchronisation réussie: ${saveResult.saved} équipes synchronisées`,
     duration: durationSeconds,
   };
@@ -111,6 +112,7 @@ export async function syncTeamMatches(db: Firestore) {
   return {
     success: true,
     matchesCount: saveResult.saved,
+    errors: saveResult.errors,
     message: `Synchronisation réussie: ${saveResult.saved} matchs synchronisés`,
     duration: durationSeconds,
   };

@@ -50,6 +50,12 @@ jobs:
       - name: Run type-check
         run: npm run type-check
 
+      - name: Install Cloud Functions dependencies
+        run: cd functions && npm ci
+
+      - name: Build Cloud Functions
+        run: npm run functions:build
+
       - name: Run tests
         run: npm test -- --ci
 

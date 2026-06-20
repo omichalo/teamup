@@ -10,6 +10,7 @@ import {
   syncTeamsWrapper,
   syncTeamMatchesWrapper,
 } from "./sync-wrappers";
+import { ffttSyncFunctions } from "./sync-runtime";
 
 const ALLOWED_ROLES = new Set(["admin", "secretary", "coach", "player"]);
 const ALLOWED_COACH_STATUSES = new Set([
@@ -44,7 +45,7 @@ const resolveCoachStatus = (
  * 🔄 Synchronisation quotidienne des joueurs SQY Ping
  * Se déclenche tous les jours à 6h00 (Europe/Paris)
  */
-export const syncPlayersDaily = functions.pubsub
+export const syncPlayersDaily = ffttSyncFunctions.pubsub
   .schedule("0 6 * * *")
   .timeZone("Europe/Paris")
   .onRun(async () => {
@@ -56,7 +57,7 @@ export const syncPlayersDaily = functions.pubsub
  * 🔄 Synchronisation manuelle des joueurs SQY Ping
  * Déclenchée via HTTP POST
  */
-export const syncPlayersManual = functions.https.onRequest(async (req, res) => {
+export const syncPlayersManual = ffttSyncFunctions.https.onRequest(async (req, res) => {
   // Configurer CORS
   res.set("Access-Control-Allow-Origin", "*");
   res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -110,7 +111,7 @@ export const syncPlayersManual = functions.https.onRequest(async (req, res) => {
  * 🏆 Synchronisation quotidienne des équipes SQY Ping
  * Se déclenche tous les jours à 6h05 (Europe/Paris) - 5 minutes après les joueurs
  */
-export const syncTeamsDaily = functions.pubsub
+export const syncTeamsDaily = ffttSyncFunctions.pubsub
   .schedule("5 6 * * *")
   .timeZone("Europe/Paris")
   .onRun(async () => {
@@ -122,7 +123,7 @@ export const syncTeamsDaily = functions.pubsub
  * 🏆 Synchronisation manuelle des équipes SQY Ping
  * Déclenchée via HTTP POST
  */
-export const syncTeamsManual = functions.https.onRequest(async (req, res) => {
+export const syncTeamsManual = ffttSyncFunctions.https.onRequest(async (req, res) => {
   // Configurer CORS
   res.set("Access-Control-Allow-Origin", "*");
   res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -176,7 +177,7 @@ export const syncTeamsManual = functions.https.onRequest(async (req, res) => {
  * 🏆 Synchronisation quotidienne des matchs par équipe SQY Ping
  * Se déclenche tous les jours à 6h10 (Europe/Paris) - 10 minutes après les joueurs
  */
-export const syncTeamMatchesDaily = functions.pubsub
+export const syncTeamMatchesDaily = ffttSyncFunctions.pubsub
   .schedule("10 6 * * *")
   .timeZone("Europe/Paris")
   .onRun(async () => {
@@ -190,7 +191,7 @@ export const syncTeamMatchesDaily = functions.pubsub
  * 🏆 Synchronisation manuelle des matchs par équipe SQY Ping
  * Déclenchée via HTTP POST
  */
-export const syncTeamMatchesManual = functions.https.onRequest(
+export const syncTeamMatchesManual = ffttSyncFunctions.https.onRequest(
   async (req, res) => {
     // Configurer CORS
     res.set("Access-Control-Allow-Origin", "*");
