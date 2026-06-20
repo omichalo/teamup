@@ -4,6 +4,7 @@ import {
   normalizeMedicalCertificateStatus,
   type ManagedListMedicalCertificateFilter,
 } from "@/lib/club-registration/medical-certificate";
+import { hasPaymentProofAvailable } from "@/lib/club-registration/payment-proof";
 import {
   ACTIONABLE_REGISTRATION_STATUSES,
   type ManagedListStatusFilter,
@@ -64,8 +65,7 @@ export function mapRegistrationDocToSummary(
   summary.paymentRequestedAt =
     data.paymentRequestedAt?.toDate?.()?.toISOString?.() ?? null;
   summary.paidAt = data.paidAt?.toDate?.()?.toISOString?.() ?? null;
-  summary.invoiceAvailable =
-    typeof data.stripeInvoiceId === "string" && data.stripeInvoiceId.length > 0;
+  summary.invoiceAvailable = hasPaymentProofAvailable(data);
   return { summary, submittedAtMs };
 }
 

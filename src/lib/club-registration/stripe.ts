@@ -129,6 +129,34 @@ export type StripeInvoiceLinks = {
   invoicePdf: string | null;
 };
 
+type StripeInvoice = {
+  id: string;
+  hosted_invoice_url?: string | null;
+  invoice_pdf?: string | null;
+  error?: { message?: string };
+};
+
+async function postStripeForm<T>(
+  path: string,
+  body: URLSearchParams
+): Promise<T & { error?: { message?: string } }> {
+  const response = await fetch(`https://api.stripe.com${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${requireEnv("STRIPE_SECRET_KEY")}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+    cache: "no-store",
+  });
+
+  const json = (await response.json()) as T & { error?: { message?: string } };
+  if (!response.ok) {
+    throw new Error(json.error?.message ?? "Erreur Stripe");
+  }
+  return json;
+}
+
 /** Récupère les URLs publiques Stripe pour consulter / télécharger une facture. */
 export async function retrieveStripeInvoiceLinks(
   invoiceId: string
@@ -157,6 +185,55 @@ export async function retrieveStripeInvoiceLinks(
     hostedInvoiceUrl: json.hosted_invoice_url ?? null,
     invoicePdf: json.invoice_pdf ?? null,
   };
+}
+
+/**
+ * Crée une facture Stripe "payée hors ligne" pour les encaissements manuels.
+ * Permet d'avoir un format de facture homogène (Checkout + hors Checkout).
+ */
+export async function createPaidOutOfBandInvoice(params: {
+  registrationId: string;
+  customerEmail: string;
+  amountCents: number;
+  description: string;
+}): Promise<{ invoiceId: string }> {
+  if (params.amountCents <= 0) {
+    throw new Error("Montant de facture invalide");
+  }
+
+  const customerBody = new URLSearchParams();
+  customerBody.set("email", params.customerEmail);
+  customerBody.set("metadata[registrationId]", params.registrationId);
+  const customer = await postStripeForm<{ id: string }>("/v1/customers", customerBody);
+
+  const invoiceItemBody = new URLSearchParams();
+  invoiceItemBody.set("customer", customer.id);
+  invoiceItemBody.set("currency", "eur");
+  invoiceItemBody.set("amount", String(params.amountCents));
+  invoiceItemBody.set("description", `Adhésion SQY Ping — dossier ${params.registrationId}`);
+  await postStripeForm<{ id: string }>("/v1/invoiceitems", invoiceItemBody);
+
+  const invoiceBody = new URLSearchParams();
+  invoiceBody.set("customer", customer.id);
+  invoiceBody.set("description", params.description);
+  invoiceBody.set("collection_method", "send_invoice");
+  invoiceBody.set("auto_advance", "false");
+  invoiceBody.set("metadata[registrationId]", params.registrationId);
+  const draftInvoice = await postStripeForm<StripeInvoice>("/v1/invoices", invoiceBody);
+
+  const finalizedInvoice = await postStripeForm<StripeInvoice>(
+    `/v1/invoices/${encodeURIComponent(draftInvoice.id)}/finalize`,
+    new URLSearchParams()
+  );
+
+  const payBody = new URLSearchParams();
+  payBody.set("paid_out_of_band", "true");
+  const paidInvoice = await postStripeForm<StripeInvoice>(
+    `/v1/invoices/${encodeURIComponent(finalizedInvoice.id)}/pay`,
+    payBody
+  );
+
+  return { invoiceId: paidInvoice.id };
 }
 
 /** URL à ouvrir côté adhérent : PDF si disponible, sinon page hébergée Stripe. */
