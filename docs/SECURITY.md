@@ -72,8 +72,7 @@ Le script `scripts/setup-functions-config.js` lit les variables d'environnement 
 
 ## Fichiers concernés
 
-- `functions/shared/fftt-utils.ts` : Utilise `functions.config().fftt.*` (sans fallback)
-- `src/lib/shared/fftt-utils.ts` : Utilise `process.env.ID_FFTT` et `process.env.PWD_FFTT`
+- `src/lib/shared/fftt-config.ts` : `process.env.ID_FFTT` / `PWD_FFTT`, secours `functions.config().fftt.*` (Cloud Functions)
 - `scripts/setup-functions-config.js` : Lit depuis `.env.local` ou variables d'environnement
 - `apphosting.yaml` : Utilise Firebase App Hosting Secrets Manager pour les secrets
 

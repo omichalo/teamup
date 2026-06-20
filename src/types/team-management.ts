@@ -21,11 +21,8 @@ export interface Player {
     masculine: string[]; // IDs des équipes masculines préférées
     feminine: string[]; // IDs des équipes féminines préférées
   };
-  participation: {
-    [teamId: string]: boolean; // Participation au championnat par équipe
-    championnat?: boolean; // Participation générale au championnat
-    championnatParis?: boolean; // Participation au championnat de Paris IDF (mixte)
-  };
+  /** Clés = teamId ou drapeaux `championnat` / `championnatParis`. */
+  participation: Record<string, boolean | undefined>;
   hasPlayedAtLeastOneMatch?: boolean; // Indique si le joueur a participé à au moins un match (championnat par équipes)
   hasPlayedAtLeastOneMatchParis?: boolean; // Indique si le joueur a participé à au moins un match au championnat de Paris (mixte)
   highestMasculineTeamNumberByPhase?: { 

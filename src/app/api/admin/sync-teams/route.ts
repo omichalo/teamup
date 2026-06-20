@@ -1,11 +1,8 @@
 import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
-import {
-  initializeFirebaseAdmin,
-  getFirestoreAdmin,
-  adminAuth,
-} from "@/lib/firebase-admin";
+import { syncTeams } from "@/lib/shared/sync-utils";
+import { initializeFirebaseAdmin, getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
 import { logAuditAction, AUDIT_ACTIONS } from "@/lib/auth/audit-logger";
@@ -18,13 +15,9 @@ export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   try {
-    // Valider l'origine de la requête pour prévenir les attaques CSRF
     if (!validateOrigin(req)) {
       return jsonNoStore(
-        {
-          error: "Invalid origin",
-          message: "Requête non autorisée",
-        },
+        { error: "Invalid origin", message: "Requête non autorisée" },
         { status: 403 }
       );
     }
@@ -33,10 +26,7 @@ export async function POST(req: NextRequest) {
     const sessionCookie = cookieStore.get("__session")?.value;
     if (!sessionCookie) {
       return jsonNoStore(
-        {
-          error: "Token d'authentification requis",
-          message: "Cette API nécessite une authentification valide",
-        },
+        { error: "Token d'authentification requis", message: "Cette API nécessite une authentification valide" },
         { status: 401 }
       );
     }
@@ -46,10 +36,7 @@ export async function POST(req: NextRequest) {
 
     if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
       return jsonNoStore(
-        {
-          error: "Accès refusé",
-          message: "Cette opération est réservée aux administrateurs",
-        },
+        { error: "Accès refusé", message: "Cette opération est réservée aux administrateurs" },
         { status: 403 }
       );
     }
@@ -61,50 +48,18 @@ export async function POST(req: NextRequest) {
     );
     if (syncRl) return syncRl;
 
-    console.log("🔄 [app/api/admin/sync-teams] Déclenchement de la synchronisation des équipes directe");
+    console.log("🔄 [app/api/admin/sync-teams] Déclenchement de la synchronisation des équipes");
 
     await initializeFirebaseAdmin();
     const db = getFirestoreAdmin();
+    const result = await syncTeams(db);
 
-    const startTime = Date.now();
-    const { TeamSyncService } = await import("@/lib/shared/team-sync");
-    const teamSyncService = new TeamSyncService();
-    const syncResult = await teamSyncService.syncTeamsAndMatches();
-
-    if (!syncResult.success || !syncResult.processedTeams) {
-      return jsonNoStore(
-        {
-          success: false,
-          error: "Erreur lors de la synchronisation",
-          details: syncResult.error || "Unknown error",
-        },
-        { status: 500 }
-      );
-    }
-
-    const saveResult = await teamSyncService.saveTeamsAndMatchesToFirestore(
-      syncResult.processedTeams,
-      db
-    );
-
-    const duration = Date.now() - startTime;
-    const durationSeconds = Math.round(duration / 1000);
-
-    // Sauvegarder la durée dans les métadonnées
-    await db.collection("metadata").doc("lastSync").set(
-      {
-        teamsDuration: durationSeconds,
-      },
-      { merge: true }
-    );
-
-    // Log d'audit pour la synchronisation
     logAuditAction(AUDIT_ACTIONS.DATA_SYNCED, decoded.uid, {
       resource: "teams",
       details: {
-        teamsCount: saveResult.saved,
-        errors: saveResult.errors,
-        duration: durationSeconds,
+        teamsCount: result.teamsCount,
+        errors: result.errors,
+        duration: result.duration,
       },
       success: true,
     });
@@ -112,11 +67,11 @@ export async function POST(req: NextRequest) {
     return jsonNoStore(
       {
         success: true,
-        message: `Synchronisation des équipes réussie: ${saveResult.saved} équipes sauvegardées`,
+        message: result.message,
         data: {
-          teamsCount: saveResult.saved,
-          errors: saveResult.errors,
-          duration: durationSeconds,
+          teamsCount: result.teamsCount,
+          errors: result.errors,
+          duration: result.duration,
         },
       },
       { status: 200 }
@@ -133,5 +88,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-
-
