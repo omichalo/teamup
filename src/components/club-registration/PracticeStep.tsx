@@ -22,6 +22,10 @@ import { formatSectionPracticeLabel } from "@/lib/club-registration-config/site-
 import { useRegistrationConfigValue } from "@/hooks/useRegistrationConfig";
 import type { RegistrationDraft } from "./registration-defaults";
 import { PracticeSlotPicker } from "./PracticeSlotPicker";
+import {
+  PracticeCompetitorJerseyField,
+  PracticeOptionalJerseySection,
+} from "./PracticeJerseySection";
 
 type Props = {
   draft: RegistrationDraft;
@@ -187,42 +191,32 @@ export function PracticeStep({ draft, onChange }: Props) {
         control={
           <Switch
             checked={draft.wantsCompetitorExtras}
-            onChange={(e) =>
-              onChange({ wantsCompetitorExtras: e.target.checked })
-            }
+            onChange={(e) => {
+              const checked = e.target.checked;
+              onChange({
+                wantsCompetitorExtras: checked,
+                ...(checked
+                  ? {
+                      wantsOptionalJersey: false,
+                      optionalJerseySize: undefined,
+                    }
+                  : {}),
+              });
+            }}
           />
         }
-        label="Je souhaite m’inscrire en section compétiteur (maillot et compétitions)"
+        label="Je souhaite m'inscrire en section compétiteur (maillot et compétitions)"
       />
+
+      {draft.wantsCompetitorExtras ? (
+        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: -1 }}>
+          {config.uiCopy.competitorJerseyHelper}
+        </Typography>
+      ) : null}
 
       {draft.wantsCompetitorExtras && (
         <Stack spacing={2}>
-          <FormControl fullWidth required={draft.wantsCompetitorExtras}>
-            <InputLabel id="jersey-label">
-              Taille de maillot de compétition
-            </InputLabel>
-            <Select
-              labelId="jersey-label"
-              label="Taille de maillot de compétition"
-              name="competitionJerseySize"
-              value={draft.competitionJerseySize ?? ""}
-              onChange={(e) =>
-                onChange({
-                  competitionJerseySize: e.target
-                    .value as RegistrationDraft["competitionJerseySize"],
-                })
-              }
-            >
-              <MenuItem value="">
-                <em>Choisir…</em>
-              </MenuItem>
-              {config.uiCopy.jerseySizes.map((size) => (
-                <MenuItem key={size} value={size}>
-                  {size}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <PracticeCompetitorJerseyField config={config} draft={draft} onChange={onChange} />
 
           <Typography
             variant="subtitle2"
@@ -338,6 +332,8 @@ export function PracticeStep({ draft, onChange }: Props) {
           </Box>
         </Stack>
       )}
+
+      <PracticeOptionalJerseySection config={config} draft={draft} onChange={onChange} />
     </Stack>
   );
 }

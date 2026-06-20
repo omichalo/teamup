@@ -11,6 +11,7 @@ function ctx(
   return {
     mainSectionId: "voisins",
     wantsCompetitorExtras: false,
+    wantsOptionalJersey: false,
     competitionIds: [],
     familyRegistrationOrder: "none",
     sex: "male",
@@ -81,6 +82,31 @@ describe("calculateQuoteFromConfig — handisport", () => {
       config
     );
     expectTotals(compet, { membership: 17_500, license: 3_000, total: 20_500 });
+  });
+});
+
+describe("calculateQuoteFromConfig — maillot optionnel", () => {
+  it("ajoute une ligne à 35 € hors section compétiteur", () => {
+    const quote = calculateQuoteFromConfig(
+      ctx({ birthDate: "2005-01-01", wantsOptionalJersey: true }),
+      config
+    );
+    const jersey = quote.lines.find((l) => l.id === "optional_jersey");
+    expect(jersey?.amountCents).toBe(3_500);
+    expect(quote.totalCents).toBe(22_200 + 3_500);
+  });
+
+  it("n'ajoute pas le maillot optionnel en section compétiteur", () => {
+    const quote = calculateQuoteFromConfig(
+      ctx({
+        birthDate: "2005-01-01",
+        wantsCompetitorExtras: true,
+        wantsOptionalJersey: true,
+      }),
+      config
+    );
+    expect(quote.lines.some((l) => l.id === "optional_jersey")).toBe(false);
+    expect(quote.lines.some((l) => l.id === "competitor_jersey_info")).toBe(true);
   });
 });
 

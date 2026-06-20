@@ -186,6 +186,7 @@ export function runSampleQuoteChecks(config: RegistrationConfigV1): ConfigValida
     const ctx: PricingContext = {
       mainSectionId: partial.mainSectionId ?? "voisins",
       wantsCompetitorExtras: partial.wantsCompetitorExtras ?? false,
+      wantsOptionalJersey: partial.wantsOptionalJersey ?? false,
       competitionIds: [],
       familyRegistrationOrder: "none",
       sex: "male",

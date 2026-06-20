@@ -6,6 +6,9 @@ import { jsonNoStore } from "@/lib/http/cache-headers";
 import { adminAuth, getFirestoreAdmin } from "@/lib/firebase-admin";
 import { hasAnyRole, resolveRole, USER_ROLES } from "@/lib/auth/roles";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
+import { buildPaymentInstructionsEmail } from "@/lib/email/payment-instructions-email";
+import { buildPaymentRequestEmail } from "@/lib/email/payment-email";
+import { getSqyPingLogoAttachment } from "@/lib/email/logo-attachment";
 import { sendMail } from "@/lib/mailer";
 import { AUDIT_ACTIONS, logAuditAction } from "@/lib/auth/audit-logger";
 import {
@@ -34,55 +37,12 @@ import {
   buildStripeCheckoutLineItems,
   buildStripeInvoiceCustomFields,
 } from "@/lib/pricing/stripe-checkout-lines";
+import { resolveRegistrationContactEmail } from "@/lib/club-registration/resolve-registration-contact-email";
+import type { RegistrationPayment } from "@/lib/club-registration/payment/types";
 import type { PriceQuote } from "@/lib/pricing/types";
 
 const COLLECTION = "clubRegistrations";
 const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
-
-function formatEuros(amountCents: number): string {
-  return new Intl.NumberFormat("fr-FR", {
-    style: "currency",
-    currency: "EUR",
-  }).format(amountCents / 100);
-}
-
-function formatQuoteBreakdownText(quote: PriceQuote): string {
-  return quote.lines
-    .filter((line) => line.kind !== "info" && line.amountCents !== 0)
-    .map((line) => `  - ${line.label} : ${formatEuros(line.amountCents)}`)
-    .join("\n");
-}
-
-function formatQuoteBreakdownHtml(quote: PriceQuote): string {
-  const rows = quote.lines
-    .filter((line) => line.kind !== "info" && line.amountCents !== 0)
-    .map(
-      (line) =>
-        `<li>${line.label} : <strong>${formatEuros(line.amountCents)}</strong></li>`
-    )
-    .join("");
-  return `<ul>${rows}</ul><p><strong>Total : ${formatEuros(quote.totalCents)}</strong></p>`;
-}
-
-function resolvePaymentEmail(data: DocumentData): string | null {
-  if (typeof data.adherentEmail === "string" && data.adherentEmail.includes("@")) {
-    return data.adherentEmail;
-  }
-  if (
-    Array.isArray(data.representatives) &&
-    typeof data.representatives[0]?.email === "string" &&
-    data.representatives[0].email.includes("@")
-  ) {
-    return data.representatives[0].email;
-  }
-  if (
-    typeof data.submitterAccountEmail === "string" &&
-    data.submitterAccountEmail.includes("@")
-  ) {
-    return data.submitterAccountEmail;
-  }
-  return null;
-}
 
 async function resolveQuoteFromRegistration(
   data: DocumentData
@@ -132,7 +92,7 @@ export async function POST(
       );
     }
 
-    const paymentEmail = resolvePaymentEmail(data);
+    const paymentEmail = resolveRegistrationContactEmail(data);
     if (!paymentEmail) {
       return jsonNoStore(
         { error: "Aucune adresse e-mail exploitable pour envoyer la demande de paiement." },
@@ -202,40 +162,102 @@ export async function POST(
     }
 
     const installments = payment?.paymentInstallments ?? 1;
+    const paymentMethod = payment?.paymentMethod ?? "card";
     const stripeCapability = await createStripePaymentForRegistration({
       registrationId: id,
       amountToPayCents,
       installments,
+      paymentMethod,
     });
 
     if (!stripeCapability.supported) {
-      const manualPayment = setManualFollowUp(
-        payment ?? {
+      const baseManualPayment: RegistrationPayment =
+        payment ??
+        ({
           totalAmountCents: quote?.totalCents ?? amountToPayCents,
           assistanceTotalAmountCents: 0,
           amountToPayCents,
           aids: [],
-          paymentMethod: "card",
+          paymentMethod,
           paymentInstallments: installments,
           expectedPayments: [],
           receivedPayments: [],
           paidAmountCents: 0,
           remainingAmountCents: amountToPayCents,
           paymentStatus: "waiting_payment",
-        }
-      );
+        } satisfies RegistrationPayment);
+
+      const manualPayment = setManualFollowUp(baseManualPayment);
+
       await docRef.set(
         {
+          status: "payment_requested",
           ...paymentToFirestoreUpdate(manualPayment),
+          paymentAmountCents: amountToPayCents,
+          paymentRequestedAt: FieldValue.serverTimestamp(),
+          paymentRequestedBy: decoded.uid,
+          paymentEmailSentTo: paymentEmail,
           updatedAt: FieldValue.serverTimestamp(),
         },
         { merge: true }
       );
+
+      const instructionsMail = buildPaymentInstructionsEmail({
+        adherentName,
+        amountCents: amountToPayCents,
+        registrationId: id,
+        appOrigin: baseUrl,
+        paymentMethod: manualPayment.paymentMethod,
+        paymentInstallments: manualPayment.paymentInstallments,
+        expectedPayments: manualPayment.expectedPayments,
+        ...(manualPayment.holidayVoucherAmountCents != null
+          ? { holidayVoucherAmountCents: manualPayment.holidayVoucherAmountCents }
+          : {}),
+        ...(manualPayment.remainingPaymentMethod
+          ? { remainingPaymentMethod: manualPayment.remainingPaymentMethod }
+          : {}),
+        ...(manualPayment.specialPaymentNote
+          ? { specialPaymentNote: manualPayment.specialPaymentNote }
+          : {}),
+        ...(manualPayment.paymentNote ? { paymentNote: manualPayment.paymentNote } : {}),
+        quote,
+      });
+
+      try {
+        await sendMail({
+          to: paymentEmail,
+          subject: `Instructions de règlement — adhésion ${adherentName}`,
+          html: instructionsMail.html,
+          text: instructionsMail.text,
+          attachments: [getSqyPingLogoAttachment()],
+        });
+      } catch (emailError) {
+        console.error("[api/club/registration/request-payment] instructions email", emailError);
+        return jsonNoStore(
+          {
+            error: "Dossier mis à jour mais l'e-mail d'instructions n'a pas pu être envoyé.",
+          },
+          { status: 500 }
+        );
+      }
+
+      logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_PAYMENT_REQUESTED, decoded.uid, {
+        resource: "clubRegistration",
+        resourceId: id,
+        details: {
+          amountCents: amountToPayCents,
+          manualFollowUp: true,
+          paymentMethod: manualPayment.paymentMethod,
+        },
+        success: true,
+      });
+
       return jsonNoStore(
         {
           success: true,
           manualFollowUp: true,
-          message: stripeCapability.reason,
+          message:
+            "Dossier validé. Un e-mail d'instructions de règlement a été envoyé au contact du dossier.",
         },
         { status: 200 }
       );
@@ -295,35 +317,20 @@ export async function POST(
         { merge: true }
       );
 
-      const breakdownText = formatQuoteBreakdownText(quote);
+      const paymentMail = buildPaymentRequestEmail({
+        adherentName,
+        amountCents: amountToPayCents,
+        checkoutUrl: session.url ?? "",
+        appOrigin: baseUrl,
+        quote: quote,
+      });
+
       await sendMail({
         to: paymentEmail,
         subject: `Paiement de votre adhésion SQY Ping - ${adherentName}`,
-        text: [
-          `Bonjour,`,
-          ``,
-          `Votre dossier d'adhésion SQY Ping a été relu et validé administrativement.`,
-          ``,
-          `Détail :`,
-          breakdownText,
-          ``,
-          `Montant à régler : ${formatEuros(amountToPayCents)}.`,
-          ``,
-          `Paiement sécurisé Stripe : ${session.url}`,
-          ``,
-          `Une facture détaillée sera disponible après paiement.`,
-          ``,
-          `SQY Ping TeamUp`,
-        ].join("\n"),
-        html: `
-          <p>Bonjour,</p>
-          <p>Votre dossier d'adhésion SQY Ping a été relu et validé administrativement.</p>
-          <p><strong>Détail :</strong></p>
-          ${formatQuoteBreakdownHtml(quote)}
-          <p><a href="${session.url}">Procéder au paiement sécurisé Stripe</a></p>
-          <p>Une facture détaillée sera disponible après paiement.</p>
-          <p>SQY Ping TeamUp</p>
-        `,
+        text: paymentMail.text,
+        html: paymentMail.html,
+        attachments: [getSqyPingLogoAttachment()],
       });
 
       logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_PAYMENT_REQUESTED, decoded.uid, {
@@ -370,26 +377,20 @@ export async function POST(
         { merge: true }
       );
 
+      const paymentMail = buildPaymentRequestEmail({
+        adherentName,
+        amountCents: amountToPayCents,
+        checkoutUrl: session.url ?? "",
+        appOrigin: baseUrl,
+        quote: null,
+      });
+
       await sendMail({
         to: paymentEmail,
         subject: `Paiement de votre adhésion SQY Ping - ${adherentName}`,
-        text: [
-          `Bonjour,`,
-          ``,
-          `Votre dossier d'adhésion SQY Ping a été relu et validé administrativement.`,
-          `Montant à régler : ${formatEuros(amountToPayCents)}.`,
-          ``,
-          `Paiement sécurisé Stripe : ${session.url}`,
-          ``,
-          `SQY Ping TeamUp`,
-        ].join("\n"),
-        html: `
-          <p>Bonjour,</p>
-          <p>Votre dossier d'adhésion SQY Ping a été relu et validé administrativement.</p>
-          <p><strong>Montant à régler : ${formatEuros(amountToPayCents)}</strong></p>
-          <p><a href="${session.url}">Procéder au paiement sécurisé Stripe</a></p>
-          <p>SQY Ping TeamUp</p>
-        `,
+        text: paymentMail.text,
+        html: paymentMail.html,
+        attachments: [getSqyPingLogoAttachment()],
       });
 
       logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_PAYMENT_REQUESTED, decoded.uid, {

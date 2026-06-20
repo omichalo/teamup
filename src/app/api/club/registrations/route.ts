@@ -4,33 +4,18 @@ import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
-import { normalizeMedicalCertificateStatus } from "@/lib/club-registration/medical-certificate";
+import {
+  listManagedRegistrations,
+  listPersonalRegistrations,
+  MANAGED_PAGE_SIZE_DEFAULT,
+  MANAGED_PAGE_SIZE_MAX,
+} from "@/lib/club-registration/list-registrations";
+import { resolveManagedListStatusFilter } from "@/lib/club-registration/registration-status";
+import { resolveManagedListMedicalCertificateFilter } from "@/lib/club-registration/medical-certificate";
 
-const COLLECTION = "clubRegistrations";
 const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
 
-/** Champs renvoyés en mode "liste" (synthèse, pas la totalité du dossier). */
-const LIST_FIELDS = [
-  "adherentRole",
-  "firstName",
-  "lastName",
-  "birthDate",
-  "isMinor",
-  "mainSectionId",
-  "medicalCertificateDeclaration",
-  "medicalCertificateStatus",
-  "status",
-  "submitterUid",
-  "submitterAccountEmail",
-  "paymentAmountCents",
-  "paymentStatus",
-  "paymentRequestedAt",
-  "paidAt",
-  "payment",
-  "pricingQuote",
-] as const;
-
-/** GET /api/club/registrations — liste personnelle ou, avec scope=managed, liste à traiter. */
+/** GET /api/club/registrations — liste personnelle ou, avec scope=managed, liste secrétariat. */
 export async function GET(req: Request) {
   try {
     const cookieStore = await cookies();
@@ -60,47 +45,45 @@ export async function GET(req: Request) {
       return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
     }
 
+    if (managedScope) {
+      const statusFilter = resolveManagedListStatusFilter(url.searchParams.get("status"));
+      const medicalCertificateFilter = resolveManagedListMedicalCertificateFilter(
+        url.searchParams.get("medicalCertificate")
+      );
+      const rawLimit = Number.parseInt(url.searchParams.get("limit") ?? "", 10);
+      const pageSize = Number.isFinite(rawLimit)
+        ? Math.min(Math.max(rawLimit, 1), MANAGED_PAGE_SIZE_MAX)
+        : MANAGED_PAGE_SIZE_DEFAULT;
+      const cursor = url.searchParams.get("cursor");
+      const searchQuery = url.searchParams.get("q");
+
+      const page = await listManagedRegistrations(db, {
+        statusFilter,
+        medicalCertificateFilter,
+        pageSize,
+        cursor,
+        searchQuery,
+      });
+
+      return jsonNoStore(
+        {
+          registrations: page.registrations,
+          pageInfo: {
+            hasNextPage: page.hasNextPage,
+            nextCursor: page.nextCursor,
+            searchMode: page.searchMode,
+            totalMatched: page.totalMatched ?? null,
+          },
+        },
+        { status: 200 }
+      );
+    }
+
     /* Tri en mémoire (un soumettant a typiquement <10 dossiers, on évite ainsi
        la dépendance à l'index composite `submitterUid + submittedAt desc`
        déclaré dans firestore.indexes.json mais qui peut ne pas être encore
-       déployé sur l'environnement courant). Limite serveur volontairement
-       plus large que la limite finale pour conserver les plus récents même
-       en cas de borderline. */
-    const snap = managedScope
-      ? await db.collection(COLLECTION).limit(200).get()
-      : await db
-          .collection(COLLECTION)
-          .where("submitterUid", "==", decoded.uid)
-          .limit(50)
-          .get();
-
-    const registrations = snap.docs
-      .map((doc) => {
-        const data = doc.data();
-        const summary: Record<string, unknown> = { id: doc.id };
-        for (const key of LIST_FIELDS) {
-          if (data[key] !== undefined) {
-            summary[key] = data[key];
-          }
-        }
-        summary.medicalCertificateStatus = normalizeMedicalCertificateStatus(
-          data.medicalCertificateStatus,
-          data.medicalCertificateDeclaration
-        );
-        const submittedAtMs: number = data.submittedAt?.toMillis?.() ?? 0;
-        summary.submittedAt =
-          data.submittedAt?.toDate?.()?.toISOString?.() ?? null;
-        summary.updatedAt = data.updatedAt?.toDate?.()?.toISOString?.() ?? null;
-        summary.paymentRequestedAt =
-          data.paymentRequestedAt?.toDate?.()?.toISOString?.() ?? null;
-        summary.paidAt = data.paidAt?.toDate?.()?.toISOString?.() ?? null;
-        summary.invoiceAvailable =
-          typeof data.stripeInvoiceId === "string" && data.stripeInvoiceId.length > 0;
-        return { summary, submittedAtMs };
-      })
-      .sort((a, b) => b.submittedAtMs - a.submittedAtMs)
-      .slice(0, 20)
-      .map((entry) => entry.summary);
+       déployé sur l'environnement courant). */
+    const { registrations } = await listPersonalRegistrations(db, decoded.uid);
 
     return jsonNoStore({ registrations }, { status: 200 });
   } catch (error) {

@@ -1,3 +1,4 @@
+import { SQYPING_EMAIL_APP_NAME } from "@/lib/email/brand";
 import * as nodemailer from "nodemailer";
 import type { Attachment } from "nodemailer/lib/mailer";
 
@@ -25,7 +26,7 @@ export async function sendMail(options: MailOptions): Promise<void> {
   const pass = getEnv("SMTP_PASS");
   const secure = String(process.env.SMTP_SECURE ?? "false").toLowerCase() === "true";
   const fromDefault =
-    process.env.SMTP_FROM || `SQY Ping TeamUp <${user}>`;
+    process.env.SMTP_FROM || `${SQYPING_EMAIL_APP_NAME} <${user}>`;
 
   const transporter = nodemailer.createTransport({
     host,

@@ -4,6 +4,7 @@ type RegistrationPricingRecord = {
   birthDate?: string;
   mainSectionId?: string;
   wantsCompetitorExtras?: boolean;
+  wantsOptionalJersey?: boolean;
   competitionIds?: string[];
   familyRegistrationOrder?: string;
   sex?: string;
@@ -48,6 +49,9 @@ export function buildPricingContextFromRecord(
     mainSectionId:
       typeof record.mainSectionId === "string" ? record.mainSectionId : "voisins",
     wantsCompetitorExtras,
+    wantsOptionalJersey: wantsCompetitorExtras
+      ? false
+      : Boolean(record.wantsOptionalJersey),
     competitionIds: Array.isArray(record.competitionIds)
       ? record.competitionIds.filter((id): id is string => typeof id === "string")
       : [],

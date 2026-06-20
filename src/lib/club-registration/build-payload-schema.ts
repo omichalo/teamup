@@ -128,6 +128,8 @@ export function buildRegistrationPayloadSchema(config: RegistrationConfigV1) {
       internalRulesAccepted: z.literal(true),
       wantsCompetitorExtras: z.boolean(),
       competitionJerseySize: z.enum(jerseySizes).optional(),
+      wantsOptionalJersey: z.boolean().default(false),
+      optionalJerseySize: z.enum(jerseySizes).optional(),
       competitionIds: z.array(z.enum(competitionIds)).default([]),
       applicantNotes: z.preprocess(
         (val) => (typeof val === "string" && val.trim() === "" ? undefined : val),
@@ -199,6 +201,31 @@ export function buildRegistrationPayloadSchema(config: RegistrationConfigV1) {
           code: z.ZodIssueCode.custom,
           message: "Taille de maillot obligatoire pour la section compétiteur",
           path: ["competitionJerseySize"],
+        });
+      }
+
+      if (data.wantsCompetitorExtras && data.wantsOptionalJersey) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "Le maillot optionnel ne s'applique pas avec l'inscription en section compétiteur",
+          path: ["wantsOptionalJersey"],
+        });
+      }
+
+      if (!data.wantsCompetitorExtras && data.wantsOptionalJersey && !data.optionalJerseySize) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Indiquez une taille de maillot pour la commande",
+          path: ["optionalJerseySize"],
+        });
+      }
+
+      if (!data.wantsOptionalJersey && data.optionalJerseySize) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "La taille de maillot optionnel ne s'applique pas sans commande de maillot",
+          path: ["optionalJerseySize"],
         });
       }
 
@@ -390,6 +417,7 @@ export function buildRegistrationPayloadSchema(config: RegistrationConfigV1) {
         birthDate: data.birthDate,
         mainSectionId: data.mainSectionId,
         wantsCompetitorExtras: data.wantsCompetitorExtras,
+        wantsOptionalJersey: data.wantsOptionalJersey,
         competitionIds: data.competitionIds,
         familyRegistrationOrder: data.familyRegistrationOrder,
         sex: data.sex,

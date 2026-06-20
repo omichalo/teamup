@@ -17,6 +17,7 @@ const PRICING_INPUT_FIELDS = [
   "birthDate",
   "mainSectionId",
   "wantsCompetitorExtras",
+  "wantsOptionalJersey",
   "competitionIds",
   "familyRegistrationOrder",
   "sex",

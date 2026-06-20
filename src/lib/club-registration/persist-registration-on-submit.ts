@@ -23,6 +23,7 @@ export function buildRegistrationSubmitDocument(params: {
     birthDate: payload.birthDate,
     mainSectionId: payload.mainSectionId,
     wantsCompetitorExtras: payload.wantsCompetitorExtras,
+    wantsOptionalJersey: payload.wantsOptionalJersey,
     competitionIds: payload.competitionIds,
     familyRegistrationOrder: payload.familyRegistrationOrder,
     sex: payload.sex,

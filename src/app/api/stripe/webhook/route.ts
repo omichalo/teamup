@@ -4,6 +4,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { jsonNoStore } from "@/lib/http/cache-headers";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { AUDIT_ACTIONS, logAuditAction } from "@/lib/auth/audit-logger";
+import { dispatchPaymentConfirmedEmail } from "@/lib/email/dispatch-payment-confirmed-email";
 import { verifyStripeWebhookSignature } from "@/lib/club-registration/stripe";
 import {
   normalizeRegistrationPayment,
@@ -48,6 +49,9 @@ export async function POST(req: Request) {
     const docRef = db.collection("clubRegistrations").doc(registrationId);
     const snap = await docRef.get();
     const existing = snap.data() ?? {};
+    if (existing.status === "paid") {
+      return jsonNoStore({ received: true, duplicate: true }, { status: 200 });
+    }
 
     const basePayment = normalizeRegistrationPayment(existing);
     const amountCents =
@@ -87,6 +91,22 @@ export async function POST(req: Request) {
       details: { eventId: event.id, checkoutSessionId: session?.id },
       success: true,
     });
+
+    if (amountCents > 0) {
+      try {
+        await dispatchPaymentConfirmedEmail({
+          registrationId,
+          data: {
+            ...existing,
+            stripeInvoiceId: session?.invoice ?? existing.stripeInvoiceId,
+          },
+          amountCents,
+          source: "stripe",
+        });
+      } catch (emailError) {
+        console.error("[api/stripe/webhook] payment confirmed email", emailError);
+      }
+    }
 
     return jsonNoStore({ received: true }, { status: 200 });
   } catch (error) {

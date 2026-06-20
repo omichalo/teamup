@@ -8,6 +8,7 @@ function ctx(
   return {
     mainSectionId: "voisins",
     wantsCompetitorExtras: false,
+    wantsOptionalJersey: false,
     competitionIds: [],
     familyRegistrationOrder: "none",
     sex: "male",

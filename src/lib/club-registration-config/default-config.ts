@@ -29,6 +29,11 @@ import type {
   RegistrationConfigV1,
   RegistrationSection,
 } from "./types";
+import {
+  DEFAULT_COMPETITOR_JERSEY_HELPER,
+  DEFAULT_JERSEY_CATALOG,
+  DEFAULT_OPTIONAL_JERSEY_OPT_IN_LABEL,
+} from "./repair-jersey";
 
 function sectionPricingProfile(id: string): RegistrationSection["pricingProfile"] {
   if (id === "handisport") return "handisport";
@@ -309,10 +314,11 @@ export function buildDefaultRegistrationConfig(): RegistrationConfigV1 {
       membershipLabelWithDiscounts: "Adhésion club (net après remises)",
       licenseLabel: "Licence FFTT",
       competitorJerseyInfoLabel:
-        "Maillot compétiteur inclus (renouvellement tous les deux ans)",
+        "Maillot compétiteur inclus dans l'adhésion (15 € — renouvellement tous les deux ans)",
       invoiceHeaderTemplate: "Adhésion {{clubName}} — dossier {{registrationId}}",
       discountCustomFieldName: "Remises sur adhésion",
     },
+    jersey: { ...DEFAULT_JERSEY_CATALOG },
     uiCopy: {
       schoolPickupService: {
         title: SCHOOL_PICKUP_SERVICE.title,
@@ -325,6 +331,8 @@ export function buildDefaultRegistrationConfig(): RegistrationConfigV1 {
         id: o.id,
         label: o.label,
       })),
+      competitorJerseyHelper: DEFAULT_COMPETITOR_JERSEY_HELPER,
+      optionalJerseyOptInLabel: DEFAULT_OPTIONAL_JERSEY_OPT_IN_LABEL,
     },
   };
 }

@@ -120,6 +120,8 @@ export function createEmptyDraft(): RegistrationDraft {
     rulesAccepted: false,
     wantsCompetitorExtras: false,
     competitionJerseySize: undefined,
+    wantsOptionalJersey: false,
+    optionalJerseySize: undefined,
     competitionIds: [],
     applicantNotes: "",
     paymentMethod: "" as PaymentMethodId | "",
