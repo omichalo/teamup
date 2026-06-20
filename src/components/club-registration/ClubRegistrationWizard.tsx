@@ -471,6 +471,14 @@ export function ClubRegistrationWizard({
         effectiveCompetitorExtras && draft.competitionJerseySize
           ? draft.competitionJerseySize
           : undefined,
+      wantsOptionalJersey:
+        !effectiveCompetitorExtras && draft.wantsOptionalJersey,
+      optionalJerseySize:
+        !effectiveCompetitorExtras &&
+        draft.wantsOptionalJersey &&
+        draft.optionalJerseySize
+          ? draft.optionalJerseySize
+          : undefined,
       competitionIds: effectiveCompetitorExtras ? draft.competitionIds : [],
       schoolPickupSlotIds: sanitizeSchoolPickupSlotIds(
         draft.slotIds,

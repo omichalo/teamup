@@ -1,8 +1,13 @@
 import crypto from "node:crypto";
+import { resolveAppOrigin } from "@/lib/auth/resolve-app-origin";
 import type {
   StripeCheckoutLineItem,
   StripeInvoiceCustomField,
 } from "@/lib/pricing/stripe-checkout-lines";
+import {
+  PAYMENT_METHOD_LABELS,
+  type PaymentMethodId,
+} from "@/lib/club-registration/payment-constants";
 
 export interface StripeCheckoutSession {
   id: string;
@@ -19,16 +24,9 @@ function requireEnv(name: string): string {
   return value;
 }
 
-export function getAppBaseUrl(req?: Request): string {
-  const configured = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
-  if (configured) {
-    return configured.replace(/\/$/, "");
-  }
-  if (req) {
-    const url = new URL(req.url);
-    return `${url.protocol}//${url.host}`;
-  }
-  throw new Error("Missing APP_URL or NEXT_PUBLIC_APP_URL");
+/** URL publique de l'app (Stripe success/cancel, etc.) — même logique que les mails Auth. */
+export function getAppBaseUrl(req: Request): string {
+  return resolveAppOrigin(req);
 }
 
 export async function createMembershipCheckoutSession(params: {
@@ -131,6 +129,34 @@ export type StripeInvoiceLinks = {
   invoicePdf: string | null;
 };
 
+type StripeInvoice = {
+  id: string;
+  hosted_invoice_url?: string | null;
+  invoice_pdf?: string | null;
+  error?: { message?: string };
+};
+
+async function postStripeForm<T>(
+  path: string,
+  body: URLSearchParams
+): Promise<T & { error?: { message?: string } }> {
+  const response = await fetch(`https://api.stripe.com${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${requireEnv("STRIPE_SECRET_KEY")}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+    cache: "no-store",
+  });
+
+  const json = (await response.json()) as T & { error?: { message?: string } };
+  if (!response.ok) {
+    throw new Error(json.error?.message ?? "Erreur Stripe");
+  }
+  return json;
+}
+
 /** Récupère les URLs publiques Stripe pour consulter / télécharger une facture. */
 export async function retrieveStripeInvoiceLinks(
   invoiceId: string
@@ -161,30 +187,89 @@ export async function retrieveStripeInvoiceLinks(
   };
 }
 
+/**
+ * Crée une facture Stripe "payée hors ligne" pour les encaissements manuels.
+ * Permet d'avoir un format de facture homogène (Checkout + hors Checkout).
+ */
+export async function createPaidOutOfBandInvoice(params: {
+  registrationId: string;
+  customerEmail: string;
+  amountCents: number;
+  description: string;
+}): Promise<{ invoiceId: string }> {
+  if (params.amountCents <= 0) {
+    throw new Error("Montant de facture invalide");
+  }
+
+  const customerBody = new URLSearchParams();
+  customerBody.set("email", params.customerEmail);
+  customerBody.set("metadata[registrationId]", params.registrationId);
+  const customer = await postStripeForm<{ id: string }>("/v1/customers", customerBody);
+
+  const invoiceItemBody = new URLSearchParams();
+  invoiceItemBody.set("customer", customer.id);
+  invoiceItemBody.set("currency", "eur");
+  invoiceItemBody.set("amount", String(params.amountCents));
+  invoiceItemBody.set("description", `Adhésion SQY Ping — dossier ${params.registrationId}`);
+  await postStripeForm<{ id: string }>("/v1/invoiceitems", invoiceItemBody);
+
+  const invoiceBody = new URLSearchParams();
+  invoiceBody.set("customer", customer.id);
+  invoiceBody.set("description", params.description);
+  invoiceBody.set("collection_method", "send_invoice");
+  invoiceBody.set("auto_advance", "false");
+  invoiceBody.set("metadata[registrationId]", params.registrationId);
+  const draftInvoice = await postStripeForm<StripeInvoice>("/v1/invoices", invoiceBody);
+
+  const finalizedInvoice = await postStripeForm<StripeInvoice>(
+    `/v1/invoices/${encodeURIComponent(draftInvoice.id)}/finalize`,
+    new URLSearchParams()
+  );
+
+  const payBody = new URLSearchParams();
+  payBody.set("paid_out_of_band", "true");
+  const paidInvoice = await postStripeForm<StripeInvoice>(
+    `/v1/invoices/${encodeURIComponent(finalizedInvoice.id)}/pay`,
+    payBody
+  );
+
+  return { invoiceId: paidInvoice.id };
+}
+
 /** URL à ouvrir côté adhérent : PDF si disponible, sinon page hébergée Stripe. */
 export function pickInvoiceDownloadUrl(links: StripeInvoiceLinks): string | null {
   return links.invoicePdf ?? links.hostedInvoiceUrl ?? null;
 }
 
 /**
- * Point d'extension pour le paiement CB multi-échéances.
- * V1 : paiement unique via Checkout ; installments > 1 → suivi manuel secrétariat.
+ * Point d'extension pour le paiement CB en ligne via Checkout.
+ * V1 : carte en une seule fois uniquement ; les autres modes passent en suivi secrétariat.
  */
 export async function createStripePaymentForRegistration(params: {
   registrationId: string;
   amountToPayCents: number;
   installments: number;
+  paymentMethod: PaymentMethodId;
 }): Promise<{ supported: boolean; reason?: string }> {
   if (params.amountToPayCents <= 0) {
     return { supported: false, reason: "Aucun montant à régler" };
   }
+
+  if (params.paymentMethod !== "card") {
+    return {
+      supported: false,
+      reason: `Mode « ${PAYMENT_METHOD_LABELS[params.paymentMethod]} » : pas de lien de paiement en ligne. Suivez les encaissements dans le tableau ci-dessous.`,
+    };
+  }
+
   if (params.installments > 1) {
     return {
       supported: false,
       reason:
-        "Paiement carte en plusieurs fois : pas encore de lien automatique. Le secrétariat suit les échéances dans le tableau ci-dessus.",
+        "Carte en plusieurs fois : envoyez chaque lien Stripe manuellement, puis suivez les échéances dans le tableau ci-dessus.",
     };
   }
+
   return { supported: true };
 }
 

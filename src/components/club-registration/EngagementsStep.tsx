@@ -104,10 +104,6 @@ export function EngagementsStep({ draft, onChange }: Props) {
           >
             Autorisations pour l’adhérent mineur
           </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Ces deux autorisations sont obligatoires pour l’inscription d’un
-            mineur. Elles ne sont pas affichées si l’adhérent est majeur.
-          </Typography>
           <Box data-field="emergencyMedicalAuthorization" tabIndex={-1}>
             <FormControlLabel
               control={

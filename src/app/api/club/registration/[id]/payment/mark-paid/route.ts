@@ -10,6 +10,7 @@ import {
   normalizeRegistrationPayment,
   paymentToFirestoreUpdate,
 } from "@/lib/club-registration/payment/normalize-payment";
+import { dispatchPaymentConfirmedEmail } from "@/lib/email/dispatch-payment-confirmed-email";
 import { markPaymentFullyPaid } from "@/lib/club-registration/payment/payment-mutations";
 
 const COLLECTION = "clubRegistrations";
@@ -38,10 +39,13 @@ export async function POST(
       return jsonNoStore({ error: "Dossier introuvable" }, { status: 404 });
     }
 
-    const payment = normalizeRegistrationPayment(snap.data() ?? {});
+    const data = snap.data() ?? {};
+    const payment = normalizeRegistrationPayment(data);
     if (!payment) {
       return jsonNoStore({ error: "Aucune donnée de paiement sur ce dossier" }, { status: 400 });
     }
+
+    const alreadyPaid = data.status === "paid" || payment.paymentStatus === "paid";
 
     const next = markPaymentFullyPaid(payment, {
       recordedBy: auth.uid,
@@ -66,6 +70,20 @@ export async function POST(
       details: { action: "payment_mark_paid" },
       success: true,
     });
+
+    if (!alreadyPaid && next.paidAmountCents > 0) {
+      try {
+        await dispatchPaymentConfirmedEmail({
+          registrationId: id,
+          data,
+          amountCents: next.paidAmountCents,
+          source: "secretariat",
+          req,
+        });
+      } catch (emailError) {
+        console.error("[api/club/registration/payment/mark-paid] confirmation email", emailError);
+      }
+    }
 
     return jsonNoStore({ payment: next }, { status: 200 });
   } catch (error) {

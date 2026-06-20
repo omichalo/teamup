@@ -210,8 +210,8 @@ export function MesInscriptionsClient() {
         {justCreated ? (
           <Alert severity="success">
             Votre demande pour <strong>{justCreated.firstName} {justCreated.lastName}</strong>
-            {" "}a bien été envoyée au club. Vous recevrez un retour sur l’adresse e-mail de
-            votre compte.
+            {" "}a bien été envoyée au club. Un e-mail de confirmation vous a été adressé à
+            l’adresse de votre compte.
           </Alert>
         ) : null}
 

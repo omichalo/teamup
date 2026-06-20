@@ -12,6 +12,7 @@ export type PriceLineKind =
   | "membership"
   | "fftt_license"
   | "competition"
+  | "addon"
   | "discount_family"
   | "discount_female_first"
   | "discount_aid"
@@ -34,6 +35,7 @@ export type PricingContext = {
   birthDate: string;
   mainSectionId: string;
   wantsCompetitorExtras: boolean;
+  wantsOptionalJersey: boolean;
   competitionIds: string[];
   familyRegistrationOrder: FamilyRegistrationOrder;
   sex: "female" | "male" | "other";

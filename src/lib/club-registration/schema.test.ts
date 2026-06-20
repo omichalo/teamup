@@ -54,6 +54,7 @@ function buildPayload(
     supervisionAcknowledgement: "not_applicable_adult",
     internalRulesAccepted: true,
     wantsCompetitorExtras: false,
+    wantsOptionalJersey: false,
     competitionIds: [],
     paymentMethod: "card" as const,
     paymentInstallments: 1,
@@ -301,6 +302,40 @@ describe("clubRegistrationPayloadSchema", () => {
         r.error.issues.some((i) => i.path.includes("competitionJerseySize"))
       ).toBe(true);
     }
+  });
+
+  it("accepte un maillot optionnel hors section compétiteur", () => {
+    const r = clubRegistrationPayloadSchema.safeParse(
+      buildPayload({
+        wantsOptionalJersey: true,
+        optionalJerseySize: "M",
+      })
+    );
+    expect(r.success).toBe(true);
+  });
+
+  it("refuse un maillot optionnel sans taille", () => {
+    const r = clubRegistrationPayloadSchema.safeParse(
+      buildPayload({ wantsOptionalJersey: true, optionalJerseySize: undefined })
+    );
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(r.error.issues.some((i) => i.path.includes("optionalJerseySize"))).toBe(
+        true
+      );
+    }
+  });
+
+  it("refuse maillot optionnel et section compétiteur simultanément", () => {
+    const r = clubRegistrationPayloadSchema.safeParse(
+      buildPayload({
+        wantsCompetitorExtras: true,
+        competitionJerseySize: "M",
+        wantsOptionalJersey: true,
+        optionalJerseySize: "M",
+      })
+    );
+    expect(r.success).toBe(false);
   });
 
   it("refuse un téléphone principal invalide", () => {

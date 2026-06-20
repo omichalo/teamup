@@ -6,6 +6,7 @@ function isPriceLineKind(value: unknown): value is PriceQuote["lines"][number]["
     value === "membership" ||
     value === "fftt_license" ||
     value === "competition" ||
+    value === "addon" ||
     value === "discount_family" ||
     value === "discount_female_first" ||
     value === "info"

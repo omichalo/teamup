@@ -126,7 +126,23 @@ export function AudienceStep({
           <FormControlLabel
             value="other_adult"
             control={<Radio />}
-            label="Un autre adulte (cas particulier&nbsp;: tutelle, etc.)"
+            label={
+              <Box component="span" sx={{ display: "block" }}>
+                <Typography component="span" variant="body2">
+                  Un autre adulte
+                </Typography>
+                <Typography
+                  component="span"
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ display: "block", mt: 0.25 }}
+                >
+                  Ex.&nbsp;: un membre de la famille (conjoint, parent majeur,
+                  enfant majeur…).
+                </Typography>
+              </Box>
+            }
+            sx={{ alignItems: "flex-start", "& .MuiRadio-root": { pt: 0.5 } }}
           />
         </RadioGroup>
       </FormControl>

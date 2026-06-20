@@ -331,6 +331,14 @@ export function calculateQuoteFromConfig(
       amountCents: 0,
       source: "catalog",
     });
+  } else if (ctx.wantsOptionalJersey && config.jersey.optionalPriceCents > 0) {
+    lines.push({
+      id: "optional_jersey",
+      kind: "addon",
+      label: config.jersey.optionalStripeLabel,
+      amountCents: config.jersey.optionalPriceCents,
+      source: "catalog",
+    });
   }
 
   const competitions = buildCompetitionLines(config, ctx.competitionIds);

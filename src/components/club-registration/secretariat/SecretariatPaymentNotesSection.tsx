@@ -15,7 +15,10 @@ import {
   MarkEmailRead as MarkEmailReadIcon,
   Save as SaveIcon,
 } from "@mui/icons-material";
-import type { PaymentMethodId } from "@/lib/club-registration/payment-constants";
+import {
+  PAYMENT_METHOD_LABELS,
+  type PaymentMethodId,
+} from "@/lib/club-registration/payment-constants";
 
 type Props = {
   amountEuros: string;
@@ -49,8 +52,8 @@ export function SecretariatPaymentNotesSection({
   onRequestPayment,
 }: Props) {
   const installments = paymentInstallments ?? 1;
-  const isMultiCard =
-    paymentMethod === "card" && installments > 1;
+  const isMultiCard = paymentMethod === "card" && installments > 1;
+  const canSendStripeEmail = paymentMethod === "card" && installments === 1;
 
   return (
     <>
@@ -60,10 +63,18 @@ export function SecretariatPaymentNotesSection({
 
       {isMultiCard ? (
         <Alert severity="info" variant="outlined">
-          Mode <strong>carte en {installments} fois</strong> : l’application ne envoie pas
-          encore un lien de paiement en ligne pour chaque échéance. Le tableau « Paiements
-          attendus » sert de feuille de route ; enregistrez les encaissements au fur et à
-          mesure (« Marquer reçu » ou « Ajouter un paiement reçu »).
+          Mode <strong>carte en {installments} fois</strong> : l’application envoie d’abord un
+          e-mail d’instructions avec l’échéancier. Ensuite, créez et transmettez{" "}
+          <strong>manuellement un lien Stripe</strong> (Dashboard ou lien de paiement) pour
+          chaque échéance, puis marquez-la reçue dans le tableau « Paiements attendus » lorsque
+          le webhook confirme le paiement.
+        </Alert>
+      ) : null}
+
+      {paymentMethod && paymentMethod !== "card" ? (
+        <Alert severity="info" variant="outlined">
+          Mode <strong>{PAYMENT_METHOD_LABELS[paymentMethod]}</strong> : aucun lien Stripe
+          ne sera envoyé. Utilisez le tableau de suivi pour noter les encaissements reçus.
         </Alert>
       ) : null}
 
@@ -122,9 +133,9 @@ export function SecretariatPaymentNotesSection({
         </Tooltip>
         <Tooltip
           title={
-            isMultiCard
-              ? "Enregistre le dossier puis bascule en suivi adapté : pas de lien de paiement automatique pour les cartes en plusieurs fois pour l’instant."
-              : "Enregistre le dossier puis envoie un e-mail au contact avec un lien sécurisé pour payer en ligne (une seule fois par carte)."
+            canSendStripeEmail
+              ? "Enregistre le dossier puis envoie un e-mail au contact avec un lien sécurisé Stripe (carte bancaire en une seule fois uniquement)."
+              : "Enregistre le dossier puis bascule en suivi adapté : pas de lien de paiement automatique pour ce mode de règlement."
           }
           slotProps={{ popper: { sx: { maxWidth: 340 } } }}
           {...tooltipEnterProps}

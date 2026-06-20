@@ -6,7 +6,6 @@ import {
   Box,
   Button,
   Card,
-  CardActions,
   CardContent,
   Checkbox,
   Chip,
@@ -29,7 +28,6 @@ import { PageHeader } from "@/components/ui";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import { getEnabledSections, getEnabledSites } from "@/lib/club-registration-config/helpers";
 import { formatRegistrationSiteLabel } from "@/lib/club-registration-config/site-display";
-import { normalizeReductionReferenceCodes } from "@/lib/club-registration/reduction-reference-codes";
 import { useRegistrationConfigValue } from "@/hooks/useRegistrationConfig";
 import {
   MEDICAL_CERTIFICATE_STATUS_LABELS,
@@ -38,17 +36,21 @@ import {
   normalizeMedicalCertificateStatus,
   type MedicalCertificateStatus,
 } from "@/lib/club-registration/medical-certificate";
+import {
+  REGISTRATION_STATUS_COLORS,
+  REGISTRATION_STATUS_LABELS,
+  type RegistrationStatus,
+} from "@/lib/club-registration/registration-status";
 import type { Representative } from "@/lib/club-registration/schema";
 import { APPLICANT_NOTES_MAX_LENGTH } from "@/lib/club-registration/applicant-notes";
-import { expandCompetitionIdsForForm } from "@/lib/club-registration/competition-ids";
 import {
   calculateQuote,
   buildPricingContext,
   formatCentsAsEuros,
   type FamilyRegistrationOrder,
-  type PriceQuote,
 } from "@/lib/pricing";
 import { PricingBreakdown } from "./PricingBreakdown";
+import { RegistrationCompetitionFields } from "./RegistrationCompetitionFields";
 import { ReductionReferenceCodeAdminFields } from "./ReductionReferenceCodeAdminFields";
 import { RegistrationMultiSelectField } from "./RegistrationMultiSelectField";
 import { SchoolPickupAdminFields } from "./SchoolPickupAdminFields";
@@ -56,127 +58,20 @@ import type { RegistrationDraft } from "./registration-defaults";
 import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
 import { calculatePaymentSummary } from "@/lib/club-registration/payment/calculate-payment-summary";
 import { normalizePaymentAidList } from "@/lib/club-registration/payment/payment-draft-helpers";
-import type { PaymentAid, RegistrationPayment } from "@/lib/club-registration/payment/types";
-import { PaymentSummaryCard } from "./secretariat/PaymentSummaryCard";
 import { PaymentTrackingSection } from "./secretariat/PaymentTrackingSection";
 import { SecretariatPaymentNotesSection } from "./secretariat/SecretariatPaymentNotesSection";
-
-type RegistrationSummary = {
-  id: string;
-  firstName?: string;
-  lastName?: string;
-  submitterAccountEmail?: string;
-  mainSectionId?: string;
-  medicalCertificateDeclaration?: string;
-  medicalCertificateStatus?: MedicalCertificateStatus;
-  status?: string;
-  paymentAmountCents?: number;
-  pricingQuote?: PriceQuote;
-  pricingQuoteStatus?: string;
-  pricingQuoteComputedAt?: string | null;
-  /** Ancien champ — lecture seule pour dossiers déjà enregistrés. */
-  handisportPracticeLevel?: "leisure" | "competition";
-  paymentStatus?: string;
-  payment?: RegistrationPayment;
-  submittedAt?: string | null;
-  updatedAt?: string | null;
-};
-
-type RegistrationDetail = RegistrationSummary & {
-  adherentRole?: "self" | "minor_dependent" | "other_adult";
-  sex?: "female" | "male" | "other";
-  birthCity?: string;
-  birthDate?: string;
-  adherentEmail?: string;
-  adherentPhonePrimary?: string;
-  adherentPhoneSecondary?: string;
-  addressLine1?: string;
-  addressLine2?: string;
-  postalCode?: string;
-  city?: string;
-  representatives?: Representative[];
-  additionalSectionIds?: string[];
-  slotIds?: string[];
-  schoolPickupSlotIds?: string[];
-  medicalCertificateStatusUpdatedAt?: string | null;
-  medicalCertificateStatusUpdatedBy?: string;
-  wantsRegistrationCertificate?: boolean;
-  familyRegistrationOrder?: string;
-  reductionTypes?: string[];
-  reductionReferenceCodes?: Record<string, string>;
-  passSportCode?: string;
-  firstFemaleRegistrationSqy?: boolean;
-  photoConsent?: "accept" | "refuse";
-  emergencyMedicalAuthorization?: "yes" | "not_applicable_adult";
-  supervisionAcknowledgement?: "yes" | "not_applicable_adult";
-  internalRulesAccepted?: boolean;
-  wantsCompetitorExtras?: boolean;
-  competitionJerseySize?: string;
-  competitionIds?: string[];
-  applicantNotes?: string;
-  reviewNotes?: string;
-  paymentEmailSentTo?: string;
-  stripeCheckoutUrl?: string;
-  payment?: RegistrationPayment;
-  paymentAids?: PaymentAid[];
-};
-
-type EditableRegistration = {
-  adherentRole: "self" | "minor_dependent" | "other_adult";
-  firstName: string;
-  lastName: string;
-  sex: "female" | "male" | "other";
-  birthCity: string;
-  birthDate: string;
-  adherentEmail: string;
-  adherentPhonePrimary: string;
-  adherentPhoneSecondary: string;
-  addressLine1: string;
-  addressLine2: string;
-  postalCode: string;
-  city: string;
-  representatives: Representative[];
-  mainSectionId: string;
-  additionalSectionIds: string[];
-  slotIds: string[];
-  schoolPickupSlotIds: string[];
-  medicalCertificateDeclaration: string;
-  medicalCertificateStatus: MedicalCertificateStatus;
-  wantsRegistrationCertificate: boolean;
-  familyRegistrationOrder: string;
-  reductionTypes: string[];
-  reductionReferenceCodes: Record<string, string>;
-  firstFemaleRegistrationSqy: boolean | undefined;
-  photoConsent: "accept" | "refuse";
-  emergencyMedicalAuthorization: "yes" | "not_applicable_adult";
-  supervisionAcknowledgement: "yes" | "not_applicable_adult";
-  internalRulesAccepted: boolean;
-  wantsCompetitorExtras: boolean;
-  competitionJerseySize: string;
-  competitionIds: string[];
-  applicantNotes: string;
-  reviewNotes: string;
-  amountEuros: string;
-  paymentAids: PaymentAid[];
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  submitted: "A relire",
-  in_review: "En relecture",
-  payment_requested: "Paiement demandé",
-  paid: "Payé",
-  approved: "Approuvé",
-  rejected: "Refusé",
-};
-
-const STATUS_COLOR: Record<string, "default" | "info" | "warning" | "success" | "error"> = {
-  submitted: "warning",
-  in_review: "info",
-  payment_requested: "info",
-  paid: "success",
-  approved: "success",
-  rejected: "error",
-};
+import {
+  RegistrationFfttFields,
+  RegistrationMedicalDossierDetail,
+  RegistrationSubmissionContext,
+} from "./membership-requests/RegistrationSupplementarySections";
+import { toEditableRegistration } from "./membership-requests/to-editable-registration";
+import { MembershipRequestsListPanel } from "./membership-requests/MembershipRequestsListPanel";
+import { useManagedRegistrations } from "./membership-requests/useManagedRegistrations";
+import type {
+  EditableRegistration,
+  RegistrationDetail,
+} from "./membership-requests/types";
 
 const ADHERENT_ROLE_OPTIONS = [
   { value: "self", label: "L'adhérent lui-même" },
@@ -213,16 +108,6 @@ const MEDICAL_OPTIONS = [
     label: "Au moins une réponse Oui : certificat requis",
   },
 ] as const;
-
-const MEDICAL_CERTIFICATE_STATUS_COLOR: Record<
-  MedicalCertificateStatus,
-  "default" | "info" | "warning" | "success"
-> = {
-  not_required: "default",
-  required_not_received: "warning",
-  received: "info",
-  validated: "success",
-};
 
 const MEDICAL_CERTIFICATE_STATUS_OPTIONS =
   MEDICAL_CERTIFICATE_STATUS_VALUES.map((value) => ({
@@ -267,74 +152,12 @@ function createEmptyRepresentative(): Representative {
   };
 }
 
-function toEditable(
-  registration: RegistrationDetail,
-  config: RegistrationConfigV1
-): EditableRegistration {
-  return {
-    adherentRole: registration.adherentRole ?? "self",
-    firstName: registration.firstName ?? "",
-    lastName: registration.lastName ?? "",
-    sex: registration.sex ?? "other",
-    birthCity: registration.birthCity ?? "",
-    birthDate: registration.birthDate ?? "",
-    adherentEmail: registration.adherentEmail ?? "",
-    adherentPhonePrimary: registration.adherentPhonePrimary ?? "",
-    adherentPhoneSecondary: registration.adherentPhoneSecondary ?? "",
-    addressLine1: registration.addressLine1 ?? "",
-    addressLine2: registration.addressLine2 ?? "",
-    postalCode: registration.postalCode ?? "",
-    city: registration.city ?? "",
-    representatives: registration.representatives ?? [],
-    mainSectionId:
-      registration.mainSectionId ??
-      getEnabledSections(config)[0]?.id ??
-      "voisins",
-    additionalSectionIds: registration.additionalSectionIds ?? [],
-    slotIds: registration.slotIds ?? [],
-    schoolPickupSlotIds: registration.schoolPickupSlotIds ?? [],
-    medicalCertificateDeclaration:
-      registration.medicalCertificateDeclaration ?? "under_40_all_no",
-    medicalCertificateStatus: normalizeMedicalCertificateStatus(
-      registration.medicalCertificateStatus,
-      registration.medicalCertificateDeclaration
-    ),
-    wantsRegistrationCertificate: registration.wantsRegistrationCertificate ?? false,
-    familyRegistrationOrder: registration.familyRegistrationOrder ?? "none",
-    reductionTypes: registration.reductionTypes ?? [],
-    reductionReferenceCodes: normalizeReductionReferenceCodes(
-      registration.reductionReferenceCodes,
-      registration.passSportCode
-    ),
-    firstFemaleRegistrationSqy: registration.firstFemaleRegistrationSqy,
-    photoConsent: registration.photoConsent ?? "refuse",
-    emergencyMedicalAuthorization:
-      registration.emergencyMedicalAuthorization ?? "not_applicable_adult",
-    supervisionAcknowledgement:
-      registration.supervisionAcknowledgement ?? "not_applicable_adult",
-    internalRulesAccepted: registration.internalRulesAccepted ?? false,
-    wantsCompetitorExtras:
-      registration.wantsCompetitorExtras ??
-      registration.handisportPracticeLevel === "competition",
-    competitionJerseySize: registration.competitionJerseySize ?? "",
-    competitionIds: expandCompetitionIdsForForm(registration.competitionIds ?? []),
-    applicantNotes: registration.applicantNotes ?? "",
-    reviewNotes: registration.reviewNotes ?? "",
-    amountEuros:
-      typeof registration.paymentAmountCents === "number"
-        ? String(registration.paymentAmountCents / 100)
-        : "",
-    paymentAids: normalizePaymentAidList(
-      (registration.paymentAids as PaymentAid[] | undefined) ?? []
-    ),
-  };
-}
-
 function formToPricingInput(form: EditableRegistration) {
   const input: Parameters<typeof buildPricingContext>[0] = {
     birthDate: form.birthDate,
     mainSectionId: form.mainSectionId,
     wantsCompetitorExtras: form.wantsCompetitorExtras,
+    wantsOptionalJersey: form.wantsCompetitorExtras ? false : form.wantsOptionalJersey,
     competitionIds: form.competitionIds,
     familyRegistrationOrder: form.familyRegistrationOrder as FamilyRegistrationOrder,
     sex: form.sex,
@@ -355,6 +178,20 @@ function parseAmountCents(value: string): number | null {
   return Math.round(amount * 100);
 }
 
+function registrationStatusChipProps(status: string | undefined): {
+  label: string;
+  color: "default" | "info" | "warning" | "success" | "error";
+} {
+  if (status && status in REGISTRATION_STATUS_LABELS) {
+    const known = status as RegistrationStatus;
+    return {
+      label: REGISTRATION_STATUS_LABELS[known],
+      color: REGISTRATION_STATUS_COLORS[known],
+    };
+  }
+  return { label: status ?? "Statut inconnu", color: "default" };
+}
+
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
     <Typography variant="h6" fontWeight={800} sx={{ color: "primary.main" }}>
@@ -370,39 +207,30 @@ export function MembershipRequestsClient() {
   const reductionOptions = config.aidRules;
   const jerseySizes = config.uiCopy.jerseySizes;
   const allSlotOptions = buildSlotOptions(config);
-  const [registrations, setRegistrations] = useState<RegistrationSummary[]>([]);
+  const {
+    statusFilter,
+    setStatusFilter,
+    medicalCertificateFilter,
+    setMedicalCertificateFilter,
+    searchInput,
+    setSearchInput,
+    registrations,
+    pageInfo,
+    loadingList,
+    loadingMore,
+    error: listError,
+    reload,
+    loadMore,
+  } = useManagedRegistrations();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selected, setSelected] = useState<RegistrationDetail | null>(null);
   const [form, setForm] = useState<EditableRegistration | null>(null);
-  const [loadingList, setLoadingList] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [saving, setSaving] = useState(false);
   const [requestingPayment, setRequestingPayment] = useState(false);
   const [persistingQuote, setPersistingQuote] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-
-  const fetchRegistrations = useCallback(async () => {
-    setLoadingList(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/club/registrations?scope=managed", {
-        credentials: "include",
-      });
-      const json = await res.json();
-      if (!res.ok || json.error) {
-        throw new Error(json.error || "Impossible de charger les demandes.");
-      }
-      setRegistrations(json.registrations ?? []);
-      if (!selectedId && json.registrations?.[0]?.id) {
-        setSelectedId(json.registrations[0].id);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erreur de chargement.");
-    } finally {
-      setLoadingList(false);
-    }
-  }, [selectedId]);
 
   const fetchDetail = useCallback(async (id: string) => {
     setLoadingDetail(true);
@@ -415,8 +243,12 @@ export function MembershipRequestsClient() {
       if (!res.ok || json.error) {
         throw new Error(json.error || "Impossible de charger le dossier.");
       }
-      setSelected(json.registration);
-      setForm(toEditable(json.registration, config));
+      const registration = json.registration as RegistrationDetail;
+      const payment =
+        registration.payment ??
+        normalizeRegistrationPayment(registration as unknown as Record<string, unknown>);
+      setSelected(registration);
+      setForm(toEditableRegistration(registration, config, payment));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur de chargement.");
       setSelected(null);
@@ -427,8 +259,14 @@ export function MembershipRequestsClient() {
   }, [config]);
 
   useEffect(() => {
-    void fetchRegistrations();
-  }, [fetchRegistrations]);
+    if (registrations.length === 0) {
+      setSelectedId(null);
+      return;
+    }
+    if (!selectedId || !registrations.some((registration) => registration.id === selectedId)) {
+      setSelectedId(registrations[0].id);
+    }
+  }, [registrations, selectedId]);
 
   useEffect(() => {
     if (selectedId) {
@@ -558,6 +396,7 @@ export function MembershipRequestsClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           adherentRole: form.adherentRole,
+          ffttLicense: form.ffttLicense.trim() || undefined,
           firstName: form.firstName,
           lastName: form.lastName,
           sex: form.sex,
@@ -591,6 +430,11 @@ export function MembershipRequestsClient() {
           internalRulesAccepted: form.internalRulesAccepted,
           wantsCompetitorExtras: form.wantsCompetitorExtras,
           competitionJerseySize: form.competitionJerseySize || undefined,
+          wantsOptionalJersey: form.wantsCompetitorExtras ? false : form.wantsOptionalJersey,
+          optionalJerseySize:
+            !form.wantsCompetitorExtras && form.wantsOptionalJersey
+              ? form.optionalJerseySize || undefined
+              : undefined,
           competitionIds: form.competitionIds,
           applicantNotes: form.applicantNotes.trim() || undefined,
           reviewNotes: form.reviewNotes,
@@ -602,7 +446,7 @@ export function MembershipRequestsClient() {
         throw new Error(json.error || "Impossible d'enregistrer les corrections.");
       }
       setSuccess("Dossier mis à jour.");
-      await Promise.all([fetchRegistrations(), fetchDetail(selectedId)]);
+      await Promise.all([reload(), fetchDetail(selectedId)]);
       return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur d'enregistrement.");
@@ -654,7 +498,7 @@ export function MembershipRequestsClient() {
         updateField("amountEuros", String(json.paymentAmountCents / 100));
       }
       setSuccess("Devis enregistré et montant à régler mis à jour.");
-      await Promise.all([fetchRegistrations(), fetchDetail(selectedId)]);
+      await Promise.all([reload(), fetchDetail(selectedId)]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur lors de l'enregistrement du devis.");
     } finally {
@@ -689,14 +533,18 @@ export function MembershipRequestsClient() {
       if (!res.ok || json.error) {
         throw new Error(json.error || "Impossible d'envoyer la demande de paiement.");
       }
-      if (json.manualFollowUp === true && typeof json.message === "string") {
-        setSuccess(json.message);
+      if (json.manualFollowUp === true) {
+        setSuccess(
+          typeof json.message === "string"
+            ? json.message
+            : "Dossier validé. Un e-mail d'instructions de règlement a été envoyé au contact du dossier."
+        );
       } else {
         setSuccess(
           "Un e-mail avec un lien de paiement sécurisé a été envoyé au contact du dossier."
         );
       }
-      await Promise.all([fetchRegistrations(), fetchDetail(selectedId)]);
+      await Promise.all([reload(), fetchDetail(selectedId)]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur lors de la demande de paiement.");
     } finally {
@@ -710,12 +558,12 @@ export function MembershipRequestsClient() {
         <PageHeader
           eyebrow="Secrétariat"
           title="Demandes d'adhésion"
-          subtitle="Relisez le dossier, vérifiez le montant, puis demandez le paiement : un e-mail avec lien sécurisé part si le mode le permet (carte en une fois). Sinon, suivez les encaissements depuis le tableau ci-dessous."
+          subtitle="Relisez le dossier, vérifiez le montant, puis demandez le paiement : un e-mail avec lien Stripe part uniquement pour la carte bancaire en une fois. Les autres modes sont suivis manuellement dans le tableau ci-dessous."
           actions={
             <Button
               variant="outlined"
               startIcon={<RefreshIcon />}
-              onClick={() => fetchRegistrations()}
+              onClick={() => reload()}
               disabled={loadingList}
             >
               Actualiser
@@ -723,6 +571,9 @@ export function MembershipRequestsClient() {
           }
         />
 
+        {listError ? (
+          <Alert severity="error">{listError}</Alert>
+        ) : null}
         {error ? <Alert severity="error" onClose={() => setError(null)}>{error}</Alert> : null}
         {success ? (
           <Alert severity="success" onClose={() => setSuccess(null)}>{success}</Alert>
@@ -730,79 +581,21 @@ export function MembershipRequestsClient() {
 
         <Grid container spacing={3}>
           <Grid size={{ xs: 12, md: 4 }}>
-            <Stack spacing={1.5}>
-              {loadingList ? (
-                <Box sx={{ display: "flex", justifyContent: "center", py: 5 }}>
-                  <CircularProgress />
-                </Box>
-              ) : registrations.length === 0 ? (
-                <Alert severity="info">Aucune demande d&apos;adhésion pour le moment.</Alert>
-              ) : (
-                registrations.map((registration) => {
-                  const active = registration.id === selectedId;
-                  return (
-                    <Card
-                      key={registration.id}
-                      variant={active ? "elevation" : "outlined"}
-                      sx={{
-                        borderColor: active ? "primary.main" : undefined,
-                        cursor: "pointer",
-                      }}
-                      onClick={() => setSelectedId(registration.id)}
-                    >
-                      <CardContent sx={{ pb: 1 }}>
-                        <Stack spacing={1}>
-                          <Stack direction="row" justifyContent="space-between" spacing={1}>
-                            <Typography variant="subtitle1" fontWeight={700}>
-                              {registration.firstName ?? "-"} {registration.lastName ?? ""}
-                            </Typography>
-                            <Chip
-                              size="small"
-                              label={STATUS_LABEL[registration.status ?? ""] ?? "Statut inconnu"}
-                              color={STATUS_COLOR[registration.status ?? ""] ?? "default"}
-                            />
-                          </Stack>
-                          <Typography variant="body2" color="text.secondary">
-                            {registration.submitterAccountEmail ?? "E-mail compte inconnu"}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Envoyé le {formatDate(registration.submittedAt)}
-                          </Typography>
-                          {registration.medicalCertificateStatus &&
-                          registration.medicalCertificateStatus !== "not_required" ? (
-                            <Chip
-                              size="small"
-                              variant="outlined"
-                              label={
-                                MEDICAL_CERTIFICATE_STATUS_LABELS[
-                                  registration.medicalCertificateStatus
-                                ]
-                              }
-                              color={
-                                MEDICAL_CERTIFICATE_STATUS_COLOR[
-                                  registration.medicalCertificateStatus
-                                ]
-                              }
-                              sx={{ alignSelf: "flex-start" }}
-                            />
-                          ) : null}
-                        </Stack>
-                      </CardContent>
-                      <CardActions sx={{ px: 2, pt: 0, pb: 1.5, flexDirection: "column", alignItems: "stretch" }}>
-                        <PaymentSummaryCard
-                          payment={
-                            registration.payment ??
-                            normalizeRegistrationPayment(
-                              registration as unknown as Record<string, unknown>
-                            )
-                          }
-                        />
-                      </CardActions>
-                    </Card>
-                  );
-                })
-              )}
-            </Stack>
+            <MembershipRequestsListPanel
+              registrations={registrations}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              statusFilter={statusFilter}
+              onStatusFilterChange={setStatusFilter}
+              medicalCertificateFilter={medicalCertificateFilter}
+              onMedicalCertificateFilterChange={setMedicalCertificateFilter}
+              searchInput={searchInput}
+              onSearchInputChange={setSearchInput}
+              pageInfo={pageInfo}
+              loadingList={loadingList}
+              loadingMore={loadingMore}
+              onLoadMore={() => void loadMore()}
+            />
           </Grid>
 
           <Grid size={{ xs: 12, md: 8 }}>
@@ -832,12 +625,26 @@ export function MembershipRequestsClient() {
                         </Typography>
                       </Box>
                       <Chip
-                        label={STATUS_LABEL[selectedSummary?.status ?? selected.status ?? ""] ?? selected.status}
-                        color={STATUS_COLOR[selectedSummary?.status ?? selected.status ?? ""] ?? "default"}
+                        label={
+                          registrationStatusChipProps(
+                            selectedSummary?.status ?? selected.status
+                          ).label
+                        }
+                        color={
+                          registrationStatusChipProps(
+                            selectedSummary?.status ?? selected.status
+                          ).color
+                        }
                       />
                     </Stack>
 
                     <Divider />
+
+                    <RegistrationSubmissionContext
+                      submitterAccountEmail={selected.submitterAccountEmail}
+                      submittedAt={selected.submittedAt}
+                      updatedAt={selected.updatedAt}
+                    />
 
                     <SectionTitle>Identité et type d&apos;inscription</SectionTitle>
                     <Grid container spacing={2}>
@@ -876,6 +683,12 @@ export function MembershipRequestsClient() {
                         </Grid>
                       ) : null}
                     </Grid>
+
+                    <RegistrationFfttFields
+                      ffttLicense={form.ffttLicense}
+                      lookup={selected.ffttLicenseLookup}
+                      onLicenseChange={(value) => updateField("ffttLicense", value)}
+                    />
 
                     <SectionTitle>Contact et adresse</SectionTitle>
                     <Grid container spacing={2}>
@@ -989,6 +802,7 @@ export function MembershipRequestsClient() {
 
                     <SectionTitle>Dossier administratif</SectionTitle>
                     <Grid container spacing={2}>
+                      <RegistrationMedicalDossierDetail registration={selected} />
                       <Grid size={{ xs: 12, sm: 6 }}>
                         <TextField select label="Déclaration médicale" value={form.medicalCertificateDeclaration} onChange={(e) => updateMedicalDeclaration(e.target.value)} fullWidth>
                           {MEDICAL_OPTIONS.map((option) => (
@@ -1095,33 +909,13 @@ export function MembershipRequestsClient() {
                     </Grid>
 
                     <SectionTitle>Compétition</SectionTitle>
-                    <Grid container spacing={2}>
-                      <Grid size={{ xs: 12, sm: 6 }}>
-                        <FormControlLabel
-                          control={<Checkbox checked={form.wantsCompetitorExtras} onChange={(e) => updateField("wantsCompetitorExtras", e.target.checked)} />}
-                          label="Options compétiteur"
-                        />
-                      </Grid>
-                      <Grid size={{ xs: 12, sm: 6 }}>
-                        <TextField select label="Taille maillot compétition" value={form.competitionJerseySize} onChange={(e) => updateField("competitionJerseySize", e.target.value)} fullWidth>
-                          <MenuItem value="">Non renseignée</MenuItem>
-                          {jerseySizes.map((size) => (
-                            <MenuItem key={size} value={size}>{size}</MenuItem>
-                          ))}
-                        </TextField>
-                      </Grid>
-                      <Grid size={{ xs: 12 }}>
-                        <RegistrationMultiSelectField
-                          label="Compétitions demandées"
-                          value={form.competitionIds}
-                          options={competitionOptions.map((competition) => ({
-                            value: competition.id,
-                            label: competition.formLabel,
-                          }))}
-                          onChange={(value) => updateField("competitionIds", value)}
-                        />
-                      </Grid>
-                    </Grid>
+                    <RegistrationCompetitionFields
+                      config={config}
+                      form={form}
+                      jerseySizes={jerseySizes}
+                      competitionOptions={competitionOptions}
+                      onFieldChange={updateField}
+                    />
 
                     <SectionTitle>Tarification</SectionTitle>
                     <Stack spacing={2}>
@@ -1130,6 +924,7 @@ export function MembershipRequestsClient() {
                           birthDate: form.birthDate,
                           mainSectionId: form.mainSectionId,
                           wantsCompetitorExtras: form.wantsCompetitorExtras,
+                          wantsOptionalJersey: form.wantsOptionalJersey,
                           competitionIds: form.competitionIds,
                           familyRegistrationOrder:
                             form.familyRegistrationOrder as RegistrationDraft["familyRegistrationOrder"],
@@ -1212,7 +1007,7 @@ export function MembershipRequestsClient() {
                         payment={selectedPayment}
                         onRefresh={async () => {
                           if (selectedId) await fetchDetail(selectedId);
-                          await fetchRegistrations();
+                          await reload();
                         }}
                       />
                     ) : null}

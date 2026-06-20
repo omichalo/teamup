@@ -103,7 +103,7 @@ Dans **Authentication** → **Templates** (ou paramètres email du projet), vér
 
 - `https://teamup-staging--sqyping-teamup-dev.us-east4.hosted.app/auth/verify-email`
 
-Sans cela, les liens générés par Firebase peuvent contenir `continueUrl=localhost` même depuis staging. Le code serveur force aussi le `continueUrl` dans les liens oob (`resolve-app-origin` + `withActionContinueUrl`).
+Sans cela, les liens générés par Firebase peuvent contenir `continueUrl=localhost` même depuis staging. Côté serveur, les routes `/api/auth/send-verification` et `send-password-reset` envoient un **lien direct** vers l’app (`/auth/verify-email?oobCode=…` ou `/reset-password?oobCode=…`) via `buildDirectAppActionLink`, et `resolveAppOrigin` ignore les `APP_URL` localhost en hébergé (secours par `NEXT_PUBLIC_FIREBASE_PROJECT_ID`).
 
 ## 5. Stripe (mode test)
 

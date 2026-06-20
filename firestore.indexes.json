@@ -33,12 +33,12 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "submitterUid",
+          "fieldPath": "status",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "status",
-          "order": "ASCENDING"
+          "fieldPath": "submittedAt",
+          "order": "DESCENDING"
         }
       ]
     }

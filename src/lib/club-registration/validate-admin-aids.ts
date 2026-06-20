@@ -14,6 +14,7 @@ type DraftSlice = Pick<
   | "birthDate"
   | "mainSectionId"
   | "wantsCompetitorExtras"
+  | "wantsOptionalJersey"
   | "competitionIds"
   | "familyRegistrationOrder"
   | "sex"
@@ -30,6 +31,7 @@ function quoteTotalCents(draft: DraftSlice): number | null {
       birthDate: draft.birthDate,
       mainSectionId: draft.mainSectionId,
       wantsCompetitorExtras: draft.wantsCompetitorExtras,
+      wantsOptionalJersey: draft.wantsOptionalJersey,
       competitionIds: draft.competitionIds,
       familyRegistrationOrder: draft.familyRegistrationOrder,
       sex,

@@ -205,13 +205,15 @@ export const REDUCTION_OPTIONS = [
   { id: "aide_municipale", label: "Aide municipale" },
 ] as const;
 
-/** Liens officiels (questionnaires, communication club). */
+/** PDF officiels servis depuis `public/club-registration/`. */
+export const CLUB_REGISTRATION_DOCUMENTS = {
+  questionnaireMajeur: "/club-registration/questionnaire-medical-majeur.pdf",
+  questionnaireMineur: "/club-registration/questionnaire-medical-mineur.pdf",
+  reglementInterieur: "/club-registration/reglement-interieur-sqy-ping-2019.pdf",
+} as const;
+
+/** Liens utilisés dans le parcours d'inscription (documents locaux + site club). */
 export const CLUB_REGISTRATION_EXTERNAL_LINKS = {
-  questionnaireMajeur:
-    "https://cdn.prod.website-files.com/66e06edc471d4cd7cfe7d477/683f5edfa870f40a5e55c621_25-10-1-autoquestionnaire-medical-majeur.pdf",
-  questionnaireMineur:
-    "https://cdn.prod.website-files.com/66e06edc471d4cd7cfe7d477/683f5e0a8729cf962d616d7f_25-10-2-autoquestionnaire-medical-mineur.pdf",
+  ...CLUB_REGISTRATION_DOCUMENTS,
   siteClub: "https://www.sqyping.fr",
-  reglementInterieur:
-    "https://sqyping-my.sharepoint.com/:b:/r/personal/salome_nizan_sqyping_onmicrosoft_com/Documents/Voisins%20TT/Bureau%20-%20Administratif/Docs%20officiels%20club/R%C3%A8glement%20Int%C3%A9rieur/R%C3%A8glement%20Int%C3%A9rieur%20SQY%20PING%202019.pdf?csf=1&web=1&e=dbwOno",
 } as const;

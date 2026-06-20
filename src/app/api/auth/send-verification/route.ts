@@ -1,15 +1,15 @@
 import { jsonNoStore } from "@/lib/http/cache-headers";
 import { adminAuth } from "@/lib/firebase-admin";
+import { buildVerificationEmail } from "@/lib/email/auth-emails";
+import { getSqyPingLogoAttachment } from "@/lib/email/logo-attachment";
 import { sendMail } from "@/lib/mailer";
-import { readFile } from "fs/promises";
-import path from "path";
 import { getFirebaseErrorMessage } from "@/lib/firebase-error-utils";
 import { checkRateLimit } from "@/lib/auth/rate-limit";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
 import {
+  buildDirectAppActionLink,
   isAuthOriginDebugEnabled,
   resolveAppOrigin,
-  withActionContinueUrl,
 } from "@/lib/auth/resolve-app-origin";
 
 export const runtime = "nodejs";
@@ -77,12 +77,13 @@ export async function POST(req: Request) {
     // Générer le lien de vérification via Firebase Admin
     let link: string;
     try {
-      link = withActionContinueUrl(
+      link = buildDirectAppActionLink(
         await adminAuth.generateEmailVerificationLink(email, {
           url: redirectUrl,
           handleCodeInApp: false,
         }),
-        redirectUrl
+        origin,
+        "/auth/verify-email"
       );
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
@@ -125,38 +126,19 @@ export async function POST(req: Request) {
       console.log("[send-verification] Generated link:", link);
     }
 
-    // Charger le template HTML et injecter le lien
-    const templatePath = path.join(
-      process.cwd(),
-      "emails",
-      "email-verification.html"
-    );
-    const logoPath = path.join(process.cwd(), "public", "sqyping-logo.jpg");
-    const htmlTemplate = await readFile(templatePath, "utf8");
-    // Remplacer le lien d'action et injecter le CID du logo
-    const html = htmlTemplate
-      .replace(/{{actionUrl}}/g, link)
-      .replace(
-        /https:\/\/sqyping-live-scoring\.web\.app\/sqyping-logo\.jpg/g,
-        "cid:logo-sqyping"
-      )
-      .replace(/\/sqyping-logo\.jpg/g, "cid:logo-sqyping");
+    const { html, text } = buildVerificationEmail({
+      actionUrl: link,
+      appOrigin: origin,
+    });
 
     // Envoyer l'email
     try {
       await sendMail({
         to: email,
-        subject: "Vérification de votre adresse email",
+        subject: "Vérification de votre adresse e-mail",
         html,
-        attachments: [
-          {
-            filename: "sqyping-logo.jpg",
-            path: logoPath,
-            cid: "logo-sqyping",
-            contentType: "image/jpeg",
-          },
-        ],
-        text: `Bonjour,\n\nMerci de vérifier votre adresse email en cliquant sur ce lien: ${link}\n\nSQY Ping TeamUp`,
+        text,
+        attachments: [getSqyPingLogoAttachment()],
       });
     } catch (error) {
       console.error("[send-verification] Erreur lors de l'envoi de l'email:", error);

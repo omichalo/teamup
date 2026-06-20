@@ -216,6 +216,12 @@ export function validateStep(
         '[name="competitionJerseySize"]'
       );
     }
+    if (draft.wantsOptionalJersey && !draft.optionalJerseySize) {
+      return invalid(
+        "Indiquez une taille de maillot pour la commande.",
+        '[name="optionalJerseySize"]'
+      );
+    }
     return { valid: true };
   }
 

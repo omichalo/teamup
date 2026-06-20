@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "@jest/globals";
 import {
+  buildDirectAppActionLink,
   isLocalhostUrl,
   resolveAppOrigin,
   withActionContinueUrl,
@@ -20,6 +21,7 @@ function requestWithHeaders(headers: Record<string, string>): Request {
 describe("resolveAppOrigin", () => {
   const originalAppUrl = process.env.APP_URL;
   const originalPublicUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const originalProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
 
   afterEach(() => {
     if (originalAppUrl === undefined) {
@@ -31,6 +33,11 @@ describe("resolveAppOrigin", () => {
       delete process.env.NEXT_PUBLIC_APP_URL;
     } else {
       process.env.NEXT_PUBLIC_APP_URL = originalPublicUrl;
+    }
+    if (originalProjectId === undefined) {
+      delete process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+    } else {
+      process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID = originalProjectId;
     }
   });
 
@@ -88,6 +95,37 @@ describe("resolveAppOrigin", () => {
       )
     ).toBe("http://localhost:3000");
   });
+
+  it("uses known staging origin when env is localhost and request is hosted", () => {
+    process.env.APP_URL = "http://localhost:3000";
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID = "sqyping-teamup-dev";
+    delete process.env.NEXT_PUBLIC_APP_URL;
+
+    expect(
+      resolveAppOrigin(
+        requestWithHeaders({
+          "x-forwarded-proto": "https",
+          "x-forwarded-host":
+            "teamup-staging--sqyping-teamup-dev.us-east4.hosted.app",
+        })
+      )
+    ).toBe("https://teamup-staging--sqyping-teamup-dev.us-east4.hosted.app");
+  });
+
+  it("keeps localhost when env is localhost and request is local", () => {
+    process.env.APP_URL = "http://localhost:3000";
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID = "sqyping-teamup-dev";
+    delete process.env.NEXT_PUBLIC_APP_URL;
+
+    expect(
+      resolveAppOrigin(
+        requestWithHeaders({
+          host: "localhost:3000",
+          origin: "http://localhost:3000",
+        })
+      )
+    ).toBe("http://localhost:3000");
+  });
 });
 
 describe("isLocalhostUrl", () => {
@@ -114,5 +152,36 @@ describe("withActionContinueUrl", () => {
       "continueUrl=https%3A%2F%2Fteamup-staging--sqyping-teamup-dev.us-east4.hosted.app%2Fauth%2Fverify-email"
     );
     expect(updated).not.toContain("localhost");
+  });
+});
+
+describe("buildDirectAppActionLink", () => {
+  const stagingOrigin =
+    "https://teamup-staging--sqyping-teamup-dev.us-east4.hosted.app";
+
+  it("builds a direct app link for email verification", () => {
+    const firebaseLink =
+      "https://sqyping-teamup-dev.firebaseapp.com/__/auth/action?mode=verifyEmail&continueUrl=http%3A%2F%2Flocalhost%3A3000%2Fauth%2Fverify-email&oobCode=abc123";
+
+    expect(
+      buildDirectAppActionLink(
+        firebaseLink,
+        stagingOrigin,
+        "/auth/verify-email"
+      )
+    ).toBe(
+      "https://teamup-staging--sqyping-teamup-dev.us-east4.hosted.app/auth/verify-email?oobCode=abc123&mode=verifyEmail"
+    );
+  });
+
+  it("builds a direct app link for password reset", () => {
+    const firebaseLink =
+      "http://localhost:3000/__/auth/action?mode=resetPassword&oobCode=reset456";
+
+    expect(
+      buildDirectAppActionLink(firebaseLink, stagingOrigin, "/reset-password")
+    ).toBe(
+      "https://teamup-staging--sqyping-teamup-dev.us-east4.hosted.app/reset-password?oobCode=reset456&mode=resetPassword"
+    );
   });
 });

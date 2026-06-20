@@ -145,6 +145,12 @@ export type StripePresentationConfig = {
   discountCustomFieldName: string;
 };
 
+/** Tarification et libellé Stripe du maillot commandé hors section compétiteur. */
+export type JerseyCatalogConfig = {
+  optionalPriceCents: number;
+  optionalStripeLabel: string;
+};
+
 export type SchoolPickupServiceCopy = {
   title: string;
   intro: string;
@@ -156,6 +162,10 @@ export type RegistrationUiCopy = {
   schoolPickupService: SchoolPickupServiceCopy;
   jerseySizes: string[];
   handisportPracticeOptions: Array<{ id: "leisure" | "competition"; label: string }>;
+  /** Texte d'aide sous l'option section compétiteur (maillot obligatoire, 15 € inclus). */
+  competitorJerseyHelper: string;
+  /** Libellé de la case à cocher maillot hors section compétiteur. */
+  optionalJerseyOptInLabel: string;
 };
 
 export type RegistrationConfigV1 = {
@@ -170,6 +180,7 @@ export type RegistrationConfigV1 = {
   discountRules: DiscountRule[];
   aidRules: AidRule[];
   stripePresentation: StripePresentationConfig;
+  jersey: JerseyCatalogConfig;
   uiCopy: RegistrationUiCopy;
 };
 

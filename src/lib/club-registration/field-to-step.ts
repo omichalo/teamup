@@ -63,6 +63,8 @@ export const REGISTRATION_FIELD_TO_STEP_ID: Readonly<
   schoolPickupSlotIds: "practice",
   wantsCompetitorExtras: "practice",
   competitionJerseySize: "practice",
+  wantsOptionalJersey: "practice",
+  optionalJerseySize: "practice",
   competitionIds: "practice",
 
   /* Étape 5 — Dossier administratif */
