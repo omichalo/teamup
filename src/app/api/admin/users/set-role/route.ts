@@ -1,8 +1,4 @@
-export const runtime = "nodejs";
-
 import { jsonNoStore } from "@/lib/http/cache-headers";
-import { cookies } from "next/headers";
-import type { NextRequest } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import {
   initializeFirebaseAdmin,
@@ -11,7 +7,6 @@ import {
 } from "@/lib/firebase-admin";
 import {
   COACH_REQUEST_STATUS,
-  hasAnyRole,
   resolveCoachRequestStatus,
   resolveRole,
   USER_ROLES,
@@ -19,6 +14,10 @@ import {
 import type { CoachRequestStatus, UserRole } from "@/types";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
 import { logAuditAction, AUDIT_ACTIONS } from "@/lib/auth/audit-logger";
+import { withAuth } from "@/lib/auth/api-utils";
+import type { DecodedIdToken } from "firebase-admin/auth";
+
+export const runtime = "nodejs";
 
 interface SetRolePayload {
   userId?: string;
@@ -28,7 +27,6 @@ interface SetRolePayload {
   playerId?: string | null;
 }
 
-const ADMIN_ONLY_ROLES: readonly UserRole[] = [USER_ROLES.ADMIN];
 const MANAGED_ROLES: readonly UserRole[] = [
   USER_ROLES.ADMIN,
   USER_ROLES.SECRETARY,
@@ -51,44 +49,24 @@ const resolveCoachStatusForRole = (
   return COACH_REQUEST_STATUS.NONE;
 };
 
-export async function POST(req: NextRequest) {
-  try {
-    // Valider l'origine de la requête pour prévenir les attaques CSRF
-    if (!validateOrigin(req)) {
-      return jsonNoStore(
-        {
-          success: false,
-          error: "Invalid origin",
-          message: "Requête non autorisée",
-        },
-        { status: 403 }
-      );
-    }
+export const POST = withAuth(
+  async (req: Request, context: unknown) => {
+    try {
+      const { decoded } = context as { decoded: DecodedIdToken };
 
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-    if (!sessionCookie) {
-      return jsonNoStore(
-        { success: false, error: "Session cookie requis" },
-        { status: 401 }
-      );
-    }
+      // Valider l'origine de la requête pour prévenir les attaques CSRF
+      if (!validateOrigin(req)) {
+        return jsonNoStore(
+          {
+            success: false,
+            error: "Invalid origin",
+            message: "Requête non autorisée",
+          },
+          { status: 403 }
+        );
+      }
 
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    const requesterRole = resolveRole(decoded.role as string | undefined);
-
-    if (!hasAnyRole(requesterRole, ADMIN_ONLY_ROLES)) {
-      return jsonNoStore(
-        {
-          success: false,
-          error: "Accès refusé",
-          message: "Seuls les administrateurs peuvent modifier les rôles",
-        },
-        { status: 403 }
-      );
-    }
-
-    const body = (await req.json()) as SetRolePayload;
+      const body = (await req.json()) as SetRolePayload;
 
     const { userId, role, coachRequestStatus, coachRequestMessage, playerId } =
       body ?? {};
@@ -167,44 +145,43 @@ export async function POST(req: NextRequest) {
       success: true,
     });
 
-    return jsonNoStore(
-      {
-        success: true,
-        data: {
-          userId,
-          role: resolvedRole,
-          coachRequestStatus: resolvedCoachStatus,
+      return jsonNoStore(
+        {
+          success: true,
+          data: {
+            userId,
+            role: resolvedRole,
+            coachRequestStatus: resolvedCoachStatus,
+          },
         },
-      },
-      { status: 200 }
-    );
-  } catch (error) {
-    console.error("[app/api/admin/users/set-role] error", error);
-    
-    // Log d'audit pour l'échec
-    try {
-      const cookieStore = await cookies();
-      const sessionCookie = cookieStore.get("__session")?.value;
-      if (sessionCookie) {
-        const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+        { status: 200 }
+      );
+    } catch (error) {
+      console.error("[app/api/admin/users/set-role] error", error);
+
+      // Log d'audit pour l'échec
+      try {
+        const { decoded } = context as { decoded: DecodedIdToken };
         logAuditAction(AUDIT_ACTIONS.USER_ROLE_CHANGED, decoded.uid, {
           resource: "user",
           success: false,
-          details: { error: error instanceof Error ? error.message : "Unknown error" },
+          details: {
+            error: error instanceof Error ? error.message : "Unknown error",
+          },
         });
+      } catch {
+        // Ignorer les erreurs de logging d'audit
       }
-    } catch {
-      // Ignorer les erreurs de logging d'audit
-    }
 
-    return jsonNoStore(
-      {
-        success: false,
-        error: "Erreur lors de la mise à jour du rôle",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 }
-    );
-  }
-}
+      return jsonNoStore(
+        {
+          success: false,
+          error: "Erreur lors de la mise à jour du rôle",
+        },
+        { status: 500 }
+      );
+    }
+  },
+  [USER_ROLES.ADMIN]
+);
 
