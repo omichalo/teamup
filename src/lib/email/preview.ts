@@ -44,10 +44,10 @@ export const EMAIL_PREVIEW_VARIANTS: EmailPreviewVariant[] = [
     description: "Envoyé hors Stripe — chèques vacances + complément.",
   },
   {
-    id: "payment-instructions-card-multi",
-    label: "Instructions de règlement (CB en plusieurs fois)",
-    filename: "payment-instructions-card-multi.html",
-    description: "Envoyé hors Stripe — carte en échéances au secrétariat.",
+    id: "payment-instructions-card",
+    label: "Instructions de règlement (carte / BNPL)",
+    filename: "payment-instructions-card.html",
+    description: "Hors Stripe automatique — rappel carte avec lien Stripe et option BNPL.",
   },
   {
     id: "payment-confirmed-stripe",

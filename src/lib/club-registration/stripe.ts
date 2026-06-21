@@ -242,13 +242,12 @@ export function pickInvoiceDownloadUrl(links: StripeInvoiceLinks): string | null
 }
 
 /**
- * Point d'extension pour le paiement CB en ligne via Checkout.
- * V1 : carte en une seule fois uniquement ; les autres modes passent en suivi secrétariat.
+ * Point d'extension pour le paiement CB en ligne via Checkout (carte ou BNPL sur Stripe).
+ * Les autres modes passent en suivi secrétariat.
  */
 export async function createStripePaymentForRegistration(params: {
   registrationId: string;
   amountToPayCents: number;
-  installments: number;
   paymentMethod: PaymentMethodId;
 }): Promise<{ supported: boolean; reason?: string }> {
   if (params.amountToPayCents <= 0) {
@@ -259,14 +258,6 @@ export async function createStripePaymentForRegistration(params: {
     return {
       supported: false,
       reason: `Mode « ${PAYMENT_METHOD_LABELS[params.paymentMethod]} » : pas de lien de paiement en ligne. Suivez les encaissements dans le tableau ci-dessous.`,
-    };
-  }
-
-  if (params.installments > 1) {
-    return {
-      supported: false,
-      reason:
-        "Carte en plusieurs fois : envoyez chaque lien Stripe manuellement, puis suivez les échéances dans le tableau ci-dessus.",
     };
   }
 

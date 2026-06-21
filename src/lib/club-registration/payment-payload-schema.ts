@@ -64,7 +64,7 @@ export function refinePaymentPayload(
     });
   }
 
-  if (data.paymentMethod === "card" || data.paymentMethod === "cheque") {
+  if (data.paymentMethod === "cheque") {
     if (
       data.paymentInstallments < 1 ||
       data.paymentInstallments > MAX_PAYMENT_INSTALLMENTS

@@ -90,6 +90,40 @@ checkout.session.completed
 6. Lorsque Stripe envoie `checkout.session.completed`, le webhook marque le
    dossier comme paye.
 
+## Paiement en plusieurs fois (BNPL)
+
+Pour les dossiers en **carte bancaire**, un seul lien Stripe Checkout est
+envoye. L'adherent peut alors :
+
+- payer en **une fois** par carte ;
+- ou choisir un **partenaire BNPL** sur la page Stripe (Alma, Klarna, etc. —
+  2x, 3x ou 4x sans frais selon eligibilite).
+
+Le club est credite du montant integral a la validation ; le partenaire BNPL
+gere les echeances cote adherent.
+
+### Activer le BNPL
+
+1. Dashboard Stripe → **Settings** → **Payment methods**.
+2. Activer **Alma**, **Klarna** et/ou les autres BNPL souhaites (mode test
+   puis live apres validation metier).
+3. Aucun changement de code : les *dynamic payment methods* affichent les
+   options eligibles automatiquement sur Checkout.
+
+### Tests locaux BNPL
+
+Apres activation en mode test, ouvrir le lien Checkout et verifier qu'une
+option BNPL apparait pour un montant typique (200–300 €). Utiliser les
+scenarios de test documentes par Stripe et le prestataire actif.
+
+### Points d'attention
+
+- Montant restant a payer **inferieur au minimum BNPL** (ex. Alma : 50 €) :
+  seule la carte classique s'affiche.
+- Verifier l'**eligibilite metier** SQY Ping pour chaque prestataire active.
+- Ajouter les **mentions CGV** requises par le(s) prestataire(s) BNPL retenu(s)
+  (retractation, refus = annulation possible, etc.).
+
 ## Test de bout en bout
 
 1. Demarrer l'application :

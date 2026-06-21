@@ -64,7 +64,8 @@ export function buildPaymentFromDraft(
   });
 
   const paymentMethod = input.paymentMethod as PaymentMethodId;
-  const paymentInstallments = Math.max(1, input.paymentInstallments);
+  const paymentInstallments =
+    paymentMethod === "cheque" ? Math.max(1, input.paymentInstallments) : 1;
 
   const expectedPayments = generateExpectedPayments({
     amountToPayCents: summary.amountToPayCents,

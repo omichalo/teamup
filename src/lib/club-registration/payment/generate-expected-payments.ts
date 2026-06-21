@@ -8,17 +8,6 @@ export type GenerateExpectedPaymentsInput = {
   paymentInstallments: number;
 };
 
-function installmentLabelPrefix(paymentMethod: PaymentMethodId): string {
-  switch (paymentMethod) {
-    case "card":
-      return "CB";
-    case "cheque":
-      return "Chèque";
-    default:
-      return "Paiement";
-  }
-}
-
 function createId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -51,14 +40,15 @@ export function splitAmountAcrossInstallments(
 }
 
 /**
- * Génère les lignes de paiements attendus pour CB ou chèque en plusieurs fois.
+ * Génère les lignes de paiements attendus pour chèque en plusieurs fois.
+ * La carte (y compris BNPL sur Stripe Checkout) se règle en une seule session.
  */
 export function generateExpectedPayments(
   input: GenerateExpectedPaymentsInput
 ): ExpectedPayment[] {
   const { amountToPayCents, paymentMethod, paymentInstallments } = input;
 
-  if (paymentMethod !== "card" && paymentMethod !== "cheque") {
+  if (paymentMethod !== "cheque") {
     return [];
   }
 
@@ -71,13 +61,11 @@ export function generateExpectedPayments(
     Math.max(1, paymentInstallments)
   );
   const amounts = splitAmountAcrossInstallments(amountToPayCents, installments);
-  const prefix = installmentLabelPrefix(paymentMethod);
-  const method = paymentMethod === "card" ? "card" : "cheque";
 
   return amounts.map((expectedAmountCents, index) => ({
     id: createId(),
-    method,
-    label: `${prefix} ${index + 1}/${amounts.length}`,
+    method: "cheque" as const,
+    label: `Chèque ${index + 1}/${amounts.length}`,
     expectedAmountCents,
     status: "expected" as const,
   }));

@@ -6,6 +6,7 @@ import { buildPaymentRequestEmail } from "@/lib/email/payment-email";
 import { adaptEmailHtmlForFilePreview } from "@/lib/email/preview";
 import { buildPaymentConfirmedEmail } from "@/lib/email/payment-confirmed-email";
 import { buildPaymentInstructionsEmail } from "@/lib/email/payment-instructions-email";
+import { BNPL_COPY_TEST_MARKER } from "@/lib/club-registration/payment/bnpl-checkout-copy";
 import { CHECK_PAYABLE_TO } from "@/lib/club-registration/payment-constants";
 import { buildRegistrationSubmittedEmail } from "@/lib/email/registration-submitted-email";
 import type { PriceQuote } from "@/lib/pricing/types";
@@ -141,27 +142,20 @@ describe("buildPaymentInstructionsEmail", () => {
     expect(html).toContain("Chèque");
   });
 
-  it("précise les liens Stripe manuels pour la CB en plusieurs fois", () => {
+  it("mentionne le BNPL pour la carte bancaire", () => {
     const { html, text } = buildPaymentInstructionsEmail({
       adherentName: "Paul",
-      amountCents: 12000,
+      amountCents: 25_000,
       registrationId: "reg_cb",
       appOrigin: APP_ORIGIN,
       paymentMethod: "card",
-      paymentInstallments: 3,
-      expectedPayments: [
-        {
-          id: "ep1",
-          method: "card",
-          label: "CB 1/3",
-          expectedAmountCents: 4000,
-          status: "expected",
-        },
-      ],
+      paymentInstallments: 1,
+      expectedPayments: [],
     });
 
+    expect(html).toContain(BNPL_COPY_TEST_MARKER);
     expect(html).toContain("lien de paiement Stripe");
-    expect(text).toContain("lien Stripe");
+    expect(text).toContain(BNPL_COPY_TEST_MARKER);
   });
 });
 
@@ -237,7 +231,9 @@ describe("buildPaymentRequestEmail", () => {
     expect(html).toContain("150,00");
     expect(html).toContain(checkoutUrl);
     expect(html).toContain("Payer");
+    expect(html).toContain(BNPL_COPY_TEST_MARKER);
     expect(text).toContain("Cotisation loisir");
+    expect(text).toContain(BNPL_COPY_TEST_MARKER);
     expect(text).toContain(checkoutUrl);
   });
 

@@ -161,16 +161,15 @@ export async function POST(
       );
     }
 
-    const installments = payment?.paymentInstallments ?? 1;
     const paymentMethod = payment?.paymentMethod ?? "card";
     const stripeCapability = await createStripePaymentForRegistration({
       registrationId: id,
       amountToPayCents,
-      installments,
       paymentMethod,
     });
 
     if (!stripeCapability.supported) {
+      const paymentInstallments = payment?.paymentInstallments ?? 1;
       const baseManualPayment: RegistrationPayment =
         payment ??
         ({
@@ -179,7 +178,7 @@ export async function POST(
           amountToPayCents,
           aids: [],
           paymentMethod,
-          paymentInstallments: installments,
+          paymentInstallments,
           expectedPayments: [],
           receivedPayments: [],
           paidAmountCents: 0,

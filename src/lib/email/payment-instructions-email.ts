@@ -19,6 +19,10 @@ import {
   formatQuoteBreakdownHtmlForEmail,
   formatQuoteBreakdownText,
 } from "@/lib/email/payment-email";
+import {
+  BNPL_INSTRUCTIONS_CARD_HTML,
+  BNPL_INSTRUCTIONS_CARD_TEXT,
+} from "@/lib/club-registration/payment/bnpl-checkout-copy";
 import type { PriceQuote } from "@/lib/pricing/types";
 
 export type PaymentInstructionsEmailContent = {
@@ -128,24 +132,10 @@ function buildMethodInstructionsHtml(
     ].join("");
   }
 
-  if (paymentMethod === "card" && paymentInstallments > 1) {
-    const schedule =
-      expectedPayments.length > 0
-        ? `${emailSectionTitle("Échéancier carte bancaire")}${formatExpectedPaymentsHtml(expectedPayments)}`
-        : "";
-
-    return [
-      emailParagraph(
-        `Règlement par <strong>carte bancaire en ${paymentInstallments} fois</strong>&nbsp;:`
-      ),
-      emailParagraph(
-        "L'application n'envoie pas automatiquement un lien pour chaque échéance. Le secrétariat vous transmettra <strong>un lien de paiement Stripe sécurisé par e-mail</strong> au fil des échéances, pour le montant indiqué ci-dessous."
-      ),
-      emailParagraph(
-        "Après chaque règlement, votre dossier sera mis à jour ; vous recevrez une confirmation lorsque la totalité aura été réglée."
-      ),
-      schedule,
-    ].join("");
+  if (paymentMethod === "card") {
+    return emailParagraph(
+      `Mode de règlement&nbsp;: <strong>${escapeHtml(PAYMENT_METHOD_LABELS.card)}</strong>. ${escapeHtml(BNPL_INSTRUCTIONS_CARD_HTML)}`
+    );
   }
 
   return emailParagraph(
@@ -193,16 +183,12 @@ function buildMethodInstructionsText(content: PaymentInstructionsEmailContent): 
     return lines.join("\n");
   }
 
-  if (paymentMethod === "card" && paymentInstallments > 1) {
-    const lines = [
-      `Carte bancaire en ${paymentInstallments} fois.`,
-      "Le secrétariat vous enverra un lien Stripe sécurisé par e-mail pour chaque échéance.",
-    ];
-    const schedule = formatExpectedPaymentsText(expectedPayments);
-    if (schedule) {
-      lines.push("", "Échéancier :", schedule);
-    }
-    return lines.join("\n");
+  if (paymentMethod === "card") {
+    return [
+      "Carte bancaire.",
+      "Le secrétariat vous enverra un lien Stripe sécurisé par e-mail.",
+      BNPL_INSTRUCTIONS_CARD_TEXT,
+    ].join("\n");
   }
 
   return `Mode : ${PAYMENT_METHOD_LABELS[paymentMethod]}. Contactez le secrétariat.`;

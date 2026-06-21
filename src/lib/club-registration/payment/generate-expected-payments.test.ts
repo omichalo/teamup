@@ -17,19 +17,13 @@ describe("splitAmountAcrossInstallments", () => {
 });
 
 describe("generateExpectedPayments", () => {
-  it("génère 4 lignes CB pour 200 €", () => {
+  it("ne génère pas d'échéances pour la carte (BNPL sur Stripe Checkout)", () => {
     const expected = generateExpectedPayments({
       amountToPayCents: 20_000,
       paymentMethod: "card",
       paymentInstallments: 4,
     });
-    expect(expected).toHaveLength(4);
-    expect(expected[0].label).toBe("CB 1/4");
-    expect(expected[0].expectedAmountCents).toBe(5000);
-    expect(expected.every((e) => e.status === "expected")).toBe(true);
-    expect(
-      expected.reduce((sum, e) => sum + e.expectedAmountCents, 0)
-    ).toBe(20_000);
+    expect(expected).toEqual([]);
   });
 
   it("génère des chèques pour paiement par chèque", () => {

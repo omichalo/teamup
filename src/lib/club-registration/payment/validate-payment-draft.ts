@@ -24,7 +24,7 @@ export function validatePaymentDraft(
     };
   }
 
-  if (draft.paymentMethod === "card" || draft.paymentMethod === "cheque") {
+  if (draft.paymentMethod === "cheque") {
     if (
       draft.paymentInstallments < 1 ||
       draft.paymentInstallments > MAX_PAYMENT_INSTALLMENTS
