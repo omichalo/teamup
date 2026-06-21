@@ -107,7 +107,7 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico, icon.png, icon.svg, apple-icon.png, apple-icon.svg (favicon files)
      */
-    "/((?!api|_next/static|_next/image|favicon.ico|icon.png|icon.svg|apple-icon.png|apple-icon.svg).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|icon.png|icon.svg|apple-icon.png|apple-icon.svg|club-registration/).*)",
   ],
 };
 
