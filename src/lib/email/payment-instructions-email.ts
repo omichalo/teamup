@@ -6,19 +6,26 @@ import {
   type RemainingPaymentMethodId,
 } from "@/lib/club-registration/payment-constants";
 import type { ExpectedPayment } from "@/lib/club-registration/payment/types";
-import { SQYPING_COLORS, SQYPING_EMAIL_APP_NAME } from "@/lib/email/brand";
+import { SQYPING_COLORS, SQYPING_EMAIL_APP_NAME, SQYPING_SECRETARIAT_EMAIL } from "@/lib/email/brand";
 import { escapeHtml } from "@/lib/email/escape-html";
 import {
   buildSqyPingEmailLayout,
   emailMutedParagraph,
   emailParagraph,
   emailSectionTitle,
+  emailSecretariatContactHtml,
+  emailSecretariatContactText,
+  emailSecretariatMailtoLink,
 } from "@/lib/email/layout";
 import {
   formatEurosForEmail,
   formatQuoteBreakdownHtmlForEmail,
   formatQuoteBreakdownText,
 } from "@/lib/email/payment-email";
+import {
+  BNPL_INSTRUCTIONS_CARD_HTML,
+  BNPL_INSTRUCTIONS_CARD_TEXT,
+} from "@/lib/club-registration/payment/bnpl-checkout-copy";
 import type { PriceQuote } from "@/lib/pricing/types";
 
 export type PaymentInstructionsEmailContent = {
@@ -110,7 +117,7 @@ function buildMethodInstructionsHtml(
       `<ul style="margin: 0 0 16px 0; padding-left: 20px; font-size: 15px; line-height: 1.65; color: ${SQYPING_COLORS.text.primary};">
         ${cvAmount ? `<li>Montant prévu en chèques vacances&nbsp;: <strong>${escapeHtml(cvAmount)}</strong>.</li>` : "<li>Préparez vos chèques vacances pour la part couverte par ce moyen de paiement.</li>"}
         ${complement ? `<li>Complément prévu&nbsp;: <strong>${escapeHtml(complement)}</strong>.</li>` : ""}
-        <li>Contactez le secrétariat pour convenir de la remise des titres et du solde éventuel.</li>
+        <li>Contactez le secrétariat à ${emailSecretariatMailtoLink()} pour convenir de la remise des titres et du solde éventuel.</li>
       </ul>`,
     ].join("");
   }
@@ -128,24 +135,10 @@ function buildMethodInstructionsHtml(
     ].join("");
   }
 
-  if (paymentMethod === "card" && paymentInstallments > 1) {
-    const schedule =
-      expectedPayments.length > 0
-        ? `${emailSectionTitle("Échéancier carte bancaire")}${formatExpectedPaymentsHtml(expectedPayments)}`
-        : "";
-
-    return [
-      emailParagraph(
-        `Règlement par <strong>carte bancaire en ${paymentInstallments} fois</strong>&nbsp;:`
-      ),
-      emailParagraph(
-        "L'application n'envoie pas automatiquement un lien pour chaque échéance. Le secrétariat vous transmettra <strong>un lien de paiement Stripe sécurisé par e-mail</strong> au fil des échéances, pour le montant indiqué ci-dessous."
-      ),
-      emailParagraph(
-        "Après chaque règlement, votre dossier sera mis à jour ; vous recevrez une confirmation lorsque la totalité aura été réglée."
-      ),
-      schedule,
-    ].join("");
+  if (paymentMethod === "card") {
+    return emailParagraph(
+      `Mode de règlement&nbsp;: <strong>${escapeHtml(PAYMENT_METHOD_LABELS.card)}</strong>. ${escapeHtml(BNPL_INSTRUCTIONS_CARD_HTML)}`
+    );
   }
 
   return emailParagraph(
@@ -180,7 +173,7 @@ function buildMethodInstructionsText(content: PaymentInstructionsEmailContent): 
         `- Complément prévu : ${REMAINING_PAYMENT_METHOD_LABELS[content.remainingPaymentMethod]}`
       );
     }
-    lines.push("- Contactez le secrétariat pour la remise des titres.");
+    lines.push(`- Contactez le secrétariat à ${SQYPING_SECRETARIAT_EMAIL} pour la remise des titres.`);
     return lines.join("\n");
   }
 
@@ -193,19 +186,15 @@ function buildMethodInstructionsText(content: PaymentInstructionsEmailContent): 
     return lines.join("\n");
   }
 
-  if (paymentMethod === "card" && paymentInstallments > 1) {
-    const lines = [
-      `Carte bancaire en ${paymentInstallments} fois.`,
-      "Le secrétariat vous enverra un lien Stripe sécurisé par e-mail pour chaque échéance.",
-    ];
-    const schedule = formatExpectedPaymentsText(expectedPayments);
-    if (schedule) {
-      lines.push("", "Échéancier :", schedule);
-    }
-    return lines.join("\n");
+  if (paymentMethod === "card") {
+    return [
+      "Carte bancaire.",
+      "Le secrétariat vous enverra un lien Stripe sécurisé par e-mail.",
+      BNPL_INSTRUCTIONS_CARD_TEXT,
+    ].join("\n");
   }
 
-  return `Mode : ${PAYMENT_METHOD_LABELS[paymentMethod]}. Contactez le secrétariat.`;
+  return `Mode : ${PAYMENT_METHOD_LABELS[paymentMethod]}. Contactez le secrétariat à ${SQYPING_SECRETARIAT_EMAIL}.`;
 }
 
 export function buildPaymentInstructionsEmail(
@@ -249,7 +238,7 @@ export function buildPaymentInstructionsEmail(
     `${emailSectionTitle("Modalités de règlement")}${methodBlock}`,
     adherentNoteBlock,
     emailMutedParagraph(
-      `Pour toute question, répondez à cet e-mail ou consultez votre espace sur <a href="${escapeHtml(appOrigin)}/club/mes-inscriptions" style="color: ${SQYPING_COLORS.primary.main}; text-decoration: none;">${escapeHtml(SQYPING_EMAIL_APP_NAME)}</a>.`
+      `${emailSecretariatContactHtml()} Vous pouvez aussi consulter <a href="${escapeHtml(appOrigin)}/club/mes-inscriptions" style="color: ${SQYPING_COLORS.primary.main}; text-decoration: none;">votre espace adhérent</a>.`
     ),
   ].join("");
 
@@ -263,12 +252,6 @@ export function buildPaymentInstructionsEmail(
       url: mesInscriptionsUrl,
     },
     fallbackLink: mesInscriptionsUrl,
-    noticeHtml: `
-      <p style="margin: 0; font-size: 14px; line-height: 1.6;">
-        <strong>Paiement hors ligne</strong> — aucun lien Stripe automatique pour ce mode. Le secrétariat mettra à jour votre dossier à réception des fonds (ou après chaque lien Stripe envoyé manuellement pour les échéances carte).
-      </p>
-    `,
-    noticeVariant: "info",
   });
 
   const textLines = [
@@ -289,6 +272,8 @@ export function buildPaymentInstructionsEmail(
     "",
     ...(paymentNote?.trim() ? [`Votre message : ${paymentNote.trim()}`, ""] : []),
     `Suivre mon dossier : ${mesInscriptionsUrl}`,
+    "",
+    emailSecretariatContactText(),
     "",
     SQYPING_EMAIL_APP_NAME
   );

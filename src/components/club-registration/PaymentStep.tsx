@@ -32,6 +32,7 @@ import {
   eurosInputToCents,
   normalizePaymentAidList,
 } from "@/lib/club-registration/payment/payment-draft-helpers";
+import { BNPL_ADHERENT_WIZARD_MESSAGE } from "@/lib/club-registration/payment/bnpl-checkout-copy";
 import { formatCentsAsEuros } from "@/lib/pricing";
 import type { RegistrationDraft } from "./registration-defaults";
 import { usePricingQuote, type PricingBreakdownDraft } from "./PricingBreakdown";
@@ -65,7 +66,7 @@ export function PaymentStep({ draft, onChange }: Props) {
     onChange({
       paymentMethod: method,
       paymentInstallments:
-        method === "card" || method === "cheque" ? draft.paymentInstallments || 1 : 1,
+        method === "cheque" ? draft.paymentInstallments || 1 : 1,
     });
   };
 
@@ -137,8 +138,7 @@ export function PaymentStep({ draft, onChange }: Props) {
         </FormControl>
       </Stack>
 
-      {(draft.paymentMethod === "card" || draft.paymentMethod === "cheque") &&
-      summary.amountToPayCents > 0 ? (
+      {draft.paymentMethod === "cheque" && summary.amountToPayCents > 0 ? (
         <FormControl fullWidth data-field="paymentInstallments">
           <InputLabel id="payment-installments-label">
             Paiement en plusieurs fois
@@ -153,7 +153,7 @@ export function PaymentStep({ draft, onChange }: Props) {
           >
             {installmentOptions().map((n) => (
               <MenuItem key={n} value={n}>
-                {n} {draft.paymentMethod === "cheque" ? "chèque(s)" : "fois"}
+                {n} chèque(s)
               </MenuItem>
             ))}
           </Select>
@@ -164,9 +164,7 @@ export function PaymentStep({ draft, onChange }: Props) {
         <Alert severity="info" variant="outlined">
           {summary.amountToPayCents <= 0
             ? "Aucun paiement n'est dû à ce stade. Le secrétariat validera votre dossier."
-            : draft.paymentInstallments > 1
-              ? "Après validation de votre dossier, le secrétariat vous enverra un lien de paiement Stripe par e-mail pour chaque échéance (montants indiqués ci-dessus)."
-              : "Après validation de votre dossier, un lien de paiement Stripe vous sera envoyé par e-mail pour régler la totalité en une fois."}
+            : BNPL_ADHERENT_WIZARD_MESSAGE}
         </Alert>
       ) : null}
 

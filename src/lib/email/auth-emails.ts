@@ -1,8 +1,9 @@
-import { SQYPING_EMAIL_APP_NAME } from "@/lib/email/brand";
+import { SQYPING_EMAIL_APP_NAME, SQYPING_SECRETARIAT_EMAIL } from "@/lib/email/brand";
 import {
   buildSqyPingEmailLayout,
   emailMutedParagraph,
   emailParagraph,
+  emailSecretariatMailtoLink,
 } from "@/lib/email/layout";
 
 export type VerificationEmailContent = {
@@ -78,7 +79,7 @@ export function buildPasswordResetEmail(
     <ul style="margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.6;">
       <li>Ce lien est valable <strong>1 heure</strong> uniquement.</li>
       <li>Ne partagez pas ce lien : il donne accès à la modification de votre mot de passe.</li>
-      <li>En cas de difficulté, contactez le secrétariat du club.</li>
+      <li>En cas de difficulté, contactez le secrétariat à ${emailSecretariatMailtoLink()}.</li>
     </ul>
   `;
 
@@ -105,6 +106,8 @@ export function buildPasswordResetEmail(
     actionUrl,
     "",
     "Si vous n'avez pas demandé cette réinitialisation, ignorez cet e-mail.",
+    "",
+    `En cas de difficulté, contactez le secrétariat à ${SQYPING_SECRETARIAT_EMAIL}.`,
     "",
     SQYPING_EMAIL_APP_NAME,
   ].join("\n");

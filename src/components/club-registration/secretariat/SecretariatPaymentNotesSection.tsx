@@ -16,6 +16,10 @@ import {
   Save as SaveIcon,
 } from "@mui/icons-material";
 import {
+  BNPL_SECRETARIAT_ALERT,
+  BNPL_SECRETARIAT_PAYMENT_TOOLTIP,
+} from "@/lib/club-registration/payment/bnpl-checkout-copy";
+import {
   PAYMENT_METHOD_LABELS,
   type PaymentMethodId,
 } from "@/lib/club-registration/payment-constants";
@@ -27,7 +31,6 @@ type Props = {
   onReviewNotesChange: (value: string) => void;
   paymentEmailSentTo?: string | null | undefined;
   paymentMethod?: PaymentMethodId | null | undefined;
-  paymentInstallments?: number | null | undefined;
   saving: boolean;
   requestingPayment: boolean;
   persistingQuote: boolean;
@@ -44,16 +47,13 @@ export function SecretariatPaymentNotesSection({
   onReviewNotesChange,
   paymentEmailSentTo,
   paymentMethod,
-  paymentInstallments,
   saving,
   requestingPayment,
   persistingQuote,
   onSave,
   onRequestPayment,
 }: Props) {
-  const installments = paymentInstallments ?? 1;
-  const isMultiCard = paymentMethod === "card" && installments > 1;
-  const canSendStripeEmail = paymentMethod === "card" && installments === 1;
+  const canSendStripeEmail = paymentMethod === "card";
 
   return (
     <>
@@ -61,13 +61,10 @@ export function SecretariatPaymentNotesSection({
         Paiement et notes internes
       </Typography>
 
-      {isMultiCard ? (
+      {paymentMethod === "card" ? (
         <Alert severity="info" variant="outlined">
-          Mode <strong>carte en {installments} fois</strong> : l’application envoie d’abord un
-          e-mail d’instructions avec l’échéancier. Ensuite, créez et transmettez{" "}
-          <strong>manuellement un lien Stripe</strong> (Dashboard ou lien de paiement) pour
-          chaque échéance, puis marquez-la reçue dans le tableau « Paiements attendus » lorsque
-          le webhook confirme le paiement.
+          Mode <strong>carte bancaire</strong> : un lien Stripe Checkout sera envoyé par
+          e-mail. {BNPL_SECRETARIAT_ALERT}
         </Alert>
       ) : null}
 
@@ -134,7 +131,7 @@ export function SecretariatPaymentNotesSection({
         <Tooltip
           title={
             canSendStripeEmail
-              ? "Enregistre le dossier puis envoie un e-mail au contact avec un lien sécurisé Stripe (carte bancaire en une seule fois uniquement)."
+              ? BNPL_SECRETARIAT_PAYMENT_TOOLTIP
               : "Enregistre le dossier puis bascule en suivi adapté : pas de lien de paiement automatique pour ce mode de règlement."
           }
           slotProps={{ popper: { sx: { maxWidth: 340 } } }}

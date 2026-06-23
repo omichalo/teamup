@@ -85,7 +85,7 @@ export function PaymentTrackingSection({
         label: "Mode choisi",
         value: PAYMENT_METHOD_LABELS[payment.paymentMethod],
       },
-      ...(payment.paymentMethod === "card" || payment.paymentMethod === "cheque"
+      ...(payment.paymentMethod === "cheque"
         ? [{ label: "Nombre de fois", value: String(payment.paymentInstallments) }]
         : []),
     ],

@@ -61,7 +61,7 @@ export function buildRecapPaymentFields(
           ? PAYMENT_METHOD_LABELS[draft.paymentMethod]
           : "—",
     },
-    ...(draft.paymentMethod === "card" || draft.paymentMethod === "cheque"
+    ...(draft.paymentMethod === "cheque"
       ? [{ label: "Nombre de fois", value: String(draft.paymentInstallments) }]
       : []),
     ...(draft.paymentMethod === "holiday_vouchers" && draft.holidayVoucherAmountCents

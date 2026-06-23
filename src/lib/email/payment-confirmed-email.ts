@@ -1,9 +1,11 @@
-import { SQYPING_COLORS, SQYPING_EMAIL_APP_NAME } from "@/lib/email/brand";
+import { SQYPING_COLORS } from "@/lib/email/brand";
 import { escapeHtml } from "@/lib/email/escape-html";
 import {
   buildSqyPingEmailLayout,
   emailMutedParagraph,
   emailParagraph,
+  emailSecretariatContactHtml,
+  emailSecretariatContactText,
 } from "@/lib/email/layout";
 import { formatEurosForEmail } from "@/lib/email/payment-email";
 
@@ -73,7 +75,7 @@ export function buildPaymentConfirmedEmail(
     fallbackLink: mesInscriptionsUrl,
     noticeHtml: `
       <p style="margin: 0; font-size: 14px; line-height: 1.6;">
-        <strong>Adhésion SQY Ping</strong> — merci pour votre confiance. Pour toute question, contactez le secrétariat via ${escapeHtml(SQYPING_EMAIL_APP_NAME)}.
+        <strong>Adhésion SQY Ping</strong> — merci pour votre confiance. ${emailSecretariatContactHtml()}
       </p>
     `,
     noticeVariant: "info",
@@ -91,7 +93,9 @@ export function buildPaymentConfirmedEmail(
     "",
     `Voir mon dossier : ${mesInscriptionsUrl}`,
     "",
-    SQYPING_EMAIL_APP_NAME,
+    emailSecretariatContactText(),
+    "",
+    "SQY Ping",
   ].join("\n");
 
   return { html, text };

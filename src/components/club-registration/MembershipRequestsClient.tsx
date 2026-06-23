@@ -60,6 +60,7 @@ import { calculatePaymentSummary } from "@/lib/club-registration/payment/calcula
 import { normalizePaymentAidList } from "@/lib/club-registration/payment/payment-draft-helpers";
 import { PaymentTrackingSection } from "./secretariat/PaymentTrackingSection";
 import { SecretariatPaymentNotesSection } from "./secretariat/SecretariatPaymentNotesSection";
+import { BNPL_SECRETARIAT_PAGE_SUBTITLE } from "@/lib/club-registration/payment/bnpl-checkout-copy";
 import {
   RegistrationFfttFields,
   RegistrationMedicalDossierDetail,
@@ -558,7 +559,7 @@ export function MembershipRequestsClient() {
         <PageHeader
           eyebrow="Secrétariat"
           title="Demandes d'adhésion"
-          subtitle="Relisez le dossier, vérifiez le montant, puis demandez le paiement : un e-mail avec lien Stripe part uniquement pour la carte bancaire en une fois. Les autres modes sont suivis manuellement dans le tableau ci-dessous."
+          subtitle={BNPL_SECRETARIAT_PAGE_SUBTITLE}
           actions={
             <Button
               variant="outlined"
@@ -1019,7 +1020,6 @@ export function MembershipRequestsClient() {
                       onReviewNotesChange={(value) => updateField("reviewNotes", value)}
                       paymentEmailSentTo={selected.paymentEmailSentTo ?? null}
                       paymentMethod={selectedPayment?.paymentMethod}
-                      paymentInstallments={selectedPayment?.paymentInstallments}
                       saving={saving}
                       requestingPayment={requestingPayment}
                       persistingQuote={persistingQuote}

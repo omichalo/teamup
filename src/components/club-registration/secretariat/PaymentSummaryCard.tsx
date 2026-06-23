@@ -37,7 +37,7 @@ export function PaymentSummaryCard({ payment }: Props) {
           variant="outlined"
           label={PAYMENT_METHOD_LABELS[payment.paymentMethod]}
         />
-        {(payment.paymentMethod === "card" || payment.paymentMethod === "cheque") &&
+        {(payment.paymentMethod === "cheque") &&
         payment.paymentInstallments > 1 ? (
           <Chip
             size="small"

@@ -174,45 +174,16 @@ async function main(): Promise<void> {
   );
 
   await writePreview(
-    "payment-instructions-card-multi.html",
+    "payment-instructions-card.html",
     buildPaymentInstructionsEmail({
       adherentName: "Paul Martin",
-      amountCents: 12000,
+      amountCents: 25_000,
       registrationId: "preview-registration-id",
       appOrigin: EMAIL_PREVIEW_APP_ORIGIN,
       paymentMethod: "card",
-      paymentInstallments: 4,
-      expectedPayments: [
-        {
-          id: "ep1",
-          method: "card",
-          label: "CB 1/4",
-          expectedAmountCents: 3000,
-          status: "expected",
-        },
-        {
-          id: "ep2",
-          method: "card",
-          label: "CB 2/4",
-          expectedAmountCents: 3000,
-          status: "expected",
-        },
-        {
-          id: "ep3",
-          method: "card",
-          label: "CB 3/4",
-          expectedAmountCents: 3000,
-          status: "expected",
-        },
-        {
-          id: "ep4",
-          method: "card",
-          label: "CB 4/4",
-          expectedAmountCents: 3000,
-          status: "expected",
-        },
-      ],
-      quote: null,
+      paymentInstallments: 1,
+      expectedPayments: [],
+      quote: SAMPLE_QUOTE,
     }).html
   );
 

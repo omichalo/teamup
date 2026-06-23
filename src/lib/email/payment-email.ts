@@ -5,7 +5,14 @@ import {
   emailMutedParagraph,
   emailParagraph,
   emailSectionTitle,
+  emailSecretariatContactText,
+  emailSecretariatMailtoLink,
 } from "@/lib/email/layout";
+import {
+  BNPL_PAYMENT_REQUEST_NOTICE,
+  BNPL_PAYMENT_REQUEST_PARAGRAPH,
+  BNPL_PAYMENT_REQUEST_TEXT_LINE,
+} from "@/lib/club-registration/payment/bnpl-checkout-copy";
 import type { PriceQuote } from "@/lib/pricing/types";
 
 export function formatEurosForEmail(amountCents: number): string {
@@ -85,12 +92,13 @@ export function buildPaymentRequestEmail(
     emailParagraph(
       "Vous pouvez maintenant procéder au règlement en ligne via notre plateforme de paiement sécurisée Stripe."
     ),
+    emailParagraph(BNPL_PAYMENT_REQUEST_PARAGRAPH),
     breakdownBlock,
     emailMutedParagraph(
       "Après paiement, une facture détaillée vous sera transmise automatiquement par Stripe à la même adresse e-mail."
     ),
     emailMutedParagraph(
-      `Besoin d'aide&nbsp;? Répondez à cet e-mail ou contactez le secrétariat via <a href="${escapeHtml(appOrigin)}/club" style="color: ${SQYPING_COLORS.primary.main}; text-decoration: none;">${escapeHtml(SQYPING_EMAIL_APP_NAME)}</a>.`
+      `Besoin d'aide&nbsp;? Répondez à cet e-mail ou contactez le secrétariat par e-mail à ${emailSecretariatMailtoLink()}.`
     ),
   ].join("");
 
@@ -100,13 +108,13 @@ export function buildPaymentRequestEmail(
     bodyHtml,
     appOrigin,
     primaryAction: {
-      label: `Payer ${formattedAmount} en ligne`,
+      label: "Payer en ligne",
       url: checkoutUrl,
     },
     fallbackLink: checkoutUrl,
     noticeHtml: `
       <p style="margin: 0; font-size: 14px; line-height: 1.6;">
-        <strong>Paiement sécurisé</strong> — vous serez redirigé(e) vers Stripe. Aucune donnée bancaire n'est collectée par ${escapeHtml(SQYPING_EMAIL_APP_NAME)}.
+        <strong>Paiement sécurisé</strong> — vous serez redirigé(e) vers Stripe. ${escapeHtml(BNPL_PAYMENT_REQUEST_NOTICE)} Aucune donnée bancaire n'est collectée par ${escapeHtml(SQYPING_EMAIL_APP_NAME)}.
       </p>
     `,
     noticeVariant: "info",
@@ -126,10 +134,12 @@ export function buildPaymentRequestEmail(
   }
 
   textLines.push(
-    "Paiement sécurisé Stripe :",
+    BNPL_PAYMENT_REQUEST_TEXT_LINE,
     checkoutUrl,
     "",
     "Une facture détaillée sera disponible après paiement.",
+    "",
+    emailSecretariatContactText("Besoin d'aide ? Contactez le secrétariat par e-mail à"),
     "",
     SQYPING_EMAIL_APP_NAME
   );

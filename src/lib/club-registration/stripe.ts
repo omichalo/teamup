@@ -33,6 +33,8 @@ export async function createMembershipCheckoutSession(params: {
   registrationId: string;
   lineItems: StripeCheckoutLineItem[];
   customerEmail: string;
+  /** Nom affiché côté Stripe (colonne Client, facture). */
+  customerName: string;
   /** Description de facture (en-tête) — identité dossier, pas les lignes. */
   invoiceDescription: string;
   catalogVersion: string;
@@ -46,9 +48,15 @@ export async function createMembershipCheckoutSession(params: {
     throw new Error("Au moins une ligne de paiement est requise.");
   }
 
+  const customerId = await findOrCreateStripeCheckoutCustomer({
+    registrationId: params.registrationId,
+    customerEmail: params.customerEmail,
+    customerName: params.customerName,
+  });
+
   const body = new URLSearchParams();
   body.set("mode", "payment");
-  body.set("customer_email", params.customerEmail);
+  body.set("customer", customerId);
   body.set("success_url", params.successUrl);
   body.set("cancel_url", params.cancelUrl);
   body.set("client_reference_id", params.registrationId);
@@ -116,6 +124,7 @@ export async function createLegacySingleLineCheckoutSession(params: {
       },
     ],
     customerEmail: params.customerEmail,
+    customerName: params.adherentName,
     invoiceDescription: `Adhésion SQY Ping — ${params.adherentName}`,
     catalogVersion: "legacy",
     quoteHash: "legacy",
@@ -136,6 +145,12 @@ type StripeInvoice = {
   error?: { message?: string };
 };
 
+function stripeAuthHeaders(): HeadersInit {
+  return {
+    Authorization: `Bearer ${requireEnv("STRIPE_SECRET_KEY")}`,
+  };
+}
+
 async function postStripeForm<T>(
   path: string,
   body: URLSearchParams
@@ -143,7 +158,7 @@ async function postStripeForm<T>(
   const response = await fetch(`https://api.stripe.com${path}`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${requireEnv("STRIPE_SECRET_KEY")}`,
+      ...stripeAuthHeaders(),
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body,
@@ -155,6 +170,61 @@ async function postStripeForm<T>(
     throw new Error(json.error?.message ?? "Erreur Stripe");
   }
   return json;
+}
+
+async function getStripeForm<T>(
+  path: string,
+  query?: URLSearchParams
+): Promise<T & { error?: { message?: string } }> {
+  const queryString = query?.toString();
+  const url = `https://api.stripe.com${path}${queryString ? `?${queryString}` : ""}`;
+  const response = await fetch(url, {
+    headers: stripeAuthHeaders(),
+    cache: "no-store",
+  });
+
+  const json = (await response.json()) as T & { error?: { message?: string } };
+  if (!response.ok) {
+    throw new Error(json.error?.message ?? "Erreur Stripe");
+  }
+  return json;
+}
+
+/** Client Stripe avec nom pour alimenter le Dashboard et les factures Checkout. */
+async function findOrCreateStripeCheckoutCustomer(params: {
+  registrationId: string;
+  customerEmail: string;
+  customerName: string;
+}): Promise<string> {
+  const listQuery = new URLSearchParams();
+  listQuery.set("email", params.customerEmail);
+  listQuery.set("limit", "1");
+
+  const list = await getStripeForm<{ data: Array<{ id: string; name?: string | null }> }>(
+    "/v1/customers",
+    listQuery
+  );
+
+  const existing = list.data[0];
+  if (existing) {
+    if (existing.name !== params.customerName) {
+      const updateBody = new URLSearchParams();
+      updateBody.set("name", params.customerName);
+      updateBody.set("metadata[registrationId]", params.registrationId);
+      await postStripeForm<{ id: string }>(
+        `/v1/customers/${encodeURIComponent(existing.id)}`,
+        updateBody
+      );
+    }
+    return existing.id;
+  }
+
+  const createBody = new URLSearchParams();
+  createBody.set("email", params.customerEmail);
+  createBody.set("name", params.customerName);
+  createBody.set("metadata[registrationId]", params.registrationId);
+  const customer = await postStripeForm<{ id: string }>("/v1/customers", createBody);
+  return customer.id;
 }
 
 /** Récupère les URLs publiques Stripe pour consulter / télécharger une facture. */
@@ -242,13 +312,12 @@ export function pickInvoiceDownloadUrl(links: StripeInvoiceLinks): string | null
 }
 
 /**
- * Point d'extension pour le paiement CB en ligne via Checkout.
- * V1 : carte en une seule fois uniquement ; les autres modes passent en suivi secrétariat.
+ * Point d'extension pour le paiement CB en ligne via Checkout (carte ou BNPL sur Stripe).
+ * Les autres modes passent en suivi secrétariat.
  */
 export async function createStripePaymentForRegistration(params: {
   registrationId: string;
   amountToPayCents: number;
-  installments: number;
   paymentMethod: PaymentMethodId;
 }): Promise<{ supported: boolean; reason?: string }> {
   if (params.amountToPayCents <= 0) {
@@ -259,14 +328,6 @@ export async function createStripePaymentForRegistration(params: {
     return {
       supported: false,
       reason: `Mode « ${PAYMENT_METHOD_LABELS[params.paymentMethod]} » : pas de lien de paiement en ligne. Suivez les encaissements dans le tableau ci-dessous.`,
-    };
-  }
-
-  if (params.installments > 1) {
-    return {
-      supported: false,
-      reason:
-        "Carte en plusieurs fois : envoyez chaque lien Stripe manuellement, puis suivez les échéances dans le tableau ci-dessus.",
     };
   }
 
