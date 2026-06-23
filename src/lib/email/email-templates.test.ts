@@ -1,4 +1,4 @@
-import { SQYPING_COLORS } from "@/lib/email/brand";
+import { SQYPING_COLORS, SQYPING_SECRETARIAT_EMAIL } from "@/lib/email/brand";
 import { buildVerificationEmail } from "@/lib/email/auth-emails";
 import { buildPasswordResetEmail } from "@/lib/email/auth-emails";
 import { buildSqyPingEmailLayout } from "@/lib/email/layout";
@@ -74,7 +74,7 @@ describe("buildVerificationEmail", () => {
 describe("buildPasswordResetEmail", () => {
   it("inclut un encart d'avertissement", () => {
     const link = "https://teamup.sqyping.fr/reset-password?oobCode=xyz";
-    const { html } = buildPasswordResetEmail({
+    const { html, text } = buildPasswordResetEmail({
       actionUrl: link,
       appOrigin: APP_ORIGIN,
     });
@@ -82,6 +82,8 @@ describe("buildPasswordResetEmail", () => {
     expect(html).toContain("1 heure");
     expect(html).toContain(SQYPING_COLORS.secondary.main);
     expect(html).toContain("Réinitialiser mon mot de passe");
+    expect(html).toContain(SQYPING_SECRETARIAT_EMAIL);
+    expect(text).toContain(SQYPING_SECRETARIAT_EMAIL);
   });
 });
 
@@ -122,7 +124,9 @@ describe("buildPaymentInstructionsEmail", () => {
 
     expect(html).toContain(CHECK_PAYABLE_TO);
     expect(html).toContain("Chèque 1/2");
+    expect(html).toContain(SQYPING_SECRETARIAT_EMAIL);
     expect(text).toContain(CHECK_PAYABLE_TO);
+    expect(text).toContain(SQYPING_SECRETARIAT_EMAIL);
   });
 
   it("mentionne le complément pour les chèques vacances", () => {
@@ -173,7 +177,9 @@ describe("buildPaymentConfirmedEmail", () => {
     expect(html).toContain("Stripe");
     expect(html).toContain("facture");
     expect(html).toContain("150,00");
+    expect(html).toContain(SQYPING_SECRETARIAT_EMAIL);
     expect(text).toContain("facture");
+    expect(text).toContain(SQYPING_SECRETARIAT_EMAIL);
   });
 
   it("adapte le message pour un encaissement secrétariat", () => {
@@ -232,8 +238,10 @@ describe("buildPaymentRequestEmail", () => {
     expect(html).toContain(checkoutUrl);
     expect(html).toContain("Payer");
     expect(html).toContain(BNPL_COPY_TEST_MARKER);
+    expect(html).toContain(SQYPING_SECRETARIAT_EMAIL);
     expect(text).toContain("Cotisation loisir");
     expect(text).toContain(BNPL_COPY_TEST_MARKER);
+    expect(text).toContain(SQYPING_SECRETARIAT_EMAIL);
     expect(text).toContain(checkoutUrl);
   });
 

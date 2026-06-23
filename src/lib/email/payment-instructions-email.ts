@@ -6,13 +6,16 @@ import {
   type RemainingPaymentMethodId,
 } from "@/lib/club-registration/payment-constants";
 import type { ExpectedPayment } from "@/lib/club-registration/payment/types";
-import { SQYPING_COLORS, SQYPING_EMAIL_APP_NAME } from "@/lib/email/brand";
+import { SQYPING_COLORS, SQYPING_EMAIL_APP_NAME, SQYPING_SECRETARIAT_EMAIL } from "@/lib/email/brand";
 import { escapeHtml } from "@/lib/email/escape-html";
 import {
   buildSqyPingEmailLayout,
   emailMutedParagraph,
   emailParagraph,
   emailSectionTitle,
+  emailSecretariatContactHtml,
+  emailSecretariatContactText,
+  emailSecretariatMailtoLink,
 } from "@/lib/email/layout";
 import {
   formatEurosForEmail,
@@ -114,7 +117,7 @@ function buildMethodInstructionsHtml(
       `<ul style="margin: 0 0 16px 0; padding-left: 20px; font-size: 15px; line-height: 1.65; color: ${SQYPING_COLORS.text.primary};">
         ${cvAmount ? `<li>Montant prévu en chèques vacances&nbsp;: <strong>${escapeHtml(cvAmount)}</strong>.</li>` : "<li>Préparez vos chèques vacances pour la part couverte par ce moyen de paiement.</li>"}
         ${complement ? `<li>Complément prévu&nbsp;: <strong>${escapeHtml(complement)}</strong>.</li>` : ""}
-        <li>Contactez le secrétariat pour convenir de la remise des titres et du solde éventuel.</li>
+        <li>Contactez le secrétariat à ${emailSecretariatMailtoLink()} pour convenir de la remise des titres et du solde éventuel.</li>
       </ul>`,
     ].join("");
   }
@@ -170,7 +173,7 @@ function buildMethodInstructionsText(content: PaymentInstructionsEmailContent): 
         `- Complément prévu : ${REMAINING_PAYMENT_METHOD_LABELS[content.remainingPaymentMethod]}`
       );
     }
-    lines.push("- Contactez le secrétariat pour la remise des titres.");
+    lines.push(`- Contactez le secrétariat à ${SQYPING_SECRETARIAT_EMAIL} pour la remise des titres.`);
     return lines.join("\n");
   }
 
@@ -191,7 +194,7 @@ function buildMethodInstructionsText(content: PaymentInstructionsEmailContent): 
     ].join("\n");
   }
 
-  return `Mode : ${PAYMENT_METHOD_LABELS[paymentMethod]}. Contactez le secrétariat.`;
+  return `Mode : ${PAYMENT_METHOD_LABELS[paymentMethod]}. Contactez le secrétariat à ${SQYPING_SECRETARIAT_EMAIL}.`;
 }
 
 export function buildPaymentInstructionsEmail(
@@ -235,7 +238,7 @@ export function buildPaymentInstructionsEmail(
     `${emailSectionTitle("Modalités de règlement")}${methodBlock}`,
     adherentNoteBlock,
     emailMutedParagraph(
-      `Pour toute question, répondez à cet e-mail ou consultez votre espace sur <a href="${escapeHtml(appOrigin)}/club/mes-inscriptions" style="color: ${SQYPING_COLORS.primary.main}; text-decoration: none;">${escapeHtml(SQYPING_EMAIL_APP_NAME)}</a>.`
+      `${emailSecretariatContactHtml()} Vous pouvez aussi consulter <a href="${escapeHtml(appOrigin)}/club/mes-inscriptions" style="color: ${SQYPING_COLORS.primary.main}; text-decoration: none;">votre espace adhérent</a>.`
     ),
   ].join("");
 
@@ -249,12 +252,6 @@ export function buildPaymentInstructionsEmail(
       url: mesInscriptionsUrl,
     },
     fallbackLink: mesInscriptionsUrl,
-    noticeHtml: `
-      <p style="margin: 0; font-size: 14px; line-height: 1.6;">
-        <strong>Paiement hors ligne</strong> — aucun lien Stripe automatique pour ce mode. Le secrétariat mettra à jour votre dossier à réception des fonds (ou après chaque lien Stripe envoyé manuellement pour les échéances carte).
-      </p>
-    `,
-    noticeVariant: "info",
   });
 
   const textLines = [
@@ -275,6 +272,8 @@ export function buildPaymentInstructionsEmail(
     "",
     ...(paymentNote?.trim() ? [`Votre message : ${paymentNote.trim()}`, ""] : []),
     `Suivre mon dossier : ${mesInscriptionsUrl}`,
+    "",
+    emailSecretariatContactText(),
     "",
     SQYPING_EMAIL_APP_NAME
   );

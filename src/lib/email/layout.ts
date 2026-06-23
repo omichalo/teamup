@@ -3,6 +3,7 @@ import {
   SQYPING_EMAIL_APP_NAME,
   SQYPING_EMAIL_TAGLINE,
   SQYPING_GRADIENT,
+  SQYPING_SECRETARIAT_EMAIL,
 } from "@/lib/email/brand";
 import { escapeHtml } from "@/lib/email/escape-html";
 import { SQYPING_EMAIL_LOGO_CID } from "@/lib/email/logo-attachment";
@@ -198,4 +199,25 @@ export function emailMutedParagraph(html: string): string {
 
 export function emailSectionTitle(label: string): string {
   return `<p style="margin: 24px 0 12px 0; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: ${SQYPING_COLORS.text.secondary};">${escapeHtml(label)}</p>`;
+}
+
+/** Lien mailto vers le secrétariat (HTML e-mail). */
+export function emailSecretariatMailtoLink(): string {
+  const safeEmail = escapeHtml(SQYPING_SECRETARIAT_EMAIL);
+
+  return `<a href="mailto:${safeEmail}" style="color: ${SQYPING_COLORS.primary.main}; text-decoration: none;">${safeEmail}</a>`;
+}
+
+/** Phrase standard de contact secrétariat (HTML). */
+export function emailSecretariatContactHtml(
+  prefix = "Pour toute question, contactez le secrétariat par e-mail à"
+): string {
+  return `${prefix}&nbsp;${emailSecretariatMailtoLink()}.`;
+}
+
+/** Phrase standard de contact secrétariat (texte brut). */
+export function emailSecretariatContactText(
+  prefix = "Pour toute question, contactez le secrétariat par e-mail à"
+): string {
+  return `${prefix} ${SQYPING_SECRETARIAT_EMAIL}.`;
 }

@@ -5,6 +5,8 @@ import {
   emailMutedParagraph,
   emailParagraph,
   emailSectionTitle,
+  emailSecretariatContactText,
+  emailSecretariatMailtoLink,
 } from "@/lib/email/layout";
 import {
   BNPL_PAYMENT_REQUEST_NOTICE,
@@ -96,7 +98,7 @@ export function buildPaymentRequestEmail(
       "Après paiement, une facture détaillée vous sera transmise automatiquement par Stripe à la même adresse e-mail."
     ),
     emailMutedParagraph(
-      `Besoin d'aide&nbsp;? Répondez à cet e-mail ou contactez le secrétariat via <a href="${escapeHtml(appOrigin)}/club" style="color: ${SQYPING_COLORS.primary.main}; text-decoration: none;">${escapeHtml(SQYPING_EMAIL_APP_NAME)}</a>.`
+      `Besoin d'aide&nbsp;? Répondez à cet e-mail ou contactez le secrétariat par e-mail à ${emailSecretariatMailtoLink()}.`
     ),
   ].join("");
 
@@ -136,6 +138,8 @@ export function buildPaymentRequestEmail(
     checkoutUrl,
     "",
     "Une facture détaillée sera disponible après paiement.",
+    "",
+    emailSecretariatContactText("Besoin d'aide ? Contactez le secrétariat par e-mail à"),
     "",
     SQYPING_EMAIL_APP_NAME
   );

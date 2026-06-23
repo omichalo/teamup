@@ -278,6 +278,7 @@ export async function POST(
         registrationId: id,
         lineItems: stripeLineItems,
         customerEmail: paymentEmail,
+        customerName: adherentName,
         invoiceDescription: renderInvoiceHeader(stripePresentation.invoiceHeaderTemplate, {
           clubName: pricingConfig.meta.clubName,
           registrationId: id,
