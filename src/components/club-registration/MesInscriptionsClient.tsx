@@ -192,7 +192,7 @@ export function MesInscriptionsClient() {
       <Stack spacing={3}>
         <PageHeader
           eyebrow="Mon espace"
-          title="Mes inscriptions"
+          title="Mes dossiers"
           subtitle="Retrouvez l’historique de vos demandes au club et leur statut."
           actions={
             <Button
@@ -202,7 +202,7 @@ export function MesInscriptionsClient() {
               color="secondary"
               startIcon={<AddIcon fontSize="small" />}
             >
-              Nouvelle inscription
+              Nouvelle adhésion
             </Button>
           }
         />
@@ -250,7 +250,7 @@ export function MesInscriptionsClient() {
             <CardContent>
               <Typography variant="body1" color="text.secondary">
                 Vous n’avez pas encore de dossier d’inscription. Cliquez sur{" "}
-                <em>Nouvelle inscription</em> pour préparer un dossier.
+                <em>Nouvelle adhésion</em> pour préparer un dossier.
               </Typography>
             </CardContent>
           </Card>
