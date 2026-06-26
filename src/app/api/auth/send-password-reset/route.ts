@@ -4,7 +4,10 @@ import { buildPasswordResetEmail } from "@/lib/email/auth-emails";
 import { getSqyPingLogoAttachment } from "@/lib/email/logo-attachment";
 import { sendMail } from "@/lib/mailer";
 import { getFirebaseErrorMessage } from "@/lib/firebase-error-utils";
-import { checkRateLimit } from "@/lib/auth/rate-limit";
+import {
+  authEmailRateLimitExceededMessage,
+  checkAuthEmailRateLimit,
+} from "@/lib/auth/auth-email-rate-limit";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
 import {
   getAuthErrorCode,
@@ -39,18 +42,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Rate limiting par email (3 requêtes par 15 minutes)
-    const rateLimitResult = checkRateLimit(`email:${email}`, 3, 15 * 60 * 1000);
-    if (!rateLimitResult.allowed) {
-      return jsonNoStore(
-        {
-          error: "Trop de requêtes",
-          message: `Veuillez patienter avant de renvoyer un email. Prochaine tentative possible dans ${Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000 / 60)} minutes.`,
-        },
-        { status: 429 }
-      );
-    }
-
     const origin = resolveAppOrigin(req);
     const redirectUrl = `${origin}/reset-password`;
 
@@ -82,6 +73,17 @@ export async function POST(req: Request) {
       return jsonNoStore(
         { error: "Erreur serveur", message: "Impossible de traiter la demande" },
         { status: 500 }
+      );
+    }
+
+    const rateLimitResult = checkAuthEmailRateLimit("password-reset", email);
+    if (!rateLimitResult.allowed) {
+      return jsonNoStore(
+        {
+          error: "Trop de requêtes",
+          message: authEmailRateLimitExceededMessage(rateLimitResult.resetAt),
+        },
+        { status: 429 }
       );
     }
 
