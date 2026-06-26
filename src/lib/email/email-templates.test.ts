@@ -9,6 +9,7 @@ import { buildPaymentInstructionsEmail } from "@/lib/email/payment-instructions-
 import { BNPL_COPY_TEST_MARKER } from "@/lib/club-registration/payment/bnpl-checkout-copy";
 import { CHECK_PAYABLE_TO } from "@/lib/club-registration/payment-constants";
 import { buildRegistrationSubmittedEmail } from "@/lib/email/registration-submitted-email";
+import { buildRegistrationCreatedSecretaryEmail } from "@/lib/email/registration-created-secretary-email";
 import type { PriceQuote } from "@/lib/pricing/types";
 
 const APP_ORIGIN = "https://teamup.sqyping.fr";
@@ -98,6 +99,35 @@ describe("buildRegistrationSubmittedEmail", () => {
     expect(html).toContain("Suivre mon dossier");
     expect(html).toContain("created=reg_abc");
     expect(text).toContain(`${APP_ORIGIN}/club/mes-inscriptions?created=reg_abc`);
+  });
+});
+
+describe("buildRegistrationCreatedSecretaryEmail", () => {
+  it("inclut les informations adhérent et le lien vers le dossier secrétariat", () => {
+    const { html, text, subject } = buildRegistrationCreatedSecretaryEmail({
+      adherentName: "Marie Dupont",
+      birthDate: "2010-05-12",
+      adherentRole: "minor_dependent",
+      sectionLabel: "Loisir",
+      contactEmail: "parent@example.com",
+      contactPhone: "0612345678",
+      ffttLicense: "1234567",
+      isMinor: true,
+      submitterAccountEmail: "parent@example.com",
+      applicantNotes: "Disponible le mercredi après-midi.",
+      registrationId: "reg_secretary",
+      appOrigin: APP_ORIGIN,
+    });
+
+    expect(subject).toContain("Marie Dupont");
+    expect(html).toContain("Ouvrir le dossier");
+    expect(html).toContain("12/05/2010");
+    expect(html).toContain("Loisir");
+    expect(html).toContain("1234567");
+    expect(html).toContain("Disponible le mercredi");
+    expect(html).toContain(`${APP_ORIGIN}/club/demandes-adhesion?id=reg_secretary`);
+    expect(text).toContain("parent@example.com");
+    expect(text).toContain(`${APP_ORIGIN}/club/demandes-adhesion?id=reg_secretary`);
   });
 });
 

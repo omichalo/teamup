@@ -3,6 +3,7 @@
 import {
   FormControl,
   FormControlLabel,
+  FormHelperText,
   InputLabel,
   MenuItem,
   Select,
@@ -27,29 +28,32 @@ export function PracticeCompetitorJerseyField({ config, draft, onChange }: Props
   }
 
   return (
-    <FormControl fullWidth required={draft.wantsCompetitorExtras}>
-      <InputLabel id="jersey-label">Taille de maillot de compétition</InputLabel>
-      <Select
-        labelId="jersey-label"
-        label="Taille de maillot de compétition"
-        name="competitionJerseySize"
-        value={draft.competitionJerseySize ?? ""}
-        onChange={(e) =>
-          onChange({
-            competitionJerseySize: e.target.value as JerseySize,
-          })
-        }
-      >
-        <MenuItem value="">
-          <em>Choisir…</em>
-        </MenuItem>
-        {config.uiCopy.jerseySizes.map((size) => (
-          <MenuItem key={size} value={size}>
-            {size}
+    <Stack spacing={0.5}>
+      <FormControl fullWidth required={draft.wantsCompetitorExtras}>
+        <InputLabel id="jersey-label">Taille de maillot de compétition</InputLabel>
+        <Select
+          labelId="jersey-label"
+          label="Taille de maillot de compétition"
+          name="competitionJerseySize"
+          value={draft.competitionJerseySize ?? ""}
+          onChange={(e) =>
+            onChange({
+              competitionJerseySize: e.target.value as JerseySize,
+            })
+          }
+        >
+          <MenuItem value="">
+            <em>Choisir…</em>
           </MenuItem>
-        ))}
-      </Select>
-    </FormControl>
+          {config.uiCopy.jerseySizes.map((size) => (
+            <MenuItem key={size} value={size}>
+              {size}
+            </MenuItem>
+          ))}
+        </Select>
+        <FormHelperText>{config.uiCopy.jerseySizeHelper}</FormHelperText>
+      </FormControl>
+    </Stack>
   );
 }
 
@@ -109,6 +113,7 @@ export function PracticeOptionalJerseySection({ config, draft, onChange }: Props
               </MenuItem>
             ))}
           </Select>
+          <FormHelperText>{config.uiCopy.jerseySizeHelper}</FormHelperText>
         </FormControl>
       ) : null}
     </Stack>

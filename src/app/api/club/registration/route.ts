@@ -31,6 +31,7 @@ import {
 import { buildRegistrationSubmitDocument } from "@/lib/club-registration/persist-registration-on-submit";
 import { resolveRegistrationContactEmail } from "@/lib/club-registration/resolve-registration-contact-email";
 import { stripSubmitterEmailFromRegistrationPayload } from "@/lib/club-registration/strip-submitter-email-from-payload";
+import { notifySecretariesOfNewRegistration } from "@/lib/club-registration/dispatch-registration-notifications";
 import { buildRegistrationSubmittedEmail } from "@/lib/email/registration-submitted-email";
 import { getSqyPingLogoAttachment } from "@/lib/email/logo-attachment";
 import { sendMail } from "@/lib/mailer";
@@ -396,6 +397,20 @@ export async function POST(req: Request) {
       } catch (emailError) {
         console.error("[api/club/registration POST] confirmation email", emailError);
       }
+    }
+
+    try {
+      await notifySecretariesOfNewRegistration({
+        db,
+        req,
+        registrationId: docRef.id,
+        payload: sanitizedPayload,
+        config: activeConfig,
+        submitterAccountEmail: decoded.email ?? null,
+        isMinor: isMinorAt(sanitizedPayload.birthDate),
+      });
+    } catch (emailError) {
+      console.error("[api/club/registration POST] secretary notification email", emailError);
     }
 
     return jsonNoStore({ success: true, id: docRef.id }, { status: 200 });
