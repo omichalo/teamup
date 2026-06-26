@@ -29,6 +29,7 @@ import { PricingBreakdown, usePricingQuote } from "./PricingBreakdown";
 type Props = {
   draft: RegistrationDraft;
   accountEmail: string | null;
+  isRegistrationManager?: boolean;
   onEditStep: (stepId: RegistrationStepId) => void;
   onChange: (patch: Partial<RegistrationDraft>) => void;
 };
@@ -201,7 +202,13 @@ function RecapBlock({
   );
 }
 
-export function RecapStep({ draft, accountEmail, onEditStep, onChange }: Props) {
+export function RecapStep({
+  draft,
+  accountEmail,
+  isRegistrationManager = false,
+  onEditStep,
+  onChange,
+}: Props) {
   const config = useRegistrationConfigValue();
   const quote = usePricingQuote(draft);
   const additionalSections = draft.additionalSectionIds.map((id) =>
@@ -486,9 +493,11 @@ export function RecapStep({ draft, accountEmail, onEditStep, onChange }: Props) 
         title="Contacts et compte"
         padding="compact"
         description={
-          accountEmail
-            ? "Le compte connecté sert à envoyer et retrouver le dossier. Le club utilisera en priorité le contact principal indiqué ci-dessous."
-            : "Vous vous connecterez ou créerez un compte au moment d’envoyer le dossier. Le club utilisera en priorité le contact principal indiqué ci-dessous."
+          isRegistrationManager
+            ? "Le contact principal est celui de l'adhérent. Votre compte staff est conservé uniquement pour la traçabilité interne du dossier."
+            : accountEmail
+              ? "Le compte connecté sert à envoyer et retrouver le dossier. Le club utilisera en priorité le contact principal indiqué ci-dessous."
+              : "Vous vous connecterez ou créerez un compte au moment d'envoyer le dossier. Le club utilisera en priorité le contact principal indiqué ci-dessous."
         }
       >
         <Stack
@@ -500,7 +509,11 @@ export function RecapStep({ draft, accountEmail, onEditStep, onChange }: Props) 
             value={primaryContactEmail || "—"}
           />
           <EmailRow
-            label="Compte qui envoie le dossier"
+            label={
+              isRegistrationManager
+                ? "Compte secrétariat (traçabilité)"
+                : "Compte qui envoie le dossier"
+            }
             value={
               accountEmail ? (
                 <strong>{accountEmail}</strong>

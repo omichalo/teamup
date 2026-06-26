@@ -7,27 +7,30 @@ import {
   Box,
   Button,
   Divider,
-  Drawer,
   IconButton,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
   Menu,
   MenuItem,
-  Stack,
   Toolbar,
   Tooltip,
   Typography,
 } from "@mui/material";
 import {
   AccountCircle,
-  Close as CloseIcon,
   Logout,
   Menu as MenuIcon,
 } from "@mui/icons-material";
-import { buildLayoutNavigationItems } from "@/components/layout-navigation";
+import { LayoutAccountMenuItems } from "@/components/LayoutAccountMenuItems";
+import {
+  buildLayoutAccountMenuItems,
+  buildLayoutNavigation,
+  hasLayoutNavigation,
+} from "@/components/layout-navigation";
+import { LayoutNavDesktop } from "@/components/LayoutNavDesktop";
+import { LayoutNavDrawer } from "@/components/LayoutNavDrawer";
+import {
+  NAV_DESKTOP_BREAKPOINT,
+  resolveLayoutHomeHref,
+} from "@/components/layout-nav-utils";
 import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
 import Image from "next/image";
@@ -38,20 +41,6 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
-/* Breakpoint à partir duquel la navigation horizontale tient sans déborder.
-   En dessous (xs, sm, md), on bascule sur un Drawer avec icône hamburger. */
-const NAV_DESKTOP_BREAKPOINT = "lg" as const;
-
-/**
- * Détermine si un item de navigation correspond à la route courante.
- * On considère comme actif le match exact ainsi que les sous-routes.
- */
-function isItemActive(pathname: string | null, href: string): boolean {
-  if (!pathname) return false;
-  if (pathname === href) return true;
-  return pathname.startsWith(`${href}/`);
-}
-
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, signOut, isAdmin, isPlayer, isSecretary } = useAuth();
 
@@ -60,15 +49,32 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
 
-  const navigationItems = useMemo(
-    () =>
-      buildLayoutNavigationItems({
-        hasUser: Boolean(user),
-        isAdmin,
-        isPlayer,
-        isSecretary,
-      }),
+  const navOptions = useMemo(
+    () => ({
+      hasUser: Boolean(user),
+      isAdmin,
+      isPlayer,
+      isSecretary,
+    }),
     [isAdmin, isPlayer, isSecretary, user]
+  );
+
+  const navigation = useMemo(
+    () => buildLayoutNavigation(navOptions),
+    [navOptions]
+  );
+
+  const accountMenuItems = useMemo(
+    () => buildLayoutAccountMenuItems(navOptions),
+    [navOptions]
+  );
+
+  const homeHref = useMemo(
+    () =>
+      user
+        ? resolveLayoutHomeHref({ isPlayer, isSecretary })
+        : "/",
+    [isPlayer, isSecretary, user]
   );
 
   const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
@@ -89,10 +95,8 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     }
   };
 
-  const openDrawer = () => setDrawerOpen(true);
-  const closeDrawer = () => setDrawerOpen(false);
-
-  const hasNav = navigationItems.length > 0;
+  const hasNav =
+    hasLayoutNavigation(navigation) || accountMenuItems.length > 0;
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
@@ -103,119 +107,75 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             gap: 1,
           }}
         >
-          {/* Hamburger : visible uniquement sous le breakpoint desktop quand
-              une navigation est disponible. */}
           {hasNav ? (
             <IconButton
               edge="start"
               color="inherit"
               aria-label="Ouvrir le menu de navigation"
-              onClick={openDrawer}
+              onClick={() => setDrawerOpen(true)}
               sx={{ display: { xs: "inline-flex", [NAV_DESKTOP_BREAKPOINT]: "none" } }}
             >
               <MenuIcon />
             </IconButton>
           ) : null}
 
-          <Box
-            component={Link}
-            href="/"
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              color: "inherit",
-              textDecoration: "none",
-              flexGrow: 1,
-              gap: 1,
-              minWidth: 0,
-              cursor: "pointer",
-            }}
-          >
+          <Tooltip title="Accueil">
             <Box
+              component={Link}
+              href={homeHref}
               sx={{
-                width: { xs: 36, sm: 40, md: 44 },
-                height: { xs: 36, sm: 40, md: 44 },
-                borderRadius: 2,
-                backgroundColor: "rgba(255, 255, 255, 0.95)",
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "center",
-                boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-                overflow: "hidden",
-                flexShrink: 0,
-                px: 0.5,
-                py: 0.5,
-              }}
-            >
-              <Image
-                src="/sqyping-logo.jpg"
-                alt="SQY Ping"
-                width={40}
-                height={40}
-                priority
-                style={{ width: "100%", height: "auto" }}
-              />
-            </Box>
-            <Typography
-              variant="h6"
-              component="span"
-              sx={{
-                fontWeight: 600,
-                letterSpacing: 0.5,
-                whiteSpace: "nowrap",
-                /* « Team Up » est masqué sous 360px (très petits écrans) pour
-                   laisser de l'air au CTA Connexion / avatar. */
-                display: { xs: "none", sm: "inline" },
-              }}
-            >
-              Team Up
-            </Typography>
-          </Box>
-
-          {/* Navigation horizontale : visible uniquement à partir du breakpoint
-              desktop choisi. En dessous, c'est le Drawer qui prend le relais. */}
-          {hasNav ? (
-            <Stack
-              direction="row"
-              spacing={0.5}
-              sx={{
-                display: { xs: "none", [NAV_DESKTOP_BREAKPOINT]: "flex" },
-                alignItems: "center",
-                flexShrink: 1,
+                color: "inherit",
+                textDecoration: "none",
+                flexGrow: 1,
+                gap: 1,
                 minWidth: 0,
+                cursor: "pointer",
               }}
             >
-              {navigationItems.map((item) => {
-                const active = isItemActive(pathname, item.href);
-                return (
-                  <Button
-                    key={item.href}
-                    color="inherit"
-                    startIcon={item.icon}
-                    component={Link}
-                    href={item.href}
-                    aria-current={active ? "page" : undefined}
-                    sx={{
-                      textTransform: "none",
-                      px: 1.25,
-                      minWidth: "auto",
-                      whiteSpace: "nowrap",
-                      borderRadius: 1.5,
-                      fontWeight: active ? 700 : 500,
-                      backgroundColor: active
-                        ? "rgba(255,255,255,0.12)"
-                        : "transparent",
-                      "&:hover": {
-                        backgroundColor: "rgba(255,255,255,0.16)",
-                      },
-                      "& .MuiButton-startIcon": { marginRight: 0.5 },
-                    }}
-                  >
-                    {item.label}
-                  </Button>
-                );
-              })}
-            </Stack>
+              <Box
+                sx={{
+                  width: { xs: 36, sm: 40, md: 44 },
+                  height: { xs: 36, sm: 40, md: 44 },
+                  borderRadius: 2,
+                  backgroundColor: "rgba(255, 255, 255, 0.95)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                  overflow: "hidden",
+                  flexShrink: 0,
+                  px: 0.5,
+                  py: 0.5,
+                }}
+              >
+                <Image
+                  src="/sqyping-logo.jpg"
+                  alt="SQY Ping"
+                  width={40}
+                  height={40}
+                  priority
+                  style={{ width: "100%", height: "auto" }}
+                />
+              </Box>
+              <Typography
+                variant="h6"
+                component="span"
+                sx={{
+                  fontWeight: 600,
+                  letterSpacing: 0.5,
+                  whiteSpace: "nowrap",
+                  display: { xs: "none", sm: "inline" },
+                }}
+              >
+                Team Up
+              </Typography>
+            </Box>
+          </Tooltip>
+
+          {hasLayoutNavigation(navigation) ? (
+            <LayoutNavDesktop navigation={navigation} pathname={pathname} />
           ) : null}
 
           {user ? (
@@ -247,7 +207,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                 transformOrigin={{ vertical: "top", horizontal: "right" }}
                 open={Boolean(anchorEl)}
                 onClose={handleClose}
-                slotProps={{ paper: { sx: { minWidth: 220, mt: 1 } } }}
+                slotProps={{ paper: { sx: { minWidth: 240, mt: 1 } } }}
               >
                 <MenuItem onClick={handleClose} disabled>
                   <AccountCircle sx={{ mr: 1 }} />
@@ -255,7 +215,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
                     {user.displayName || user.email}
                   </Box>
                 </MenuItem>
-                <Divider />
+                <LayoutAccountMenuItems
+                  items={accountMenuItems}
+                  pathname={pathname}
+                  onNavigate={handleClose}
+                />
+                {accountMenuItems.length > 0 ? <Divider /> : null}
                 <MenuItem onClick={handleSignOut}>
                   <Logout sx={{ mr: 1 }} />
                   Déconnexion
@@ -278,123 +243,15 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         </Toolbar>
       </AppBar>
 
-      {/* Drawer de navigation : occupe l'écran sur mobile, panneau latéral
-          ailleurs. On le masque au-delà du breakpoint desktop, où la nav
-          horizontale prend le relais. */}
-      <Drawer
-        anchor="left"
-        open={drawerOpen}
-        onClose={closeDrawer}
-        ModalProps={{ keepMounted: true }}
-        sx={{
-          display: { xs: "block", [NAV_DESKTOP_BREAKPOINT]: "none" },
-          "& .MuiDrawer-paper": {
-            width: { xs: "80vw", sm: 320 },
-            maxWidth: 360,
-            boxSizing: "border-box",
-          },
-        }}
-      >
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            px: 2,
-            py: 1.5,
-            backgroundColor: "primary.main",
-            color: "primary.contrastText",
-          }}
-        >
-          <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0 }}>
-            <Box
-              sx={{
-                width: 36,
-                height: 36,
-                borderRadius: 1.5,
-                backgroundColor: "rgba(255,255,255,0.95)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                overflow: "hidden",
-                p: 0.25,
-                flexShrink: 0,
-              }}
-            >
-              <Image
-                src="/sqyping-logo.jpg"
-                alt="SQY Ping"
-                width={32}
-                height={32}
-                style={{ width: "100%", height: "auto" }}
-              />
-            </Box>
-            <Typography variant="subtitle1" component="span" sx={{ fontWeight: 700 }}>
-              Team Up
-            </Typography>
-          </Stack>
-          <IconButton
-            aria-label="Fermer le menu"
-            onClick={closeDrawer}
-            sx={{ color: "inherit" }}
-            edge="end"
-          >
-            <CloseIcon />
-          </IconButton>
-        </Box>
-
-        <Divider />
-
-        <List sx={{ py: 1 }}>
-          {navigationItems.map((item) => {
-            const active = isItemActive(pathname, item.href);
-            return (
-              <ListItem key={item.href} disablePadding>
-                <ListItemButton
-                  component={Link}
-                  href={item.href}
-                  onClick={closeDrawer}
-                  selected={active}
-                  aria-current={active ? "page" : undefined}
-                  sx={{
-                    borderRadius: 0,
-                    "&.Mui-selected": {
-                      backgroundColor: "rgba(40,48,109,0.08)",
-                      borderRight: 3,
-                      borderColor: "secondary.main",
-                    },
-                    "&.Mui-selected:hover": {
-                      backgroundColor: "rgba(40,48,109,0.12)",
-                    },
-                    px: 2,
-                    py: 1.25,
-                  }}
-                >
-                  <ListItemIcon
-                    sx={{
-                      minWidth: 40,
-                      color: active ? "primary.main" : "text.secondary",
-                    }}
-                  >
-                    {item.icon}
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={item.label}
-                    slotProps={{
-                      primary: {
-                        sx: {
-                          fontWeight: active ? 700 : 500,
-                          color: active ? "primary.main" : "text.primary",
-                        },
-                      },
-                    }}
-                  />
-                </ListItemButton>
-              </ListItem>
-            );
-          })}
-        </List>
-      </Drawer>
+      {hasNav ? (
+        <LayoutNavDrawer
+          navigation={navigation}
+          accountItems={accountMenuItems}
+          pathname={pathname}
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+        />
+      ) : null}
 
       <Box component="main" sx={{ flexGrow: 1 }}>
         {children}

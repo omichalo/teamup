@@ -22,15 +22,15 @@ import { USER_ROLES } from "@/lib/auth/roles";
 export default function PlayerHomePage() {
   const quickActions = [
     {
-      title: "Nouvelle inscription",
+      title: "Nouvelle adhésion",
       description:
         "Créer un nouveau dossier d'adhésion pour vous ou un membre de votre foyer.",
       href: "/club/inscription",
-      cta: "Démarrer une inscription",
+      cta: "Démarrer une adhésion",
       icon: <DescriptionIcon color="primary" />,
     },
     {
-      title: "Mes inscriptions",
+      title: "Mes dossiers",
       description:
         "Suivre l'avancement de vos dossiers et vérifier les informations transmises.",
       href: "/club/mes-inscriptions",

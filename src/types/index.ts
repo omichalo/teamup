@@ -179,6 +179,8 @@ export interface User {
   lastLoginAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  /** Peut piloter le triage des idées d'amélioration (statut, priorité, livraison). */
+  appMaintainer?: boolean;
 }
 
 export interface UserProfileDocument {
@@ -195,6 +197,7 @@ export interface UserProfileDocument {
   lastLoginAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  appMaintainer?: boolean;
 }
 
 // Types pour les erreurs de validation

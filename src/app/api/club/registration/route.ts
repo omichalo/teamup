@@ -5,7 +5,7 @@ import { normalizeReductionReferenceCodes } from "@/lib/club-registration/reduct
 import { cookies } from "next/headers";
 import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
-import { canAccessClubRegistration } from "@/lib/club-registration/registration-access";
+import { canAccessClubRegistration, isClubRegistrationManager } from "@/lib/club-registration/registration-access";
 import { FieldValue } from "firebase-admin/firestore";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
 import { logAuditAction, AUDIT_ACTIONS } from "@/lib/auth/audit-logger";
@@ -29,131 +29,19 @@ import {
   normalizeApplicantNotes,
 } from "@/lib/club-registration/applicant-notes";
 import { buildRegistrationSubmitDocument } from "@/lib/club-registration/persist-registration-on-submit";
+import { resolveRegistrationContactEmail } from "@/lib/club-registration/resolve-registration-contact-email";
+import { stripSubmitterEmailFromRegistrationPayload } from "@/lib/club-registration/strip-submitter-email-from-payload";
 import { buildRegistrationSubmittedEmail } from "@/lib/email/registration-submitted-email";
 import { getSqyPingLogoAttachment } from "@/lib/email/logo-attachment";
 import { sendMail } from "@/lib/mailer";
 import { getAppBaseUrl } from "@/lib/club-registration/stripe";
+import {
+  MANAGER_EDITABLE_FIELDS,
+  REGISTRATION_CLIENT_FIELDS,
+} from "@/lib/club-registration/registration-api-fields";
 
 const COLLECTION = "clubRegistrations";
 const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
-
-/** Champs métier renvoyés au client (hors Timestamps bruts). */
-const REGISTRATION_CLIENT_FIELDS = [
-  "adherentRole",
-  "ffttLicense",
-  "ffttLicenseLookup",
-  "firstName",
-  "lastName",
-  "sex",
-  "birthCity",
-  "birthDate",
-  "adherentEmail",
-  "adherentPhonePrimary",
-  "adherentPhoneSecondary",
-  "addressLine1",
-  "addressLine2",
-  "postalCode",
-  "city",
-  "representatives",
-  "mainSectionId",
-  "additionalSectionIds",
-  "slotIds",
-  "schoolPickupSlotIds",
-  "medicalCertificateDeclaration",
-  "medicalQuestionnaire",
-  "medicalVeteranPath",
-  "medicalCertificateStatus",
-  "medicalCertificateStatusUpdatedAt",
-  "medicalCertificateStatusUpdatedBy",
-  "wantsRegistrationCertificate",
-  "familyRegistrationOrder",
-  "reductionTypes",
-  "reductionReferenceCodes",
-  "firstFemaleRegistrationSqy",
-  "photoConsent",
-  "emergencyMedicalAuthorization",
-  "supervisionAcknowledgement",
-  "internalRulesAccepted",
-  "wantsCompetitorExtras",
-  "competitionJerseySize",
-  "wantsOptionalJersey",
-  "optionalJerseySize",
-  "competitionIds",
-  "applicantNotes",
-  "isMinor",
-  "submitterUid",
-  "submitterAccountEmail",
-  "schemaVersion",
-  "status",
-  "reviewNotes",
-  "paymentAmountCents",
-  "paymentRequestedAt",
-  "paymentRequestedBy",
-  "paymentEmailSentTo",
-  "stripeCheckoutSessionId",
-  "stripeCheckoutUrl",
-  "stripeInvoiceId",
-  "paymentStatus",
-  "paidAt",
-  "pricingQuote",
-  "pricingQuoteStatus",
-  "pricingQuoteComputedAt",
-  "handisportPracticeLevel",
-  "paymentStripeLineItems",
-  "payment",
-  "paymentMethod",
-  "paymentInstallments",
-  "paymentAids",
-  "holidayVoucherAmountCents",
-  "remainingPaymentMethod",
-  "paymentNote",
-  "specialPaymentNote",
-] as const;
-
-const MANAGER_EDITABLE_FIELDS = [
-  "adherentRole",
-  "ffttLicense",
-  "ffttLicenseLookup",
-  "firstName",
-  "lastName",
-  "sex",
-  "birthCity",
-  "birthDate",
-  "adherentEmail",
-  "adherentPhonePrimary",
-  "adherentPhoneSecondary",
-  "addressLine1",
-  "addressLine2",
-  "postalCode",
-  "city",
-  "representatives",
-  "mainSectionId",
-  "additionalSectionIds",
-  "slotIds",
-  "schoolPickupSlotIds",
-  "medicalCertificateDeclaration",
-  "medicalQuestionnaire",
-  "medicalVeteranPath",
-  "medicalCertificateStatus",
-  "wantsRegistrationCertificate",
-  "familyRegistrationOrder",
-  "reductionTypes",
-  "reductionReferenceCodes",
-  "firstFemaleRegistrationSqy",
-  "photoConsent",
-  "emergencyMedicalAuthorization",
-  "supervisionAcknowledgement",
-  "internalRulesAccepted",
-  "wantsCompetitorExtras",
-  "competitionJerseySize",
-  "wantsOptionalJersey",
-  "optionalJerseySize",
-  "competitionIds",
-  "applicantNotes",
-  "reviewNotes",
-  "paymentAmountCents",
-  "handisportPracticeLevel",
-] as const;
 
 function stripUndefined<T extends Record<string, unknown>>(obj: T): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -431,20 +319,33 @@ export async function POST(req: Request) {
       );
     }
 
-    const payload = parsed.data;
+    const payload = isClubRegistrationManager(role)
+      ? stripSubmitterEmailFromRegistrationPayload(parsed.data, decoded.email)
+      : parsed.data;
+
+    const payloadCheck = buildRegistrationPayloadSchema(activeConfig).safeParse(payload);
+    if (!payloadCheck.success) {
+      const first = payloadCheck.error.flatten();
+      return jsonNoStore(
+        { error: "Données invalides", fieldErrors: first.fieldErrors },
+        { status: 400 }
+      );
+    }
+
+    const sanitizedPayload = payloadCheck.data;
     const db = getFirestoreAdmin();
     const now = FieldValue.serverTimestamp();
 
     const docRef = await db.collection(COLLECTION).add(
       stripUndefined(
         buildRegistrationSubmitDocument({
-          payload,
+          payload: sanitizedPayload,
           config: activeConfig,
           submitterUid: decoded.uid,
           submitterAccountEmail: decoded.email ?? null,
-          isMinor: isMinorAt(payload.birthDate),
+          isMinor: isMinorAt(sanitizedPayload.birthDate),
           medicalCertificateStatus: initialMedicalCertificateStatus(
-            payload.medicalCertificateDeclaration
+            sanitizedPayload.medicalCertificateDeclaration
           ),
           now,
         })
@@ -457,20 +358,36 @@ export async function POST(req: Request) {
       success: true,
     });
 
-    const submitterEmail = decoded.email?.trim();
-    if (submitterEmail) {
-      const adherentName =
-        `${payload.firstName ?? ""} ${payload.lastName ?? ""}`.trim() || "adhérent";
-      const appOrigin = getAppBaseUrl(req);
-      const confirmationMail = buildRegistrationSubmittedEmail({
-        adherentName,
-        registrationId: docRef.id,
-        appOrigin,
-      });
+    const adherentName =
+      `${sanitizedPayload.firstName ?? ""} ${sanitizedPayload.lastName ?? ""}`.trim() ||
+      "adhérent";
+    const appOrigin = getAppBaseUrl(req);
+    const confirmationMail = buildRegistrationSubmittedEmail({
+      adherentName,
+      registrationId: docRef.id,
+      appOrigin,
+    });
 
+    const confirmationRecipients: string[] = [];
+    if (isClubRegistrationManager(role)) {
+      const contactEmail = resolveRegistrationContactEmail({
+        adherentEmail: sanitizedPayload.adherentEmail,
+        representatives: sanitizedPayload.representatives,
+      });
+      if (contactEmail) {
+        confirmationRecipients.push(contactEmail);
+      }
+    } else {
+      const submitterEmail = decoded.email?.trim();
+      if (submitterEmail) {
+        confirmationRecipients.push(submitterEmail);
+      }
+    }
+
+    for (const to of confirmationRecipients) {
       try {
         await sendMail({
-          to: submitterEmail,
+          to,
           subject: `Demande d'adhésion reçue — ${adherentName}`,
           html: confirmationMail.html,
           text: confirmationMail.text,

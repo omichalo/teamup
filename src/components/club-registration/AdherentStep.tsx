@@ -35,6 +35,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 type Props = {
   draft: RegistrationDraft;
   accountEmail: string | null;
+  isRegistrationManager?: boolean;
   onPatch: (patch: Partial<RegistrationDraft>) => void;
   onSetSex: (sex: RegistrationDraft["sex"]) => void;
 };
@@ -46,7 +47,13 @@ type Props = {
  * contact et adresse postale. Le bloc « Représentants légaux » est extrait
  * dans une étape conditionnelle dédiée pour ne pas surcharger cette page.
  */
-export function AdherentStep({ draft, accountEmail, onPatch, onSetSex }: Props) {
+export function AdherentStep({
+  draft,
+  accountEmail,
+  isRegistrationManager = false,
+  onPatch,
+  onSetSex,
+}: Props) {
   const { isTouched, markTouched } = useTouchedFields();
 
   const minor = isMinorAt(draft.birthDate);
@@ -96,8 +103,10 @@ export function AdherentStep({ draft, accountEmail, onPatch, onSetSex }: Props) 
     : draft.adherentRole === "other_adult"
       ? "E-mail de contact de l’adhérent"
       : "E-mail de contact";
-  const emailHelperDefault = minor
-    ? "Optionnel. Pour un mineur, le contact principal est le représentant légal."
+  const emailHelperDefault = isRegistrationManager
+    ? "Adresse de l'adhérent ou du représentant pour le suivi du dossier. N'utilisez pas votre e-mail professionnel du club."
+    : minor
+      ? "Optionnel. Pour un mineur, le contact principal est le représentant légal."
     : draft.adherentRole === "other_adult"
       ? "Indiquez l’adresse à utiliser pour le suivi de ce dossier. Elle peut être différente du compte qui envoie la demande."
       : accountEmail

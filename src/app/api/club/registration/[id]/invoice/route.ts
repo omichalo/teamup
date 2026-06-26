@@ -5,6 +5,7 @@ import { jsonNoStore } from "@/lib/http/cache-headers";
 import { adminAuth, getFirestoreAdmin } from "@/lib/firebase-admin";
 import { resolveRole } from "@/lib/auth/roles";
 import { canAccessClubRegistration } from "@/lib/club-registration/registration-access";
+import { resolveRegistrationContactEmail } from "@/lib/club-registration/resolve-registration-contact-email";
 import { isRegistrationPaidRecord } from "@/lib/club-registration/payment-proof";
 import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
 import {
@@ -16,17 +17,7 @@ import {
 const COLLECTION = "clubRegistrations";
 
 function resolveInvoiceEmail(data: Record<string, unknown>): string | null {
-  const adherentEmail =
-    typeof data.adherentEmail === "string" ? data.adherentEmail.trim() : "";
-  if (adherentEmail.includes("@")) return adherentEmail;
-
-  const submitterEmail =
-    typeof data.submitterAccountEmail === "string"
-      ? data.submitterAccountEmail.trim()
-      : "";
-  if (submitterEmail.includes("@")) return submitterEmail;
-
-  return null;
+  return resolveRegistrationContactEmail(data);
 }
 
 function resolveInvoiceAmountCents(data: Record<string, unknown>): number {
