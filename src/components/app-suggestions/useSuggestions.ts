@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { readJsonResponse } from "@/lib/http/read-json-response";
 import type {
   AppSuggestionDetail,
@@ -119,8 +119,11 @@ export function useSuggestionDetail() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const detailRequestRef = useRef(0);
 
   const loadDetail = useCallback(async (id: string, options?: { silent?: boolean }) => {
+    const requestSeq = ++detailRequestRef.current;
+
     if (!options?.silent) {
       setLoading(true);
       setDetail(null);
@@ -135,6 +138,10 @@ export function useSuggestionDetail() {
         SuggestionDetailResponse & { error?: string }
       >(response);
 
+      if (requestSeq !== detailRequestRef.current) {
+        return;
+      }
+
       if (!response.ok) {
         throw new Error(payload.error || "Impossible de charger l'idée");
       }
@@ -142,6 +149,9 @@ export function useSuggestionDetail() {
       setDetail(payload.suggestion);
       setViewer(payload.viewer);
     } catch (loadError) {
+      if (requestSeq !== detailRequestRef.current) {
+        return;
+      }
       setError(
         loadError instanceof Error
           ? loadError.message
@@ -151,7 +161,7 @@ export function useSuggestionDetail() {
         setDetail(null);
       }
     } finally {
-      if (!options?.silent) {
+      if (requestSeq === detailRequestRef.current && !options?.silent) {
         setLoading(false);
       }
     }
