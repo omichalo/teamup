@@ -236,6 +236,14 @@ service cloud.firestore {
     }
 
     // ============================================
+    // Collection: appSuggestions (+ comments)
+    // ============================================
+    // Accès Admin SDK uniquement via les routes API.
+    match /appSuggestions/{document=**} {
+      allow read, write: if false;
+    }
+
+    // ============================================
     // Règle par défaut : refuser tout accès non explicitement autorisé
     // ============================================
     match /{document=**} {

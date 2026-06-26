@@ -649,9 +649,13 @@ export function ClubRegistrationWizard({
     <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="fr">
       <Stack spacing={3}>
         <PageHeader
-          eyebrow="Inscription au club"
-          title="Préparez votre dossier"
-          subtitle="Renseignez les informations nécessaires pour demander votre adhésion au club."
+          eyebrow={isRegistrationManager ? "Adhésions" : "Inscription au club"}
+          title={isRegistrationManager ? "Saisir une adhésion" : "Préparez votre dossier"}
+          subtitle={
+            isRegistrationManager
+              ? "Enregistrez un dossier à partir d'une fiche papier ou d'un échange au secrétariat."
+              : "Renseignez les informations nécessaires pour demander votre adhésion au club."
+          }
         />
 
         <SectionCard padding="compact" contentSx={{ py: 2 }}>
@@ -837,7 +841,8 @@ export function ClubRegistrationWizard({
               {currentStepId === "adherent" && (
                 <AdherentStep
                   draft={draft}
-                  accountEmail={accountEmail}
+                  accountEmail={isRegistrationManager ? null : accountEmail}
+                  isRegistrationManager={isRegistrationManager}
                   onPatch={actions.patchFields}
                   onSetSex={actions.setSex}
                 />
@@ -872,6 +877,7 @@ export function ClubRegistrationWizard({
                 <RecapStep
                   draft={draft}
                   accountEmail={accountEmail}
+                  isRegistrationManager={isRegistrationManager}
                   onEditStep={handleGoToStepId}
                   onChange={actions.patchFields}
                 />

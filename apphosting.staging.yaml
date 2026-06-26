@@ -34,6 +34,11 @@ env:
       - BUILD
       - RUNTIME
 
+  - variable: FIREBASE_STORAGE_BUCKET
+    value: sqyping-teamup-dev-teamup-media
+    availability:
+      - RUNTIME
+
   - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
     value: "544871588374"
     availability:

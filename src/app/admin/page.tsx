@@ -41,6 +41,7 @@ import { LocationsManagementSection } from "@/components/admin/LocationsManageme
 import { SyncOperationCard } from "@/components/admin/SyncOperationCard";
 import { CoachRequestsSection } from "@/components/admin/CoachRequestsSection";
 import { UsersManagementTable } from "@/components/admin/UsersManagementTable";
+import { useUserAdminActions } from "@/components/admin/useUserAdminActions";
 import { TabPanel } from "@/components/ui/TabPanel";
 
 const ADMIN_TAB_PANEL_PROPS = {
@@ -95,7 +96,6 @@ export default function AdminPage() {
   const [processingUserId, setProcessingUserId] = useState<string | null>(null);
   const [usersInitialized, setUsersInitialized] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [roleUpdateTarget, setRoleUpdateTarget] = useState<string | null>(null);
 
   const fetchSyncStatus = useCallback(async () => {
     if (!user) {
@@ -450,6 +450,19 @@ export default function AdminPage() {
     [users]
   );
 
+  const {
+    roleUpdateTarget,
+    maintainerUpdateTarget,
+    handleRoleChange,
+    handleAppMaintainerChange,
+  } = useUserAdminActions({
+    currentUserId: user?.id,
+    adminCount,
+    fetchUsers,
+    setUsersError,
+    setUserActionSuccess,
+  });
+
   const coachRequestChipColor = (
     status: (typeof COACH_REQUEST_STATUS)[keyof typeof COACH_REQUEST_STATUS]
   ) => {
@@ -464,63 +477,6 @@ export default function AdminPage() {
         return "default";
     }
   };
-
-  const handleRoleChange = useCallback(
-    async (targetUser: User, newRole: UserRole) => {
-      if (!user) {
-        return;
-      }
-
-      if (
-        targetUser.role === USER_ROLES.ADMIN &&
-        newRole !== USER_ROLES.ADMIN &&
-        adminCount <= 1
-      ) {
-        setUsersError(
-          "Impossible de retirer les droits du dernier administrateur."
-        );
-        setUserActionSuccess(null);
-        return;
-      }
-
-      const targetKey = `${targetUser.id}-${newRole}`;
-      setRoleUpdateTarget(targetKey);
-      setUsersError(null);
-      setUserActionSuccess(null);
-
-      try {
-        const response = await fetch("/api/admin/users/set-role", {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            userId: targetUser.id,
-            role: newRole,
-          }),
-        });
-
-        if (!response.ok) {
-          const payload = await response.json().catch(() => null);
-          throw new Error(payload?.error || "Échec de la mise à jour du rôle");
-        }
-
-        setUserActionSuccess("Rôle mis à jour avec succès.");
-        await fetchUsers();
-      } catch (error) {
-        console.error("Erreur lors de la mise à jour du rôle:", error);
-        setUsersError(
-          error instanceof Error
-            ? error.message
-            : "Impossible de mettre à jour le rôle"
-        );
-      } finally {
-        setRoleUpdateTarget(null);
-      }
-    },
-    [adminCount, fetchUsers, user]
-  );
 
   const getRoleLabel = useCallback((role: UserRole) => {
     switch (role) {
@@ -891,7 +847,9 @@ export default function AdminPage() {
                       currentUserId={user?.id}
                       adminCount={adminCount}
                       roleUpdateTarget={roleUpdateTarget}
+                      maintainerUpdateTarget={maintainerUpdateTarget}
                       onRoleChange={handleRoleChange}
+                      onAppMaintainerChange={handleAppMaintainerChange}
                       getRoleLabel={getRoleLabel}
                       getCoachStatusLabel={getCoachStatusLabel}
                       getCoachStatusColor={coachRequestChipColor}

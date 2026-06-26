@@ -75,6 +75,9 @@ export function RegistrationConfigClient() {
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 3 } }}>
       <Stack spacing={CONFIG_PAGE_BLOCK_SPACING}>
+        <Typography variant="h4" component="h1">
+          Campagnes &amp; tarifs
+        </Typography>
         <ConfigPublishBar
           dirty={dirty}
           saving={saving}

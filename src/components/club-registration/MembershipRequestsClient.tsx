@@ -558,7 +558,7 @@ export function MembershipRequestsClient() {
       <Stack spacing={3}>
         <PageHeader
           eyebrow="Secrétariat"
-          title="Demandes d'adhésion"
+          title="Dossiers à valider"
           subtitle={BNPL_SECRETARIAT_PAGE_SUBTITLE}
           actions={
             <Button

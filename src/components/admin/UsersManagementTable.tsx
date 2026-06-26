@@ -8,7 +8,9 @@ import {
   CircularProgress,
   MenuItem,
   Select,
+  FormControlLabel,
   Stack,
+  Switch,
   Table,
   TableBody,
   TableCell,
@@ -26,7 +28,9 @@ interface UsersManagementTableProps {
   currentUserId?: string | undefined;
   adminCount: number;
   roleUpdateTarget: string | null;
+  maintainerUpdateTarget: string | null;
   onRoleChange: (user: User, newRole: UserRole) => void;
+  onAppMaintainerChange: (user: User, appMaintainer: boolean) => void;
   getRoleLabel: (role: UserRole) => string;
   getCoachStatusLabel: (status: User["coachRequestStatus"]) => string;
   getCoachStatusColor: (status: User["coachRequestStatus"]) => CoachRequestChipColor;
@@ -37,7 +41,9 @@ export function UsersManagementTable({
   currentUserId,
   adminCount,
   roleUpdateTarget,
+  maintainerUpdateTarget,
   onRoleChange,
+  onAppMaintainerChange,
   getRoleLabel,
   getCoachStatusLabel,
   getCoachStatusColor,
@@ -48,6 +54,7 @@ export function UsersManagementTable({
         <TableRow sx={{ backgroundColor: "action.hover" }}>
           <TableCell sx={{ fontWeight: 700, minWidth: 280 }}>Utilisateur</TableCell>
           <TableCell sx={{ fontWeight: 700, minWidth: 180 }}>Rôle</TableCell>
+          <TableCell sx={{ fontWeight: 700, minWidth: 160 }}>Mainteneur app</TableCell>
           <TableCell sx={{ fontWeight: 700, minWidth: 140 }}>Email vérifié</TableCell>
           <TableCell sx={{ fontWeight: 700 }}>Demande coach</TableCell>
         </TableRow>
@@ -62,6 +69,7 @@ export function UsersManagementTable({
           const isRoleUpdateLoading =
             roleUpdateTarget !== null &&
             roleUpdateTarget.startsWith(`${targetUser.id}-`);
+          const isMaintainerUpdateLoading = maintainerUpdateTarget === targetUser.id;
 
           return (
             <TableRow
@@ -151,6 +159,26 @@ export function UsersManagementTable({
                   </Select>
                   {isRoleUpdateLoading ? <CircularProgress size={20} /> : null}
                 </Box>
+              </TableCell>
+
+              <TableCell>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={targetUser.appMaintainer === true}
+                        onChange={(event) => {
+                          onAppMaintainerChange(targetUser, event.target.checked);
+                        }}
+                        disabled={isMaintainerUpdateLoading}
+                        size="small"
+                      />
+                    }
+                    label=""
+                    sx={{ m: 0 }}
+                  />
+                  {isMaintainerUpdateLoading ? <CircularProgress size={20} /> : null}
+                </Stack>
               </TableCell>
 
               <TableCell>

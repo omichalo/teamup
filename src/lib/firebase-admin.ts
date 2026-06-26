@@ -1,6 +1,7 @@
 import { initializeApp, getApps, cert, applicationDefault } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
+import { getStorage } from "firebase-admin/storage";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -33,6 +34,34 @@ function resolveFirebaseAdminProjectId(): string {
   );
 }
 
+function resolveFirebaseAdminStorageBucket(projectId: string): string {
+  if (process.env.FIREBASE_WEBAPP_CONFIG) {
+    try {
+      const parsed = JSON.parse(process.env.FIREBASE_WEBAPP_CONFIG) as {
+        storageBucket?: string;
+      };
+      if (parsed.storageBucket?.trim()) {
+        return parsed.storageBucket.trim();
+      }
+    } catch {
+      // ignore invalid JSON
+    }
+  }
+
+  return (
+    process.env.FIREBASE_STORAGE_BUCKET?.trim() ||
+    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET?.trim() ||
+    `${projectId}.firebasestorage.app`
+  );
+}
+
+function buildFirebaseAdminAppOptions(projectId: string) {
+  return {
+    projectId,
+    storageBucket: resolveFirebaseAdminStorageBucket(projectId),
+  };
+}
+
 // Initialiser Firebase Admin (une seule fois)
 const app = (() => {
   if (getApps().length > 0) {
@@ -55,7 +84,7 @@ const app = (() => {
     try {
       return initializeApp({
         credential: applicationDefault(),
-        projectId,
+        ...buildFirebaseAdminAppOptions(projectId),
       });
     } catch (error) {
       console.error("❌ Erreur lors de l'initialisation avec Application Default Credentials:", error);
@@ -86,7 +115,7 @@ const app = (() => {
       
       return initializeApp({
         credential: cert(serviceAccount),
-        projectId: serviceAccountProjectId,
+        ...buildFirebaseAdminAppOptions(serviceAccountProjectId),
       });
     } catch (error) {
       console.error("❌ Erreur lors de l'initialisation avec GOOGLE_APPLICATION_CREDENTIALS:", error);
@@ -113,7 +142,7 @@ const app = (() => {
         clientEmail,
         privateKey,
       }),
-      projectId: explicitProjectId,
+      ...buildFirebaseAdminAppOptions(explicitProjectId),
     });
   }
 
@@ -148,4 +177,16 @@ export const getFirestoreAdmin = () => {
 
 export const getFirebaseAdmin = () => {
   return adminApp;
+};
+
+export const getStorageAdmin = () => {
+  return getStorage(app);
+};
+
+export const getStorageBucketAdmin = () => {
+  const bucketName = app.options.storageBucket;
+  if (!bucketName) {
+    throw new Error("Bucket Firebase Storage non configuré");
+  }
+  return getStorageAdmin().bucket(bucketName);
 };
