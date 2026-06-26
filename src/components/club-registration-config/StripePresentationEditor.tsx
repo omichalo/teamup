@@ -130,6 +130,15 @@ export function StripePresentationEditor({ config, onChange }: Props) {
             fullWidth
           />
           <TextField
+            label="Note sous le sélecteur de taille (formulaire)"
+            size="small"
+            value={config.uiCopy.jerseySizeHelper}
+            onChange={(e) => updateUiCopy({ jerseySizeHelper: e.target.value })}
+            multiline
+            minRows={2}
+            fullWidth
+          />
+          <TextField
             label="Libellé case à cocher — maillot optionnel"
             size="small"
             value={config.uiCopy.optionalJerseyOptInLabel}

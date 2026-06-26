@@ -164,6 +164,8 @@ export type RegistrationUiCopy = {
   handisportPracticeOptions: Array<{ id: "leisure" | "competition"; label: string }>;
   /** Texte d'aide sous l'option section compétiteur (maillot obligatoire, 15 € inclus). */
   competitorJerseyHelper: string;
+  /** Note sous le sélecteur de taille (modèle garçon). */
+  jerseySizeHelper: string;
   /** Libellé de la case à cocher maillot hors section compétiteur. */
   optionalJerseyOptInLabel: string;
 };

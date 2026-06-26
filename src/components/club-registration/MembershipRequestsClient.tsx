@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Alert,
   Box,
@@ -202,6 +203,8 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 export function MembershipRequestsClient() {
+  const params = useSearchParams();
+  const registrationIdFromUrl = params?.get("id") ?? null;
   const config = useRegistrationConfigValue();
   const sectionOptions = getEnabledSections(config);
   const competitionOptions = config.competitions.filter((c) => c.enabled);
@@ -260,6 +263,10 @@ export function MembershipRequestsClient() {
   }, [config]);
 
   useEffect(() => {
+    if (registrationIdFromUrl) {
+      setSelectedId(registrationIdFromUrl);
+      return;
+    }
     if (registrations.length === 0) {
       setSelectedId(null);
       return;
@@ -267,7 +274,7 @@ export function MembershipRequestsClient() {
     if (!selectedId || !registrations.some((registration) => registration.id === selectedId)) {
       setSelectedId(registrations[0].id);
     }
-  }, [registrations, selectedId]);
+  }, [registrations, registrationIdFromUrl, selectedId]);
 
   useEffect(() => {
     if (selectedId) {

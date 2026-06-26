@@ -62,6 +62,7 @@ export function RegistrationCompetitionFields({
           label="Taille maillot compétition"
           value={form.competitionJerseySize}
           onChange={(e) => onFieldChange("competitionJerseySize", e.target.value)}
+          helperText={config.uiCopy.jerseySizeHelper}
           fullWidth
         >
           <MenuItem value="">Non renseignée</MenuItem>
@@ -97,6 +98,7 @@ export function RegistrationCompetitionFields({
               label="Taille maillot optionnel"
               value={form.optionalJerseySize}
               onChange={(e) => onFieldChange("optionalJerseySize", e.target.value)}
+              helperText={config.uiCopy.jerseySizeHelper}
               fullWidth
               disabled={!form.wantsOptionalJersey}
             >

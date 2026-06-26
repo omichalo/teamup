@@ -169,6 +169,7 @@ const registrationUiCopySchema = z.object({
     )
     .min(1),
   competitorJerseyHelper: z.string().trim().min(1).max(500).optional(),
+  jerseySizeHelper: z.string().trim().min(1).max(500).optional(),
   optionalJerseyOptInLabel: z.string().trim().min(1).max(500).optional(),
 });
 

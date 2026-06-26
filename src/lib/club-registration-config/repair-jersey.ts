@@ -8,6 +8,9 @@ export const DEFAULT_JERSEY_CATALOG: JerseyCatalogConfig = {
 export const DEFAULT_COMPETITOR_JERSEY_HELPER =
   "Le maillot est obligatoire. Son prix (15 €) est inclus dans votre adhésion compétiteur.";
 
+export const DEFAULT_JERSEY_SIZE_HELPER =
+  "Le maillot proposé est un modèle garçon (coupe masculine).";
+
 export const DEFAULT_OPTIONAL_JERSEY_OPT_IN_LABEL =
   "Je souhaite commander un maillot de compétition";
 
@@ -25,6 +28,7 @@ export function repairJerseyConfig(config: RegistrationConfigV1): RegistrationCo
       ...config.uiCopy,
       competitorJerseyHelper:
         config.uiCopy.competitorJerseyHelper ?? DEFAULT_COMPETITOR_JERSEY_HELPER,
+      jerseySizeHelper: config.uiCopy.jerseySizeHelper ?? DEFAULT_JERSEY_SIZE_HELPER,
       optionalJerseyOptInLabel:
         config.uiCopy.optionalJerseyOptInLabel ?? DEFAULT_OPTIONAL_JERSEY_OPT_IN_LABEL,
     },

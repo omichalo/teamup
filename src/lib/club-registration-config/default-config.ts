@@ -32,6 +32,7 @@ import type {
 import {
   DEFAULT_COMPETITOR_JERSEY_HELPER,
   DEFAULT_JERSEY_CATALOG,
+  DEFAULT_JERSEY_SIZE_HELPER,
   DEFAULT_OPTIONAL_JERSEY_OPT_IN_LABEL,
 } from "./repair-jersey";
 
@@ -332,6 +333,7 @@ export function buildDefaultRegistrationConfig(): RegistrationConfigV1 {
         label: o.label,
       })),
       competitorJerseyHelper: DEFAULT_COMPETITOR_JERSEY_HELPER,
+      jerseySizeHelper: DEFAULT_JERSEY_SIZE_HELPER,
       optionalJerseyOptInLabel: DEFAULT_OPTIONAL_JERSEY_OPT_IN_LABEL,
     },
   };

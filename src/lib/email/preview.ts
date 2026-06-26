@@ -20,6 +20,12 @@ export const EMAIL_PREVIEW_VARIANTS: EmailPreviewVariant[] = [
     description: "Envoyé à l'adhérent après envoi du dossier.",
   },
   {
+    id: "registration-created-secretary",
+    label: "Nouveau dossier (secrétariat)",
+    filename: "registration-created-secretary.html",
+    description: "Envoyé aux secrétaires lorsqu'un dossier est à relire.",
+  },
+  {
     id: "verification",
     label: "Vérification e-mail",
     filename: "verification.html",

@@ -20,6 +20,7 @@ import { buildPaymentInstructionsEmail } from "@/lib/email/payment-instructions-
 import { buildPaymentConfirmedEmail } from "@/lib/email/payment-confirmed-email";
 import { buildPaymentRequestEmail } from "@/lib/email/payment-email";
 import { buildRegistrationSubmittedEmail } from "@/lib/email/registration-submitted-email";
+import { buildRegistrationCreatedSecretaryEmail } from "@/lib/email/registration-created-secretary-email";
 import {
   EMAIL_PREVIEW_APP_ORIGIN,
   EMAIL_PREVIEW_VARIANTS,
@@ -107,6 +108,24 @@ async function main(): Promise<void> {
     registrationId: "preview-registration-id",
     appOrigin: EMAIL_PREVIEW_APP_ORIGIN,
   }).html);
+
+  await writePreview(
+    "registration-created-secretary.html",
+    buildRegistrationCreatedSecretaryEmail({
+      adherentName: "Marie Dupont",
+      birthDate: "2010-05-12",
+      adherentRole: "minor_dependent",
+      sectionLabel: "Loisir",
+      contactEmail: "parent@example.com",
+      contactPhone: "0612345678",
+      ffttLicense: "1234567",
+      isMinor: true,
+      submitterAccountEmail: "parent@example.com",
+      applicantNotes: "Disponible le mercredi après-midi.",
+      registrationId: "preview-registration-id",
+      appOrigin: EMAIL_PREVIEW_APP_ORIGIN,
+    }).html
+  );
 
   const verification = buildVerificationEmail({
     actionUrl: SAMPLE_ACTION_URL,
