@@ -94,6 +94,41 @@ describe("AuthForm", () => {
       ).toBeInTheDocument();
     });
 
+    it("affiche un échec explicite si l'envoi de vérification échoue après inscription", async () => {
+      createUserMock.mockResolvedValueOnce({ user: { uid: "u1" } });
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({
+          error: "Trop de requêtes",
+          message: "Veuillez patienter avant de renvoyer un email.",
+        }),
+      });
+      const user = userEvent.setup();
+      render(<AuthForm mode="signup" />);
+
+      await user.type(
+        screen.getByRole("textbox", { name: /email/i }),
+        "ok@example.com"
+      );
+      const passwordInputs = screen.getAllByLabelText(/mot de passe/i, {
+        selector: "input",
+      });
+      const main = passwordInputs.find((i) => i.getAttribute("name") === "password")!;
+      const confirm = passwordInputs.find((i) => i.getAttribute("name") === "confirm")!;
+      await user.type(main, "Aaaaaaaaaa1!");
+      await user.type(confirm, "Aaaaaaaaaa1!");
+      await act(async () => {
+        await user.click(screen.getByRole("button", { name: /créer mon compte/i }));
+      });
+
+      expect(
+        await screen.findByText(/l'envoi de l'email de vérification a échoué/i)
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/veuillez patienter avant de renvoyer un email/i)
+      ).toBeInTheDocument();
+    });
+
     it("affiche un message d'erreur si les mots de passe ne correspondent pas", async () => {
       const user = userEvent.setup();
       render(<AuthForm mode="signup" />);

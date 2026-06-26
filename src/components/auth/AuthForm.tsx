@@ -27,6 +27,7 @@ import { PasswordRequirements } from "@/components/PasswordRequirements";
 import { EmailField } from "./fields/EmailField";
 import { PasswordField } from "./fields/PasswordField";
 import { usePostSignupVerificationPolling } from "./usePostSignupVerificationPolling";
+import { requestVerificationEmail } from "./request-verification-email";
 
 export type AuthMode = "login" | "signup" | "forgot-password";
 
@@ -115,18 +116,14 @@ function LoginPanel({
     try {
       const cred = await signInWithEmailAndPassword(clientAuth, email, password);
       if (!cred.user.emailVerified) {
-        try {
-          await fetch("/api/auth/send-verification", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email }),
-          });
+        const verification = await requestVerificationEmail(email);
+        if (verification.ok) {
           setErr(
             "Email non vérifié. Un nouveau lien de vérification vient d'être envoyé à votre adresse. Vérifiez votre boîte de réception (et vos spams)."
           );
-        } catch {
+        } else {
           setErr(
-            "Email non vérifié. Impossible d'envoyer l'email de vérification. Veuillez réessayer plus tard ou contacter l'administrateur."
+            `Email non vérifié. ${verification.error} Vous pouvez réessayer via la page de renvoi.`
           );
         }
         setLoading(false);
@@ -268,18 +265,14 @@ function SignupPanel({
 
     try {
       await createUserWithEmailAndPassword(clientAuth, email, password);
-      try {
-        await fetch("/api/auth/send-verification", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email }),
-        });
+      const verification = await requestVerificationEmail(email);
+      if (verification.ok) {
         setInfo(
           "Compte créé. Un email de vérification vient de vous être envoyé. Cliquez sur le lien dans votre boîte de réception (et vos spams) — vous serez automatiquement reconnecté(e) ici."
         );
-      } catch {
+      } else {
         setInfo(
-          "Compte créé. Cependant l'envoi de l'email de vérification a échoué. Vous pouvez en demander un nouveau via la page de renvoi."
+          `Compte créé. Cependant l'envoi de l'email de vérification a échoué (${verification.error}). Vous pouvez en demander un nouveau via la page de renvoi.`
         );
       }
       setSignupCompleted(true);

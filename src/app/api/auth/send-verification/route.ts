@@ -4,8 +4,15 @@ import { buildVerificationEmail } from "@/lib/email/auth-emails";
 import { getSqyPingLogoAttachment } from "@/lib/email/logo-attachment";
 import { sendMail } from "@/lib/mailer";
 import { getFirebaseErrorMessage } from "@/lib/firebase-error-utils";
-import { checkRateLimit } from "@/lib/auth/rate-limit";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
+import {
+  authEmailRateLimitExceededMessage,
+  checkAuthEmailRateLimit,
+} from "@/lib/auth/auth-email-rate-limit";
+import {
+  getAuthErrorCode,
+  isFirebaseUserNotFoundError,
+} from "@/lib/auth/firebase-auth-errors";
 import {
   buildDirectAppActionLink,
   isAuthOriginDebugEnabled,
@@ -13,15 +20,6 @@ import {
 } from "@/lib/auth/resolve-app-origin";
 
 export const runtime = "nodejs";
-
-function getAuthErrorCode(error: unknown): string {
-  if (typeof error !== "object" || error === null) {
-    return "";
-  }
-
-  const maybeCode = (error as { code?: unknown }).code;
-  return typeof maybeCode === "string" ? maybeCode : "";
-}
 
 export async function POST(req: Request) {
   try {
@@ -34,24 +32,11 @@ export async function POST(req: Request) {
       return jsonNoStore({ error: "Email requis" }, { status: 400 });
     }
 
-    // Validation du format email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return jsonNoStore(
         { error: "Format d'email invalide" },
         { status: 400 }
-      );
-    }
-
-    // Rate limiting par email (3 requêtes par 15 minutes)
-    const rateLimitResult = checkRateLimit(`email:${email}`, 3, 15 * 60 * 1000);
-    if (!rateLimitResult.allowed) {
-      return jsonNoStore(
-        {
-          error: "Trop de requêtes",
-          message: `Veuillez patienter avant de renvoyer un email. Prochaine tentative possible dans ${Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000 / 60)} minutes.`,
-        },
-        { status: 429 }
       );
     }
 
@@ -74,7 +59,33 @@ export async function POST(req: Request) {
       console.log("[send-verification] Redirect URL:", redirectUrl);
     }
 
-    // Générer le lien de vérification via Firebase Admin
+    try {
+      await adminAuth.getUserByEmail(email);
+    } catch (error) {
+      if (isFirebaseUserNotFoundError(error)) {
+        return jsonNoStore(
+          { error: "Utilisateur non trouvé", message: "Aucun compte n'est associé à cet email" },
+          { status: 404 }
+        );
+      }
+      console.error("[send-verification] Erreur lookup utilisateur:", error);
+      return jsonNoStore(
+        { error: "Erreur serveur", message: "Impossible de traiter la demande" },
+        { status: 500 }
+      );
+    }
+
+    const rateLimitResult = checkAuthEmailRateLimit("verification", email);
+    if (!rateLimitResult.allowed) {
+      return jsonNoStore(
+        {
+          error: "Trop de requêtes",
+          message: authEmailRateLimitExceededMessage(rateLimitResult.resetAt),
+        },
+        { status: 429 }
+      );
+    }
+
     let link: string;
     try {
       link = buildDirectAppActionLink(
@@ -88,20 +99,14 @@ export async function POST(req: Request) {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       const authCode = getAuthErrorCode(error);
-      
-      // Erreurs Firebase spécifiques
-      if (
-        authCode === "auth/user-not-found" ||
-        errorMessage.includes("user-not-found") ||
-        errorMessage.includes("USER_NOT_FOUND") ||
-        errorMessage.includes("no user record")
-      ) {
+
+      if (isFirebaseUserNotFoundError(error)) {
         return jsonNoStore(
           { error: "Utilisateur non trouvé", message: "Aucun compte n'est associé à cet email" },
           { status: 404 }
         );
       }
-      
+
       if (
         authCode === "auth/invalid-email" ||
         errorMessage.includes("invalid-email") ||
@@ -113,15 +118,17 @@ export async function POST(req: Request) {
         );
       }
 
-      // Autres erreurs Firebase
-      console.error("[send-verification] Erreur Firebase:", error);
+      console.error("[send-verification] Erreur Firebase:", error, {
+        redirectUrl,
+        origin,
+        authCode,
+      });
       return jsonNoStore(
         { error: "Erreur lors de la génération du lien", message: getFirebaseErrorMessage(error) },
         { status: 500 }
       );
     }
 
-    // Log uniquement en mode debug
     if (isAuthOriginDebugEnabled()) {
       console.log("[send-verification] Generated link:", link);
     }
@@ -131,7 +138,6 @@ export async function POST(req: Request) {
       appOrigin: origin,
     });
 
-    // Envoyer l'email
     try {
       await sendMail({
         to: email,
@@ -150,14 +156,11 @@ export async function POST(req: Request) {
 
     return jsonNoStore({ ok: true });
   } catch (error) {
-    // Logger l'erreur complète côté serveur pour le débogage
     console.error("[send-verification] error", error);
-    
-    // Retourner un message filtré au client avec le bon code HTTP
+
     const errorMessage = getFirebaseErrorMessage(error);
     const errorString = error instanceof Error ? error.message : String(error);
-    
-    // Déterminer le code HTTP approprié
+
     let statusCode = 500;
     if (errorString.includes("user-not-found") || errorString.includes("USER_NOT_FOUND")) {
       statusCode = 404;

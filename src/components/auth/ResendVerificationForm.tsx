@@ -13,6 +13,7 @@ import NextLink from "next/link";
 import { emailSchema } from "@/lib/validators";
 import { getFirebaseErrorMessage } from "@/lib/firebase-error-utils";
 import { EmailField } from "./fields/EmailField";
+import { requestVerificationEmail } from "./request-verification-email";
 
 /**
  * Formulaire « Renvoyer l'email de vérification ».
@@ -39,14 +40,9 @@ export function ResendVerificationForm() {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/send-verification", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      if (!res.ok) {
-        const j = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(j.error || "Échec d'envoi de l'email de vérification");
+      const result = await requestVerificationEmail(email);
+      if (!result.ok) {
+        throw new Error(result.error);
       }
       setInfo(
         "Email de vérification envoyé. Vérifiez votre boîte de réception (et vos spams)."
