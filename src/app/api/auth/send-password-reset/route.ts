@@ -4,8 +4,15 @@ import { buildPasswordResetEmail } from "@/lib/email/auth-emails";
 import { getSqyPingLogoAttachment } from "@/lib/email/logo-attachment";
 import { sendMail } from "@/lib/mailer";
 import { getFirebaseErrorMessage } from "@/lib/firebase-error-utils";
-import { checkRateLimit } from "@/lib/auth/rate-limit";
+import {
+  authEmailRateLimitExceededMessage,
+  checkAuthEmailRateLimit,
+} from "@/lib/auth/auth-email-rate-limit";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
+import {
+  getAuthErrorCode,
+  isFirebaseUserNotFoundError,
+} from "@/lib/auth/firebase-auth-errors";
 import {
   buildDirectAppActionLink,
   isAuthOriginDebugEnabled,
@@ -14,15 +21,6 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function getAuthErrorCode(error: unknown): string {
-  if (typeof error !== "object" || error === null) {
-    return "";
-  }
-
-  const maybeCode = (error as { code?: unknown }).code;
-  return typeof maybeCode === "string" ? maybeCode : "";
-}
 
 export async function POST(req: Request) {
   try {
@@ -41,18 +39,6 @@ export async function POST(req: Request) {
       return jsonNoStore(
         { error: "Format d'email invalide" },
         { status: 400 }
-      );
-    }
-
-    // Rate limiting par email (3 requêtes par 15 minutes)
-    const rateLimitResult = checkRateLimit(`email:${email}`, 3, 15 * 60 * 1000);
-    if (!rateLimitResult.allowed) {
-      return jsonNoStore(
-        {
-          error: "Trop de requêtes",
-          message: `Veuillez patienter avant de renvoyer un email. Prochaine tentative possible dans ${Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000 / 60)} minutes.`,
-        },
-        { status: 429 }
       );
     }
 
@@ -75,6 +61,32 @@ export async function POST(req: Request) {
       console.log("[send-password-reset] Redirect URL:", redirectUrl);
     }
 
+    // Firebase renvoie parfois auth/internal-error au lieu de user-not-found
+    // quand l'email n'existe pas — vérifier avant generatePasswordResetLink.
+    try {
+      await adminAuth.getUserByEmail(email);
+    } catch (error) {
+      if (isFirebaseUserNotFoundError(error)) {
+        return jsonNoStore({ ok: true });
+      }
+      console.error("[send-password-reset] Erreur lookup utilisateur:", error);
+      return jsonNoStore(
+        { error: "Erreur serveur", message: "Impossible de traiter la demande" },
+        { status: 500 }
+      );
+    }
+
+    const rateLimitResult = checkAuthEmailRateLimit("password-reset", email);
+    if (!rateLimitResult.allowed) {
+      return jsonNoStore(
+        {
+          error: "Trop de requêtes",
+          message: authEmailRateLimitExceededMessage(rateLimitResult.resetAt),
+        },
+        { status: 429 }
+      );
+    }
+
     // Générer le lien de réinitialisation via Firebase Admin
     let link: string;
     try {
@@ -89,16 +101,8 @@ export async function POST(req: Request) {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       const authCode = getAuthErrorCode(error);
-      
-      // Erreurs Firebase spécifiques
-      if (
-        authCode === "auth/user-not-found" ||
-        errorMessage.includes("user-not-found") ||
-        errorMessage.includes("USER_NOT_FOUND") ||
-        errorMessage.includes("no user record")
-      ) {
-        // Ne pas révéler si l'utilisateur existe ou non (sécurité)
-        // Retourner toujours 200 pour éviter l'énumération d'emails
+
+      if (isFirebaseUserNotFoundError(error)) {
         return jsonNoStore({ ok: true });
       }
       
@@ -113,8 +117,12 @@ export async function POST(req: Request) {
         );
       }
 
-      // Autres erreurs Firebase
-      console.error("[send-password-reset] Erreur Firebase:", error);
+      // Autres erreurs Firebase (souvent domaine non autorisé dans Firebase Console)
+      console.error("[send-password-reset] Erreur Firebase:", error, {
+        redirectUrl,
+        origin,
+        authCode,
+      });
       return jsonNoStore(
         { error: "Erreur lors de la génération du lien", message: getFirebaseErrorMessage(error) },
         { status: 500 }
