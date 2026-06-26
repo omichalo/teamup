@@ -74,15 +74,12 @@ export function SuggestionsClient() {
     setDetail,
   } = useSuggestionDetail();
 
-  const [selectedId, setSelectedId] = useState<string | null>(
-    () => searchParams.get("id")
-  );
+  const selectedId = searchParams.get("id");
   const [createOpen, setCreateOpen] = useState(false);
   const mobileDetailRef = useRef<HTMLDivElement>(null);
 
   const updateSelectedId = useCallback(
     (id: string | null) => {
-      setSelectedId(id);
       const params = new URLSearchParams(searchParams.toString());
       if (id) {
         params.set("id", id);
@@ -94,13 +91,6 @@ export function SuggestionsClient() {
     },
     [pathname, router, searchParams]
   );
-
-  useEffect(() => {
-    const idFromUrl = searchParams.get("id");
-    if (idFromUrl && idFromUrl !== selectedId) {
-      setSelectedId(idFromUrl);
-    }
-  }, [searchParams, selectedId]);
 
   useEffect(() => {
     void loadSuggestions();
