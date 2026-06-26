@@ -98,4 +98,8 @@ export const AUDIT_ACTIONS = {
   PLAYER_UPDATED: "player.updated",
   PLAYER_DELETED: "player.deleted",
   DATA_SYNCED: "data.synced",
+  USER_APP_MAINTAINER_CHANGED: "user.app_maintainer.changed",
+  APP_SUGGESTION_CREATED: "app.suggestion.created",
+  APP_SUGGESTION_UPDATED: "app.suggestion.updated",
+  APP_SUGGESTION_COMMENT_ADDED: "app.suggestion.comment_added",
 } as const;

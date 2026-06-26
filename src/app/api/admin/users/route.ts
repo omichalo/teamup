@@ -159,6 +159,7 @@ export async function GET() {
         lastLoginAt: lastSignInDate,
         createdAt: creationDate,
         updatedAt: updatedAtDate,
+        appMaintainer: profile.appMaintainer === true,
       };
     });
 

@@ -88,8 +88,16 @@ export async function GET() {
     }
 
     const user = {
+      id: decoded.uid,
       uid: decoded.uid,
       email: decoded.email || (userData?.email as string | undefined),
+      displayName:
+        (typeof userData?.displayName === "string" && userData.displayName.trim()) ||
+        (typeof decoded.name === "string" && decoded.name.trim()) ||
+        (typeof decoded.email === "string" && decoded.email.includes("@")
+          ? decoded.email.split("@")[0]
+          : "") ||
+        "",
       role: (userData?.role as string | undefined) || decoded.role || USER_ROLES.PLAYER,
       coachRequestStatus:
         (userData?.coachRequestStatus as string | undefined) ||
