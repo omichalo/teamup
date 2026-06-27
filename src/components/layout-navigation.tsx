@@ -13,6 +13,7 @@ import {
   PlaylistAddCheck,
   Preview,
   RateReview,
+  TableChart,
   TipsAndUpdates,
   Tune,
 } from "@mui/icons-material";
@@ -52,6 +53,11 @@ const NAV = {
     label: "Dossiers à valider",
     href: "/club/demandes-adhesion",
     icon: <RateReview />,
+  },
+  tableauAdhesions: {
+    label: "Tableau des adhésions",
+    href: "/club/adhesions-tableau",
+    icon: <TableChart />,
   },
   boiteIdees: {
     label: "Boîte à idées",
@@ -149,7 +155,7 @@ export function buildLayoutNavigation(
         {
           id: "adhesions",
           label: "Adhésions",
-          items: [NAV.campagnesTarifs, NAV.apercuFormulaire],
+          items: [NAV.tableauAdhesions, NAV.campagnesTarifs, NAV.apercuFormulaire],
         },
       ],
     };
@@ -177,7 +183,7 @@ export function buildLayoutNavigation(
         {
           id: "adhesions",
           label: "Adhésions",
-          items: [NAV.campagnesTarifs, NAV.apercuFormulaire],
+          items: [NAV.tableauAdhesions, NAV.campagnesTarifs, NAV.apercuFormulaire],
         },
       ],
     };

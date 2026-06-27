@@ -54,6 +54,11 @@ const HOME_LINK_META: Record<
     cta: "Ouvrir les dossiers",
     color: "secondary",
   },
+  "/club/adhesions-tableau": {
+    description: "Vue d'ensemble de tous les dossiers avec tri et filtres par colonne",
+    cta: "Ouvrir le tableau",
+    color: "info",
+  },
   "/admin": {
     description: "Synchroniser les données FFTT et gérer les accès",
     cta: "Ouvrir l'administration",
@@ -129,6 +134,8 @@ export function buildCoachAdminHomeContent(isAdmin: boolean): {
           id: "adhesions",
           title: "Adhésions",
           items: toHomeLinkCards([
+            LAYOUT_NAV.dossiersAValider,
+            LAYOUT_NAV.tableauAdhesions,
             LAYOUT_NAV.campagnesTarifs,
             LAYOUT_NAV.apercuFormulaire,
           ]),

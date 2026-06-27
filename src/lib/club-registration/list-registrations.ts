@@ -2,6 +2,7 @@ import type { Firestore, Query, QueryDocumentSnapshot } from "firebase-admin/fir
 import {
   matchesMedicalCertificateFilter,
   normalizeMedicalCertificateStatus,
+  summaryMedicalCertificateStatus,
   type ManagedListMedicalCertificateFilter,
 } from "@/lib/club-registration/medical-certificate";
 import { hasPaymentProofAvailable } from "@/lib/club-registration/payment-proof";
@@ -332,6 +333,55 @@ export function parseSearchCursorOffset(cursor: string | null | undefined): numb
   }
   const parsed = Number.parseInt(cursor.slice(SEARCH_CURSOR_PREFIX.length), 10);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+export async function getManagedQueueSummary(db: Firestore): Promise<{
+  actionable: number;
+  missingCertificate: number;
+  paymentPending: number;
+  paymentRequested: number;
+  truncated: boolean;
+}> {
+  const summaries = await fetchManagedSummariesInMemory(
+    db,
+    "actionable",
+    MANAGED_IN_MEMORY_SCAN_LIMIT
+  );
+  const paymentRequestedSummaries = await fetchManagedSummariesInMemory(
+    db,
+    "payment_requested",
+    MANAGED_IN_MEMORY_SCAN_LIMIT
+  );
+
+  const paymentPendingStatuses = new Set<string>([
+    "pending_validation",
+    "waiting_payment",
+    "partially_paid",
+    "manual_follow_up",
+  ]);
+
+  let missingCertificate = 0;
+  let paymentPending = 0;
+
+  for (const summary of summaries) {
+    if (summaryMedicalCertificateStatus(summary) === "required_not_received") {
+      missingCertificate += 1;
+    }
+    const paymentStatus = summary.paymentStatus;
+    if (typeof paymentStatus === "string" && paymentPendingStatuses.has(paymentStatus)) {
+      paymentPending += 1;
+    }
+  }
+
+  return {
+    actionable: summaries.length,
+    missingCertificate,
+    paymentPending,
+    paymentRequested: paymentRequestedSummaries.length,
+    truncated:
+      summaries.length >= MANAGED_IN_MEMORY_SCAN_LIMIT ||
+      paymentRequestedSummaries.length >= MANAGED_IN_MEMORY_SCAN_LIMIT,
+  };
 }
 
 export type PersonalRegistrationsResult = {

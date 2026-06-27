@@ -37,4 +37,15 @@ describe("validateStep focusSelector", () => {
       expect(result.focusSelector).toBe("#applicant-notes-field");
     }
   });
+
+  it("exige la réponse sur l'adhésion SQY PING l'an dernier à l'étape audience", () => {
+    const draft = createEmptyDraft();
+    draft.birthDate = "2000-01-15";
+    const result = validateStep("audience", draft);
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.message).toMatch(/SQY PING l’an dernier/i);
+      expect(result.focusSelector).toBe("#was-sqy-member-last-year-label");
+    }
+  });
 });

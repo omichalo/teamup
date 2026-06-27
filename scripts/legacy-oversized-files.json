@@ -14,7 +14,6 @@
     "src/components/auth/AuthForm.tsx": 578,
     "src/components/club-registration/AdminStep.tsx": 526,
     "src/components/club-registration/ClubRegistrationWizard.tsx": 1017,
-    "src/components/club-registration/MembershipRequestsClient.tsx": 1258,
     "src/components/club-registration/RecapStep.tsx": 585,
     "src/components/compositions/TeamCompositionCard.tsx": 413,
     "src/components/disponibilites/DiscordPollManager.tsx": 847,

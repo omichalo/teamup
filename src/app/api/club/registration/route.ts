@@ -1,7 +1,7 @@
 export const runtime = "nodejs";
 
 import { jsonNoStore } from "@/lib/http/cache-headers";
-import { normalizeReductionReferenceCodes } from "@/lib/club-registration/reduction-reference-codes";
+import { mapRegistrationDocToClient } from "@/lib/club-registration/map-registration-doc-to-client";
 import { cookies } from "next/headers";
 import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
@@ -38,11 +38,12 @@ import { sendMail } from "@/lib/mailer";
 import { getAppBaseUrl } from "@/lib/club-registration/stripe";
 import {
   MANAGER_EDITABLE_FIELDS,
-  REGISTRATION_CLIENT_FIELDS,
 } from "@/lib/club-registration/registration-api-fields";
+import { ffttLicenseLookupSchema } from "@/lib/club-registration/schema-base";
 
 const COLLECTION = "clubRegistrations";
 const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
+const FFTT_LICENSE_RE = /^[0-9]{5,12}$/;
 
 function stripUndefined<T extends Record<string, unknown>>(obj: T): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -88,30 +89,7 @@ export async function GET(req: Request) {
       return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
     }
 
-    const registration: Record<string, unknown> = { id: snap.id };
-    for (const key of REGISTRATION_CLIENT_FIELDS) {
-      if (data[key] !== undefined) {
-        registration[key] = data[key];
-      }
-    }
-    registration.reductionReferenceCodes = normalizeReductionReferenceCodes(
-      registration.reductionReferenceCodes as Record<string, string> | undefined,
-      typeof data.passSportCode === "string" ? data.passSportCode : undefined
-    );
-    delete registration.passSportCode;
-    registration.medicalCertificateStatus = normalizeMedicalCertificateStatus(
-      data.medicalCertificateStatus,
-      data.medicalCertificateDeclaration
-    );
-    registration.submittedAt = data.submittedAt?.toDate?.()?.toISOString?.() ?? null;
-    registration.updatedAt = data.updatedAt?.toDate?.()?.toISOString?.() ?? null;
-    registration.medicalCertificateStatusUpdatedAt =
-      data.medicalCertificateStatusUpdatedAt?.toDate?.()?.toISOString?.() ?? null;
-    registration.paymentRequestedAt =
-      data.paymentRequestedAt?.toDate?.()?.toISOString?.() ?? null;
-    registration.paidAt = data.paidAt?.toDate?.()?.toISOString?.() ?? null;
-    registration.pricingQuoteComputedAt =
-      data.pricingQuoteComputedAt?.toDate?.()?.toISOString?.() ?? null;
+    const registration = mapRegistrationDocToClient(snap);
 
     return jsonNoStore({ registration }, { status: 200 });
   } catch (error) {
@@ -193,6 +171,38 @@ export async function PATCH(req: Request) {
         { error: "Statut de certificat médical invalide" },
         { status: 400 }
       );
+    }
+
+    if (updates.ffttLicense !== undefined) {
+      if (updates.ffttLicense === null || updates.ffttLicense === "") {
+        updates.ffttLicense = FieldValue.delete();
+        if (updates.ffttLicenseLookup === undefined) {
+          updates.ffttLicenseLookup = FieldValue.delete();
+        }
+      } else if (
+        typeof updates.ffttLicense !== "string" ||
+        !FFTT_LICENSE_RE.test(updates.ffttLicense)
+      ) {
+        return jsonNoStore(
+          { error: "Numéro de licence FFTT invalide" },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (updates.ffttLicenseLookup !== undefined) {
+      if (updates.ffttLicenseLookup === null) {
+        updates.ffttLicenseLookup = FieldValue.delete();
+      } else {
+        const parsed = ffttLicenseLookupSchema.safeParse(updates.ffttLicenseLookup);
+        if (!parsed.success) {
+          return jsonNoStore(
+            { error: "Données de lookup FFTT invalides" },
+            { status: 400 }
+          );
+        }
+        updates.ffttLicenseLookup = parsed.data;
+      }
     }
 
     const db = getFirestoreAdmin();

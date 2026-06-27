@@ -1,6 +1,7 @@
 /** Champs métier renvoyés au client (hors Timestamps bruts). */
 export const REGISTRATION_CLIENT_FIELDS = [
   "adherentRole",
+  "wasSqyMemberLastYear",
   "ffttLicense",
   "ffttLicenseLookup",
   "firstName",
@@ -73,6 +74,7 @@ export const REGISTRATION_CLIENT_FIELDS = [
 
 export const MANAGER_EDITABLE_FIELDS = [
   "adherentRole",
+  "wasSqyMemberLastYear",
   "ffttLicense",
   "ffttLicenseLookup",
   "firstName",

@@ -17,8 +17,8 @@ import {
  * Diffère du payload final sur trois points :
  * - `internalRulesAccepted` côté schéma exige `true` ; on expose un `rulesAccepted: boolean`
  *   pour rester contrôlable dans l'UI.
- * - `sex` et `photoConsent` autorisent la chaîne vide tant que l'utilisateur n'a pas
- *   activement choisi. RGPD oblige : le consentement à la diffusion d'images doit être
+ * - `sex`, `photoConsent` et `wasSqyMemberLastYear` autorisent l'absence de réponse
+ *   tant que l'utilisateur n'a pas activement choisi. RGPD oblige : le consentement à la diffusion d'images doit être
  *   un acte positif (pas de pré-cochage), et le sexe ne doit pas être imposé par défaut.
  *   `buildPayload()` côté wizard refuse la chaîne vide avant tout POST.
  */
@@ -27,6 +27,7 @@ export type RegistrationDraft = Omit<
   | "internalRulesAccepted"
   | "sex"
   | "photoConsent"
+  | "wasSqyMemberLastYear"
   | "medicalCertificateDeclaration"
   | "medicalQuestionnaire"
   | "medicalVeteranPath"
@@ -40,6 +41,7 @@ export type RegistrationDraft = Omit<
   applicantNotes: string;
   sex: ClubRegistrationPayload["sex"] | "";
   photoConsent: ClubRegistrationPayload["photoConsent"] | "";
+  wasSqyMemberLastYear: boolean | undefined;
   medicalQuestionnaire: MedicalQuestionnaire;
   medicalVeteranPath: MedicalVeteranPath;
   medicalCertificateDeclaration:
@@ -87,6 +89,7 @@ export function normalizeRepresentatives(
 export function createEmptyDraft(): RegistrationDraft {
   return {
     adherentRole: "self",
+    wasSqyMemberLastYear: undefined,
     ffttLicense: "",
     ffttLicenseLookup: undefined,
     firstName: "",

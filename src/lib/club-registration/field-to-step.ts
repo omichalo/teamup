@@ -35,6 +35,7 @@ export const REGISTRATION_FIELD_TO_STEP_ID: Readonly<
 > = {
   /* Étape 1 — Pour qui ? */
   adherentRole: "audience",
+  wasSqyMemberLastYear: "audience",
   ffttLicense: "audience",
   ffttLicenseLookup: "audience",
   birthDate: "audience",

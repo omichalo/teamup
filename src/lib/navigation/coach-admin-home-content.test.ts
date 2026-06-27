@@ -41,6 +41,8 @@ describe("buildCoachAdminHomeContent", () => {
       "account",
     ]);
     expect(content.sections[1]?.items.map((item) => item.href)).toEqual([
+      "/club/demandes-adhesion",
+      "/club/adhesions-tableau",
       "/club/parametrage-inscription",
       "/club/inscription",
     ]);

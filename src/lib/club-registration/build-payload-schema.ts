@@ -77,6 +77,7 @@ export function buildRegistrationPayloadSchema(config: RegistrationConfigV1) {
     z
     .object({
       adherentRole: adherentRoleSchema,
+      wasSqyMemberLastYear: z.boolean(),
       ffttLicense: z
         .union([
           z.literal(""),

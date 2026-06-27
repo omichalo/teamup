@@ -244,6 +244,14 @@ service cloud.firestore {
     }
 
     // ============================================
+    // Collection: userUiPreferences
+    // ============================================
+    // Préférences d'interface (colonnes tableau adhésions, etc.) — Admin SDK uniquement.
+    match /userUiPreferences/{userId} {
+      allow read, write: if false;
+    }
+
+    // ============================================
     // Règle par défaut : refuser tout accès non explicitement autorisé
     // ============================================
     match /{document=**} {
