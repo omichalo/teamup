@@ -37,6 +37,7 @@ import { MembershipRequestCardQuickActions } from "./MembershipRequestCardQuickA
 import type { ManagedRegistrationsPageInfo } from "./useManagedRegistrations";
 import type { MembershipListReloadFn, RegistrationSummary } from "./types";
 import type { SpreadsheetSavedViewId } from "@/lib/club-registration/spreadsheet/quick-filters";
+import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
 
 const MEDICAL_CERTIFICATE_STATUS_COLOR: Record<
   MedicalCertificateStatus,
@@ -270,14 +271,11 @@ export function MembershipRequestsListPanel({
                       color={active ? "primary.main" : "text.primary"}
                       sx={{ wordBreak: "break-word" }}
                     >
-                      {registration.firstName ?? "-"} {registration.lastName ?? ""}
+                      {formatPersonDisplayName(registration.firstName, registration.lastName) ||
+                        "-"}
                     </Typography>
                     <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-                      {active ? (
-                        <Chip size="small" label="En cours" color="primary" />
-                      ) : (
-                        <Chip size="small" label={chip.label} color={chip.color} />
-                      )}
+                      <Chip size="small" label={chip.label} color={chip.color} />
                       {registration.medicalCertificateStatus &&
                       registration.medicalCertificateStatus !== "not_required" ? (
                         <Chip

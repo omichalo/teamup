@@ -11,6 +11,7 @@ import {
 } from "@mui/material";
 import { Home, FlightTakeoff } from "@mui/icons-material";
 import type { Match } from "@/types";
+import { formatLastNameForDisplay } from "@/lib/shared/person-name-format";
 
 function formatDateShort(date: string | Date): string {
   return new Intl.DateTimeFormat("fr-FR", {
@@ -70,7 +71,7 @@ function MatchCompositionsInline({
       <Stack spacing={0.25}>
         {entries.map(([, j]) => (
           <Typography key={`${j.nom}-${j.prenom}`} variant="body2" sx={{ fontSize: "0.8125rem" }}>
-            {j.prenom} {j.nom}
+            {j.prenom} {formatLastNameForDisplay(j.nom)}
             {typeof j.points === "number" ? ` — ${j.points} pts` : ""}
           </Typography>
         ))}

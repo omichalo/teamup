@@ -1,4 +1,5 @@
 import type { DocumentData } from "firebase-admin/firestore";
+import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
 import { resolveRegistrationContactEmail } from "@/lib/club-registration/resolve-registration-contact-email";
 import { getSqyPingLogoAttachment } from "@/lib/email/logo-attachment";
 import {
@@ -33,7 +34,10 @@ export async function dispatchPaymentConfirmedEmail(params: {
   }
 
   const adherentName =
-    `${params.data.firstName ?? ""} ${params.data.lastName ?? ""}`.trim() || "adhérent";
+    formatPersonDisplayName(
+      typeof params.data.firstName === "string" ? params.data.firstName : undefined,
+      typeof params.data.lastName === "string" ? params.data.lastName : undefined
+    ) || "adhérent";
   const invoiceAvailable =
     typeof params.data.stripeInvoiceId === "string" && params.data.stripeInvoiceId.length > 0;
 

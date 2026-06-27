@@ -21,6 +21,10 @@ import {
   lookupFFTTLicense,
   normalizeFFTTLicenseInput,
 } from "@/lib/club-registration/license-lookup";
+import {
+  formatLastNameForDisplay,
+  normalizeLastName,
+} from "@/lib/shared/person-name-format";
 import type { RegistrationDraft } from "./registration-defaults";
 
 type Props = {
@@ -101,7 +105,7 @@ export function AudienceStep({
       ffttLicense: player.licence,
       ffttLicenseLookup: player,
       ...(player.prenom ? { firstName: player.prenom } : {}),
-      ...(player.nom ? { lastName: player.nom } : {}),
+      ...(player.nom ? { lastName: normalizeLastName(player.nom) } : {}),
     });
     setLookupStatus("idle");
   };
@@ -184,7 +188,7 @@ export function AudienceStep({
         {draft.ffttLicenseLookup ? (
           <Alert severity="success">
             Licence retrouvée&nbsp;: {draft.ffttLicenseLookup.prenom}{" "}
-            {draft.ffttLicenseLookup.nom}
+            {formatLastNameForDisplay(draft.ffttLicenseLookup.nom)}
             {draft.ffttLicenseLookup.nomClub
               ? ` — ${draft.ffttLicenseLookup.nomClub}`
               : ""}

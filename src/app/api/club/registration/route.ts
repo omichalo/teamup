@@ -40,6 +40,10 @@ import {
   MANAGER_EDITABLE_FIELDS,
 } from "@/lib/club-registration/registration-api-fields";
 import { ffttLicenseLookupSchema } from "@/lib/club-registration/schema-base";
+import {
+  formatPersonDisplayName,
+  normalizeRegistrationLastNamePatch,
+} from "@/lib/shared/person-name-format";
 
 const COLLECTION = "clubRegistrations";
 const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
@@ -134,6 +138,8 @@ export async function PATCH(req: Request) {
     if (Object.keys(updates).length === 0) {
       return jsonNoStore({ error: "Aucun champ modifiable fourni" }, { status: 400 });
     }
+
+    Object.assign(updates, normalizeRegistrationLastNamePatch(updates));
 
     if (updates.applicantNotes !== undefined) {
       if (typeof updates.applicantNotes !== "string") {
@@ -370,7 +376,7 @@ export async function POST(req: Request) {
     });
 
     const adherentName =
-      `${sanitizedPayload.firstName ?? ""} ${sanitizedPayload.lastName ?? ""}`.trim() ||
+      formatPersonDisplayName(sanitizedPayload.firstName, sanitizedPayload.lastName) ||
       "adhérent";
     const appOrigin = getAppBaseUrl(req);
     const confirmationMail = buildRegistrationSubmittedEmail({

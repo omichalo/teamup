@@ -18,6 +18,10 @@ import {
 import { Add as AddIcon, Delete as DeleteIcon } from "@mui/icons-material";
 import { getEnabledSections } from "@/lib/club-registration-config/helpers";
 import type { Representative } from "@/lib/club-registration/schema";
+import {
+  formatPersonDisplayName,
+  normalizeLastNameOnInput,
+} from "@/lib/shared/person-name-format";
 import { RegistrationMultiSelectField } from "../RegistrationMultiSelectField";
 import { SchoolPickupAdminFields } from "../SchoolPickupAdminFields";
 import {
@@ -72,7 +76,7 @@ export function MembershipRequestDetailFormPrimary({ detail, hideTitleHeader = f
           >
             <Box>
               <Typography variant="h5" fontWeight={700}>
-                {form.firstName} {form.lastName}
+                {formatPersonDisplayName(form.firstName, form.lastName)}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Référence : {selected.id}
@@ -149,7 +153,7 @@ export function MembershipRequestDetailFormPrimary({ detail, hideTitleHeader = f
           <TextField
             label="Nom"
             value={form.lastName}
-            onChange={(e) => updateField("lastName", e.target.value)}
+            onChange={(e) => updateField("lastName", normalizeLastNameOnInput(e.target.value))}
             fullWidth
           />
         </Grid>
@@ -299,7 +303,11 @@ export function MembershipRequestDetailFormPrimary({ detail, hideTitleHeader = f
                     <TextField
                       label="Nom"
                       value={rep.lastName}
-                      onChange={(e) => updateRepresentative(index, { lastName: e.target.value })}
+                      onChange={(e) =>
+                        updateRepresentative(index, {
+                          lastName: normalizeLastNameOnInput(e.target.value),
+                        })
+                      }
                       fullWidth
                     />
                   </Grid>

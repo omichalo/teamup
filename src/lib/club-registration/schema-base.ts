@@ -1,5 +1,13 @@
 import { z } from "zod";
+import { normalizeLastName } from "@/lib/shared/person-name-format";
 import { isValidFrenchPhoneSurface, normalizeFrenchPhoneInput } from "./phone-fr";
+
+export const lastNameFieldSchema = z
+  .string()
+  .trim()
+  .min(1, "Le nom est obligatoire")
+  .max(120)
+  .transform(normalizeLastName);
 
 const medicalYesNoSchema = z.enum(["yes", "no"]);
 
@@ -7,7 +15,7 @@ const medicalYesNoSchema = z.enum(["yes", "no"]);
 export const representativeSchema = z.object({
   role: z.enum(["mother", "father", "guardian", "self", "other"]),
   firstName: z.string().trim().min(1, "Le prénom est obligatoire").max(120),
-  lastName: z.string().trim().min(1, "Le nom est obligatoire").max(120),
+  lastName: lastNameFieldSchema,
   email: z.string().trim().email("Adresse e-mail invalide"),
   phone: z
     .string()
@@ -45,7 +53,7 @@ export type MedicalVeteranPathPayload = z.infer<typeof medicalVeteranPathSchema>
 
 export const ffttLicenseLookupSchema = z.object({
   licence: z.string().regex(/^[0-9]{5,12}$/),
-  nom: z.string().trim().max(120).optional(),
+  nom: z.optional(z.string().trim().max(120).transform(normalizeLastName)),
   prenom: z.string().trim().max(120).optional(),
   isHomme: z.boolean().optional(),
   numClub: z.string().trim().max(40).optional(),

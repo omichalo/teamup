@@ -19,6 +19,7 @@ import DownloadIcon from "@mui/icons-material/Download";
 import NextLink from "next/link";
 import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/ui";
+import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
 import { getEnabledSections } from "@/lib/club-registration-config/helpers";
 import { getDefaultRegistrationConfig } from "@/lib/club-registration-config/default-config";
 import {
@@ -209,7 +210,10 @@ export function MesInscriptionsClient() {
 
         {justCreated ? (
           <Alert severity="success">
-            Votre demande pour <strong>{justCreated.firstName} {justCreated.lastName}</strong>
+            Votre demande pour{" "}
+            <strong>
+              {formatPersonDisplayName(justCreated.firstName, justCreated.lastName)}
+            </strong>
             {" "}a bien été envoyée au club. Un e-mail de confirmation vous a été adressé à
             l’adresse de votre compte.
           </Alert>
@@ -219,7 +223,10 @@ export function MesInscriptionsClient() {
           <Alert severity="success">
             Paiement enregistré pour{" "}
             <strong>
-              {paymentJustCompleted.firstName} {paymentJustCompleted.lastName}
+              {formatPersonDisplayName(
+                paymentJustCompleted.firstName,
+                paymentJustCompleted.lastName
+              )}
             </strong>
             .{" "}
             {paymentJustCompleted.invoiceAvailable ||
@@ -274,7 +281,7 @@ export function MesInscriptionsClient() {
                           lineHeight: 1.3,
                         }}
                       >
-                        {r.firstName ?? "—"} {r.lastName ?? ""}
+                        {formatPersonDisplayName(r.firstName, r.lastName) || "—"}
                       </Typography>
                       <Typography
                         variant="body2"

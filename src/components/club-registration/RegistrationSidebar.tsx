@@ -17,6 +17,7 @@ import {
 } from "@/lib/club-registration-config/helpers";
 import { useRegistrationConfigValue } from "@/hooks/useRegistrationConfig";
 import { computeAgeAt, isMinorAt } from "@/lib/club-registration/age";
+import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
 import type { RegistrationStepId } from "@/lib/club-registration/field-to-step";
 import { formatCentsAsEuros } from "@/lib/pricing";
 import { PricingBreakdown, usePricingQuote } from "./PricingBreakdown";
@@ -135,7 +136,7 @@ function SidebarContent({
   const age = computeAgeAt(draft.birthDate);
 
   const fullName =
-    [draft.firstName, draft.lastName].filter((s) => s.trim()).join(" ") || null;
+    formatPersonDisplayName(draft.firstName, draft.lastName) || null;
   const slotsCount = draft.slotIds.length;
   const practiceStepIndex = sequence.indexOf("practice");
   const hasReachedPractice =

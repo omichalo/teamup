@@ -43,6 +43,12 @@ describe("formatSpreadsheetCellValue user labels", () => {
       ""
     );
   });
+
+  it("affiche le nom de famille en majuscules", () => {
+    expect(
+      formatSpreadsheetCellValue("lastName", { id: "r1", lastName: "dupont" }, null)
+    ).toBe("DUPONT");
+  });
 });
 
 describe("formatSpreadsheetCellValue structured fields", () => {
@@ -98,7 +104,7 @@ describe("format complex field helpers", () => {
         nom: "Martin",
         nomClub: "SQY Ping",
       })
-    ).toBe("Licence 99999 — Alice Martin — SQY Ping");
+    ).toBe("Licence 99999 — Alice MARTIN — SQY Ping");
   });
 
   it("formate le devis tarifaire", () => {

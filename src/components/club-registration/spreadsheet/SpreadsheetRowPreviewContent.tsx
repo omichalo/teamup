@@ -5,6 +5,7 @@ import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types"
 import type { RegistrationClientRecord } from "@/lib/club-registration/map-registration-doc-to-client";
 import type { SpreadsheetFormatContext } from "@/lib/club-registration/spreadsheet/format-context";
 import { buildSpreadsheetRowPreviewLines } from "@/lib/club-registration/spreadsheet/spreadsheet-row-preview";
+import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
 
 type Props = {
   row: RegistrationClientRecord;
@@ -14,7 +15,11 @@ type Props = {
 
 export function SpreadsheetRowPreviewContent({ row, config, formatContext }: Props) {
   const lines = buildSpreadsheetRowPreviewLines(row, config, formatContext);
-  const name = [row.firstName, row.lastName].filter(Boolean).join(" ") || "Dossier";
+  const name =
+    formatPersonDisplayName(
+      typeof row.firstName === "string" ? row.firstName : undefined,
+      typeof row.lastName === "string" ? row.lastName : undefined
+    ) || "Dossier";
 
   return (
     <Box sx={{ p: 0.5, maxWidth: 320 }}>

@@ -1,6 +1,7 @@
 import type { PriceQuote } from "@/lib/pricing/types";
 import type { PaymentAid } from "@/lib/club-registration/payment/types";
 import type { StripeCheckoutLineItem } from "@/lib/pricing/stripe-checkout-lines";
+import { formatLastNameForDisplay } from "@/lib/shared/person-name-format";
 
 function formatEuros(cents: number): string {
   return `${(cents / 100).toFixed(2).replace(".", ",")} €`;
@@ -71,8 +72,11 @@ export function formatFfttLicenseLookupForSpreadsheet(value: unknown): string {
     parts.push(`Licence ${data.licence}`);
   }
 
-  const name = [data.prenom, data.nom]
-    .filter((part) => typeof part === "string" && part.trim().length > 0)
+  const name = [
+    typeof data.prenom === "string" ? data.prenom.trim() : "",
+    formatLastNameForDisplay(typeof data.nom === "string" ? data.nom : undefined),
+  ]
+    .filter((part) => part.length > 0)
     .join(" ");
   if (name) {
     parts.push(name);

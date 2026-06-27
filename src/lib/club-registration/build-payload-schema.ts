@@ -30,6 +30,7 @@ import {
   ffttLicenseLookupSchema,
   medicalQuestionnaireSchema,
   medicalVeteranPathSchema,
+  lastNameFieldSchema,
   representativeSchema,
 } from "./schema-base";
 
@@ -86,7 +87,7 @@ export function buildRegistrationPayloadSchema(config: RegistrationConfigV1) {
         .optional(),
       ffttLicenseLookup: ffttLicenseLookupSchema.optional(),
       firstName: z.string().trim().min(1, "Le prénom est obligatoire").max(120),
-      lastName: z.string().trim().min(1, "Le nom est obligatoire").max(120),
+      lastName: lastNameFieldSchema,
       sex: z.enum(["female", "male", "other"]),
       birthCity: z.string().trim().min(1, "La ville de naissance est obligatoire").max(120),
       birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date invalide (AAAA-MM-JJ)"),

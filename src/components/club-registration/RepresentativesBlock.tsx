@@ -24,6 +24,7 @@ import {
   toFrenchPhoneMaskedDisplay,
 } from "@/lib/club-registration/phone-fr";
 import type { Representative } from "@/lib/club-registration/schema";
+import { normalizeLastNameOnInput } from "@/lib/shared/person-name-format";
 
 type Props = {
   representatives: Representative[];
@@ -68,7 +69,9 @@ export function RepresentativesBlock({
   const handleField =
     (index: number, field: keyof Representative) =>
     (e: ChangeEvent<HTMLInputElement>) => {
-      onUpdate(index, { [field]: e.target.value } as Partial<Representative>);
+      const value =
+        field === "lastName" ? normalizeLastNameOnInput(e.target.value) : e.target.value;
+      onUpdate(index, { [field]: value } as Partial<Representative>);
     };
 
   const handleRole =

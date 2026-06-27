@@ -11,6 +11,7 @@ import {
   Typography,
 } from "@mui/material";
 import { isAtLeast40At } from "@/lib/club-registration/age";
+import { normalizeLastName } from "@/lib/shared/person-name-format";
 import {
   lookupFFTTLicense,
   normalizeFFTTLicenseInput,
@@ -150,7 +151,7 @@ export function RegistrationFfttFields({
         ? { sex: player.isHomme ? "male" : "female" }
         : {}),
       ...(player.prenom ? { firstName: player.prenom } : {}),
-      ...(player.nom ? { lastName: player.nom } : {}),
+      ...(player.nom ? { lastName: normalizeLastName(player.nom) } : {}),
     });
     setLookupStatus("idle");
   };

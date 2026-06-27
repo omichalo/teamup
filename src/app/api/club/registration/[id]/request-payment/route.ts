@@ -10,6 +10,7 @@ import { buildPaymentInstructionsEmail } from "@/lib/email/payment-instructions-
 import { buildPaymentRequestEmail } from "@/lib/email/payment-email";
 import { getSqyPingLogoAttachment } from "@/lib/email/logo-attachment";
 import { sendMail } from "@/lib/mailer";
+import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
 import { AUDIT_ACTIONS, logAuditAction } from "@/lib/auth/audit-logger";
 import {
   createLegacySingleLineCheckoutSession,
@@ -100,7 +101,11 @@ export async function POST(
       );
     }
 
-    const adherentName = `${data.firstName ?? ""} ${data.lastName ?? ""}`.trim() || "adhérent";
+    const adherentName =
+      formatPersonDisplayName(
+        typeof data.firstName === "string" ? data.firstName : undefined,
+        typeof data.lastName === "string" ? data.lastName : undefined
+      ) || "adhérent";
     const baseUrl = getAppBaseUrl(req);
     const successUrl = `${baseUrl}/club/mes-inscriptions?payment=success&registration=${encodeURIComponent(id)}`;
     const cancelUrl = `${baseUrl}/club/mes-inscriptions?payment=cancelled&registration=${encodeURIComponent(id)}`;

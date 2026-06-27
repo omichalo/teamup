@@ -22,6 +22,7 @@ import type {
 } from "./registration-defaults";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import { buildAdminAidRecapFields } from "@/lib/club-registration/recap-aids";
+import { formatLastNameForDisplay } from "@/lib/shared/person-name-format";
 import { ApplicantNotesSection } from "./ApplicantNotesSection";
 import { RecapPaymentBlock } from "./RecapPaymentBlock";
 import { PricingBreakdown, usePricingQuote } from "./PricingBreakdown";
@@ -266,7 +267,7 @@ export function RecapStep({
         onEdit={() => onEditStep("adherent")}
         fields={[
           { label: "Prénom", value: draft.firstName },
-          { label: "Nom", value: draft.lastName },
+          { label: "Nom", value: formatLastNameForDisplay(draft.lastName) },
           { label: "Sexe", value: SEX_LABELS[draft.sex] },
           ...(draft.ffttLicenseLookup
             ? ([
@@ -330,7 +331,7 @@ export function RecapStep({
           fields={draft.representatives.flatMap((rep, i) => [
             {
               label: `Représentant ${i + 1}`,
-              value: `${ROLE_LABELS[rep.role]} — ${rep.firstName} ${rep.lastName}`,
+              value: `${ROLE_LABELS[rep.role]} — ${rep.firstName} ${formatLastNameForDisplay(rep.lastName)}`,
             },
             { label: `E-mail rep. ${i + 1}`, value: rep.email },
             {

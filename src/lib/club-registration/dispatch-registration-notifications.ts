@@ -9,6 +9,7 @@ import { buildRegistrationCreatedSecretaryEmail } from "@/lib/email/registration
 import { getSqyPingLogoAttachment } from "@/lib/email/logo-attachment";
 import { sendMail } from "@/lib/mailer";
 import { normalizeApplicantNotes } from "@/lib/club-registration/applicant-notes";
+import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
 
 export async function notifySecretariesOfNewRegistration(params: {
   db: Firestore;
@@ -33,7 +34,7 @@ export async function notifySecretariesOfNewRegistration(params: {
   }
 
   const adherentName =
-    `${params.payload.firstName ?? ""} ${params.payload.lastName ?? ""}`.trim() ||
+    formatPersonDisplayName(params.payload.firstName, params.payload.lastName) ||
     "adhérent";
   const section =
     getSectionById(params.config, params.payload.mainSectionId)?.label ??

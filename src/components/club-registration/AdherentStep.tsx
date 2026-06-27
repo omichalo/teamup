@@ -22,6 +22,7 @@ import {
   toFrenchPhoneMaskedDisplay,
 } from "@/lib/club-registration/phone-fr";
 import { isMinorAt } from "@/lib/club-registration/age";
+import { normalizeLastNameOnInput } from "@/lib/shared/person-name-format";
 import { getDevIdentityFixture } from "./dev-identity-fixture";
 import { PostalAddressSection } from "./PostalAddressSection";
 import { useTouchedFields } from "./useTouchedFields";
@@ -158,7 +159,7 @@ export function AdherentStep({
           required
           label="Nom de l’adhérent"
           value={draft.lastName}
-          onChange={(e) => onPatch({ lastName: e.target.value })}
+          onChange={(e) => onPatch({ lastName: normalizeLastNameOnInput(e.target.value) })}
           fullWidth
           autoComplete="family-name"
           inputProps={{ "data-field": "lastName" }}

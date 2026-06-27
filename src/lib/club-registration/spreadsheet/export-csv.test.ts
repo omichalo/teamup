@@ -11,7 +11,7 @@ describe("spreadsheet export csv", () => {
 
     expect(content.startsWith("\uFEFF")).toBe(true);
     expect(content).toContain("Nom;Prénom");
-    expect(content).toContain("Dupont;Alice");
+    expect(content).toContain("DUPONT;Alice");
   });
 
   it("échappe les guillemets et retours ligne", () => {

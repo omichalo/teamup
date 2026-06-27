@@ -25,6 +25,7 @@ import {
   resolveSpreadsheetUserLabel,
   type SpreadsheetFormatContext,
 } from "./format-context";
+import { formatLastNameForDisplay } from "@/lib/shared/person-name-format";
 import { formatPaymentForSpreadsheet } from "./format-payment-spreadsheet";
 import {
   formatFfttLicenseLookupForSpreadsheet,
@@ -140,8 +141,13 @@ function formatRepresentatives(value: unknown): string {
         typeof rep.role === "string"
           ? (REPRESENTATIVE_ROLE_LABELS[rep.role] ?? rep.role)
           : "";
-      const name = [rep.firstName, rep.lastName]
-        .filter((part) => typeof part === "string" && part.trim().length > 0)
+      const name = [
+        typeof rep.firstName === "string" ? rep.firstName.trim() : "",
+        formatLastNameForDisplay(
+          typeof rep.lastName === "string" ? rep.lastName : undefined
+        ),
+      ]
+        .filter((part) => part.length > 0)
         .join(" ");
       const email = typeof rep.email === "string" ? rep.email : "";
       const phone =
@@ -185,6 +191,8 @@ export function formatSpreadsheetCellValue(
   const value = row[columnId];
 
   switch (columnId) {
+    case "lastName":
+      return formatLastNameForDisplay(typeof value === "string" ? value : undefined);
     case "submitterUid":
       return resolveSpreadsheetUserLabel(value, context, row.submitterAccountEmail);
     case "paymentRequestedBy":
