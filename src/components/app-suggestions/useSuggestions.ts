@@ -7,6 +7,7 @@ import type {
   AppSuggestionSummary,
   SuggestionCategory,
   SuggestionKind,
+  SuggestionPriority,
 } from "@/lib/app-suggestions/types";
 
 export type SuggestionsPageInfo = {
@@ -180,6 +181,7 @@ export function useSuggestionDetail() {
       description: string;
       kind: SuggestionKind;
       category: SuggestionCategory;
+      priority: SuggestionPriority;
     }) => {
       const response = await fetch("/api/club/suggestions", {
         method: "POST",
@@ -226,6 +228,7 @@ export function useSuggestionDetail() {
         title: string;
         description: string;
         category: SuggestionCategory;
+        priority: SuggestionPriority;
       }>
     ) => {
       const response = await fetch(`/api/club/suggestions/${id}`, {

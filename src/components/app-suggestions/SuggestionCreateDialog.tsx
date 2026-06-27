@@ -12,10 +12,11 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import type { SuggestionCategory, SuggestionKind } from "@/lib/app-suggestions/types";
+import type { SuggestionCategory, SuggestionKind, SuggestionPriority } from "@/lib/app-suggestions/types";
 import { isValidSuggestionCategory } from "@/lib/app-suggestions/categories";
 import { stripSuggestionHtmlText } from "@/lib/app-suggestions/rich-text";
 import { SuggestionCategoryField } from "@/components/app-suggestions/SuggestionCategoryField";
+import { SuggestionPriorityField } from "@/components/app-suggestions/SuggestionPriorityField";
 import { SuggestionRichTextEditor } from "@/components/app-suggestions/rich-text/SuggestionRichTextEditor";
 import { cleanupAllDraftSuggestionImages } from "@/components/app-suggestions/rich-text/draft-image-cleanup";
 
@@ -28,6 +29,7 @@ type SuggestionCreateDialogProps = {
     description: string;
     kind: SuggestionKind;
     category: SuggestionCategory;
+    priority: SuggestionPriority;
   }) => Promise<void>;
 };
 
@@ -68,6 +70,7 @@ export function SuggestionCreateDialog({
   const [title, setTitle] = useState("");
   const [descriptionHtml, setDescriptionHtml] = useState("<p></p>");
   const [category, setCategory] = useState("");
+  const [priority, setPriority] = useState<SuggestionPriority>("medium");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,6 +80,7 @@ export function SuggestionCreateDialog({
     setTitle("");
     setDescriptionHtml("<p></p>");
     setCategory("");
+    setPriority("medium");
     setError(null);
   };
 
@@ -116,6 +120,7 @@ export function SuggestionCreateDialog({
         description: descriptionHtml,
         kind,
         category,
+        priority,
       });
       reset();
       onClose();
@@ -152,6 +157,13 @@ export function SuggestionCreateDialog({
             onChange={setCategory}
             required
             disabled={submitting}
+          />
+
+          <SuggestionPriorityField
+            value={priority}
+            onChange={setPriority}
+            disabled={submitting}
+            required
           />
 
           <Stack spacing={0.75}>

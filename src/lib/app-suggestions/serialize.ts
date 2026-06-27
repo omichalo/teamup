@@ -1,5 +1,6 @@
 import type { Timestamp } from "firebase-admin/firestore";
 import { getSuggestionDescriptionExcerpt } from "@/lib/app-suggestions/rich-text";
+import { resolveStoredSuggestionPriority } from "@/lib/app-suggestions/priority-fields";
 import type {
   AppSuggestionComment,
   AppSuggestionCommentRecord,
@@ -65,7 +66,7 @@ export function serializeSuggestionSummary(
     ),
     kind: resolveSuggestionKind(data.kind),
     category: data.category,
-    priority: data.priority,
+    priority: resolveStoredSuggestionPriority(data.priority),
     status: data.status,
     submitterUid: data.submitterUid,
     submitterDisplayName: data.submitterDisplayName,
