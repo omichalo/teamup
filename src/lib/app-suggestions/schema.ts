@@ -89,6 +89,7 @@ export const suggestionCreateSchema = z.object({
   description: richDescriptionSchema,
   kind: kindSchema,
   category: categorySchema,
+  priority: z.enum(SUGGESTION_PRIORITIES).default("medium"),
 });
 
 export type SuggestionCreateInput = z.infer<typeof suggestionCreateSchema>;
@@ -98,12 +99,14 @@ export const suggestionAuthorPatchSchema = z
     title: titleSchema.optional(),
     description: richDescriptionSchema.optional(),
     category: categorySchema.optional(),
+    priority: z.enum(SUGGESTION_PRIORITIES).optional(),
   })
   .refine(
     (value) =>
       value.title !== undefined ||
       value.description !== undefined ||
-      value.category !== undefined,
+      value.category !== undefined ||
+      value.priority !== undefined,
     { message: "Aucune modification fournie" }
   );
 

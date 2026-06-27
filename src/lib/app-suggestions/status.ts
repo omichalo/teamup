@@ -1,4 +1,8 @@
-import type { SuggestionKind, SuggestionStatus } from "@/lib/app-suggestions/types";
+import type {
+  SuggestionKind,
+  SuggestionPriority,
+  SuggestionStatus,
+} from "@/lib/app-suggestions/types";
 import { formatSuggestionCategoryLabel } from "@/lib/app-suggestions/categories";
 
 export { formatSuggestionCategoryLabel };
@@ -37,11 +41,39 @@ export const SUGGESTION_KIND_COLORS: Record<
   problem: "warning",
 };
 
-export const SUGGESTION_PRIORITY_LABELS = {
+export const SUGGESTION_PRIORITY_LABELS: Record<SuggestionPriority, string> = {
   low: "Basse",
   medium: "Moyenne",
   high: "Haute",
-} as const;
+};
+
+export const SUGGESTION_PRIORITY_COLORS: Record<
+  SuggestionPriority,
+  "default" | "warning" | "error"
+> = {
+  low: "default",
+  medium: "warning",
+  high: "error",
+};
+
+export const SUGGESTION_PRIORITY_RANK: Record<SuggestionPriority, number> = {
+  high: 3,
+  medium: 2,
+  low: 1,
+};
+
+export function compareSuggestionsByPriority(
+  left: { priority: SuggestionPriority; createdAt: string },
+  right: { priority: SuggestionPriority; createdAt: string }
+): number {
+  const rankDiff =
+    SUGGESTION_PRIORITY_RANK[right.priority] -
+    SUGGESTION_PRIORITY_RANK[left.priority];
+  if (rankDiff !== 0) {
+    return rankDiff;
+  }
+  return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+}
 
 /** Retours encore en suivi (hors livrés ou classés sans suite). */
 export const SUGGESTION_OPEN_STATUSES = [
