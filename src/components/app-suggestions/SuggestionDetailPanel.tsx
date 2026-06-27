@@ -14,7 +14,7 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { OpenInNew as OpenInNewIcon } from "@mui/icons-material";
-import type { AppSuggestionDetail, SuggestionCategory } from "@/lib/app-suggestions/types";
+import type { AppSuggestionDetail, SuggestionCategory, SuggestionPriority } from "@/lib/app-suggestions/types";
 import {
   formatSuggestionCategoryLabel,
   SUGGESTION_KIND_COLORS,
@@ -25,6 +25,8 @@ import {
 } from "@/lib/app-suggestions/status";
 import { isValidSuggestionCategory } from "@/lib/app-suggestions/categories";
 import { SuggestionCategoryField } from "@/components/app-suggestions/SuggestionCategoryField";
+import { SuggestionPriorityChip } from "@/components/app-suggestions/SuggestionPriorityChip";
+import { SuggestionPriorityField } from "@/components/app-suggestions/SuggestionPriorityField";
 import { formatSuggestionDate } from "@/components/app-suggestions/format-utils";
 import { SuggestionDetailEmptyState } from "@/components/app-suggestions/SuggestionDetailEmptyState";
 import { SuggestionDetailCommentsSection } from "@/components/app-suggestions/SuggestionDetailCommentsSection";
@@ -49,6 +51,7 @@ type SuggestionDetailPanelProps = {
       title: string;
       description: string;
       category: SuggestionCategory;
+      priority: SuggestionPriority;
     }>
   ) => Promise<void>;
   onPatchMaintainer: (
@@ -76,6 +79,7 @@ export function SuggestionDetailPanel({
   const [editTitle, setEditTitle] = useState("");
   const [editDescriptionHtml, setEditDescriptionHtml] = useState("<p></p>");
   const [editCategory, setEditCategory] = useState("");
+  const [editPriority, setEditPriority] = useState<SuggestionPriority>("medium");
   const [authorSubmitting, setAuthorSubmitting] = useState(false);
   const [authorError, setAuthorError] = useState<string | null>(null);
   const [authorSuccess, setAuthorSuccess] = useState<string | null>(null);
@@ -88,6 +92,7 @@ export function SuggestionDetailPanel({
     setEditTitle(detail.title);
     setEditDescriptionHtml(detail.description || "<p></p>");
     setEditCategory(detail.category);
+    setEditPriority(detail.priority);
   }, [detail, isEditing]);
 
   useEffect(() => {
@@ -127,6 +132,7 @@ export function SuggestionDetailPanel({
         title: editTitle,
         description: editDescriptionHtml,
         category: editCategory,
+        priority: editPriority,
       });
       setIsEditing(false);
       setAuthorSuccess("Modifications enregistrées.");
@@ -150,6 +156,7 @@ export function SuggestionDetailPanel({
     setEditTitle(detail.title);
     setEditDescriptionHtml(referenceHtml);
     setEditCategory(detail.category);
+    setEditPriority(detail.priority);
     setAuthorError(null);
     setIsEditing(false);
     void cleanupDraftSuggestionImages(draftHtml, referenceHtml).catch(() => undefined);
@@ -205,12 +212,20 @@ export function SuggestionDetailPanel({
           </Stack>
         </Stack>
         {isEditing ? (
-          <SuggestionCategoryField
-            value={editCategory}
-            onChange={setEditCategory}
-            required
-            disabled={authorSubmitting}
-          />
+          <>
+            <SuggestionCategoryField
+              value={editCategory}
+              onChange={setEditCategory}
+              required
+              disabled={authorSubmitting}
+            />
+            <SuggestionPriorityField
+              value={editPriority}
+              onChange={setEditPriority}
+              disabled={authorSubmitting}
+              required
+            />
+          </>
         ) : (
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
             <Chip
@@ -223,6 +238,7 @@ export function SuggestionDetailPanel({
               size="small"
               variant="outlined"
             />
+            <SuggestionPriorityChip priority={detail.priority} />
             <Typography variant="body2" color="text.secondary">
               {detail.submitterDisplayName || "Utilisateur"} ·{" "}
               {formatSuggestionDate(detail.createdAt)}
@@ -234,8 +250,8 @@ export function SuggestionDetailPanel({
       {isEditing ? (
         <Stack spacing={1.5}>
           <Alert severity="info">
-            Modifiez le titre, la catégorie ou la description puis cliquez sur
-            « Enregistrer ». « Annuler » restaure la version affichée.
+            Modifiez le titre, la catégorie, la priorité ou la description puis
+            cliquez sur « Enregistrer ». « Annuler » restaure la version affichée.
           </Alert>
           <Typography variant="subtitle2" fontWeight={600}>
             Description

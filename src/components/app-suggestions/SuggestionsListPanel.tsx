@@ -18,6 +18,7 @@ import {
   SUGGESTION_STATUS_LABELS,
 } from "@/lib/app-suggestions/status";
 import { formatSuggestionDate } from "@/components/app-suggestions/format-utils";
+import { SuggestionPriorityChip } from "@/components/app-suggestions/SuggestionPriorityChip";
 import { suggestionListItemSx } from "@/components/app-suggestions/suggestions-surface-styles";
 
 type SuggestionsListPanelProps = {
@@ -130,6 +131,7 @@ export function SuggestionsListPanel({
                     variant="outlined"
                     sx={{ height: 22, fontSize: "0.7rem" }}
                   />
+                  <SuggestionPriorityChip priority={suggestion.priority} />
                   <Typography variant="caption" color="text.secondary" sx={{ alignSelf: "center" }}>
                     {suggestion.submitterDisplayName || "Utilisateur"} ·{" "}
                     {formatSuggestionDate(suggestion.createdAt)}

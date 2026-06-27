@@ -21,6 +21,7 @@ import type {
 import { SUGGESTION_SCHEMA_VERSION } from "@/lib/app-suggestions/types";
 import {
   SUGGESTION_OPEN_STATUSES,
+  compareSuggestionsByPriority,
   type SuggestionStatusFilter,
 } from "@/lib/app-suggestions/status";
 import { resolveStoredCommentCount } from "@/lib/app-suggestions/resolve-comment-count";
@@ -37,6 +38,7 @@ import {
   isValidSuggestionCategory,
   normalizeSuggestionCategory,
 } from "@/lib/app-suggestions/categories";
+import { buildSuggestionPriorityFields } from "@/lib/app-suggestions/priority-fields";
 
 const COLLECTION = "appSuggestions";
 
@@ -63,7 +65,7 @@ export async function createSuggestion(
     descriptionFormat: "html",
     kind: input.kind,
     category: input.category,
-    priority: "medium",
+    ...buildSuggestionPriorityFields(input.priority),
     status: "received",
     submitterUid: submitter.uid,
     submitterDisplayName: submitter.displayName,
@@ -96,7 +98,8 @@ function buildSuggestionsListQuery(
     kindFilter: SuggestionKind | "all";
     mineOnly: boolean;
     submitterUid?: string;
-  }
+  },
+  sortMode: "priority" | "createdAt" = "priority"
 ): FirebaseFirestore.Query {
   let query: FirebaseFirestore.Query = suggestionsCollection(db);
 
@@ -115,7 +118,93 @@ function buildSuggestionsListQuery(
     query = query.where("category", "==", filters.categoryFilter);
   }
 
+  if (sortMode === "priority") {
+    return query.orderBy("priorityRank", "desc").orderBy("createdAt", "desc");
+  }
+
   return query.orderBy("createdAt", "desc");
+}
+
+function isMissingOrBuildingIndexError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const code = (error as { code?: number }).code;
+  const message = String((error as { message?: string }).message ?? "");
+
+  return (
+    code === 9 &&
+    (message.includes("requires an index") ||
+      message.includes("index is currently building"))
+  );
+}
+
+async function fetchSuggestionsPageDocs(
+  db: Firestore,
+  filters: {
+    statusFilter: SuggestionStatusFilter;
+    categoryFilter: SuggestionCategory | "all";
+    kindFilter: SuggestionKind | "all";
+    mineOnly: boolean;
+    submitterUid?: string;
+  },
+  options: {
+    pageSize: number;
+    cursor?: string | null;
+  }
+): Promise<{
+  docs: FirebaseFirestore.QueryDocumentSnapshot[];
+  sortedInMemory: boolean;
+}> {
+  const runQuery = async (sortMode: "priority" | "createdAt") => {
+    let query = buildSuggestionsListQuery(db, filters, sortMode);
+
+    if (options.cursor) {
+      const cursorDoc = await suggestionsCollection(db).doc(options.cursor).get();
+      if (cursorDoc.exists) {
+        query = query.startAfter(cursorDoc);
+      }
+    }
+
+    return query.limit(options.pageSize).get();
+  };
+
+  try {
+    const snapshot = await runQuery("priority");
+    return { docs: snapshot.docs, sortedInMemory: false };
+  } catch (error) {
+    if (!isMissingOrBuildingIndexError(error)) {
+      throw error;
+    }
+
+    const snapshot = await runQuery("createdAt");
+    return { docs: snapshot.docs, sortedInMemory: true };
+  }
+}
+
+async function finalizeSuggestionPage(
+  db: Firestore,
+  docs: FirebaseFirestore.QueryDocumentSnapshot[],
+  pageSize: number,
+  sortedInMemory: boolean
+): Promise<{
+  suggestions: AppSuggestionSummary[];
+  hasNextPage: boolean;
+  nextCursor: string | null;
+}> {
+  const hasNextPage = docs.length > pageSize;
+  const pageDocs = hasNextPage ? docs.slice(0, pageSize) : docs;
+  let suggestions = await mapSuggestionDocs(db, pageDocs);
+
+  if (sortedInMemory) {
+    suggestions = [...suggestions].sort(compareSuggestionsByPriority);
+  }
+
+  const lastDoc = pageDocs.at(-1);
+  const nextCursor = hasNextPage && lastDoc ? lastDoc.id : null;
+
+  return { suggestions, hasNextPage, nextCursor };
 }
 
 async function mapSuggestionDocs(
@@ -181,38 +270,35 @@ export async function listSuggestions(
     let cursor = options.cursor ?? null;
 
     while (matched.length < pageSize + 1) {
-      let query = buildSuggestionsListQuery(db, {
-        ...options,
-        kindFilter: "all",
-      });
+      const page = await fetchSuggestionsPageDocs(
+        db,
+        { ...options, kindFilter: "all" },
+        { pageSize: pageSize + 1, cursor }
+      );
 
-      if (cursor) {
-        const cursorDoc = await suggestionsCollection(db).doc(cursor).get();
-        if (cursorDoc.exists) {
-          query = query.startAfter(cursorDoc);
-        }
-      }
-
-      const snapshot = await query.limit(pageSize + 1).get();
-      if (snapshot.empty) {
+      if (page.docs.length === 0) {
         break;
       }
 
-      const suggestions = await mapSuggestionDocs(db, snapshot.docs);
-      matched.push(...suggestions.filter((suggestion) => suggestion.kind === "improvement"));
+      const suggestions = await mapSuggestionDocs(db, page.docs);
+      matched.push(
+        ...suggestions.filter((suggestion) => suggestion.kind === "improvement")
+      );
 
-      if (snapshot.docs.length <= pageSize) {
+      if (page.docs.length <= pageSize) {
         break;
       }
 
-      cursor = snapshot.docs[snapshot.docs.length - 1]?.id ?? null;
+      cursor = page.docs[page.docs.length - 1]?.id ?? null;
       if (!cursor) {
         break;
       }
     }
 
     const hasNextPage = matched.length > pageSize;
-    const suggestions = matched.slice(0, pageSize);
+    const suggestions = matched
+      .slice(0, pageSize)
+      .sort(compareSuggestionsByPriority);
     const nextCursor =
       hasNextPage && suggestions.length > 0
         ? (suggestions[suggestions.length - 1]?.id ?? null)
@@ -221,27 +307,12 @@ export async function listSuggestions(
     return { suggestions, hasNextPage, nextCursor };
   }
 
-  let query = buildSuggestionsListQuery(db, options);
+  const page = await fetchSuggestionsPageDocs(db, options, {
+    pageSize: pageSize + 1,
+    ...(options.cursor !== undefined ? { cursor: options.cursor } : {}),
+  });
 
-  if (options.cursor) {
-    const cursorDoc = await suggestionsCollection(db).doc(options.cursor).get();
-    if (cursorDoc.exists) {
-      query = query.startAfter(cursorDoc);
-    }
-  }
-
-  const snapshot = await query.limit(pageSize + 1).get();
-  const docs = snapshot.docs;
-  const hasNextPage = docs.length > pageSize;
-  const pageDocs = hasNextPage ? docs.slice(0, pageSize) : docs;
-  const lastDoc = pageDocs.at(-1);
-  const nextCursor = hasNextPage && lastDoc ? lastDoc.id : null;
-
-  return {
-    suggestions: await mapSuggestionDocs(db, pageDocs),
-    hasNextPage,
-    nextCursor,
-  };
+  return finalizeSuggestionPage(db, page.docs, pageSize, page.sortedInMemory);
 }
 
 export async function getSuggestionDetail(
@@ -302,6 +373,9 @@ export async function patchSuggestionAsAuthor(
     updates.descriptionFormat = "html";
   }
   if (patch.category !== undefined) updates.category = patch.category;
+  if (patch.priority !== undefined) {
+    Object.assign(updates, buildSuggestionPriorityFields(patch.priority));
+  }
 
   await docRef.update(updates);
 
@@ -352,7 +426,9 @@ export async function patchSuggestionAsMaintainer(
     updates.statusUpdatedByDisplayName = maintainer.displayName;
     updates.statusHistory = [...(current.statusHistory ?? []), historyEntry];
   }
-  if (patch.priority !== undefined) updates.priority = patch.priority;
+  if (patch.priority !== undefined) {
+    Object.assign(updates, buildSuggestionPriorityFields(patch.priority));
+  }
   if (patch.maintainerNote !== undefined) {
     updates.maintainerNote = patch.maintainerNote;
   }

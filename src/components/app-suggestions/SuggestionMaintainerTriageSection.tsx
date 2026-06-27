@@ -13,10 +13,8 @@ import {
 } from "@mui/material";
 import type { AppSuggestionDetail } from "@/lib/app-suggestions/types";
 import { SUGGESTION_STATUSES } from "@/lib/app-suggestions/types";
-import {
-  SUGGESTION_PRIORITY_LABELS,
-  SUGGESTION_STATUS_LABELS,
-} from "@/lib/app-suggestions/status";
+import { SUGGESTION_STATUS_LABELS } from "@/lib/app-suggestions/status";
+import { SuggestionPriorityField } from "@/components/app-suggestions/SuggestionPriorityField";
 
 type Props = {
   detail: AppSuggestionDetail;
@@ -97,19 +95,11 @@ export function SuggestionMaintainerTriageSection({
               </MenuItem>
             ))}
           </TextField>
-          <TextField
-            select
-            label="Priorité"
+          <SuggestionPriorityField
             value={priority}
-            onChange={(event) =>
-              setPriority(event.target.value as AppSuggestionDetail["priority"])
-            }
-            fullWidth
-          >
-            <MenuItem value="low">{SUGGESTION_PRIORITY_LABELS.low}</MenuItem>
-            <MenuItem value="medium">{SUGGESTION_PRIORITY_LABELS.medium}</MenuItem>
-            <MenuItem value="high">{SUGGESTION_PRIORITY_LABELS.high}</MenuItem>
-          </TextField>
+            onChange={setPriority}
+            disabled={submitting}
+          />
         </Stack>
         <TextField
           label="Note officielle (équipe technique)"

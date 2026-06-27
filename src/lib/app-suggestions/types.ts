@@ -60,6 +60,8 @@ export interface AppSuggestionRecord {
   kind?: SuggestionKind;
   category: SuggestionCategory;
   priority: SuggestionPriority;
+  /** Tri Firestore (3 = haute, 2 = moyenne, 1 = basse). */
+  priorityRank?: number;
   status: SuggestionStatus;
   submitterUid: string;
   submitterDisplayName: string | null;
