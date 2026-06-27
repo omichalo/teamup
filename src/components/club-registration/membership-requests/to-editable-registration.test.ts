@@ -56,5 +56,9 @@ describe("toEditableRegistration", () => {
     null);
 
     expect(form.ffttLicense).toBe("12345678");
+    expect(form.ffttLicenseLookup).toEqual({
+      licence: "12345678",
+      nomClub: "SQY Ping",
+    });
   });
 });

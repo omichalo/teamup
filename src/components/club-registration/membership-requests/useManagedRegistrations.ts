@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ManagedListMedicalCertificateFilter } from "@/lib/club-registration/medical-certificate";
+import type { ManagedListUrlState } from "@/lib/club-registration/managed-list-url-state";
 import type { ManagedListStatusFilter } from "@/lib/club-registration/registration-status";
 import type { RegistrationSummary } from "./types";
 
@@ -39,10 +40,14 @@ function buildManagedRegistrationsUrl(params: {
   return url.pathname + url.search;
 }
 
-export function useManagedRegistrations() {
-  const [statusFilter, setStatusFilter] = useState<ManagedListStatusFilter>("actionable");
+type InitialState = Pick<ManagedListUrlState, "statusFilter" | "medicalCertificateFilter">;
+
+export function useManagedRegistrations(initial?: InitialState) {
+  const [statusFilter, setStatusFilter] = useState<ManagedListStatusFilter>(
+    initial?.statusFilter ?? "actionable"
+  );
   const [medicalCertificateFilter, setMedicalCertificateFilter] =
-    useState<ManagedListMedicalCertificateFilter>("all");
+    useState<ManagedListMedicalCertificateFilter>(initial?.medicalCertificateFilter ?? "all");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [registrations, setRegistrations] = useState<RegistrationSummary[]>([]);
@@ -56,6 +61,7 @@ export function useManagedRegistrations() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
+  const hasLoadedOnceRef = useRef(false);
 
   useEffect(() => {
     const handle = window.setTimeout(() => {
@@ -75,7 +81,7 @@ export function useManagedRegistrations() {
       const requestId = ++requestIdRef.current;
       if (options.append) {
         setLoadingMore(true);
-      } else {
+      } else if (!hasLoadedOnceRef.current) {
         setLoadingList(true);
       }
       setError(null);
@@ -110,6 +116,7 @@ export function useManagedRegistrations() {
             totalMatched: null,
           }
         );
+        hasLoadedOnceRef.current = true;
         return nextRegistrations;
       } catch (err) {
         if (requestId === requestIdRef.current) {

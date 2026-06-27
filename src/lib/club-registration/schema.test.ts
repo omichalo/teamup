@@ -49,6 +49,7 @@ function buildPayload(
     familyRegistrationOrder: "none",
     reductionTypes: [],
     reductionReferenceCodes: {},
+    wasSqyMemberLastYear: false,
     photoConsent: "accept",
     emergencyMedicalAuthorization: "not_applicable_adult",
     supervisionAcknowledgement: "not_applicable_adult",
@@ -218,6 +219,18 @@ describe("clubRegistrationPayloadSchema", () => {
     expect(r.success).toBe(false);
     if (!r.success) {
       expect(r.error.issues.some((i) => i.path[0] === "representatives")).toBe(true);
+    }
+  });
+
+  it("refuse un payload sans wasSqyMemberLastYear", () => {
+    const { wasSqyMemberLastYear: _removed, ...without } = buildPayload();
+    void _removed;
+    const r = clubRegistrationPayloadSchema.safeParse(without);
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(r.error.issues.some((i) => i.path.includes("wasSqyMemberLastYear"))).toBe(
+        true
+      );
     }
   });
 

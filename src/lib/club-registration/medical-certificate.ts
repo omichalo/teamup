@@ -65,11 +65,24 @@ export type ManagedListMedicalCertificateFilter = "all" | MedicalCertificateStat
 export const MANAGED_LIST_MEDICAL_CERTIFICATE_FILTER_OPTIONS: {
   value: ManagedListMedicalCertificateFilter;
   label: string;
+  hint?: string;
 }[] = [
-  { value: "all", label: "Tous certificats" },
-  { value: "required_not_received", label: "Certificat attendu" },
-  { value: "received", label: "Certificat reçu" },
-  { value: "validated", label: "Certificat validé" },
+  { value: "all", label: "Tous" },
+  {
+    value: "required_not_received",
+    label: "Attendu",
+    hint: "Certificat requis, pas encore reçu au bureau.",
+  },
+  {
+    value: "received",
+    label: "Reçu",
+    hint: "Document reçu, en attente de contrôle par le secrétariat.",
+  },
+  {
+    value: "validated",
+    label: "Contrôlé",
+    hint: "Certificat reçu et vérifié conforme par le secrétariat.",
+  },
 ];
 
 export function resolveManagedListMedicalCertificateFilter(

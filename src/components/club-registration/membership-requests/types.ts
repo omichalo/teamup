@@ -6,6 +6,11 @@ import type {
 } from "@/lib/club-registration/schema";
 import type { PaymentAid, RegistrationPayment } from "@/lib/club-registration/payment/types";
 import type { PriceQuote } from "@/lib/pricing";
+import type { QueueAdvanceMode, QueueReloadResult } from "./queue-navigation";
+
+export type MembershipListReloadFn = (
+  options?: { advance?: QueueAdvanceMode }
+) => Promise<QueueReloadResult | void>;
 
 export type FfttLicenseLookup = {
   licence?: string;
@@ -39,6 +44,7 @@ export type RegistrationSummary = {
 
 export type RegistrationDetail = RegistrationSummary & {
   adherentRole?: "self" | "minor_dependent" | "other_adult";
+  wasSqyMemberLastYear?: boolean;
   ffttLicense?: string;
   ffttLicenseLookup?: FfttLicenseLookup;
   sex?: "female" | "male" | "other";
@@ -83,7 +89,9 @@ export type RegistrationDetail = RegistrationSummary & {
 
 export type EditableRegistration = {
   adherentRole: "self" | "minor_dependent" | "other_adult";
+  wasSqyMemberLastYear: boolean | undefined;
   ffttLicense: string;
+  ffttLicenseLookup: FfttLicenseLookup | undefined;
   firstName: string;
   lastName: string;
   sex: "female" | "male" | "other";

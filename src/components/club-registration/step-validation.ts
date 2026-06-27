@@ -67,6 +67,12 @@ export function validateStep(
         '[data-field="birthDate"]'
       );
     }
+    if (draft.wasSqyMemberLastYear === undefined) {
+      return invalid(
+        "Indiquez si l’adhérent était adhérent de SQY PING l’an dernier.",
+        "#was-sqy-member-last-year-label"
+      );
+    }
     return { valid: true };
   }
 

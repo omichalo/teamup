@@ -31,6 +31,7 @@ const SEQUENCE_MINOR: RegistrationStepId[] = [
 describe("REGISTRATION_FIELD_TO_STEP_ID", () => {
   it("mappe le rôle et la date de naissance sur l'étape audience", () => {
     expect(REGISTRATION_FIELD_TO_STEP_ID.adherentRole).toBe("audience");
+    expect(REGISTRATION_FIELD_TO_STEP_ID.wasSqyMemberLastYear).toBe("audience");
     expect(REGISTRATION_FIELD_TO_STEP_ID.birthDate).toBe("audience");
   });
 

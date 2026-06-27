@@ -399,6 +399,7 @@ export function ClubRegistrationWizard({
       rulesAccepted: _rulesAccepted,
       sex,
       photoConsent,
+      wasSqyMemberLastYear,
       medicalCertificateDeclaration: _decl,
       medicalQuestionnaire,
       medicalVeteranPath,
@@ -418,6 +419,7 @@ export function ClubRegistrationWizard({
     if (
       sex === "" ||
       photoConsent === "" ||
+      wasSqyMemberLastYear === undefined ||
       medicalCertificateDeclaration === "" ||
       !draft.paymentMethod ||
       !isMedicalAdminStepComplete({
@@ -446,6 +448,7 @@ export function ClubRegistrationWizard({
       ...rest,
       sex,
       photoConsent,
+      wasSqyMemberLastYear,
       medicalQuestionnaire: {
         ...(medicalQuestionnaire.summary !== ""
           ? { summary: medicalQuestionnaire.summary }

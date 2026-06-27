@@ -4,6 +4,7 @@ import type { RegistrationDraft } from "./registration-defaults";
 export function getDevIdentityFixture(): Partial<RegistrationDraft> {
   return {
     adherentRole: "self",
+    wasSqyMemberLastYear: false,
     firstName: "Camille",
     lastName: "DevTest",
     sex: "male",

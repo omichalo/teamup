@@ -37,6 +37,7 @@ describe("buildLayoutNavigation", () => {
     expect(nav.groups[0]?.id).toBe("adhesions");
     expect(nav.groups[0]?.label).toBe("Adhésions");
     expect(nav.groups[0]?.items.map((item) => item.href)).toEqual([
+      "/club/adhesions-tableau",
       "/club/parametrage-inscription",
       "/club/inscription",
     ]);
@@ -74,6 +75,11 @@ describe("buildLayoutNavigation", () => {
       "/equipes",
       "/disponibilites",
       "/compositions/defaults",
+    ]);
+    expect(nav.groups[1]?.items.map((item) => item.href)).toEqual([
+      "/club/adhesions-tableau",
+      "/club/parametrage-inscription",
+      "/club/inscription",
     ]);
   });
 });

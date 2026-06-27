@@ -257,6 +257,7 @@ export function RecapStep({
               : "—",
           },
           { label: "Date de naissance", value: draft.birthDate },
+          { label: "Adhérent SQY PING l’an dernier", value: draft.wasSqyMemberLastYear === undefined ? "—" : draft.wasSqyMemberLastYear ? "Oui" : "Non" },
         ]}
       />
 

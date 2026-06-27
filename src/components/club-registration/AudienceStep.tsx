@@ -224,6 +224,28 @@ export function AudienceStep({
         />
       </Box>
 
+      <FormControl component="fieldset" required>
+        <Typography variant="subtitle2" gutterBottom id="was-sqy-member-last-year-label">
+          L’adhérent était-il adhérent de SQY PING l’an dernier&nbsp;?
+        </Typography>
+        <RadioGroup
+          aria-labelledby="was-sqy-member-last-year-label"
+          value={
+            draft.wasSqyMemberLastYear === undefined
+              ? ""
+              : draft.wasSqyMemberLastYear
+                ? "yes"
+                : "no"
+          }
+          onChange={(e) =>
+            onPatch({ wasSqyMemberLastYear: e.target.value === "yes" })
+          }
+        >
+          <FormControlLabel value="yes" control={<Radio />} label="Oui" />
+          <FormControlLabel value="no" control={<Radio />} label="Non" />
+        </RadioGroup>
+      </FormControl>
+
       {minorMismatch ? (
         <Alert severity="warning">
           La date de naissance saisie correspond à un mineur. Sélectionnez

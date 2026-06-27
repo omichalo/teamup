@@ -31,7 +31,9 @@ export function toEditableRegistration(
 ): EditableRegistration {
   return {
     adherentRole: registration.adherentRole ?? "self",
+    wasSqyMemberLastYear: registration.wasSqyMemberLastYear,
     ffttLicense: registration.ffttLicense ?? registration.ffttLicenseLookup?.licence ?? "",
+    ffttLicenseLookup: registration.ffttLicenseLookup,
     firstName: registration.firstName ?? "",
     lastName: registration.lastName ?? "",
     sex: registration.sex ?? "other",
