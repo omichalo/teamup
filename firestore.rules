@@ -35,6 +35,16 @@ service cloud.firestore {
     function isClubRegistrationManager() {
       return isAdmin() || isSecretary();
     }
+
+    // Liste client : uniquement ses propres dossiers (requête filtrée + plafond).
+    // Les listes secrétariat passent par l'API (Admin SDK).
+    function isPersonalClubRegistrationListQuery() {
+      return request.query.limit <= 50
+             && request.query.filters.size() == 1
+             && request.query.filters[0].field.path == 'submitterUid'
+             && request.query.filters[0].op == '=='
+             && request.query.filters[0].value == request.auth.uid;
+    }
     
     // ============================================
     // Collection: users
@@ -135,11 +145,11 @@ service cloud.firestore {
     // ============================================
     // Collection: availabilities
     // ============================================
-    // Lecture pour tous les utilisateurs authentifiés
-    // Écriture pour tous les utilisateurs authentifiés (les joueurs peuvent mettre à jour leurs disponibilités)
+    // Lecture pour coach/admin (compositions, disponibilités)
+    // Écriture réservée au serveur (Admin SDK via /api/availabilities et Discord)
     match /availabilities/{availabilityId} {
-      allow read: if isAuthenticated();
-      allow write: if isAuthenticated();
+      allow read: if isCoach();
+      allow write: if false;
     }
     
     // ============================================
@@ -204,14 +214,18 @@ service cloud.firestore {
     // peut créer plusieurs dossiers (ex. inscription de 2 enfants). Le couplage 1 dossier ↔ 1 uid
     // est volontairement abandonné.
     //
-    // - read   : owner (submitterUid == uid), admin ou secrétariat
+    // - get    : owner (submitterUid == uid), admin ou secrétariat
+    // - list   : owner uniquement, requête where submitterUid == uid, limit <= 50
+    //            (listes secrétariat via API / Admin SDK)
     // - create : owner se déclare comme submitterUid, schemaVersion strict
     // - update : owner uniquement, tant que status != 'approved'
     // - delete : interdit côté client (l'admin gère via Admin SDK)
     match /clubRegistrations/{registrationId} {
-      allow read: if isAuthenticated()
-                  && (isClubRegistrationManager()
-                      || resource.data.submitterUid == request.auth.uid);
+      allow get: if isAuthenticated()
+                 && (isClubRegistrationManager()
+                     || resource.data.submitterUid == request.auth.uid);
+      allow list: if isAuthenticated()
+                  && isPersonalClubRegistrationListQuery();
       allow create: if isAuthenticated()
                     && request.resource.data.submitterUid == request.auth.uid
                     && request.resource.data.schemaVersion == 1;
@@ -220,11 +234,6 @@ service cloud.firestore {
                     && request.resource.data.submitterUid == request.auth.uid
                     && resource.data.get('status', 'draft') != 'approved';
       allow delete: if false;
-    }
-    // List queries : autorisées aux utilisateurs authentifiés. Les requêtes sont filtrées
-    // côté serveur API par submitterUid (admin SDK contourne les rules de toute façon).
-    match /clubRegistrations/{document=**} {
-      allow list: if isAuthenticated();
     }
 
     // ============================================

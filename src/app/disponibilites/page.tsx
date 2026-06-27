@@ -24,7 +24,6 @@ import { useAvailabilities } from "@/hooks/useAvailabilities";
 import { usePlayers } from "@/hooks/usePlayers";
 import {
   AvailabilityService,
-  DayAvailability,
 } from "@/lib/services/availability-service";
 import { CompositionService } from "@/lib/services/composition-service";
 import { Player } from "@/types/team-management";
@@ -35,7 +34,6 @@ import { AvailabilityResponse } from "@/lib/services/availability-service";
 import {
   AvailabilityState,
   sanitizeAvailabilityEntry,
-  buildPlayersPayload,
 } from "@/lib/availability/utils";
 import { useAvailabilityStore } from "@/stores/availabilityStore";
 import { usePhasePreselect } from "@/hooks/usePhasePreselect";
@@ -92,10 +90,11 @@ export default function DisponibilitesPage() {
     setAvailabilityWarning(null);
   }, []);
 
-  const persistAvailability = useCallback(
+  const persistPlayerAvailability = useCallback(
     async (
-      stateSnapshot: AvailabilityState,
-      championshipType: ChampionshipType
+      playerId: string,
+      championshipType: ChampionshipType,
+      entry: AvailabilityResponse | undefined
     ) => {
       if (
         selectedJournee === null ||
@@ -105,30 +104,17 @@ export default function DisponibilitesPage() {
         return;
       }
 
-      const payload = buildPlayersPayload(stateSnapshot, championshipType);
       const idEpreuve = getIdEpreuve(selectedEpreuve);
 
-      console.log("[Disponibilites] Persist availability", {
-        journee: selectedJournee,
-        phase: selectedPhase,
-        championshipType,
-        idEpreuve,
-        payload,
-      });
-
       try {
-        const availabilityData: DayAvailability = {
-          journee: selectedJournee,
-          phase: selectedPhase,
+        await availabilityService.updatePlayerAvailability(
+          selectedJournee,
+          selectedPhase,
           championshipType,
-          players: payload,
-        };
-
-        if (idEpreuve !== undefined) {
-          availabilityData.idEpreuve = idEpreuve;
-        }
-
-        await availabilityService.saveAvailability(availabilityData);
+          playerId,
+          entry ?? {},
+          idEpreuve
+        );
       } catch (error) {
         console.error(
           "Erreur lors de la sauvegarde de la disponibilité:",
@@ -630,11 +616,12 @@ export default function DisponibilitesPage() {
     );
 
     if (nextStateSnapshot) {
-      void persistAvailability(nextStateSnapshot, championshipType);
-
-      const resultingEntry = nextStateSnapshot[playerId]?.[championshipType] as
-        | AvailabilityResponse
-        | undefined;
+      const resultingEntry = nextStateSnapshot[playerId]?.[championshipType];
+      void persistPlayerAvailability(
+        playerId,
+        championshipType,
+        resultingEntry
+      );
       const isNowAvailable = resultingEntry?.available === true;
       const isPlayerAssigned =
         assignedPlayersByTypeRef.current[championshipType]?.has(playerId) ??
@@ -704,7 +691,8 @@ export default function DisponibilitesPage() {
       async () => {
         try {
           const snapshot = availabilitiesRef.current;
-          await persistAvailability(snapshot, championshipType);
+          const entry = snapshot[playerId]?.[championshipType];
+          await persistPlayerAvailability(playerId, championshipType, entry);
         } catch (error) {
           console.error("Erreur lors de la sauvegarde automatique:", error);
         }
