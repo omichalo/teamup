@@ -1,6 +1,9 @@
-import { doc, getDoc, setDoc, Timestamp, onSnapshot, Unsubscribe } from "firebase/firestore";
+import { doc, getDoc, Timestamp, onSnapshot, Unsubscribe } from "firebase/firestore";
 import { getDbInstanceDirect } from "@/lib/firebase";
 import { ChampionshipType } from "@/types";
+import { getAvailabilityDocumentId } from "@/lib/availability/document-id";
+import { patchAvailabilities } from "@/lib/availability/api-client";
+import { sanitizeAvailabilityResponse } from "@/lib/availability/sanitize-response";
 
 export interface AvailabilityResponse {
   available?: boolean;
@@ -9,65 +12,6 @@ export interface AvailabilityResponse {
   fridayAvailable?: boolean;
   saturdayAvailable?: boolean;
 }
-
-const sanitizeResponse = (
-  response?: AvailabilityResponse | null
-): AvailabilityResponse | undefined => {
-  if (!response) {
-    return undefined;
-  }
-
-  const sanitized: AvailabilityResponse = {};
-
-  if (typeof response.available === "boolean") {
-    sanitized.available = response.available;
-  }
-
-  if (typeof response.comment === "string") {
-    const trimmed = response.comment.trim();
-    if (trimmed.length > 0) {
-      sanitized.comment = trimmed;
-    }
-  }
-
-  if (typeof response.fridayAvailable === "boolean") {
-    sanitized.fridayAvailable = response.fridayAvailable;
-  }
-
-  if (typeof response.saturdayAvailable === "boolean") {
-    sanitized.saturdayAvailable = response.saturdayAvailable;
-  }
-
-  if (
-    sanitized.available === undefined &&
-    sanitized.comment === undefined &&
-    sanitized.fridayAvailable === undefined &&
-    sanitized.saturdayAvailable === undefined
-  ) {
-    return undefined;
-  }
-
-  return sanitized;
-};
-
-const toTimestamp = (value: unknown | Date | Timestamp | undefined): Timestamp => {
-  if (value instanceof Timestamp) {
-    return value;
-  }
-
-  if (value instanceof Date) {
-    return Timestamp.fromDate(value);
-  }
-
-  if (typeof value === "string" || typeof value === "number") {
-    const date = new Date(value);
-    if (!Number.isNaN(date.getTime())) {
-      return Timestamp.fromDate(date);
-    }
-  }
-
-  return Timestamp.fromDate(new Date());
-};
 
 export interface PlayerAvailability {
   [playerId: string]: AvailabilityResponse;
@@ -93,12 +37,7 @@ export class AvailabilityService {
     championshipType: ChampionshipType,
     idEpreuve?: number
   ): string {
-    // Si idEpreuve est fourni, l'inclure dans l'ID pour différencier les calendriers
-    // Sinon, utiliser l'ancien format pour la rétrocompatibilité
-    if (idEpreuve !== undefined) {
-      return `${phase}_${journee}_${championshipType}_${idEpreuve}`;
-    }
-    return `${phase}_${journee}_${championshipType}`;
+    return getAvailabilityDocumentId(journee, phase, championshipType, idEpreuve);
   }
 
   async getAvailability(
@@ -140,72 +79,27 @@ export class AvailabilityService {
   }
 
   async saveAvailability(availability: DayAvailability): Promise<void> {
-    try {
-      const docId = this.getDocumentId(
-        availability.journee,
-        availability.phase,
-        availability.championshipType,
-        availability.idEpreuve
-      );
-      const docRef = doc(getDbInstanceDirect(), this.collectionName, docId);
+    const playerUpdates = Object.entries(availability.players).map(
+      ([playerId, response]) => ({
+        playerId,
+        response: sanitizeAvailabilityResponse(response) ?? null,
+      })
+    );
 
-      const existingSnap = await getDoc(docRef);
-      const existingData = existingSnap.exists() ? existingSnap.data() : null;
-
-      console.log("[AvailabilityService] saveAvailability input", {
-        docId,
-        incomingPlayers: availability.players,
-      });
-
-      const sanitizedPlayers: PlayerAvailability = {};
-
-      Object.entries(availability.players).forEach(([playerId, response]) => {
-        const sanitized = sanitizeResponse(response);
-        if (sanitized) {
-          sanitizedPlayers[playerId] = sanitized;
-        }
-      });
-
-      const createdAtTimestamp = availability.createdAt
-        ? toTimestamp(availability.createdAt)
-        : existingData?.createdAt
-        ? toTimestamp(existingData.createdAt)
-        : Timestamp.fromDate(new Date());
-
-      const dataToSave: Record<string, unknown> = {
-        journee: availability.journee,
-        phase: availability.phase,
-        championshipType: availability.championshipType,
-        players: sanitizedPlayers,
-        updatedAt: Timestamp.fromDate(new Date()),
-        createdAt: createdAtTimestamp,
-      };
-
-      if (availability.date !== undefined) {
-        dataToSave.date = availability.date;
-      } else if (existingData?.date !== undefined) {
-        dataToSave.date = existingData.date;
-      }
-
-      if (availability.idEpreuve !== undefined) {
-        dataToSave.idEpreuve = availability.idEpreuve;
-      }
-
-      console.log("[AvailabilityService] sanitized players", {
-        docId,
-        players: sanitizedPlayers,
-      });
-
-      await setDoc(docRef, dataToSave);
-      console.log("[AvailabilityService] Saved availability document", {
-        docId,
-        dataToSave,
-        playersKeys: Object.keys(sanitizedPlayers),
-      });
-    } catch (error) {
-      console.error("Erreur lors de la sauvegarde de la disponibilité:", error);
-      throw error;
+    if (playerUpdates.length === 0) {
+      return;
     }
+
+    await patchAvailabilities({
+      journee: availability.journee,
+      phase: availability.phase,
+      championshipType: availability.championshipType,
+      ...(availability.idEpreuve !== undefined
+        ? { idEpreuve: availability.idEpreuve }
+        : {}),
+      ...(availability.date !== undefined ? { date: availability.date } : {}),
+      playerUpdates,
+    });
   }
 
   async updatePlayerAvailability(
@@ -213,23 +107,24 @@ export class AvailabilityService {
     phase: "aller" | "retour",
     championshipType: ChampionshipType,
     playerId: string,
-    response: AvailabilityResponse
+    response: AvailabilityResponse,
+    idEpreuve?: number
   ): Promise<void> {
     try {
-      const availability = await this.getAvailability(journee, phase, championshipType);
+      const sanitized = sanitizeAvailabilityResponse(response);
 
-      const updatedAvailability: DayAvailability = {
+      await patchAvailabilities({
         journee,
         phase,
         championshipType,
-        players: {
-          ...(availability?.players || {}),
-          [playerId]: response,
-        },
-        createdAt: availability?.createdAt || new Date(),
-      };
-
-      await this.saveAvailability(updatedAvailability);
+        ...(idEpreuve !== undefined ? { idEpreuve } : {}),
+        playerUpdates: [
+          {
+            playerId,
+            response: sanitized ?? null,
+          },
+        ],
+      });
     } catch (error) {
       console.error("Erreur lors de la mise à jour de la disponibilité:", error);
       throw error;

@@ -6,66 +6,27 @@ import {
   DayAvailability,
   PlayerAvailability,
 } from "@/lib/services/availability-service";
+import { getAvailabilityDocumentId } from "@/lib/availability/document-id";
+import { applyPlayerAvailabilityUpdates } from "@/lib/availability/firestore-persistence";
+import { sanitizeAvailabilityResponse } from "@/lib/availability/sanitize-response";
 
-const sanitizeResponse = (
-  response?: AvailabilityResponse | null
-): AvailabilityResponse | undefined => {
-  if (!response) {
-    return undefined;
-  }
-
-  const sanitized: AvailabilityResponse = {};
-
-  if (typeof response.available === "boolean") {
-    sanitized.available = response.available;
-  }
-
-  if (typeof response.comment === "string") {
-    const trimmed = response.comment.trim();
-    if (trimmed.length > 0) {
-      sanitized.comment = trimmed;
-    }
-  }
-
-  if (typeof response.fridayAvailable === "boolean") {
-    sanitized.fridayAvailable = response.fridayAvailable;
-  }
-
-  if (typeof response.saturdayAvailable === "boolean") {
-    sanitized.saturdayAvailable = response.saturdayAvailable;
-  }
-
-  if (
-    sanitized.available === undefined &&
-    sanitized.comment === undefined &&
-    sanitized.fridayAvailable === undefined &&
-    sanitized.saturdayAvailable === undefined
-  ) {
-    return undefined;
-  }
-
-  return sanitized;
-};
-
-const toTimestamp = (
-  value: unknown | Date | Timestamp | undefined
-): Timestamp => {
+const toDate = (value: unknown): Date => {
   if (value instanceof Timestamp) {
-    return value;
+    return value.toDate();
   }
 
   if (value instanceof Date) {
-    return Timestamp.fromDate(value);
+    return value;
   }
 
   if (typeof value === "string" || typeof value === "number") {
     const date = new Date(value);
     if (!Number.isNaN(date.getTime())) {
-      return Timestamp.fromDate(date);
+      return date;
     }
   }
 
-  return Timestamp.now();
+  return new Date();
 };
 
 export class AvailabilityServiceAdmin {
@@ -77,10 +38,7 @@ export class AvailabilityServiceAdmin {
     championshipType: ChampionshipType,
     idEpreuve?: number
   ): string {
-    if (idEpreuve !== undefined) {
-      return `${phase}_${journee}_${championshipType}_${idEpreuve}`;
-    }
-    return `${phase}_${journee}_${championshipType}`;
+    return getAvailabilityDocumentId(journee, phase, championshipType, idEpreuve);
   }
 
   async getAvailability(
@@ -91,14 +49,8 @@ export class AvailabilityServiceAdmin {
   ): Promise<DayAvailability | null> {
     try {
       const db = getFirestoreAdmin();
-      const docId = this.getDocumentId(
-        journee,
-        phase,
-        championshipType,
-        idEpreuve
-      );
-      const docRef = db.collection(this.collectionName).doc(docId);
-      const docSnap = await docRef.get();
+      const docId = this.getDocumentId(journee, phase, championshipType, idEpreuve);
+      const docSnap = await db.collection(this.collectionName).doc(docId).get();
 
       if (!docSnap.exists) {
         return null;
@@ -115,15 +67,9 @@ export class AvailabilityServiceAdmin {
         championshipType: data.championshipType,
         idEpreuve: data.idEpreuve,
         date: data.date,
-        players: data.players || {},
-        createdAt:
-          data.createdAt instanceof Timestamp
-            ? data.createdAt.toDate()
-            : data.createdAt?.toDate?.() || new Date(),
-        updatedAt:
-          data.updatedAt instanceof Timestamp
-            ? data.updatedAt.toDate()
-            : data.updatedAt?.toDate?.() || new Date(),
+        players: (data.players as PlayerAvailability) || {},
+        createdAt: toDate(data.createdAt),
+        updatedAt: toDate(data.updatedAt),
       };
     } catch (error) {
       console.error(
@@ -135,58 +81,28 @@ export class AvailabilityServiceAdmin {
   }
 
   async saveAvailability(availability: DayAvailability): Promise<void> {
-    try {
-      const db = getFirestoreAdmin();
-      const docId = this.getDocumentId(
-        availability.journee,
-        availability.phase,
-        availability.championshipType,
-        availability.idEpreuve
-      );
-      const docRef = db.collection(this.collectionName).doc(docId);
+    const playerUpdates = Object.entries(availability.players).map(
+      ([playerId, response]) => ({
+        playerId,
+        response: sanitizeAvailabilityResponse(response) ?? null,
+      })
+    );
 
-      const existingSnap = await docRef.get();
-      const existingData = existingSnap.exists ? existingSnap.data() : null;
-
-      const sanitizedPlayers: PlayerAvailability = {};
-
-      Object.entries(availability.players).forEach(([playerId, response]) => {
-        const sanitized = sanitizeResponse(response);
-        if (sanitized) {
-          sanitizedPlayers[playerId] = sanitized;
-        }
-      });
-
-      const createdAtTimestamp = availability.createdAt
-        ? toTimestamp(availability.createdAt)
-        : existingData?.createdAt
-        ? toTimestamp(existingData.createdAt)
-        : Timestamp.now();
-
-      const dataToSave: Record<string, unknown> = {
-        journee: availability.journee,
-        phase: availability.phase,
-        championshipType: availability.championshipType,
-        players: sanitizedPlayers,
-        updatedAt: Timestamp.now(),
-        createdAt: createdAtTimestamp,
-      };
-
-      if (availability.date !== undefined) {
-        dataToSave.date = availability.date;
-      } else if (existingData?.date !== undefined) {
-        dataToSave.date = existingData.date;
-      }
-
-      if (availability.idEpreuve !== undefined) {
-        dataToSave.idEpreuve = availability.idEpreuve;
-      }
-
-      await docRef.set(dataToSave);
-    } catch (error) {
-      console.error("Erreur lors de la sauvegarde de la disponibilité:", error);
-      throw error;
+    if (playerUpdates.length === 0) {
+      return;
     }
+
+    const db = getFirestoreAdmin();
+    await applyPlayerAvailabilityUpdates(db, {
+      journee: availability.journee,
+      phase: availability.phase,
+      championshipType: availability.championshipType,
+      ...(availability.idEpreuve !== undefined
+        ? { idEpreuve: availability.idEpreuve }
+        : {}),
+      ...(availability.date !== undefined ? { date: availability.date } : {}),
+      playerUpdates,
+    });
   }
 
   async updatePlayerAvailability(
@@ -198,26 +114,21 @@ export class AvailabilityServiceAdmin {
     idEpreuve?: number
   ): Promise<void> {
     try {
-      const availability = await this.getAvailability(
-        journee,
-        phase,
-        championshipType,
-        idEpreuve
-      );
+      const db = getFirestoreAdmin();
+      const sanitized = sanitizeAvailabilityResponse(response);
 
-      const updatedAvailability: DayAvailability = {
+      await applyPlayerAvailabilityUpdates(db, {
         journee,
         phase,
         championshipType,
         ...(idEpreuve !== undefined ? { idEpreuve } : {}),
-        players: {
-          ...(availability?.players || {}),
-          [playerId]: response,
-        },
-        createdAt: availability?.createdAt || new Date(),
-      };
-
-      await this.saveAvailability(updatedAvailability);
+        playerUpdates: [
+          {
+            playerId,
+            response: sanitized ?? null,
+          },
+        ],
+      });
     } catch (error) {
       console.error(
         "Erreur lors de la mise à jour de la disponibilité:",
