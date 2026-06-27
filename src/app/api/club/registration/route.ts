@@ -190,7 +190,7 @@ export async function PATCH(req: Request) {
         !FFTT_LICENSE_RE.test(updates.ffttLicense)
       ) {
         return jsonNoStore(
-          { error: "Numéro de licence FFTT invalide" },
+          { error: "Numéro de licence invalide" },
           { status: 400 }
         );
       }

@@ -651,7 +651,7 @@ export default function JoueursPage() {
             Joueurs sans licence
           </Typography>
           <Alert severity="warning" sx={{ mb: 2 }}>
-            Ces joueurs n&apos;ont pas encore de licence FFTT. Vous pouvez les
+            Ces joueurs n&apos;ont pas encore de licence. Vous pouvez les
             rechercher pour les ajouter à une équipe temporairement.
           </Alert>
           {loadingPlayers || searching ? (
@@ -816,7 +816,7 @@ export default function JoueursPage() {
                     ? "Un joueur avec ce numéro de licence existe déjà. Un joueur temporaire ne peut pas correspondre à un joueur existant."
                     : licenseExists
                     ? "Un joueur avec ce numéro de licence existe déjà. Un joueur temporaire ne peut pas correspondre à un joueur existant."
-                    : "Laisser vide si pas encore de licence FFTT"
+                    : "Laisser vide si pas encore de licence"
                 }
               />
               <FormControl fullWidth>
@@ -980,7 +980,7 @@ export default function JoueursPage() {
                         ? "Un joueur avec ce numéro de licence existe déjà. Un joueur temporaire ne peut pas correspondre à un joueur existant."
                         : licenseExists
                         ? "Un joueur avec ce numéro de licence existe déjà. Un joueur temporaire ne peut pas correspondre à un joueur existant."
-                        : "Laisser vide si pas encore de licence FFTT"
+                        : "Laisser vide si pas encore de licence"
                     }
                   />
                   <FormControl fullWidth>

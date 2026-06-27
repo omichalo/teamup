@@ -84,7 +84,7 @@ export function StripePresentationEditor({ config, onChange }: Props) {
             fullWidth
           />
           <TextField
-            label="Libellé licence FFTT"
+            label="Libellé licence"
             size="small"
             value={stripe.licenseLabel}
             onChange={(e) => update({ licenseLabel: e.target.value })}

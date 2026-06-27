@@ -58,7 +58,7 @@ function buildInfoLines(options: RegistrationCreatedSecretaryEmailContent): stri
     lines.push(emailInfoLine("E-mail de contact", options.contactEmail));
   }
   if (options.ffttLicense) {
-    lines.push(emailInfoLine("Licence FFTT", options.ffttLicense));
+    lines.push(emailInfoLine("Licence", options.ffttLicense));
   }
   if (options.submitterAccountEmail) {
     lines.push(emailInfoLine("Compte ayant envoyé le dossier", options.submitterAccountEmail));
@@ -113,7 +113,7 @@ export function buildRegistrationCreatedSecretaryEmail(
     textLines.push(`E-mail de contact : ${options.contactEmail}`);
   }
   if (options.ffttLicense) {
-    textLines.push(`Licence FFTT : ${options.ffttLicense}`);
+    textLines.push(`Licence : ${options.ffttLicense}`);
   }
   if (options.submitterAccountEmail) {
     textLines.push(`Compte ayant envoyé le dossier : ${options.submitterAccountEmail}`);

@@ -158,11 +158,11 @@ export function RegistrationFfttFields({
 
   return (
     <>
-      <SectionTitle>Licence FFTT</SectionTitle>
+      <SectionTitle>Licence</SectionTitle>
       <Stack spacing={1.5}>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
           <TextField
-            label="Numéro de licence FFTT"
+            label="Numéro de licence"
             value={ffttLicense}
             onChange={(e) => handleLicenseChange(e.target.value)}
             fullWidth
@@ -310,8 +310,8 @@ export function RegistrationMedicalDossierDetail({
             <ReadOnlyField
               label={
                 hasVerifiedFfttLicense
-                  ? "Licence FFTT passée (vérifiée)"
-                  : "Licence FFTT passée (déclarée)"
+                  ? "Licence passée (vérifiée)"
+                  : "Licence passée (déclarée)"
               }
               value={
                 hasVerifiedFfttLicense

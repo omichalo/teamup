@@ -19,7 +19,7 @@ function numberOrNull(value: unknown): number | null {
 }
 
 /**
- * Recherche publique contrôlée d'une licence FFTT pendant le parcours
+ * Recherche publique contrôlée d'une licence pendant le parcours
  * d'inscription. On ne renvoie qu'un sous-ensemble utile au formulaire.
  */
 export async function POST(req: Request) {
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
 
     if (!LICENSE_RE.test(licence)) {
       return jsonNoStore(
-        { error: "Numéro de licence FFTT invalide" },
+        { error: "Numéro de licence invalide" },
         { status: 400 }
       );
     }

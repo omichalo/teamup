@@ -313,7 +313,7 @@ export function buildDefaultRegistrationConfig(): RegistrationConfigV1 {
     stripePresentation: {
       membershipLabel: "Adhésion club",
       membershipLabelWithDiscounts: "Adhésion club (net après remises)",
-      licenseLabel: "Licence FFTT",
+      licenseLabel: "Licence",
       competitorJerseyInfoLabel:
         "Maillot compétiteur inclus dans l'adhésion (15 € — renouvellement tous les deux ans)",
       invoiceHeaderTemplate: "Adhésion {{clubName}} — dossier {{registrationId}}",

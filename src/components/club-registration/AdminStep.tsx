@@ -183,7 +183,7 @@ export function AdminStep({ draft, onChange }: Props) {
         {atLeast40 ? (
           <>
             Répondez d’abord aux questions sur votre situation FFTT. En cas de
-            première licence FFTT ou de changement de catégorie vétéran, un
+            première licence ou de changement de catégorie vétéran, un
             certificat médical est requis directement. Sinon, remplissez le{" "}
             <a href={questionnaireUrl} target="_blank" rel="noreferrer">
               {questionnaireLabel}
@@ -208,7 +208,7 @@ export function AdminStep({ draft, onChange }: Props) {
           {skipVeteranFirstRegistration ? null : (
             <FormControl component="fieldset" required>
               <Typography variant="subtitle2" gutterBottom id="medical-first-label">
-                Avez-vous déjà eu une licence FFTT&nbsp;?
+                Avez-vous déjà eu une licence&nbsp;?
               </Typography>
               <RadioGroup
                 aria-labelledby="medical-first-label"
@@ -233,7 +233,7 @@ export function AdminStep({ draft, onChange }: Props) {
                 <FormControlLabel
                   value="no"
                   control={<Radio />}
-                  label="Non, c’est ma première licence FFTT"
+                  label="Non, c’est ma première licence"
                 />
               </RadioGroup>
             </FormControl>

@@ -206,7 +206,7 @@ export function RateTableEditor({ config, onChange }: Props) {
                 sx={{ flex: 1 }}
               />
               <EuroAmountField
-                label="Licence FFTT"
+                label="Licence"
                 valueCents={entry.licenseCents}
                 onChangeCents={(licenseCents) => updateEntry(entry.id, { licenseCents })}
                 sx={{ flex: 1 }}

@@ -250,7 +250,7 @@ export function RecapStep({
             value: ADHERENT_ROLE_LABELS[draft.adherentRole],
           },
           {
-            label: "Licence FFTT",
+            label: "Licence",
             value: draft.ffttLicense
               ? draft.ffttLicenseLookup?.nomClub
                 ? `${draft.ffttLicense} — ${draft.ffttLicenseLookup.nomClub}`
@@ -486,7 +486,7 @@ export function RecapStep({
       <SectionCard
         title="Tarif estimé"
         padding="compact"
-        description="Adhésion club, licence FFTT et compétitions sélectionnées, selon la grille publique du club."
+        description="Adhésion club, licence et compétitions sélectionnées, selon la grille publique du club."
       >
         <PricingBreakdown draft={draft} variant="full" />
       </SectionCard>

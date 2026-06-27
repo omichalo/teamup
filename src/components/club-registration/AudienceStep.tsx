@@ -38,7 +38,7 @@ type Props = {
  * Étape 1 — « Pour qui ? ».
  *
  * Méta-écran ramené aux informations qui orientent le dossier : qui s'inscrit,
- * une éventuelle licence FFTT pour préremplir l'identité, et la date de
+ * une éventuelle licence pour préremplir l'identité, et la date de
  * naissance.
  *
  * Le but : engager rapidement l'utilisateur avec un écran très court, et
@@ -153,11 +153,11 @@ export function AudienceStep({
 
       <Stack spacing={1.25}>
         <Typography variant="subtitle2">
-          Numéro de licence FFTT, si vous en avez déjà un
+          Numéro de licence, si vous en avez déjà un
         </Typography>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
           <TextField
-            label="Numéro de licence FFTT"
+            label="Numéro de licence"
             value={draft.ffttLicense ?? ""}
             onChange={handleLicenseChange}
             fullWidth

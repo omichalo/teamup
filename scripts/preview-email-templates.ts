@@ -56,7 +56,7 @@ const SAMPLE_QUOTE: PriceQuote = {
     {
       id: "fftt",
       kind: "fftt_license",
-      label: "Licence FFTT",
+      label: "Licence",
       amountCents: 4200,
       source: "catalog",
     },

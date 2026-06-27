@@ -27,7 +27,7 @@ export const STEP_SHORT_LABELS: Record<RegistrationStepId, string> = {
 
 export const STEP_DESCRIPTIONS: Record<RegistrationStepId, string> = {
   audience:
-    "Indiquez pour qui est l’inscription et, si vous en avez une, votre licence FFTT.",
+    "Indiquez pour qui est l’inscription et, si vous en avez une, votre licence.",
   adherent:
     "Identité, contact et adresse postale de la personne qui pratiquera au club.",
   representatives:

@@ -51,7 +51,7 @@ export function formatMedicalVeteranPathForSpreadsheet(value: unknown): string {
 
   const hadLicense = formatYesNo(data.hadFfttLicense);
   if (hadLicense) {
-    parts.push(`Licence FFTT antérieure : ${hadLicense}`);
+    parts.push(`Licence antérieure : ${hadLicense}`);
   }
 
   const categoryChanged = formatYesNo(data.categoryChanged);

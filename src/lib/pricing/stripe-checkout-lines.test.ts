@@ -58,7 +58,7 @@ describe("buildStripeCheckoutLineItems", () => {
       })
     );
     const items = buildStripeCheckoutLineItems(quote);
-    expect(items.some((i) => i.name === "Licence FFTT")).toBe(true);
+    expect(items.some((i) => i.name === "Licence")).toBe(true);
     expect(items.some((i) => i.name === "Championnat de Paris")).toBe(true);
     expect(sumStripeCheckoutLineItems(items)).toBe(quote.totalCents);
   });

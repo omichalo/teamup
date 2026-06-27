@@ -102,7 +102,7 @@ npm run discord:register-command -- --no-env-file
 ```
 
 Les commandes disponibles :
-- `/lier_licence <numéro>` : Lier un compte Discord à une licence FFTT
+- `/lier_licence <numéro>` : Lier un compte Discord à une licence
 - `/modifier_licence <numéro>` : Modifier la licence liée
 - `/supprimer_licence` : Supprimer la liaison
 - `/ma_licence` : Afficher la licence actuellement liée

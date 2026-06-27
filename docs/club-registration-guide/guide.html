@@ -209,7 +209,7 @@ Paiement en ligne ── webhook ──► statut « payé » + facture PDF</div
   <table>
     <thead><tr><th>#</th><th>Étape</th><th>Contenu principal</th></tr></thead>
     <tbody>
-      <tr><td>1</td><td>Pour qui ?</td><td>Type d'inscription, licence FFTT, date de naissance</td></tr>
+      <tr><td>1</td><td>Pour qui ?</td><td>Type d'inscription, licence, date de naissance</td></tr>
       <tr><td>2</td><td>L'adhérent</td><td>Identité, contact, adresse (BAN)</td></tr>
       <tr><td>3*</td><td>Représentants</td><td>1 ou 2 représentants légaux (mineur uniquement)</td></tr>
       <tr><td>3/4</td><td>Pratique</td><td>Section, créneaux, option compétiteur</td></tr>
@@ -233,7 +233,7 @@ Paiement en ligne ── webhook ──► statut « payé » + facture PDF</div
     <li><strong>Un mineur dont je suis le représentant légal</strong> — active l'étape « Représentants » et des engagements spécifiques.</li>
     <li><strong>Un autre adulte</strong> — cas tutelle / tiers (encadrant, etc.).</li>
   </ul>
-  <h3>Licence FFTT (optionnelle)</h3>
+  <h3>Licence (optionnelle)</h3>
   <p>Saisie du numéro de licence puis bouton <em>Retrouver</em> : appel API <code>/api/club/registration/license-lookup</code> pour préremplir identité (prénom, nom, sexe, date de naissance) sans exposer de données sensibles inutiles.</p>
   <h3>Date de naissance</h3>
   <p>Détermine l'âge, l'affichage conditionnel (mineur / majeur), le tarif et les règles médicales. Si un mineur est détecté avec le profil « Moi-même », un message demande de changer de profil.</p>
@@ -284,7 +284,7 @@ Paiement en ligne ── webhook ──► statut « payé » + facture PDF</div
   <p>Logique progressive selon l'âge et l'historique FFTT :</p>
   <ul>
     <li>Moins de 40 ans : questionnaire de santé (toutes réponses « Non » ou au moins un « Oui »).</li>
-    <li>40 ans et plus : questions licence FFTT passée, changement de catégorie vétéran, puis questionnaire si applicable.</li>
+    <li>40 ans et plus : questions licence passée, changement de catégorie vétéran, puis questionnaire si applicable.</li>
     <li>Première licence ou changement vétéran : certificat médical requis (suivi côté secrétariat, sans upload de document dans l'app).</li>
   </ul>
   <h3>Famille et tarification dégressive</h3>
@@ -304,7 +304,7 @@ Paiement en ligne ── webhook ──► statut « payé » + facture PDF</div
   <ul>
     <li><strong>Diffusion d'images</strong> — consentement RGPD explicite (accepter / refuser).</li>
     <li><strong>Mineur</strong> — autorisation actes médicaux d'urgence ; engagement de prise en charge à l'heure des cours.</li>
-    <li><strong>Règlement intérieur</strong> — case obligatoire + lien vers sqyping.fr ; mention transmission données licence FFTT.</li>
+    <li><strong>Règlement intérieur</strong> — case obligatoire + lien vers sqyping.fr ; mention transmission données licence.</li>
   </ul>
   <figure class="figure">
     <img src="screenshots/05-inscription-etape-engagements.png" alt="Engagements" />
@@ -332,7 +332,7 @@ Paiement en ligne ── webhook ──► statut « payé » + facture PDF</div
   <p>Le bandeau <strong>Mon dossier — XX,XX €</strong> (mobile : accordéon) affiche en temps réel :</p>
   <ul>
     <li>Profil résumé (pour qui, âge, pratique).</li>
-    <li>Détail des lignes : adhésion club, licence FFTT, compétitions, réductions famille / 1ʳᵉ femme.</li>
+    <li>Détail des lignes : adhésion club, licence, compétitions, réductions famille / 1ʳᵉ femme.</li>
     <li>Mention des aides non encore validées (Pass Sport, etc.).</li>
   </ul>
   <p>Le calcul repose sur la grille publique SQY Ping 2025 (<code>lib/pricing</code>), recalculée à chaque modification du brouillon.</p>

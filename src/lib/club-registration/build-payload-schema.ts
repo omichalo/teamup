@@ -82,7 +82,7 @@ export function buildRegistrationPayloadSchema(config: RegistrationConfigV1) {
       ffttLicense: z
         .union([
           z.literal(""),
-          z.string().trim().regex(/^[0-9]{5,12}$/, "Numéro de licence FFTT invalide"),
+          z.string().trim().regex(/^[0-9]{5,12}$/, "Numéro de licence invalide"),
         ])
         .optional(),
       ffttLicenseLookup: ffttLicenseLookupSchema.optional(),
@@ -278,7 +278,7 @@ export function buildRegistrationPayloadSchema(config: RegistrationConfigV1) {
       if (atLeast40 && !data.medicalVeteranPath) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Complétez le parcours médical vétéran (licence FFTT).",
+          message: "Complétez le parcours médical vétéran (licence).",
           path: ["medicalVeteranPath"],
         });
       }
@@ -312,7 +312,7 @@ export function buildRegistrationPayloadSchema(config: RegistrationConfigV1) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message:
-            "Le parcours licence FFTT vétéran ne s'applique pas aux moins de 40 ans.",
+            "Le parcours licence vétéran ne s'applique pas aux moins de 40 ans.",
           path: ["medicalVeteranPath"],
         });
       }

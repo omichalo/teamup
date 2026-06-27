@@ -99,12 +99,12 @@ if (!DISCORD_APPLICATION_ID) {
 const commands = [
   {
     name: "lier_licence",
-    description: "Lier votre compte Discord à votre numéro de licence FFTT",
+    description: "Lier votre compte Discord à votre numéro de licence",
     defaultMemberPermissions: null, // Accessible à tous les membres
     options: [
       {
         name: "licence",
-        description: "Votre numéro de licence FFTT",
+        description: "Votre numéro de licence",
         type: 3, // STRING
         required: true,
       },
@@ -113,12 +113,12 @@ const commands = [
   {
     name: "modifier_licence",
     description:
-      "Modifier votre association Discord vers une autre licence FFTT",
+      "Modifier votre association Discord vers une autre licence",
     defaultMemberPermissions: null, // Accessible à tous les membres
     options: [
       {
         name: "licence",
-        description: "Nouveau numéro de licence FFTT",
+        description: "Nouveau numéro de licence",
         type: 3, // STRING
         required: true,
       },
@@ -127,14 +127,14 @@ const commands = [
   {
     name: "supprimer_licence",
     description:
-      "Supprimer l'association entre votre compte Discord et votre licence FFTT",
+      "Supprimer l'association entre votre compte Discord et votre licence",
     defaultMemberPermissions: null, // Accessible à tous les membres
     options: [],
   },
   {
     name: "ma_licence",
     description:
-      "Afficher la licence FFTT à laquelle votre compte Discord est associé",
+      "Afficher la licence à laquelle votre compte Discord est associé",
     defaultMemberPermissions: null, // Accessible à tous les membres
     options: [],
   },

@@ -96,7 +96,7 @@ describe("format complex field helpers", () => {
     ).toContain("Au moins une réponse Oui");
   });
 
-  it("formate la licence FFTT", () => {
+  it("formate la licence", () => {
     expect(
       formatFfttLicenseLookupForSpreadsheet({
         licence: "99999",

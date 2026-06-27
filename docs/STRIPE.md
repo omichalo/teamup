@@ -80,7 +80,7 @@ checkout.session.completed
    `Valider et demander le paiement`.
 4. Le serveur recalcule le devis (`pricingQuote`), verifie que le montant
    saisi correspond au total, puis cree une session Stripe Checkout **multi-lignes**
-   (adhésion nette, licence FFTT, compétitions) avec facture Stripe activee.
+   (adhésion nette, licence, compétitions) avec facture Stripe activee.
    Les remises catalogue sont integrees au net de la ligne « Adhésion club (net
    apres remises) », avec description detaillee (brut, remises, net facture) et
    un champ personnalise facture « Remises sur adhesion » (Stripe n'accepte pas de

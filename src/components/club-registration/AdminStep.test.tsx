@@ -67,13 +67,13 @@ describe("AdminStep — questionnaire de santé conditionnel", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("demande un certificat pour une première licence FFTT à 40 ans et plus", () => {
+  it("demande un certificat pour une première licence à 40 ans et plus", () => {
     const { onChange } = renderStep({ birthDate: "1970-04-12" });
 
     fireEvent.click(
       within(
-        screen.getByRole("radiogroup", { name: /déjà eu une licence FFTT/i })
-      ).getByLabelText(/première licence FFTT/i)
+        screen.getByRole("radiogroup", { name: /déjà eu une licence/i })
+      ).getByLabelText(/première licence/i)
     );
 
     expect(onChange).toHaveBeenCalledWith(
@@ -90,7 +90,7 @@ describe("AdminStep — questionnaire de santé conditionnel", () => {
 
     fireEvent.click(
       within(
-        screen.getByRole("radiogroup", { name: /déjà eu une licence FFTT/i })
+        screen.getByRole("radiogroup", { name: /déjà eu une licence/i })
       ).getByLabelText(/déjà été licencié FFTT/i)
     );
     fireEvent.click(
@@ -113,7 +113,7 @@ describe("AdminStep — questionnaire de santé conditionnel", () => {
 
     fireEvent.click(
       within(
-        screen.getByRole("radiogroup", { name: /déjà eu une licence FFTT/i })
+        screen.getByRole("radiogroup", { name: /déjà eu une licence/i })
       ).getByLabelText(/déjà été licencié FFTT/i)
     );
     fireEvent.click(
@@ -148,7 +148,7 @@ describe("AdminStep — questionnaire de santé conditionnel", () => {
     });
 
     expect(
-      screen.queryByRole("radiogroup", { name: /déjà eu une licence FFTT/i })
+      screen.queryByRole("radiogroup", { name: /déjà eu une licence/i })
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole("radiogroup", { name: /changé de catégorie vétéran/i })

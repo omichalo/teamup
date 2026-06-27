@@ -44,7 +44,7 @@ export function effectiveHadFfttLicense(
 
 /**
  * Dérive la déclaration agrégée (enum historique) à partir du dossier médical détaillé.
- * Aligné sur le parcours AdminStep (âge, licence FFTT vérifiée, parcours vétéran).
+ * Aligné sur le parcours AdminStep (âge, licence vérifiée, parcours vétéran).
  */
 export function deriveMedicalCertificateDeclaration(params: {
   birthDate: string;

@@ -195,7 +195,7 @@ export default function JoueursFirestorePage() {
                     <TableHead>
                       <TableRow>
                         <TableCell>Nom</TableCell>
-                        <TableCell>Licence FFTT</TableCell>
+                        <TableCell>Licence</TableCell>
                         <TableCell align="right">Points</TableCell>
                         <TableCell align="right">Classement</TableCell>
                         <TableCell align="center">Sexe</TableCell>

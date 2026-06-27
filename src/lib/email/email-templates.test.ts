@@ -244,7 +244,7 @@ describe("buildPaymentRequestEmail", () => {
       },
       {
         id: "licence",
-        label: "Licence FFTT",
+        label: "Licence",
         amountCents: 3000,
         kind: "fftt_license",
         source: "catalog",
