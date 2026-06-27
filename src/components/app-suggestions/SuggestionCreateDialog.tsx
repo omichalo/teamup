@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Button,
@@ -8,44 +8,84 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  MenuItem,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
-import { SUGGESTION_CATEGORIES, type SuggestionCategory } from "@/lib/app-suggestions/types";
-import { SUGGESTION_CATEGORY_LABELS } from "@/lib/app-suggestions/status";
+import type { SuggestionCategory, SuggestionKind } from "@/lib/app-suggestions/types";
+import { isValidSuggestionCategory } from "@/lib/app-suggestions/categories";
 import { stripSuggestionHtmlText } from "@/lib/app-suggestions/rich-text";
+import { SuggestionCategoryField } from "@/components/app-suggestions/SuggestionCategoryField";
 import { SuggestionRichTextEditor } from "@/components/app-suggestions/rich-text/SuggestionRichTextEditor";
 import { cleanupAllDraftSuggestionImages } from "@/components/app-suggestions/rich-text/draft-image-cleanup";
 
 type SuggestionCreateDialogProps = {
   open: boolean;
+  kind: SuggestionKind;
   onClose: () => void;
   onSubmit: (input: {
     title: string;
     description: string;
+    kind: SuggestionKind;
     category: SuggestionCategory;
   }) => Promise<void>;
 };
 
+const DIALOG_COPY: Record<
+  SuggestionKind,
+  {
+    title: string;
+    intro: string;
+    titleLabel: string;
+    titlePlaceholder: string;
+    submitError: string;
+  }
+> = {
+  improvement: {
+    title: "Nouvelle idée d'amélioration",
+    intro:
+      "Proposez une évolution de l'application. Vous pouvez mettre en forme le texte, ajouter des emojis et insérer des images.",
+    titleLabel: "Titre de l'idée",
+    titlePlaceholder: "Ex. Export Excel des adhésions",
+    submitError: "Impossible de créer l'idée",
+  },
+  problem: {
+    title: "Signaler un problème",
+    intro:
+      "Décrivez le dysfonctionnement rencontré (écran, action, message d'erreur…). Des captures d'écran aident l'équipe à reproduire le cas.",
+    titleLabel: "Résumé du problème",
+    titlePlaceholder: "Ex. Le bouton Enregistrer ne répond plus",
+    submitError: "Impossible d'envoyer la remontée",
+  },
+};
+
 export function SuggestionCreateDialog({
   open,
+  kind,
   onClose,
   onSubmit,
 }: SuggestionCreateDialogProps) {
   const [title, setTitle] = useState("");
   const [descriptionHtml, setDescriptionHtml] = useState("<p></p>");
-  const [category, setCategory] = useState<SuggestionCategory>("autre");
+  const [category, setCategory] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const copy = DIALOG_COPY[kind];
 
   const reset = () => {
     setTitle("");
     setDescriptionHtml("<p></p>");
-    setCategory("autre");
+    setCategory("");
     setError(null);
   };
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    reset();
+  }, [open, kind]);
 
   const handleClose = () => {
     if (submitting) {
@@ -58,24 +98,30 @@ export function SuggestionCreateDialog({
   };
 
   const descriptionTextLength = stripSuggestionHtmlText(descriptionHtml).length;
-  const canSubmit = title.trim().length >= 3 && descriptionTextLength >= 10;
+  const canSubmit =
+    title.trim().length >= 3 &&
+    descriptionTextLength >= 10 &&
+    isValidSuggestionCategory(category);
 
   const handleSubmit = async () => {
+    if (!canSubmit) {
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
     try {
       await onSubmit({
         title,
         description: descriptionHtml,
+        kind,
         category,
       });
       reset();
       onClose();
     } catch (submitError) {
       setError(
-        submitError instanceof Error
-          ? submitError.message
-          : "Impossible de créer l'idée"
+        submitError instanceof Error ? submitError.message : copy.submitError
       );
     } finally {
       setSubmitting(false);
@@ -84,16 +130,16 @@ export function SuggestionCreateDialog({
 
   return (
     <Dialog open={open} onClose={handleClose} fullWidth maxWidth="md">
-      <DialogTitle>Nouvelle idée d&apos;amélioration</DialogTitle>
+      <DialogTitle>{copy.title}</DialogTitle>
       <DialogContent>
         <Stack spacing={2.5} sx={{ mt: 1 }}>
           <Typography variant="body2" color="text.secondary">
-            Rédigez librement votre idée. Vous pouvez mettre en forme le texte,
-            ajouter des emojis et insérer des images.
+            {copy.intro}
           </Typography>
 
           <TextField
-            label="Titre"
+            label={copy.titleLabel}
+            placeholder={copy.titlePlaceholder}
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             required
@@ -101,19 +147,12 @@ export function SuggestionCreateDialog({
             autoFocus
           />
 
-          <TextField
-            select
-            label="Catégorie"
+          <SuggestionCategoryField
             value={category}
-            onChange={(event) => setCategory(event.target.value as SuggestionCategory)}
-            fullWidth
-          >
-            {SUGGESTION_CATEGORIES.map((value) => (
-              <MenuItem key={value} value={value}>
-                {SUGGESTION_CATEGORY_LABELS[value]}
-              </MenuItem>
-            ))}
-          </TextField>
+            onChange={setCategory}
+            required
+            disabled={submitting}
+          />
 
           <Stack spacing={0.75}>
             <Typography variant="subtitle2">Description</Typography>

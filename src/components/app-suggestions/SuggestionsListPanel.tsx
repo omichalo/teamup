@@ -11,7 +11,9 @@ import {
 import { ChatBubbleOutline as ChatBubbleOutlineIcon } from "@mui/icons-material";
 import type { AppSuggestionSummary } from "@/lib/app-suggestions/types";
 import {
-  SUGGESTION_CATEGORY_LABELS,
+  formatSuggestionCategoryLabel,
+  SUGGESTION_KIND_COLORS,
+  SUGGESTION_KIND_LABELS,
   SUGGESTION_STATUS_COLORS,
   SUGGESTION_STATUS_LABELS,
 } from "@/lib/app-suggestions/status";
@@ -56,10 +58,11 @@ export function SuggestionsListPanel({
           }}
         >
           <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-            Aucune idée pour le moment
+            Aucun retour pour le moment
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Lancez la première proposition avec le bouton « Nouvelle idée ».
+            Lancez une idée ou signalez un problème avec les boutons en haut de
+            page.
           </Typography>
         </Box>
       ) : null}
@@ -116,7 +119,13 @@ export function SuggestionsListPanel({
 
                 <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
                   <Chip
-                    label={SUGGESTION_CATEGORY_LABELS[suggestion.category]}
+                    label={SUGGESTION_KIND_LABELS[suggestion.kind]}
+                    size="small"
+                    color={SUGGESTION_KIND_COLORS[suggestion.kind]}
+                    sx={{ height: 22, fontSize: "0.7rem" }}
+                  />
+                  <Chip
+                    label={formatSuggestionCategoryLabel(suggestion.category)}
                     size="small"
                     variant="outlined"
                     sx={{ height: 22, fontSize: "0.7rem" }}

@@ -6,6 +6,7 @@ import type {
   AppSuggestionDetail,
   AppSuggestionSummary,
   SuggestionCategory,
+  SuggestionKind,
 } from "@/lib/app-suggestions/types";
 
 export type SuggestionsPageInfo = {
@@ -36,8 +37,9 @@ export function useSuggestionsList() {
   const [isMaintainer, setIsMaintainer] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("open");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [kindFilter, setKindFilter] = useState<string>("all");
   const [mineOnly, setMineOnly] = useState(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
 
@@ -54,6 +56,9 @@ export function useSuggestionsList() {
         if (categoryFilter !== "all") {
           params.set("category", categoryFilter);
         }
+        if (kindFilter !== "all") {
+          params.set("kind", kindFilter);
+        }
         if (mineOnly) {
           params.set("mine", "1");
         }
@@ -69,7 +74,7 @@ export function useSuggestionsList() {
         >(response);
 
         if (!response.ok) {
-          throw new Error(payload.error || "Impossible de charger les idées");
+          throw new Error(payload.error || "Impossible de charger les retours");
         }
 
         setSuggestions((current) =>
@@ -84,13 +89,13 @@ export function useSuggestionsList() {
         setError(
           loadError instanceof Error
             ? loadError.message
-            : "Impossible de charger les idées"
+            : "Impossible de charger les retours"
         );
       } finally {
         setLoading(false);
       }
     },
-    [categoryFilter, mineOnly, statusFilter]
+    [categoryFilter, kindFilter, mineOnly, statusFilter]
   );
 
   return {
@@ -103,6 +108,8 @@ export function useSuggestionsList() {
     setStatusFilter,
     categoryFilter,
     setCategoryFilter,
+    kindFilter,
+    setKindFilter,
     mineOnly,
     setMineOnly,
     lastRefreshedAt,
@@ -171,6 +178,7 @@ export function useSuggestionDetail() {
     async (input: {
       title: string;
       description: string;
+      kind: SuggestionKind;
       category: SuggestionCategory;
     }) => {
       const response = await fetch("/api/club/suggestions", {

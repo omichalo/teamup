@@ -5,6 +5,7 @@ import { resolveSuggestionSession } from "@/lib/app-suggestions/api-auth";
 import { resolveSuggestionStatusFilter } from "@/lib/app-suggestions/status";
 import {
   resolveSuggestionCategoryFilter,
+  resolveSuggestionKindFilter,
   resolveSuggestionMineFilter,
 } from "@/lib/app-suggestions/resolve-list-filters";
 import {
@@ -34,6 +35,7 @@ export async function GET(req: Request) {
   const categoryFilter = resolveSuggestionCategoryFilter(
     url.searchParams.get("category")
   );
+  const kindFilter = resolveSuggestionKindFilter(url.searchParams.get("kind"));
   const mineOnly = resolveSuggestionMineFilter(url.searchParams.get("mine"));
   const rawLimit = Number.parseInt(url.searchParams.get("limit") ?? "", 10);
   const pageSize = Number.isFinite(rawLimit)
@@ -45,6 +47,7 @@ export async function GET(req: Request) {
     const page = await listSuggestions(auth.session.db, {
       statusFilter,
       categoryFilter,
+      kindFilter,
       mineOnly,
       ...(mineOnly ? { submitterUid: auth.session.uid } : {}),
       pageSize,
@@ -130,6 +133,7 @@ export async function POST(req: Request) {
         req,
         suggestionId: id,
         title: created.title,
+        kind: created.kind,
         category: created.category,
         description: created.description,
         descriptionFormat: created.descriptionFormat,

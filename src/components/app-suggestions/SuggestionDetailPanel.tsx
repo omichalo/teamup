@@ -8,7 +8,6 @@ import {
   Chip,
   CircularProgress,
   Link,
-  MenuItem,
   Stack,
   TextField,
   Typography,
@@ -16,13 +15,16 @@ import {
 import { alpha } from "@mui/material/styles";
 import { OpenInNew as OpenInNewIcon } from "@mui/icons-material";
 import type { AppSuggestionDetail, SuggestionCategory } from "@/lib/app-suggestions/types";
-import { SUGGESTION_CATEGORIES } from "@/lib/app-suggestions/types";
 import {
-  SUGGESTION_CATEGORY_LABELS,
+  formatSuggestionCategoryLabel,
+  SUGGESTION_KIND_COLORS,
+  SUGGESTION_KIND_LABELS,
   SUGGESTION_STATUS_COLORS,
   SUGGESTION_STATUS_LABELS,
   isAuthorEditableStatus,
 } from "@/lib/app-suggestions/status";
+import { isValidSuggestionCategory } from "@/lib/app-suggestions/categories";
+import { SuggestionCategoryField } from "@/components/app-suggestions/SuggestionCategoryField";
 import { formatSuggestionDate } from "@/components/app-suggestions/format-utils";
 import { SuggestionDetailEmptyState } from "@/components/app-suggestions/SuggestionDetailEmptyState";
 import { SuggestionDetailCommentsSection } from "@/components/app-suggestions/SuggestionDetailCommentsSection";
@@ -73,7 +75,7 @@ export function SuggestionDetailPanel({
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDescriptionHtml, setEditDescriptionHtml] = useState("<p></p>");
-  const [editCategory, setEditCategory] = useState<SuggestionCategory>("autre");
+  const [editCategory, setEditCategory] = useState("");
   const [authorSubmitting, setAuthorSubmitting] = useState(false);
   const [authorError, setAuthorError] = useState<string | null>(null);
   const [authorSuccess, setAuthorSuccess] = useState<string | null>(null);
@@ -155,7 +157,9 @@ export function SuggestionDetailPanel({
 
   const editDescriptionTextLength = stripSuggestionHtmlText(editDescriptionHtml).length;
   const canSaveAuthorEdit =
-    editTitle.trim().length >= 3 && editDescriptionTextLength >= 10;
+    editTitle.trim().length >= 3 &&
+    editDescriptionTextLength >= 10 &&
+    isValidSuggestionCategory(editCategory);
 
   const isAuthor =
     viewerUid !== null && detail.submitterUid === viewerUid;
@@ -201,25 +205,21 @@ export function SuggestionDetailPanel({
           </Stack>
         </Stack>
         {isEditing ? (
-          <TextField
-            select
-            label="Catégorie"
+          <SuggestionCategoryField
             value={editCategory}
-            onChange={(event) =>
-              setEditCategory(event.target.value as SuggestionCategory)
-            }
-            fullWidth
-          >
-            {SUGGESTION_CATEGORIES.map((value) => (
-              <MenuItem key={value} value={value}>
-                {SUGGESTION_CATEGORY_LABELS[value]}
-              </MenuItem>
-            ))}
-          </TextField>
+            onChange={setEditCategory}
+            required
+            disabled={authorSubmitting}
+          />
         ) : (
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
             <Chip
-              label={SUGGESTION_CATEGORY_LABELS[detail.category]}
+              label={SUGGESTION_KIND_LABELS[detail.kind]}
+              size="small"
+              color={SUGGESTION_KIND_COLORS[detail.kind]}
+            />
+            <Chip
+              label={formatSuggestionCategoryLabel(detail.category)}
               size="small"
               variant="outlined"
             />
@@ -272,7 +272,7 @@ export function SuggestionDetailPanel({
           </Box>
           {showAuthorLockedNotice ? (
             <Alert severity="info">
-              Cette idée est en cours de traitement. Pour une correction, ajoutez un
+              Ce retour est en cours de traitement. Pour une correction, ajoutez un
               commentaire ou contactez un mainteneur.
             </Alert>
           ) : null}

@@ -1,6 +1,10 @@
-import { SUGGESTION_CATEGORY_LABELS, SUGGESTION_STATUS_LABELS } from "@/lib/app-suggestions/status";
+import { formatSuggestionCategoryLabel, SUGGESTION_STATUS_LABELS } from "@/lib/app-suggestions/status";
 import { buildSuggestionDetailUrl } from "@/lib/app-suggestions/suggestion-url";
-import type { SuggestionCategory, SuggestionStatus } from "@/lib/app-suggestions/types";
+import type {
+  SuggestionCategory,
+  SuggestionKind,
+  SuggestionStatus,
+} from "@/lib/app-suggestions/types";
 import { SQYPING_EMAIL_APP_NAME } from "@/lib/email/brand";
 import { escapeHtml } from "@/lib/email/escape-html";
 import {
@@ -19,36 +23,64 @@ function suggestionAction(base: SuggestionEmailBase) {
   const url = buildSuggestionDetailUrl(base.appOrigin, base.suggestionId);
   return {
     url,
-    label: "Voir l'idée",
+    label: "Voir le retour",
   };
 }
+
+const CREATED_EMAIL_COPY: Record<
+  SuggestionKind,
+  {
+    intro: string;
+    layoutTitle: string;
+    preheaderPrefix: string;
+    subjectPrefix: string;
+    textVerb: string;
+  }
+> = {
+  improvement: {
+    intro: "a déposé une nouvelle idée d'amélioration",
+    layoutTitle: "Nouvelle idée d'amélioration",
+    preheaderPrefix: "Nouvelle idée",
+    subjectPrefix: "Nouvelle idée",
+    textVerb: "a déposé une nouvelle idée",
+  },
+  problem: {
+    intro: "a signalé un nouveau problème",
+    layoutTitle: "Nouvelle remontée de problème",
+    preheaderPrefix: "Nouveau problème",
+    subjectPrefix: "Nouveau problème",
+    textVerb: "a signalé un problème",
+  },
+};
 
 export function buildSuggestionCreatedMaintainerEmail(options: {
   title: string;
   suggestionId: string;
   appOrigin: string;
+  kind: SuggestionKind;
   category: SuggestionCategory;
   submitterDisplayName: string | null;
   descriptionExcerpt: string;
 }): { html: string; text: string; subject: string } {
+  const copy = CREATED_EMAIL_COPY[options.kind];
   const safeTitle = escapeHtml(options.title);
   const author = escapeHtml(options.submitterDisplayName || "Un membre du staff");
-  const category = escapeHtml(SUGGESTION_CATEGORY_LABELS[options.category]);
+  const category = escapeHtml(formatSuggestionCategoryLabel(options.category));
   const excerpt = escapeHtml(options.descriptionExcerpt);
   const action = suggestionAction(options);
 
   const bodyHtml = [
     emailParagraph("Bonjour,"),
     emailParagraph(
-      `<strong>${author}</strong> a déposé une nouvelle idée d'amélioration sur <strong>${escapeHtml(SQYPING_EMAIL_APP_NAME)}</strong>.`
+      `<strong>${author}</strong> ${copy.intro} sur <strong>${escapeHtml(SQYPING_EMAIL_APP_NAME)}</strong>.`
     ),
     emailParagraph(`<strong>${safeTitle}</strong> · ${category}`),
     emailMutedParagraph(excerpt),
   ].join("");
 
   const html = buildSqyPingEmailLayout({
-    title: "Nouvelle idée d'amélioration",
-    preheader: `Nouvelle idée : ${options.title}`,
+    title: copy.layoutTitle,
+    preheader: `${copy.preheaderPrefix} : ${options.title}`,
     bodyHtml,
     appOrigin: options.appOrigin,
     primaryAction: action,
@@ -58,7 +90,7 @@ export function buildSuggestionCreatedMaintainerEmail(options: {
   const text = [
     "Bonjour,",
     "",
-    `${options.submitterDisplayName || "Un membre du staff"} a déposé une nouvelle idée : ${options.title} (${SUGGESTION_CATEGORY_LABELS[options.category]}).`,
+    `${options.submitterDisplayName || "Un membre du staff"} ${copy.textVerb} : ${options.title} (${formatSuggestionCategoryLabel(options.category)}).`,
     options.descriptionExcerpt,
     "",
     `${action.label} : ${action.url}`,
@@ -67,7 +99,7 @@ export function buildSuggestionCreatedMaintainerEmail(options: {
   return {
     html,
     text,
-    subject: `Nouvelle idée — ${options.title}`,
+    subject: `${copy.subjectPrefix} — ${options.title}`,
   };
 }
 

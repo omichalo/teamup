@@ -81,8 +81,8 @@ const HOME_LINK_META: Record<
     color: "primary",
   },
   "/club/idees": {
-    description: "Proposer et suivre les évolutions de l'application",
-    cta: "Ouvrir la boîte à idées",
+    description: "Proposer des évolutions ou signaler un problème sur l'application",
+    cta: "Ouvrir idées & remontées",
     color: "warning",
   },
 };
@@ -142,7 +142,7 @@ export function buildCoachAdminHomeContent(isAdmin: boolean): {
         },
         {
           id: "ideas",
-          title: "Évolutions de l'application",
+          title: "Retours sur l'application",
           items: toHomeLinkCards([LAYOUT_NAV.boiteIdees]),
         },
         {
@@ -174,7 +174,7 @@ export function buildCoachAdminHomeContent(isAdmin: boolean): {
       },
       {
         id: "ideas",
-        title: "Évolutions de l'application",
+        title: "Retours sur l'application",
         items: toHomeLinkCards([LAYOUT_NAV.boiteIdees]),
       },
       {

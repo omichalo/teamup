@@ -35,11 +35,11 @@ export function SuggestionDetailEmptyState() {
         </Box>
         <Stack spacing={0.75}>
           <Typography variant="h6" component="p" fontWeight={700}>
-            Sélectionnez une idée
+            Sélectionnez un retour
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
-            Parcourez les propositions à gauche pour consulter le détail, suivre
-            l&apos;avancement et échanger avec l&apos;équipe.
+            Parcourez les idées et remontées à gauche pour consulter le détail,
+            suivre l&apos;avancement et échanger avec l&apos;équipe.
           </Typography>
         </Stack>
       </Stack>

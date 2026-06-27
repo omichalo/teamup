@@ -1,6 +1,7 @@
 "use client";
 
 import type { MouseEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Chip,
   FormControl,
@@ -16,39 +17,44 @@ import {
 } from "@mui/material";
 import { Refresh as RefreshIcon } from "@mui/icons-material";
 import type { SelectChangeEvent } from "@mui/material/Select";
-import { SUGGESTION_CATEGORIES } from "@/lib/app-suggestions/types";
+import { readJsonResponse } from "@/lib/http/read-json-response";
 import {
-  SUGGESTION_CATEGORY_LABELS,
-  SUGGESTION_STATUS_LABELS,
+  listDefaultSuggestionCategoryOptions,
+  type SuggestionCategoryOption,
+} from "@/lib/app-suggestions/categories";
+import {
+  SUGGESTION_KIND_LABELS,
+  SUGGESTION_STATUS_FILTER_LABELS,
 } from "@/lib/app-suggestions/status";
 import { formatSuggestionDate } from "@/components/app-suggestions/format-utils";
 
 const STATUS_FILTER_OPTIONS = [
-  { value: "all", label: "Toutes" },
-  { value: "received", label: SUGGESTION_STATUS_LABELS.received },
-  { value: "reviewing", label: SUGGESTION_STATUS_LABELS.reviewing },
-  { value: "planned", label: SUGGESTION_STATUS_LABELS.planned },
-  { value: "in_progress", label: SUGGESTION_STATUS_LABELS.in_progress },
-  { value: "released", label: SUGGESTION_STATUS_LABELS.released },
-  { value: "declined", label: SUGGESTION_STATUS_LABELS.declined },
+  { value: "open", label: SUGGESTION_STATUS_FILTER_LABELS.open },
+  { value: "all", label: SUGGESTION_STATUS_FILTER_LABELS.all },
+  { value: "received", label: SUGGESTION_STATUS_FILTER_LABELS.received },
+  { value: "reviewing", label: SUGGESTION_STATUS_FILTER_LABELS.reviewing },
+  { value: "planned", label: SUGGESTION_STATUS_FILTER_LABELS.planned },
+  { value: "in_progress", label: SUGGESTION_STATUS_FILTER_LABELS.in_progress },
+  { value: "released", label: SUGGESTION_STATUS_FILTER_LABELS.released },
+  { value: "declined", label: SUGGESTION_STATUS_FILTER_LABELS.declined },
 ] as const;
 
-const CATEGORY_FILTER_OPTIONS = [
-  { value: "all", label: "Toutes les catégories" },
-  ...SUGGESTION_CATEGORIES.map((value) => ({
-    value,
-    label: SUGGESTION_CATEGORY_LABELS[value],
-  })),
+const KIND_FILTER_OPTIONS = [
+  { value: "all", label: "Tous les types" },
+  { value: "improvement", label: SUGGESTION_KIND_LABELS.improvement },
+  { value: "problem", label: SUGGESTION_KIND_LABELS.problem },
 ] as const;
 
 type SuggestionsFiltersBarProps = {
   statusFilter: string;
   categoryFilter: string;
+  kindFilter: string;
   mineOnly: boolean;
   loading: boolean;
   lastRefreshedAt: Date | null;
   onStatusFilterChange: (value: string) => void;
   onCategoryFilterChange: (value: string) => void;
+  onKindFilterChange: (value: string) => void;
   onMineOnlyChange: (value: boolean) => void;
   onRefresh: () => void;
 };
@@ -56,14 +62,62 @@ type SuggestionsFiltersBarProps = {
 export function SuggestionsFiltersBar({
   statusFilter,
   categoryFilter,
+  kindFilter,
   mineOnly,
   loading,
   lastRefreshedAt,
   onStatusFilterChange,
   onCategoryFilterChange,
+  onKindFilterChange,
   onMineOnlyChange,
   onRefresh,
 }: SuggestionsFiltersBarProps) {
+  const [categoryOptions, setCategoryOptions] = useState<SuggestionCategoryOption[]>(
+    listDefaultSuggestionCategoryOptions()
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCategories = async () => {
+      try {
+        const response = await fetch("/api/club/suggestions/categories", {
+          credentials: "include",
+        });
+        const payload = await readJsonResponse<{
+          categories?: SuggestionCategoryOption[];
+        }>(response);
+
+        if (!response.ok || cancelled) {
+          return;
+        }
+
+        setCategoryOptions(
+          payload.categories ?? listDefaultSuggestionCategoryOptions()
+        );
+      } catch {
+        // Les catégories par défaut restent disponibles.
+      }
+    };
+
+    void loadCategories();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const categoryFilterOptions = useMemo(
+    () => [
+      { value: "all", label: "Toutes les catégories" },
+      ...categoryOptions.map((option) => ({
+        value: option.value,
+        label: option.label,
+      })),
+    ],
+    [categoryOptions]
+  );
+
   const handleScopeChange = (
     _event: MouseEvent<HTMLElement>,
     value: "all" | "mine" | null
@@ -75,6 +129,10 @@ export function SuggestionsFiltersBar({
 
   const handleCategoryChange = (event: SelectChangeEvent<string>) => {
     onCategoryFilterChange(event.target.value);
+  };
+
+  const handleKindChange = (event: SelectChangeEvent<string>) => {
+    onKindFilterChange(event.target.value);
   };
 
   return (
@@ -97,7 +155,7 @@ export function SuggestionsFiltersBar({
             size="small"
             value={mineOnly ? "mine" : "all"}
             onChange={handleScopeChange}
-            aria-label="Périmètre des idées"
+            aria-label="Périmètre des retours"
             sx={{
               bgcolor: "background.paper",
               "& .MuiToggleButton-root": {
@@ -107,9 +165,26 @@ export function SuggestionsFiltersBar({
               },
             }}
           >
-            <ToggleButton value="all">Toutes les idées</ToggleButton>
-            <ToggleButton value="mine">Mes idées</ToggleButton>
+            <ToggleButton value="all">Tous les retours</ToggleButton>
+            <ToggleButton value="mine">Mes retours</ToggleButton>
           </ToggleButtonGroup>
+
+          <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: 170 } }}>
+            <InputLabel id="suggestions-kind-filter-label">Type</InputLabel>
+            <Select
+              labelId="suggestions-kind-filter-label"
+              label="Type"
+              value={kindFilter}
+              onChange={handleKindChange}
+              sx={{ bgcolor: "background.paper" }}
+            >
+              {KIND_FILTER_OPTIONS.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
           <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: 200 } }}>
             <InputLabel id="suggestions-category-filter-label">Catégorie</InputLabel>
@@ -120,7 +195,7 @@ export function SuggestionsFiltersBar({
               onChange={handleCategoryChange}
               sx={{ bgcolor: "background.paper" }}
             >
-              {CATEGORY_FILTER_OPTIONS.map((option) => (
+              {categoryFilterOptions.map((option) => (
                 <MenuItem key={option.value} value={option.value}>
                   {option.label}
                 </MenuItem>

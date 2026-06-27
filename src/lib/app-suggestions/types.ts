@@ -3,16 +3,23 @@ import type { SuggestionRichTextFormat } from "@/lib/app-suggestions/rich-text";
 
 export const SUGGESTION_SCHEMA_VERSION = 1 as const;
 
-export const SUGGESTION_CATEGORIES = [
+export const SUGGESTION_KINDS = ["improvement", "problem"] as const;
+
+export type SuggestionKind = (typeof SUGGESTION_KINDS)[number];
+
+export const SUGGESTION_DEFAULT_CATEGORIES = [
   "adhesions",
   "presences",
   "emails",
   "compositions",
   "joueurs",
-  "autre",
 ] as const;
 
-export type SuggestionCategory = (typeof SUGGESTION_CATEGORIES)[number];
+/** Valeur stockée en base : slug par défaut ou libellé personnalisé. */
+export type SuggestionCategory = string;
+
+/** @deprecated Utiliser SUGGESTION_DEFAULT_CATEGORIES */
+export const SUGGESTION_CATEGORIES = SUGGESTION_DEFAULT_CATEGORIES;
 
 export const SUGGESTION_PRIORITIES = ["low", "medium", "high"] as const;
 
@@ -50,6 +57,7 @@ export interface AppSuggestionRecord {
   title: string;
   description: string;
   descriptionFormat?: SuggestionDescriptionFormat;
+  kind?: SuggestionKind;
   category: SuggestionCategory;
   priority: SuggestionPriority;
   status: SuggestionStatus;
@@ -80,6 +88,7 @@ export interface AppSuggestionSummary {
   description: string;
   descriptionFormat: SuggestionDescriptionFormat;
   descriptionExcerpt: string;
+  kind: SuggestionKind;
   category: SuggestionCategory;
   priority: SuggestionPriority;
   status: SuggestionStatus;

@@ -1,5 +1,9 @@
 import type { Firestore } from "firebase-admin/firestore";
-import type { SuggestionStatus } from "@/lib/app-suggestions/types";
+import type {
+  SuggestionCategory,
+  SuggestionKind,
+  SuggestionStatus,
+} from "@/lib/app-suggestions/types";
 import { getSuggestionDescriptionExcerpt } from "@/lib/app-suggestions/rich-text";
 import {
   getUserEmailByUid,
@@ -40,7 +44,8 @@ export async function notifyMaintainersOfNewSuggestion(params: {
   req: Request;
   suggestionId: string;
   title: string;
-  category: import("@/lib/app-suggestions/types").SuggestionCategory;
+  category: SuggestionCategory;
+  kind: SuggestionKind;
   description: string;
   descriptionFormat?: "html" | "plain";
   submitterUid: string;
@@ -59,6 +64,7 @@ export async function notifyMaintainersOfNewSuggestion(params: {
     title: params.title,
     suggestionId: params.suggestionId,
     appOrigin,
+    kind: params.kind,
     category: params.category,
     submitterDisplayName: params.submitterDisplayName,
     descriptionExcerpt: getSuggestionDescriptionExcerpt(

@@ -6,6 +6,7 @@ import type {
   AppSuggestionRecord,
   AppSuggestionSummary,
   SuggestionDescriptionFormat,
+  SuggestionKind,
   SuggestionStatusHistoryEntry,
   SuggestionStatusHistoryRecord,
 } from "@/lib/app-suggestions/types";
@@ -43,6 +44,10 @@ export function serializeStatusHistory(
     );
 }
 
+function resolveSuggestionKind(value: SuggestionKind | undefined): SuggestionKind {
+  return value === "problem" ? "problem" : "improvement";
+}
+
 export function serializeSuggestionSummary(
   id: string,
   data: AppSuggestionRecord,
@@ -58,6 +63,7 @@ export function serializeSuggestionSummary(
       data.description,
       descriptionFormat
     ),
+    kind: resolveSuggestionKind(data.kind),
     category: data.category,
     priority: data.priority,
     status: data.status,

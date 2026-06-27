@@ -60,7 +60,7 @@ const NAV = {
     icon: <TableChart />,
   },
   boiteIdees: {
-    label: "Boîte à idées",
+    label: "Idées & remontées",
     href: "/club/idees",
     icon: <TipsAndUpdates />,
   },

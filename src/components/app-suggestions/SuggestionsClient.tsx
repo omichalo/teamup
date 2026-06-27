@@ -15,7 +15,7 @@ import {
   useTheme,
   Typography,
 } from "@mui/material";
-import { Add as AddIcon, ArrowBack as ArrowBackIcon } from "@mui/icons-material";
+import { Add as AddIcon, ArrowBack as ArrowBackIcon, ReportProblem as ReportProblemIcon } from "@mui/icons-material";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
@@ -34,6 +34,7 @@ import {
   useSuggestionsList,
 } from "@/components/app-suggestions/useSuggestions";
 import { resolveSuggestionSelection } from "@/lib/app-suggestions/resolve-suggestion-selection";
+import type { SuggestionKind } from "@/lib/app-suggestions/types";
 
 const LIST_REFRESH_INTERVAL_MS = 60_000;
 
@@ -55,6 +56,8 @@ export function SuggestionsClient() {
     setStatusFilter,
     categoryFilter,
     setCategoryFilter,
+    kindFilter,
+    setKindFilter,
     mineOnly,
     setMineOnly,
     lastRefreshedAt,
@@ -76,7 +79,13 @@ export function SuggestionsClient() {
 
   const selectedId = searchParams.get("id");
   const [createOpen, setCreateOpen] = useState(false);
+  const [createKind, setCreateKind] = useState<SuggestionKind>("improvement");
   const mobileDetailRef = useRef<HTMLDivElement>(null);
+
+  const openCreateDialog = (kind: SuggestionKind) => {
+    setCreateKind(kind);
+    setCreateOpen(true);
+  };
 
   const updateSelectedId = useCallback(
     (id: string | null) => {
@@ -207,11 +216,13 @@ export function SuggestionsClient() {
     <SuggestionsFiltersBar
       statusFilter={statusFilter}
       categoryFilter={categoryFilter}
+      kindFilter={kindFilter}
       mineOnly={mineOnly}
       loading={listLoading}
       lastRefreshedAt={lastRefreshedAt}
       onStatusFilterChange={setStatusFilter}
       onCategoryFilterChange={setCategoryFilter}
+      onKindFilterChange={setKindFilter}
       onMineOnlyChange={setMineOnly}
       onRefresh={() => void loadSuggestions()}
     />
@@ -238,7 +249,7 @@ export function SuggestionsClient() {
   const listHeader = (
     <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
       <Typography variant="subtitle2" fontWeight={700}>
-        Idées
+        Retours
       </Typography>
       <Chip
         label={suggestions.length}
@@ -255,17 +266,27 @@ export function SuggestionsClient() {
       <Stack spacing={3}>
         <PageHeader
           eyebrow="Club"
-          title="Boîte à idées"
-          subtitle="Proposez et suivez les évolutions de l'application. Tout le staff peut commenter ; les mainteneurs pilotent le triage."
+          title="Idées & remontées"
+          subtitle="Proposez des évolutions ou signalez un problème sur l'application. Tout le staff peut commenter ; les mainteneurs pilotent le triage."
           actions={
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setCreateOpen(true)}
-              sx={{ fontWeight: 600, px: 2.5 }}
-            >
-              Nouvelle idée
-            </Button>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => openCreateDialog("improvement")}
+                sx={{ fontWeight: 600, px: 2.5 }}
+              >
+                Nouvelle idée
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<ReportProblemIcon />}
+                onClick={() => openCreateDialog("problem")}
+                sx={{ fontWeight: 600, px: 2.5 }}
+              >
+                Signaler un problème
+              </Button>
+            </Stack>
           }
           marginBottom={0}
         />
@@ -317,6 +338,7 @@ export function SuggestionsClient() {
 
       <SuggestionCreateDialog
         open={createOpen}
+        kind={createKind}
         onClose={() => setCreateOpen(false)}
         onSubmit={handleCreate}
       />

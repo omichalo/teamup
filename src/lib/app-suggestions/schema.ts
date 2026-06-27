@@ -8,7 +8,11 @@ import {
   stripSuggestionHtmlText,
 } from "@/lib/app-suggestions/rich-text";
 import {
-  SUGGESTION_CATEGORIES,
+  isValidSuggestionCategory,
+  normalizeSuggestionCategory,
+} from "@/lib/app-suggestions/categories";
+import {
+  SUGGESTION_KINDS,
   SUGGESTION_PRIORITIES,
   SUGGESTION_STATUSES,
 } from "@/lib/app-suggestions/types";
@@ -57,7 +61,13 @@ const plainDescriptionSchema = z
   )
   .max(8000, "La description ne peut pas dépasser 8000 caractères");
 
-const categorySchema = z.enum(SUGGESTION_CATEGORIES);
+const categorySchema = z
+  .string()
+  .trim()
+  .transform((value) => normalizeSuggestionCategory(value))
+  .refine((value) => isValidSuggestionCategory(value), {
+    message: "La catégorie doit contenir au moins 2 caractères",
+  });
 
 const githubIssueUrlSchema = z
   .string()
@@ -72,9 +82,12 @@ const maintainerNoteSchema = z
   .max(2000, "La note ne peut pas dépasser 2000 caractères")
   .nullable();
 
+const kindSchema = z.enum(SUGGESTION_KINDS);
+
 export const suggestionCreateSchema = z.object({
   title: titleSchema,
   description: richDescriptionSchema,
+  kind: kindSchema,
   category: categorySchema,
 });
 

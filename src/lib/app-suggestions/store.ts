@@ -16,9 +16,13 @@ import type {
   AppSuggestionRecord,
   AppSuggestionSummary,
   SuggestionCategory,
-  SuggestionStatus,
+  SuggestionKind,
 } from "@/lib/app-suggestions/types";
 import { SUGGESTION_SCHEMA_VERSION } from "@/lib/app-suggestions/types";
+import {
+  SUGGESTION_OPEN_STATUSES,
+  type SuggestionStatusFilter,
+} from "@/lib/app-suggestions/status";
 import { resolveStoredCommentCount } from "@/lib/app-suggestions/resolve-comment-count";
 import {
   collectOrphanedSuggestionImageUrls,
@@ -28,6 +32,11 @@ import {
   enrichSuggestionDetail,
   enrichSuggestionSummaries,
 } from "@/lib/app-suggestions/enrich-display-names";
+import {
+  formatSuggestionCategoryLabel,
+  isValidSuggestionCategory,
+  normalizeSuggestionCategory,
+} from "@/lib/app-suggestions/categories";
 
 const COLLECTION = "appSuggestions";
 
@@ -52,6 +61,7 @@ export async function createSuggestion(
     title: input.title,
     description: input.description,
     descriptionFormat: "html",
+    kind: input.kind,
     category: input.category,
     priority: "medium",
     status: "received",
@@ -81,8 +91,9 @@ export async function createSuggestion(
 function buildSuggestionsListQuery(
   db: Firestore,
   filters: {
-    statusFilter: SuggestionStatus | "all";
+    statusFilter: SuggestionStatusFilter;
     categoryFilter: SuggestionCategory | "all";
+    kindFilter: SuggestionKind | "all";
     mineOnly: boolean;
     submitterUid?: string;
   }
@@ -92,7 +103,12 @@ function buildSuggestionsListQuery(
   if (filters.mineOnly && filters.submitterUid) {
     query = query.where("submitterUid", "==", filters.submitterUid);
   }
-  if (filters.statusFilter !== "all") {
+  if (filters.kindFilter === "problem") {
+    query = query.where("kind", "==", "problem");
+  }
+  if (filters.statusFilter === "open") {
+    query = query.where("status", "in", [...SUGGESTION_OPEN_STATUSES]);
+  } else if (filters.statusFilter !== "all") {
     query = query.where("status", "==", filters.statusFilter);
   }
   if (filters.categoryFilter !== "all") {
@@ -102,11 +118,49 @@ function buildSuggestionsListQuery(
   return query.orderBy("createdAt", "desc");
 }
 
+async function mapSuggestionDocs(
+  db: Firestore,
+  docs: FirebaseFirestore.QueryDocumentSnapshot[]
+): Promise<AppSuggestionSummary[]> {
+  const suggestions = docs.map((docSnap) => {
+    const data = docSnap.data() as AppSuggestionRecord;
+    return serializeSuggestionSummary(
+      docSnap.id,
+      data,
+      resolveStoredCommentCount(data)
+    );
+  });
+
+  return enrichSuggestionSummaries(db, suggestions);
+}
+
+export async function listDistinctSuggestionCategories(
+  db: Firestore
+): Promise<string[]> {
+  const snapshot = await suggestionsCollection(db).select("category").get();
+  const categories = new Set<string>();
+
+  for (const docSnap of snapshot.docs) {
+    const category = docSnap.get("category");
+    if (typeof category === "string" && isValidSuggestionCategory(category)) {
+      categories.add(normalizeSuggestionCategory(category));
+    }
+  }
+
+  return Array.from(categories).sort((left, right) =>
+    formatSuggestionCategoryLabel(left).localeCompare(
+      formatSuggestionCategoryLabel(right),
+      "fr"
+    )
+  );
+}
+
 export async function listSuggestions(
   db: Firestore,
   options: {
-    statusFilter: SuggestionStatus | "all";
+    statusFilter: SuggestionStatusFilter;
     categoryFilter: SuggestionCategory | "all";
+    kindFilter: SuggestionKind | "all";
     mineOnly: boolean;
     submitterUid?: string;
     pageSize: number;
@@ -121,6 +175,51 @@ export async function listSuggestions(
     Math.max(options.pageSize, 1),
     SUGGESTIONS_PAGE_SIZE_MAX
   );
+
+  if (options.kindFilter === "improvement") {
+    const matched: AppSuggestionSummary[] = [];
+    let cursor = options.cursor ?? null;
+
+    while (matched.length < pageSize + 1) {
+      let query = buildSuggestionsListQuery(db, {
+        ...options,
+        kindFilter: "all",
+      });
+
+      if (cursor) {
+        const cursorDoc = await suggestionsCollection(db).doc(cursor).get();
+        if (cursorDoc.exists) {
+          query = query.startAfter(cursorDoc);
+        }
+      }
+
+      const snapshot = await query.limit(pageSize + 1).get();
+      if (snapshot.empty) {
+        break;
+      }
+
+      const suggestions = await mapSuggestionDocs(db, snapshot.docs);
+      matched.push(...suggestions.filter((suggestion) => suggestion.kind === "improvement"));
+
+      if (snapshot.docs.length <= pageSize) {
+        break;
+      }
+
+      cursor = snapshot.docs[snapshot.docs.length - 1]?.id ?? null;
+      if (!cursor) {
+        break;
+      }
+    }
+
+    const hasNextPage = matched.length > pageSize;
+    const suggestions = matched.slice(0, pageSize);
+    const nextCursor =
+      hasNextPage && suggestions.length > 0
+        ? (suggestions[suggestions.length - 1]?.id ?? null)
+        : null;
+
+    return { suggestions, hasNextPage, nextCursor };
+  }
 
   let query = buildSuggestionsListQuery(db, options);
 
@@ -138,17 +237,8 @@ export async function listSuggestions(
   const lastDoc = pageDocs.at(-1);
   const nextCursor = hasNextPage && lastDoc ? lastDoc.id : null;
 
-  const suggestions = pageDocs.map((docSnap) => {
-    const data = docSnap.data() as AppSuggestionRecord;
-    return serializeSuggestionSummary(
-      docSnap.id,
-      data,
-      resolveStoredCommentCount(data)
-    );
-  });
-
   return {
-    suggestions: await enrichSuggestionSummaries(db, suggestions),
+    suggestions: await mapSuggestionDocs(db, pageDocs),
     hasNextPage,
     nextCursor,
   };
