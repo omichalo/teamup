@@ -4,7 +4,7 @@ import {
   normalizeMedicalCertificateStatus,
 } from "@/lib/club-registration/medical-certificate";
 import { normalizeReductionReferenceCodes } from "@/lib/club-registration/reduction-reference-codes";
-import { expandCompetitionIdsForForm } from "@/lib/club-registration/competition-ids";
+import { expandCompetitionIdsForFormFromConfig } from "@/lib/club-registration-config/helpers";
 import { normalizePaymentAidList } from "@/lib/club-registration/payment/payment-draft-helpers";
 import type { PaymentAid, RegistrationPayment } from "@/lib/club-registration/payment/types";
 import type { EditableRegistration, RegistrationDetail } from "./types";
@@ -80,7 +80,10 @@ export function toEditableRegistration(
     competitionJerseySize: registration.competitionJerseySize ?? "",
     wantsOptionalJersey: registration.wantsOptionalJersey ?? false,
     optionalJerseySize: registration.optionalJerseySize ?? "",
-    competitionIds: expandCompetitionIdsForForm(registration.competitionIds ?? []),
+    competitionIds: expandCompetitionIdsForFormFromConfig(
+      config,
+      registration.competitionIds ?? []
+    ),
     applicantNotes: registration.applicantNotes ?? "",
     reviewNotes: registration.reviewNotes ?? "",
     amountEuros:

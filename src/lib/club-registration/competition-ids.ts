@@ -31,6 +31,9 @@ export function isYouthCompetitionId(id: string): boolean {
  * Déplie l’id de facturation historique vers les deux options formulaire
  * (dossiers créés avant la séparation des compétitions jeunes).
  */
+/**
+ * @deprecated Préférer `expandCompetitionIdsForFormFromConfig(config, ids)`.
+ */
 export function expandCompetitionIdsForForm(ids: string[]): string[] {
   const expanded: string[] = [];
 
@@ -54,6 +57,9 @@ export function expandCompetitionIdsForForm(ids: string[]): string[] {
 /**
  * Une seule ligne « Compétitions jeunes » à 25 € pour la facturation,
  * même si une ou les deux compétitions jeunes sont cochées.
+ */
+/**
+ * @deprecated Préférer `normalizeCompetitionIdsFromConfig(config, ids)`.
  */
 export function normalizeCompetitionIds(ids: string[]): string[] {
   const normalized: string[] = [];

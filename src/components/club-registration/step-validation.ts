@@ -1,4 +1,6 @@
 import { isAtLeast40At, isMinorAt } from "@/lib/club-registration/age";
+import { getDefaultRegistrationConfig } from "@/lib/club-registration-config/default-config";
+import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import type { RegistrationStepId } from "@/lib/club-registration/field-to-step";
 import {
   effectiveHadFfttLicense,
@@ -54,7 +56,8 @@ function getMedicalFocusSelector(draft: RegistrationDraft): string {
 
 export function validateStep(
   stepId: RegistrationStepId,
-  draft: RegistrationDraft
+  draft: RegistrationDraft,
+  config: RegistrationConfigV1 = getDefaultRegistrationConfig()
 ): StepValidationResult {
   if (stepId === "audience") {
     if (!draft.birthDate) {
@@ -264,7 +267,7 @@ export function validateStep(
         "#medical-dossier-section"
       );
     }
-    const aidIssue = validateAdminAids(draft);
+    const aidIssue = validateAdminAids(draft, config);
     if (aidIssue) {
       return invalid(aidIssue.message, aidIssue.focusSelector);
     }
@@ -324,8 +327,9 @@ export function validateStep(
 /** Message d’erreur uniquement (compatibilité). */
 export function validateStepById(
   stepId: RegistrationStepId,
-  draft: RegistrationDraft
+  draft: RegistrationDraft,
+  config: RegistrationConfigV1 = getDefaultRegistrationConfig()
 ): string | null {
-  const result = validateStep(stepId, draft);
+  const result = validateStep(stepId, draft, config);
   return result.valid ? null : result.message;
 }

@@ -15,12 +15,14 @@ export const SCHOOL_PICKUP_SERVICE = {
     "Je souhaite bénéficier de la récupération à la sortie de l’école pour ce créneau",
 } as const;
 
+/** @deprecated Préférer `getSchoolPickupSlotIds(config)` — liste figée dans `constants.ts`. */
 export const SCHOOL_PICKUP_SLOT_IDS: ReadonlySet<string> = new Set(
   CLUB_REGISTRATION_SITES.flatMap((site) =>
     site.slots.filter((slot) => slot.schoolPickupSchool).map((slot) => slot.id)
   )
 );
 
+/** @deprecated Préférer `getSlotSchoolPickupSchool(config, slotId)`. */
 export function getSlotSchoolPickupSchool(slotId: string): string | undefined {
   for (const site of CLUB_REGISTRATION_SITES) {
     const slot = site.slots.find((s) => s.id === slotId);
@@ -29,6 +31,10 @@ export function getSlotSchoolPickupSchool(slotId: string): string | undefined {
   return undefined;
 }
 
+/**
+ * @deprecated Préférer `sanitizeSchoolPickupSlotIdsFromConfig(config, slotIds, schoolPickupSlotIds)`.
+ * Cette variante ignore les créneaux ajoutés via le paramétrage Firestore.
+ */
 export function sanitizeSchoolPickupSlotIds(
   slotIds: readonly string[],
   schoolPickupSlotIds: readonly string[]
