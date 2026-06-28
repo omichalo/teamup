@@ -17,6 +17,7 @@ type Props = {
   size?: "small" | "medium";
   sx?: SxProps<Theme>;
   dataField: string;
+  helperText?: string;
 };
 
 /**
@@ -32,6 +33,7 @@ export function AidEuroAmountField({
   size = "small",
   sx,
   dataField,
+  helperText,
 }: Props) {
   const [text, setText] = useState(() => centsToEurosInput(amountCents));
   const focusedRef = useRef(false);
@@ -68,6 +70,7 @@ export function AidEuroAmountField({
         autoComplete: "off",
       }}
       placeholder="0,00"
+      {...(helperText !== undefined ? { helperText } : {})}
     />
   );
 }

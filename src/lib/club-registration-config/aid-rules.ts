@@ -44,3 +44,21 @@ export function repairAidRulesForm(config: RegistrationConfigV1): RegistrationCo
     aidRules: config.aidRules.map(repairAidRuleForm),
   };
 }
+
+export function getAidRuleHelperText(rule: AidRule): string | undefined {
+  const text = rule.helperText?.trim();
+  return text && text.length > 0 ? text : undefined;
+}
+
+export function getAidRuleMaxAmountCents(rule: AidRule): number | undefined {
+  const max = rule.maxAmountCents;
+  if (max === undefined || max <= 0) return undefined;
+  return max;
+}
+
+export function findAidRuleById(
+  config: RegistrationConfigV1,
+  aidId: string
+): AidRule | undefined {
+  return config.aidRules.find((rule) => rule.id === aidId);
+}

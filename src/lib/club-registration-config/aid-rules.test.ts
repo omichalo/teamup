@@ -1,6 +1,8 @@
 import { getDefaultRegistrationConfig } from "./default-config";
 import {
   DEFAULT_PASS_SPORT_FORM,
+  getAidRuleHelperText,
+  getAidRuleMaxAmountCents,
   getCheckboxAidRules,
   getToggleAidRules,
   repairAidRuleForm,
@@ -26,5 +28,19 @@ describe("aid-rules helpers", () => {
         effect: { type: "admin_review" },
       }).form
     ).toEqual(DEFAULT_PASS_SPORT_FORM);
+  });
+
+  it("normalise helperText et plafond de montant", () => {
+    const rule = {
+      id: "pass_sport",
+      label: "Pass Sport",
+      effect: { type: "admin_review" as const },
+      helperText: "  Jusqu'à 50 €  ",
+      maxAmountCents: 5_000,
+    };
+    expect(getAidRuleHelperText(rule)).toBe("Jusqu'à 50 €");
+    expect(getAidRuleMaxAmountCents(rule)).toBe(5_000);
+    expect(getAidRuleMaxAmountCents({ ...rule, maxAmountCents: 0 })).toBeUndefined();
+    expect(getAidRuleHelperText({ ...rule, helperText: "   " })).toBeUndefined();
   });
 });

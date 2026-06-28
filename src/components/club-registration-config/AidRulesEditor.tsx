@@ -1,13 +1,14 @@
 "use client";
 
-import { MenuItem, Stack, TextField, Typography } from "@mui/material";
+import { InputAdornment, MenuItem, Stack, TextField, Typography } from "@mui/material";
 import type {
   AidRule,
   AidRuleFormPresentation,
   RegistrationConfigV1,
 } from "@/lib/club-registration-config/types";
 import { moveArrayItem } from "@/lib/club-registration-config/sort-order";
-import { generateConfigItemId } from "./config-editor-utils";
+import { getAidRuleMaxAmountCents } from "@/lib/club-registration-config/aid-rules";
+import { generateConfigItemId, centsToEuroInput, euroInputToCents } from "./config-editor-utils";
 import {
   ConfigEditorAddButton,
   ConfigEditorCollapsibleItem,
@@ -33,9 +34,14 @@ function defaultAidForm(): AidRuleFormPresentation {
   return { style: "checkbox" };
 }
 
-function aidSummaryMeta(form: AidRuleFormPresentation): string | undefined {
-  if (form.style === "toggle") return "Interrupteur avec code de référence";
-  return undefined;
+function aidSummaryMeta(rule: AidRule, form: AidRuleFormPresentation): string | undefined {
+  const parts: string[] = [];
+  if (form.style === "toggle") parts.push("Interrupteur avec code de référence");
+  const maxCents = getAidRuleMaxAmountCents(rule);
+  if (maxCents !== undefined) {
+    parts.push(`Plafond ${centsToEuroInput(maxCents)} €`);
+  }
+  return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 
 export function AidRulesEditor({ config, onChange }: Props) {
@@ -83,7 +89,7 @@ export function AidRulesEditor({ config, onChange }: Props) {
                   onExpandedChange={(open) => expansion.setExpanded(rule.id, open)}
                   title={rule.label}
                   itemLabel={rule.label}
-                  meta={aidSummaryMeta(form)}
+                  meta={aidSummaryMeta(rule, form)}
                   decor={aidRuleDecor}
                   dragHandleProps={dragHandleProps}
                   isDragging={isDragging}
@@ -102,6 +108,42 @@ export function AidRulesEditor({ config, onChange }: Props) {
               value={rule.label}
               onChange={(e) => updateRule(index, { label: e.target.value })}
               fullWidth
+            />
+            <TextField
+              label="Texte d'accompagnement (facultatif)"
+              size="small"
+              value={rule.helperText ?? ""}
+              onChange={(e) =>
+                updateRule(index, {
+                  helperText: e.target.value.trim() ? e.target.value : undefined,
+                })
+              }
+              fullWidth
+              multiline
+              minRows={2}
+              helperText="Affiché aux familles à côté de l'aide (conditions, montant indicatif, etc.)."
+            />
+            <TextField
+              label="Montant maximum (facultatif)"
+              size="small"
+              type="number"
+              value={
+                rule.maxAmountCents !== undefined ? centsToEuroInput(rule.maxAmountCents) : ""
+              }
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (!raw.trim()) {
+                  updateRule(index, { maxAmountCents: undefined });
+                  return;
+                }
+                updateRule(index, { maxAmountCents: euroInputToCents(raw) });
+              }}
+              fullWidth
+              inputProps={{ min: 0, step: 0.01 }}
+              InputProps={{
+                endAdornment: <InputAdornment position="end">€</InputAdornment>,
+              }}
+              helperText="Plafond du montant saisi par la famille. Laisser vide pour aucune limite."
             />
             <Typography variant="caption" color="text.secondary" display="block">
               Identifiant technique : <strong>{rule.id}</strong>

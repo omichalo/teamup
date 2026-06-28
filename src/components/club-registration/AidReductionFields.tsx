@@ -12,11 +12,14 @@ import {
   Typography,
 } from "@mui/material";
 import {
+  getAidRuleHelperText,
+  getAidRuleMaxAmountCents,
   getCheckboxAidRules,
   getToggleAidRules,
   isToggleAidWithReferenceCode,
 } from "@/lib/club-registration-config/aid-rules";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
+import { formatCentsAsEuros } from "@/lib/pricing";
 import { AidEuroAmountField } from "./AidEuroAmountField";
 import {
   findPaymentAid,
@@ -49,6 +52,11 @@ const AID_AMOUNT_FIELD_SX = {
   width: "100%",
   maxWidth: 220,
 } as const;
+
+function aidAmountHelperText(ruleMaxCents: number | undefined): string | undefined {
+  if (ruleMaxCents === undefined) return undefined;
+  return `Montant maximum : ${formatCentsAsEuros(ruleMaxCents)}`;
+}
 
 export function AidReductionFields({ config, draft, onChange }: Props) {
   const toggleAidRules = getToggleAidRules(config);
@@ -166,6 +174,8 @@ export function AidReductionFields({ config, draft, onChange }: Props) {
         if (!isToggleAidWithReferenceCode(rule)) return null;
         const selected = draft.reductionTypes.includes(rule.id);
         const aid = findPaymentAid(paymentAids, rule.id);
+        const accompaniment = getAidRuleHelperText(rule);
+        const amountHelperText = aidAmountHelperText(getAidRuleMaxAmountCents(rule));
         return (
           <Stack key={rule.id} spacing={1}>
             <FormControlLabel
@@ -177,6 +187,11 @@ export function AidReductionFields({ config, draft, onChange }: Props) {
               }
               label={rule.form.toggleLabel}
             />
+            {accompaniment ? (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: -0.5 }}>
+                {accompaniment}
+              </Typography>
+            ) : null}
             <Collapse in={selected} timeout={{ enter: 300, exit: 200 }}>
               <Stack spacing={1.5} alignItems="flex-start">
                 <TextField
@@ -197,6 +212,7 @@ export function AidReductionFields({ config, draft, onChange }: Props) {
                   required
                   sx={AID_AMOUNT_FIELD_SX}
                   dataField={`paymentAid.${rule.id}`}
+                  {...(amountHelperText ? { helperText: amountHelperText } : {})}
                 />
               </Stack>
             </Collapse>
@@ -213,6 +229,8 @@ export function AidReductionFields({ config, draft, onChange }: Props) {
             {checkboxAidRules.map((rule) => {
               const selected = draft.reductionTypes.includes(rule.id);
               const aid = findPaymentAid(paymentAids, rule.id);
+              const accompaniment = getAidRuleHelperText(rule);
+              const amountHelperText = aidAmountHelperText(getAidRuleMaxAmountCents(rule));
               return (
                 <Stack key={rule.id} spacing={1} sx={{ mb: selected ? 1.5 : 0 }}>
                   <FormControlLabel
@@ -224,6 +242,15 @@ export function AidReductionFields({ config, draft, onChange }: Props) {
                     }
                     label={rule.label}
                   />
+                  {accompaniment ? (
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ pl: 4, mt: -0.5 }}
+                    >
+                      {accompaniment}
+                    </Typography>
+                  ) : null}
                   {selected ? (
                     <Box sx={{ pl: 4 }}>
                       <AidEuroAmountField
@@ -233,6 +260,7 @@ export function AidReductionFields({ config, draft, onChange }: Props) {
                         required
                         sx={AID_AMOUNT_FIELD_SX}
                         dataField={`paymentAid.${rule.id}`}
+                        {...(amountHelperText ? { helperText: amountHelperText } : {})}
                       />
                     </Box>
                   ) : null}

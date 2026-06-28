@@ -134,6 +134,10 @@ export type AidRule = {
   label: string;
   effect: AidRuleEffect;
   form?: AidRuleFormPresentation | undefined;
+  /** Texte d'accompagnement affiché aux familles à côté de l'aide. */
+  helperText?: string | undefined;
+  /** Plafond facultatif du montant saisi par la famille (centimes). */
+  maxAmountCents?: number | undefined;
 };
 
 export type StripePresentationConfig = {
