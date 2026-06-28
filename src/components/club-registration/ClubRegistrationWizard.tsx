@@ -27,7 +27,8 @@ import { normalizeApplicantNotes } from "@/lib/club-registration/applicant-notes
 import { scrollToFormTarget } from "@/lib/club-registration/scroll-to-form-target";
 import type { ClubRegistrationPayload } from "@/lib/club-registration/schema";
 import { buildRegistrationPayloadSchema } from "@/lib/club-registration/schema";
-import { useRegistrationConfigValue } from "@/hooks/useRegistrationConfig";
+import { useRegistrationConfig } from "@/hooks/useRegistrationConfig";
+import { getDefaultRegistrationConfig } from "@/lib/club-registration-config/default-config";
 import { isAtLeast40At, isMinorAt } from "@/lib/club-registration/age";
 import {
   shouldAutofillAdherentEmailFromAccount,
@@ -52,7 +53,7 @@ import {
   logRegistrationWizardDebug,
   summarizeRepresentativesForDebug,
 } from "@/lib/club-registration/registration-wizard-debug";
-import { sanitizeSchoolPickupSlotIds } from "@/lib/club-registration/school-pickup";
+import { sanitizeSchoolPickupSlotIdsFromConfig } from "@/lib/club-registration-config/helpers";
 import { AudienceStep } from "./AudienceStep";
 import { AdherentStep } from "./AdherentStep";
 import { RepresentativesStep } from "./RepresentativesStep";
@@ -66,6 +67,7 @@ import { validateStep, validateStepById } from "./step-validation";
 import { useRegistrationStickyOffsets } from "./useRegistrationStickyOffsets";
 import { useRegistrationDraft } from "./useRegistrationDraft";
 import { useRegistrationDraftStorage } from "./useRegistrationDraftStorage";
+import { useRegistrationWizardHydration } from "./useRegistrationWizardHydration";
 import { DraftStorageDisclosure } from "./DraftStorageDisclosure";
 import { AccountEmailTransparencyBanner } from "./AccountEmailTransparencyBanner";
 import { AuthDialog } from "@/components/auth/AuthDialog";
@@ -88,11 +90,17 @@ export function ClubRegistrationWizard({
   accountEmail,
   isRegistrationManager = false,
 }: Props) {
-  const config = useRegistrationConfigValue();
+  const { config: loadedConfig, loading: configLoading } = useRegistrationConfig();
+  const config = loadedConfig ?? getDefaultRegistrationConfig();
   const { draft, actions } = useRegistrationDraft();
   const storage = useRegistrationDraftStorage();
   const [activeStep, setActiveStep] = useState(0);
-  const [hydrating, setHydrating] = useState(true);
+  const hydrating = useRegistrationWizardHydration({
+    config,
+    configLoading,
+    storage,
+    hydrate: actions.hydrate,
+  });
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<
     Record<string, string[] | undefined> | null
@@ -100,7 +108,6 @@ export function ClubRegistrationWizard({
   const [submitting, setSubmitting] = useState(false);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const pendingPayloadRef = useRef<ClubRegistrationPayload | null>(null);
-  const hasHydratedRef = useRef(false);
   const accountEmailAutofillRef = useRef<{
     selfContact?: string;
     representativeContact?: string;
@@ -112,17 +119,6 @@ export function ClubRegistrationWizard({
   const scrollPositionsRef = useRef<Map<number, number>>(new Map());
   const navStickyRef = useRef<HTMLDivElement | null>(null);
   const stickyOffsets = useRegistrationStickyOffsets(navStickyRef, activeStep);
-
-  /* Hydratation au mount : local-first, fallback éventuel sur le draft serveur. */
-  const storageLoad = storage.load;
-  const hydrate = actions.hydrate;
-  useEffect(() => {
-    if (hasHydratedRef.current) return;
-    hasHydratedRef.current = true;
-    const local = storageLoad();
-    if (local) hydrate(local);
-    setHydrating(false);
-  }, [hydrate, storageLoad]);
 
   /* Séquence d'étapes dynamique (5 étapes pour un majeur, 6 pour un mineur,
      toutes hors récap). La séquence est reconstruite à chaque changement de
@@ -136,7 +132,7 @@ export function ClubRegistrationWizard({
 
   const revealStepValidationError = useCallback(
     (stepId: RegistrationStepId) => {
-      const result = validateStep(stepId, draft);
+      const result = validateStep(stepId, draft, config);
       if (result.valid) return true;
       setSubmitError(result.message);
       scrollToFormTarget(result.focusSelector, {
@@ -149,7 +145,7 @@ export function ClubRegistrationWizard({
       });
       return false;
     },
-    [draft]
+    [draft, config]
   );
 
   /* Si la séquence vient de raccourcir (passage mineur → majeur après coup) et
@@ -162,8 +158,8 @@ export function ClubRegistrationWizard({
   }, [activeStep, sequence.length]);
 
   const stepValidity = useMemo<(string | null)[]>(
-    () => sequence.map((id) => validateStepById(id, draft)),
-    [draft, sequence]
+    () => sequence.map((id) => validateStepById(id, draft, config)),
+    [config, draft, sequence]
   );
 
   const completedStepsCount = useMemo(
@@ -363,7 +359,7 @@ export function ClubRegistrationWizard({
       }
       for (let s = activeStep; s < to; s++) {
         const stepId = sequence[s];
-        const result = validateStep(stepId, draft);
+        const result = validateStep(stepId, draft, config);
         if (!result.valid) {
           setActiveStep(s);
           setSubmitError(result.message);
@@ -380,7 +376,7 @@ export function ClubRegistrationWizard({
       }
       setActiveStep(to);
     },
-    [activeStep, draft, sequence]
+    [activeStep, config, draft, sequence]
   );
 
   /** Navigation vers une étape par son identifiant symbolique (utilisée par
@@ -483,7 +479,8 @@ export function ClubRegistrationWizard({
           ? draft.optionalJerseySize
           : undefined,
       competitionIds: effectiveCompetitorExtras ? draft.competitionIds : [],
-      schoolPickupSlotIds: sanitizeSchoolPickupSlotIds(
+      schoolPickupSlotIds: sanitizeSchoolPickupSlotIdsFromConfig(
+        config,
         draft.slotIds,
         draft.schoolPickupSlotIds
       ),
@@ -557,7 +554,7 @@ export function ClubRegistrationWizard({
        les cas de navigation libre via le stepper. */
     for (let i = 0; i < sequence.length - 1; i++) {
       const stepId = sequence[i];
-      const result = validateStep(stepId, draft);
+      const result = validateStep(stepId, draft, config);
       if (!result.valid) {
         logRegistrationWizardDebug("handleSubmit: validateStep échoué", {
           stepIndex: i,
@@ -694,7 +691,13 @@ export function ClubRegistrationWizard({
                     <StepButton
                       color="inherit"
                       disabled={
-                        !canNavigateToRegistrationStep(index, activeStep, sequence, draft)
+                        !canNavigateToRegistrationStep(
+                          index,
+                          activeStep,
+                          sequence,
+                          draft,
+                          config
+                        )
                       }
                       onClick={() => handleGoToStep(index)}
                       icon={
@@ -733,7 +736,13 @@ export function ClubRegistrationWizard({
                     color={isPast && stepInvalid ? "error" : "primary"}
                     variant={activeStep === index ? "contained" : "outlined"}
                     disabled={
-                      !canNavigateToRegistrationStep(index, activeStep, sequence, draft)
+                      !canNavigateToRegistrationStep(
+                        index,
+                        activeStep,
+                        sequence,
+                        draft,
+                        config
+                      )
                     }
                     onClick={() => handleGoToStep(index)}
                     aria-current={activeStep === index ? "step" : undefined}

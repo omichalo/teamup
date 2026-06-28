@@ -1,4 +1,6 @@
 import { isMinorAt } from "@/lib/club-registration/age";
+import { getDefaultRegistrationConfig } from "@/lib/club-registration-config/default-config";
+import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import type { RegistrationStepId } from "@/lib/club-registration/field-to-step";
 import type { RegistrationDraft } from "./registration-defaults";
 import { validateStepById } from "./step-validation";
@@ -64,11 +66,12 @@ export function canNavigateToRegistrationStep(
   targetIndex: number,
   activeStep: number,
   sequence: ReadonlyArray<RegistrationStepId>,
-  draft: RegistrationDraft
+  draft: RegistrationDraft,
+  config: RegistrationConfigV1 = getDefaultRegistrationConfig()
 ): boolean {
   if (targetIndex <= activeStep) return true;
   for (let s = activeStep; s < targetIndex; s++) {
-    if (validateStepById(sequence[s], draft) !== null) return false;
+    if (validateStepById(sequence[s], draft, config) !== null) return false;
   }
   return true;
 }

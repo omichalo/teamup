@@ -1,4 +1,4 @@
-import { getDefaultRegistrationConfig } from "@/lib/club-registration-config/default-config";
+import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import { buildPricingContext, calculateQuote, formatCentsAsEuros } from "@/lib/pricing";
 import { calculatePaymentSummary } from "@/lib/club-registration/payment/calculate-payment-summary";
 import { findPaymentAid, normalizePaymentAidList } from "@/lib/club-registration/payment/payment-draft-helpers";
@@ -23,7 +23,10 @@ type DraftSlice = Pick<
   | "paymentAids"
 >;
 
-function quoteTotalCents(draft: DraftSlice): number | null {
+function quoteTotalCents(
+  draft: DraftSlice,
+  config: RegistrationConfigV1
+): number | null {
   if (!draft.birthDate) return null;
   const sex = draft.sex === "" ? ("other" as const) : draft.sex;
   const quote = calculateQuote(
@@ -38,13 +41,16 @@ function quoteTotalCents(draft: DraftSlice): number | null {
       firstFemaleRegistrationSqy: draft.firstFemaleRegistrationSqy,
       reductionTypes: draft.reductionTypes,
     }),
-    getDefaultRegistrationConfig()
+    config
   );
   return quote.totalCents;
 }
 
 /** Valide les montants d’aides saisis à l’étape dossier administratif. */
-export function validateAdminAids(draft: DraftSlice): AdminAidValidationIssue | null {
+export function validateAdminAids(
+  draft: DraftSlice,
+  config: RegistrationConfigV1
+): AdminAidValidationIssue | null {
   const aids = normalizePaymentAidList(draft.paymentAids);
 
   for (const reductionId of draft.reductionTypes) {
@@ -58,7 +64,7 @@ export function validateAdminAids(draft: DraftSlice): AdminAidValidationIssue | 
     }
   }
 
-  const totalCents = quoteTotalCents(draft);
+  const totalCents = quoteTotalCents(draft, config);
   if (totalCents !== null) {
     const summary = calculatePaymentSummary({
       totalAmountCents: totalCents,
