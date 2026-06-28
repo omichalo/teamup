@@ -2,13 +2,14 @@
 
 import type { ComponentType } from "react";
 import { Grid } from "@mui/material";
-import { SCHOOL_PICKUP_SLOT_IDS } from "@/lib/club-registration/school-pickup";
 
 type Option = { value: string; label: string };
 
 type Props = {
   slotIds: string[];
   schoolPickupSlotIds: string[];
+  /** Créneaux éligibles au dispositif école (config Firestore active). */
+  eligibleSchoolPickupSlotIds: ReadonlySet<string>;
   allSlotOptions: Option[];
   onSlotIdsChange: (slotIds: string[]) => void;
   onSchoolPickupSlotIdsChange: (schoolPickupSlotIds: string[]) => void;
@@ -23,6 +24,7 @@ type Props = {
 export function SchoolPickupAdminFields({
   slotIds,
   schoolPickupSlotIds,
+  eligibleSchoolPickupSlotIds,
   allSlotOptions,
   onSlotIdsChange,
   onSchoolPickupSlotIdsChange,
@@ -49,7 +51,8 @@ export function SchoolPickupAdminFields({
           value={schoolPickupSlotIds.filter((id) => slotIds.includes(id))}
           options={allSlotOptions.filter(
             (option) =>
-              slotIds.includes(option.value) && SCHOOL_PICKUP_SLOT_IDS.has(option.value)
+              slotIds.includes(option.value) &&
+              eligibleSchoolPickupSlotIds.has(option.value)
           )}
           onChange={onSchoolPickupSlotIdsChange}
         />

@@ -6,7 +6,8 @@ import {
   inferMedicalDossierFromDeclaration,
   syncMedicalCertificateDeclaration,
 } from "@/lib/club-registration/medical-dossier";
-import { expandCompetitionIdsForForm } from "@/lib/club-registration/competition-ids";
+import { expandCompetitionIdsForFormFromConfig } from "@/lib/club-registration-config/helpers";
+import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import {
   normalizeReductionReferenceCodes,
 } from "@/lib/club-registration/reduction-reference-codes";
@@ -35,7 +36,7 @@ export type RegistrationDraftAction =
   | { type: "ADD_REPRESENTATIVE"; representative?: Representative }
   | { type: "UPDATE_REPRESENTATIVE"; index: number; patch: Partial<Representative> }
   | { type: "REMOVE_REPRESENTATIVE"; index: number }
-  | { type: "HYDRATE"; draft: RegistrationDraft }
+  | { type: "HYDRATE"; draft: RegistrationDraft; config: RegistrationConfigV1 }
   | { type: "RESET" };
 
 export function registrationDraftReducer(
@@ -123,7 +124,10 @@ export function registrationDraftReducer(
         merged.medicalQuestionnaire = inferred.questionnaire;
         merged.medicalVeteranPath = inferred.veteranPath;
       }
-      merged.competitionIds = expandCompetitionIdsForForm(merged.competitionIds);
+      merged.competitionIds = expandCompetitionIdsForFormFromConfig(
+        action.config,
+        merged.competitionIds
+      );
       merged.representatives = normalizeRepresentatives(merged.representatives);
       merged.reductionReferenceCodes = normalizeReductionReferenceCodes(
         merged.reductionReferenceCodes,
@@ -147,7 +151,7 @@ export type RegistrationDraftActions = {
   addRepresentative: (rep?: Representative) => void;
   updateRepresentative: (index: number, patch: Partial<Representative>) => void;
   removeRepresentative: (index: number) => void;
-  hydrate: (draft: RegistrationDraft) => void;
+  hydrate: (draft: RegistrationDraft, config: RegistrationConfigV1) => void;
   reset: () => void;
 };
 
@@ -192,7 +196,8 @@ export function useRegistrationDraft(initial?: RegistrationDraft): {
     []
   );
   const hydrate = useCallback(
-    (next: RegistrationDraft) => dispatch({ type: "HYDRATE", draft: next }),
+    (next: RegistrationDraft, config: RegistrationConfigV1) =>
+      dispatch({ type: "HYDRATE", draft: next, config }),
     []
   );
   const reset = useCallback(() => dispatch({ type: "RESET" }), []);

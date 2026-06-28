@@ -1,5 +1,8 @@
 import { registrationDraftReducer } from "./useRegistrationDraft";
+import { buildDefaultRegistrationConfig } from "@/lib/club-registration-config/default-config";
 import { createEmptyDraft, createEmptyRepresentative } from "./registration-defaults";
+
+const defaultConfig = buildDefaultRegistrationConfig();
 
 describe("registrationDraftReducer", () => {
   it("PATCH_FIELDS fusionne les champs", () => {
@@ -151,7 +154,11 @@ describe("registrationDraftReducer", () => {
         },
       ],
     };
-    const next = registrationDraftReducer(s, { type: "HYDRATE", draft: hydrated });
+    const next = registrationDraftReducer(s, {
+      type: "HYDRATE",
+      draft: hydrated,
+      config: defaultConfig,
+    });
     expect(next.representatives[0].phone).toBe("");
   });
 
@@ -172,7 +179,11 @@ describe("registrationDraftReducer", () => {
   it("HYDRATE remplace tout l'état par le draft fourni", () => {
     const s = createEmptyDraft();
     const hydrated = { ...createEmptyDraft(), firstName: "Camille" };
-    const next = registrationDraftReducer(s, { type: "HYDRATE", draft: hydrated });
+    const next = registrationDraftReducer(s, {
+      type: "HYDRATE",
+      draft: hydrated,
+      config: defaultConfig,
+    });
     expect(next.firstName).toBe("Camille");
   });
 
