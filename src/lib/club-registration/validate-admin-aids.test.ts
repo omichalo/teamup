@@ -38,4 +38,23 @@ describe("validateAdminAids", () => {
     );
     expect(issue?.message).toMatch(/0 €/);
   });
+
+  it("refuse un montant au-delà du plafond configuré pour l'aide", () => {
+    const cappedConfig = {
+      ...config,
+      aidRules: config.aidRules.map((rule) =>
+        rule.id === "pass_sport" ? { ...rule, maxAmountCents: 5_000 } : rule
+      ),
+    };
+    const issue = validateAdminAids(
+      {
+        ...baseDraft,
+        reductionTypes: ["pass_sport"],
+        paymentAids: [{ type: "pass_sport", label: "Pass Sport", amountCents: 5_001 }],
+      },
+      cappedConfig
+    );
+    expect(issue?.message).toMatch(/50,00/);
+    expect(issue?.focusSelector).toBe('[data-field="paymentAid.pass_sport"]');
+  });
 });

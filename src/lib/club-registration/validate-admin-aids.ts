@@ -1,4 +1,5 @@
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
+import { findAidRuleById, getAidRuleMaxAmountCents } from "@/lib/club-registration-config/aid-rules";
 import { buildPricingContext, calculateQuote, formatCentsAsEuros } from "@/lib/pricing";
 import { calculatePaymentSummary } from "@/lib/club-registration/payment/calculate-payment-summary";
 import { findPaymentAid, normalizePaymentAidList } from "@/lib/club-registration/payment/payment-draft-helpers";
@@ -59,6 +60,16 @@ export function validateAdminAids(
       return {
         message:
           "Indiquez un montant supérieur à 0 € pour chaque aide sélectionnée.",
+        focusSelector: `[data-field="paymentAid.${reductionId}"]`,
+      };
+    }
+
+    const rule = findAidRuleById(config, reductionId);
+    const maxAmountCents = rule ? getAidRuleMaxAmountCents(rule) : undefined;
+    if (maxAmountCents !== undefined && entry.amountCents > maxAmountCents) {
+      const label = rule?.label ?? reductionId;
+      return {
+        message: `Le montant pour « ${label} » ne peut pas dépasser ${formatCentsAsEuros(maxAmountCents)}.`,
         focusSelector: `[data-field="paymentAid.${reductionId}"]`,
       };
     }

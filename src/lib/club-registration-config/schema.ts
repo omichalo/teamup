@@ -136,6 +136,13 @@ const aidRuleSchema = z.object({
   label: z.string().trim().min(1).max(200),
   effect: aidRuleEffectSchema,
   form: aidRuleFormPresentationSchema.optional(),
+  helperText: optionalTrimmedLabelSchema(500),
+  maxAmountCents: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .transform((value) => (value !== undefined && value > 0 ? value : undefined)),
 });
 
 const stripePresentationSchema = z.object({
