@@ -1,4 +1,5 @@
 import type { PriceQuote } from "@/lib/pricing/types";
+import { resolveDonationPricing } from "@/lib/pricing/donation-discount";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import { calculatePaymentSummary } from "./calculate-payment-summary";
 import { generateExpectedPayments } from "./generate-expected-payments";
@@ -10,6 +11,7 @@ export type BuildPaymentFromDraftInput = PaymentDraftFields & {
   config: RegistrationConfigV1;
   reductionTypes: string[];
   reductionReferenceCodes: Record<string, string>;
+  voluntaryDonationCents?: number;
 };
 
 function findAidLabel(config: RegistrationConfigV1, aidType: string): string {
@@ -55,7 +57,9 @@ export function buildPaymentFromDraft(
   input: BuildPaymentFromDraftInput
 ): RegistrationPayment {
   const aids = mergePaymentAidsFromDraft(input);
-  const totalAmountCents = Math.max(0, input.quote.totalCents);
+  const donationCents = input.voluntaryDonationCents ?? 0;
+  const donationPricing = resolveDonationPricing(input.quote, donationCents);
+  const totalAmountCents = Math.max(0, donationPricing.invoiceTotalCents);
   const summary = calculatePaymentSummary({
     totalAmountCents,
     aids,

@@ -34,6 +34,10 @@ export type PricingContext = {
   pricingDate?: string;
   birthDate: string;
   mainSectionId: string;
+  /** Créneaux sélectionnés (éligibilité dispositifs tarifaires). */
+  slotIds?: string[];
+  /** Sections complémentaires (hors section principale). */
+  additionalSectionIds?: string[];
   wantsCompetitorExtras: boolean;
   wantsOptionalJersey: boolean;
   competitionIds: string[];
@@ -52,4 +56,7 @@ export type PriceQuote = {
   totalCents: number;
   warnings: string[];
   requiresAdminReview: boolean;
+  /** Dispositif tarifaire appliqué (ex. CHAMP'YON), le cas échéant. */
+  appliedPricingDeviceId?: string;
+  appliedPricingDeviceLabel?: string;
 };

@@ -9,7 +9,6 @@ import {
   MenuItem,
   Stack,
   TextField,
-  Typography,
 } from "@mui/material";
 import { Refresh as RefreshIcon } from "@mui/icons-material";
 import { isMedicalCertificateRequired, type MedicalCertificateStatus } from "@/lib/club-registration/medical-certificate";
@@ -27,12 +26,12 @@ import { DetailSectionTitle } from "./DetailSectionTitle";
 import {
   BOOLEAN_CONSENT_OPTIONS,
   FAMILY_ORDER_OPTIONS,
-  formatRegistrationDate,
   MEDICAL_CERTIFICATE_STATUS_OPTIONS,
   MEDICAL_OPTIONS,
 } from "./membership-request-detail-shared";
-import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
+import { MembershipRequestDonationSection } from "./MembershipRequestDonationSection";
 import { DeleteRegistrationSection } from "./DeleteRegistrationSection";
+import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
 import type { MembershipRequestDetailState } from "./useMembershipRequestDetail";
 import type { EditableRegistration, MembershipListReloadFn } from "./types";
 
@@ -260,10 +259,21 @@ export function MembershipRequestDetailFormSecondary({
 
       <DetailSectionTitle>Tarification</DetailSectionTitle>
       <Stack spacing={2}>
+        <MembershipRequestDonationSection
+          liveQuote={liveQuote}
+          voluntaryDonationCents={form.voluntaryDonationCents ?? 0}
+          pricingQuoteComputedAt={selected.pricingQuoteComputedAt}
+          onDonationChange={(voluntaryDonationCents) =>
+            updateField("voluntaryDonationCents", voluntaryDonationCents)
+          }
+        />
+
         <PricingBreakdown
           draft={{
             birthDate: form.birthDate,
             mainSectionId: form.mainSectionId,
+            slotIds: form.slotIds,
+            additionalSectionIds: form.additionalSectionIds,
             wantsCompetitorExtras: form.wantsCompetitorExtras,
             wantsOptionalJersey: form.wantsOptionalJersey,
             competitionIds: form.competitionIds,
@@ -273,18 +283,10 @@ export function MembershipRequestDetailFormSecondary({
             firstFemaleRegistrationSqy: form.firstFemaleRegistrationSqy,
             reductionTypes: form.reductionTypes,
             paymentAids: form.paymentAids,
+            voluntaryDonationCents: form.voluntaryDonationCents ?? 0,
           }}
           variant="full"
         />
-
-        {liveQuote && liveQuote.totalCents > 0 ? (
-          <Typography variant="body2" color="text.secondary">
-            Total calculé : <strong>{formatCentsAsEuros(liveQuote.totalCents)}</strong>
-            {selected.pricingQuoteComputedAt
-              ? ` — dernier devis serveur : ${formatRegistrationDate(selected.pricingQuoteComputedAt)}`
-              : null}
-          </Typography>
-        ) : null}
 
         {amountDiffersFromQuote ? (
           <Alert severity="warning">
@@ -355,6 +357,9 @@ export function MembershipRequestDetailFormSecondary({
         reviewNotes={form.reviewNotes}
         onAmountEurosChange={(value) => updateField("amountEuros", value)}
         onReviewNotesChange={(value) => updateField("reviewNotes", value)}
+        registrationStatus={selected.status ?? null}
+        paymentRequestedAt={selected.paymentRequestedAt ?? null}
+        paymentAmountCents={selected.paymentAmountCents ?? null}
         paymentEmailSentTo={selected.paymentEmailSentTo ?? null}
         paymentMethod={selectedPayment?.paymentMethod}
         saving={saving}

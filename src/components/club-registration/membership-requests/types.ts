@@ -31,6 +31,8 @@ export type RegistrationSummary = {
   medicalCertificateStatus?: MedicalCertificateStatus;
   status?: string;
   paymentAmountCents?: number;
+  voluntaryDonationCents?: number;
+  donationDiscountCents?: number;
   pricingQuote?: PriceQuote;
   pricingQuoteStatus?: string;
   pricingQuoteComputedAt?: string | null;
@@ -38,6 +40,9 @@ export type RegistrationSummary = {
   handisportPracticeLevel?: "leisure" | "competition";
   paymentStatus?: string;
   payment?: RegistrationPayment;
+  paymentRequestedAt?: string | null;
+  paidAt?: string | null;
+  paymentEmailSentTo?: string;
   submittedAt?: string | null;
   updatedAt?: string | null;
 };
@@ -85,6 +90,8 @@ export type RegistrationDetail = RegistrationSummary & {
   paymentEmailSentTo?: string;
   stripeCheckoutUrl?: string;
   paymentAids?: PaymentAid[];
+  voluntaryDonationCents?: number;
+  donationDiscountCents?: number;
 };
 
 export type EditableRegistration = {
@@ -129,4 +136,5 @@ export type EditableRegistration = {
   reviewNotes: string;
   amountEuros: string;
   paymentAids: PaymentAid[];
+  voluntaryDonationCents: number;
 };

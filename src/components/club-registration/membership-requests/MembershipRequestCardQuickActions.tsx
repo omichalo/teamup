@@ -9,11 +9,13 @@ import {
   canMarkCertificateReceived,
   canMarkCertificateValidated,
   canQuickRequestPayment,
+  canQuickResendPaymentLink,
   resolveQuickPaymentAmountCents,
 } from "@/lib/club-registration/membership-requests/registration-card-quick-actions";
+import { SECRETARIAT_QUICK_RESEND_PAYMENT_LABEL } from "@/lib/club-registration/payment/bnpl-checkout-copy";
 import type { MembershipListReloadFn, RegistrationSummary } from "./types";
 
-type BusyAction = "certificate" | "validate" | "payment";
+type BusyAction = "certificate" | "validate" | "payment" | "resend";
 
 type Props = {
   registration: RegistrationSummary;
@@ -48,8 +50,9 @@ export function MembershipRequestCardQuickActions({
   const showReceivedAction = canMarkCertificateReceived(registration);
   const showValidatedAction = canMarkCertificateValidated(registration);
   const showPaymentAction = canQuickRequestPayment(registration);
+  const showResendPaymentAction = canQuickResendPaymentLink(registration);
 
-  if (!showReceivedAction && !showValidatedAction && !showPaymentAction) {
+  if (!showReceivedAction && !showValidatedAction && !showPaymentAction && !showResendPaymentAction) {
     return null;
   }
 
@@ -72,13 +75,13 @@ export function MembershipRequestCardQuickActions({
     }
   };
 
-  const requestPayment = async () => {
+  const requestPayment = async (busy: BusyAction) => {
     const amountCents = resolveQuickPaymentAmountCents(registration);
     if (!amountCents || amountCents <= 0) {
       return;
     }
 
-    setBusyAction("payment");
+    setBusyAction(busy);
     setError(null);
     try {
       const res = await fetch(
@@ -153,9 +156,27 @@ export function MembershipRequestCardQuickActions({
               )
             }
             disabled={busyAction !== null}
-            onClick={() => void requestPayment()}
+            onClick={() => void requestPayment("payment")}
           >
             Demander paiement
+          </Button>
+        ) : null}
+        {showResendPaymentAction ? (
+          <Button
+            size="small"
+            variant="outlined"
+            color="secondary"
+            startIcon={
+              busyAction === "resend" ? (
+                <CircularProgress size={14} color="inherit" />
+              ) : (
+                <MarkEmailReadIcon />
+              )
+            }
+            disabled={busyAction !== null}
+            onClick={() => void requestPayment("resend")}
+          >
+            {SECRETARIAT_QUICK_RESEND_PAYMENT_LABEL}
           </Button>
         ) : null}
       </Stack>

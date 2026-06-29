@@ -17,12 +17,12 @@ import {
   normalizeMedicalCertificateStatus,
 } from "@/lib/club-registration/medical-certificate";
 import { checkRateLimit } from "@/lib/auth/rate-limit";
-import { buildPricingContextFromRecord } from "@/lib/pricing/from-registration-record";
+import { buildManagerRegistrationPricingPatch } from "@/lib/club-registration/build-manager-registration-pricing-patch";
 import {
-  getActiveRegistrationConfig,
   ensureRegistrationConfigSeeded,
+  getActiveRegistrationConfig,
 } from "@/lib/club-registration-config/store";
-import { calculateQuoteWithConfig } from "@/lib/club-registration-config/pricing-resolve";
+import { isValidVoluntaryDonationCents } from "@/lib/pricing/donation-discount";
 import {
   APPLICANT_NOTES_MAX_LENGTH,
   isApplicantNotesTooLong,
@@ -170,6 +170,17 @@ export async function PATCH(req: Request) {
     }
 
     if (
+      updates.voluntaryDonationCents !== undefined &&
+      (!Number.isInteger(updates.voluntaryDonationCents as number) ||
+        !isValidVoluntaryDonationCents(updates.voluntaryDonationCents as number))
+    ) {
+      return jsonNoStore(
+        { error: "Don libre invalide (0 € ou minimum 1 €)." },
+        { status: 400 }
+      );
+    }
+
+    if (
       updates.paymentAmountCents !== undefined &&
       (!Number.isInteger(updates.paymentAmountCents) ||
         (updates.paymentAmountCents as number) < 0)
@@ -267,16 +278,10 @@ export async function PATCH(req: Request) {
     }
 
     const mergedForPricing = { ...currentData, ...updates };
-    const pricingCtx = buildPricingContextFromRecord(mergedForPricing);
-    const pricingPatch: Record<string, unknown> = {};
-    if (pricingCtx) {
-      await ensureRegistrationConfigSeeded();
-      const config = await getActiveRegistrationConfig();
-      const quote = calculateQuoteWithConfig(pricingCtx, config);
-      pricingPatch.pricingQuote = quote;
-      pricingPatch.pricingQuoteStatus = "proposed";
-      pricingPatch.pricingQuoteComputedAt = FieldValue.serverTimestamp();
-    }
+    const pricingPatch = await buildManagerRegistrationPricingPatch(
+      mergedForPricing,
+      currentData
+    );
 
     await docRef.set(
       {

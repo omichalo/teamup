@@ -98,6 +98,8 @@ export function formToPricingInput(form: EditableRegistration) {
   const input: Parameters<typeof buildPricingContext>[0] = {
     birthDate: form.birthDate,
     mainSectionId: form.mainSectionId,
+    slotIds: form.slotIds,
+    additionalSectionIds: form.additionalSectionIds,
     wantsCompetitorExtras: form.wantsCompetitorExtras,
     wantsOptionalJersey: form.wantsCompetitorExtras ? false : form.wantsOptionalJersey,
     competitionIds: form.competitionIds,

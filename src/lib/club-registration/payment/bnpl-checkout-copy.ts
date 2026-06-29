@@ -38,3 +38,66 @@ export const BNPL_SECRETARIAT_PAGE_SUBTITLE =
 
 /** Chaîne attendue dans les tests e-mail (repère stable). */
 export const BNPL_COPY_TEST_MARKER = "BNPL";
+
+/** Validité d'un lien Stripe Checkout. */
+export const CHECKOUT_LINK_VALIDITY_NOTICE =
+  "Ce lien de paiement est valable 24 heures.";
+
+/** Validité du lien Stripe ouvert depuis Mes dossiers. */
+export const CHECKOUT_LINK_VALIDITY_FROM_MES_DOSSIERS_NOTICE =
+  "Sur Mes dossiers, le lien Stripe ouvert via « Payer en ligne » est valable 24 heures.";
+
+/** Bouton principal e-mail demande de paiement. */
+export const PAYMENT_EMAIL_CTA_LABEL = "Finaliser mon adhésion";
+
+/** E-mail — instruction après le détail du devis. */
+export const PAYMENT_EMAIL_HUB_INSTRUCTION_HTML =
+  "Connectez-vous à votre espace <strong>Mes dossiers</strong>, puis cliquez sur <strong>Payer en ligne</strong> pour accéder à la page sécurisée Stripe.";
+
+/** E-mail — instruction (texte brut). */
+export const PAYMENT_EMAIL_HUB_INSTRUCTION_TEXT =
+  "Connectez-vous à Mes dossiers sur TeamUp, puis cliquez sur « Payer en ligne » pour régler sur Stripe.";
+
+/** Alerte Mes dossiers — arrivée depuis l'e-mail de paiement. */
+export const ADHERENT_PAYMENT_EMAIL_LANDING_ALERT =
+  "Votre dossier est prêt à être réglé. Utilisez le bouton « Payer en ligne » sur la fiche ci-dessous.";
+
+/** E-mail demande de paiement — alternative Mes dossiers (HTML). */
+export const SELF_SERVICE_MES_INSCRIPTIONS_EMAIL_HTML =
+  "Vous pouvez aussi payer depuis votre espace <strong>Mes dossiers</strong> sur TeamUp.";
+
+/** E-mail demande de paiement — alternative Mes dossiers (texte). */
+export const SELF_SERVICE_MES_INSCRIPTIONS_EMAIL_TEXT =
+  "Vous pouvez aussi payer depuis Mes dossiers sur TeamUp :";
+
+/** Bouton adhérent — Mes dossiers. */
+export const ADHERENT_PAY_ONLINE_BUTTON_LABEL = "Payer en ligne";
+
+/** Aide sous le bouton adhérent. */
+export const ADHERENT_PAY_ONLINE_HELPER =
+  "Paiement sécurisé Stripe. Carte ou paiement en plusieurs fois (BNPL) selon éligibilité.";
+
+/** Dossier en attente hors carte bancaire. */
+export const ADHERENT_NON_CARD_PAYMENT_HINT =
+  "Les instructions de règlement vous ont été envoyées par e-mail.";
+
+/** Alerte liste Mes dossiers — paiement en attente. */
+export const ADHERENT_PAYMENT_PENDING_ALERT =
+  "Un ou plusieurs dossiers attendent votre règlement pour finaliser l'inscription.";
+
+/** Bouton secrétariat — premier envoi. */
+export const SECRETARIAT_INITIAL_PAYMENT_BUTTON = "Valider et demander le paiement";
+
+/** Bouton secrétariat — renvoi lien. */
+export const SECRETARIAT_RESEND_PAYMENT_BUTTON = "Renvoyer le lien de paiement";
+
+/** Tooltip secrétariat — renvoi. */
+export const SECRETARIAT_RESEND_PAYMENT_TOOLTIP =
+  "Génère un nouveau lien Stripe (valable 24 h) et renvoie l'e-mail de paiement au contact du dossier.";
+
+/** Liste secrétariat — action rapide renvoi. */
+export const SECRETARIAT_QUICK_RESEND_PAYMENT_LABEL = "Renvoyer le lien";
+
+/** Contexte secrétariat — self-service adhérent. */
+export const SECRETARIAT_SELF_SERVICE_HINT =
+  "L'adhérent peut aussi payer depuis Mes dossiers sur TeamUp sans intervention du secrétariat.";

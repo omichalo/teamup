@@ -91,5 +91,9 @@ export function toEditableRegistration(
         ? String(registration.paymentAmountCents / 100)
         : "",
     paymentAids: resolveRegistrationPaymentAids(registration, payment),
+    voluntaryDonationCents:
+      typeof registration.voluntaryDonationCents === "number"
+        ? registration.voluntaryDonationCents
+        : 0,
   };
 }

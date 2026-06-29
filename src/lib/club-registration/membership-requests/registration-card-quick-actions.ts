@@ -1,4 +1,5 @@
 import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
+import { isRegistrationPaidRecord } from "@/lib/club-registration/payment-proof";
 import type { RegistrationSummary } from "@/components/club-registration/membership-requests/types";
 
 const QUICK_PAYMENT_ELIGIBLE_STATUSES = new Set(["submitted", "in_review"]);
@@ -38,7 +39,24 @@ export function canQuickRequestPayment(registration: RegistrationSummary): boole
   if (!status || !QUICK_PAYMENT_ELIGIBLE_STATUSES.has(status)) {
     return false;
   }
-  if (registration.paymentStatus === "paid") {
+  if (registration.paymentStatus === "paid" || isRegistrationPaidRecord(registration)) {
+    return false;
+  }
+  const amountCents = resolveQuickPaymentAmountCents(registration);
+  return amountCents !== null && amountCents > 0;
+}
+
+export function canQuickResendPaymentLink(registration: RegistrationSummary): boolean {
+  if (registration.status !== "payment_requested") {
+    return false;
+  }
+  if (registration.paymentStatus === "paid" || isRegistrationPaidRecord(registration)) {
+    return false;
+  }
+  const payment =
+    registration.payment ??
+    normalizeRegistrationPayment(registration as unknown as Record<string, unknown>);
+  if (payment?.paymentMethod !== "card") {
     return false;
   }
   const amountCents = resolveQuickPaymentAmountCents(registration);

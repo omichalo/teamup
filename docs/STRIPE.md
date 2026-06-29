@@ -85,6 +85,11 @@ checkout.session.completed
    apres remises) », avec description detaillee (brut, remises, net facture) et
    un champ personnalise facture « Remises sur adhesion » (Stripe n'accepte pas de
    montants negatifs sur les line_items).
+   Le **don libre** (optionnel, min. 1 €) apparait en ligne positive ; la remise
+   de 25 % (plafond 73 €) est appliquee via un coupon Stripe visible sur la facture.
+   Les **aides secrétariat** (Pass Sport, etc.) sont fusionnées avec la remise don
+   dans un **seul coupon** Stripe (limite API Checkout) ; le détail figure dans les
+   champs personnalisés de la facture.
 5. Un e-mail contenant le lien de paiement est envoye a l'adherent, au premier
    representant legal, ou au compte soumetteur selon les donnees disponibles.
 6. Lorsque Stripe envoie `checkout.session.completed`, le webhook marque le

@@ -15,4 +15,14 @@ describe("payment-proof", () => {
   it("refuse une preuve si le dossier n'est pas payé", () => {
     expect(isRegistrationPaidRecord({ status: "payment_requested" })).toBe(false);
   });
+
+  it("considère réglé si paidAt est renseigné même avec statuts legacy", () => {
+    expect(
+      isRegistrationPaidRecord({
+        status: "payment_requested",
+        paymentStatus: "pending",
+        paidAt: "2026-06-27T08:31:30.000Z",
+      })
+    ).toBe(true);
+  });
 });

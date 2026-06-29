@@ -134,5 +134,6 @@ export function createEmptyDraft(): RegistrationDraft {
     remainingPaymentMethod: "" as RemainingPaymentMethodId | "",
     paymentNote: "",
     specialPaymentNote: "",
+    voluntaryDonationCents: 0,
   };
 }

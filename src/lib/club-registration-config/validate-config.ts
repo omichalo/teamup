@@ -154,6 +154,42 @@ function validateAidRules(config: RegistrationConfigV1, issues: ConfigValidation
   );
 }
 
+function validatePricingDevices(config: RegistrationConfigV1, issues: ConfigValidationIssue[]): void {
+  collectUniqueIds(
+    (config.pricingDevices ?? []).map((device) => device.id),
+    "pricingDevices",
+    issues
+  );
+
+  const sectionIds = new Set(config.sections.map((section) => section.id));
+
+  for (const device of config.pricingDevices ?? []) {
+    if (!config.pricingProfiles[device.pricingProfileId]) {
+      issues.push({
+        path: `pricingDevices.${device.id}`,
+        message: `Profil tarifaire inconnu : ${device.pricingProfileId}`,
+      });
+    }
+
+    const ageBandProfileId = device.ageBandProfileId ?? device.pricingProfileId;
+    if (!config.ageBandProfiles[ageBandProfileId]) {
+      issues.push({
+        path: `pricingDevices.${device.id}`,
+        message: `Profil de tranche d'âge inconnu : ${ageBandProfileId}`,
+      });
+    }
+
+    for (const sectionId of device.conditions.sectionIds) {
+      if (!sectionIds.has(sectionId)) {
+        issues.push({
+          path: `pricingDevices.${device.id}`,
+          message: `Section inconnue : ${sectionId}`,
+        });
+      }
+    }
+  }
+}
+
 /** Validation croisée métier au-delà du schéma Zod. */
 export function validateRegistrationConfigCrossRefs(
   config: RegistrationConfigV1
@@ -166,6 +202,7 @@ export function validateRegistrationConfigCrossRefs(
   validateCompetitions(config, issues);
   validateRateTable(config, issues);
   validateAidRules(config, issues);
+  validatePricingDevices(config, issues);
   return issues;
 }
 
@@ -175,6 +212,18 @@ const SAMPLE_QUOTE_CONTEXTS: Array<Partial<PricingContext> & Pick<PricingContext
   { birthDate: "1990-01-01", mainSectionId: "handisport", wantsCompetitorExtras: false },
   { birthDate: "2010-01-01", mainSectionId: "handisport", wantsCompetitorExtras: true },
   { birthDate: "2010-01-01", mainSectionId: "sport-adapte" },
+  {
+    birthDate: "2014-06-01",
+    mainSectionId: "trappes",
+    slotIds: ["trappes-mer-1730-jeunes-loisir-compet"],
+    additionalSectionIds: [],
+  },
+  {
+    birthDate: "2005-01-01",
+    mainSectionId: "la-verriere",
+    slotIds: ["lv-jeu-1800-jeunes-loisirs"],
+    additionalSectionIds: [],
+  },
 ];
 
 /** Quotes témoins exécutées avant publication. */
@@ -185,6 +234,8 @@ export function runSampleQuoteChecks(config: RegistrationConfigV1): ConfigValida
   for (const partial of SAMPLE_QUOTE_CONTEXTS) {
     const ctx: PricingContext = {
       mainSectionId: partial.mainSectionId ?? "voisins",
+      slotIds: partial.slotIds ?? [],
+      additionalSectionIds: partial.additionalSectionIds ?? [],
       wantsCompetitorExtras: partial.wantsCompetitorExtras ?? false,
       wantsOptionalJersey: partial.wantsOptionalJersey ?? false,
       competitionIds: [],

@@ -20,7 +20,7 @@ import { computeAgeAt, isMinorAt } from "@/lib/club-registration/age";
 import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
 import type { RegistrationStepId } from "@/lib/club-registration/field-to-step";
 import { formatCentsAsEuros } from "@/lib/pricing";
-import { PricingBreakdown, usePricingQuote } from "./PricingBreakdown";
+import { PricingBreakdown, useEstimatedInvoiceTotalCents } from "./PricingBreakdown";
 import { registrationSidebarPanelSx } from "./registration-sidebar-styles";
 import type { RegistrationStickyOffsets } from "./useRegistrationStickyOffsets";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
@@ -253,10 +253,10 @@ export function RegistrationSidebar({
   stickyOffsets,
   ...props
 }: Props) {
-  const quote = usePricingQuote(props.draft);
+  const totalCents = useEstimatedInvoiceTotalCents(props.draft);
   const age = computeAgeAt(props.draft.birthDate);
   const totalLabel =
-    quote && age !== null ? formatCentsAsEuros(quote.totalCents) : null;
+    totalCents !== null && age !== null ? formatCentsAsEuros(totalCents) : null;
 
   return (
     <>
