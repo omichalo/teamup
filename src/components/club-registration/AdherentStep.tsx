@@ -22,9 +22,11 @@ import {
   toFrenchPhoneMaskedDisplay,
 } from "@/lib/club-registration/phone-fr";
 import { isMinorAt } from "@/lib/club-registration/age";
+import { buildApplyFfttIdentityPatch } from "@/lib/club-registration/fftt-license-lookup-flow";
 import { normalizeLastNameOnInput } from "@/lib/shared/person-name-format";
 import { getDevIdentityFixture } from "./dev-identity-fixture";
 import { PostalAddressSection } from "./PostalAddressSection";
+import { FfttIdentityMismatchAlert } from "./FfttIdentityMismatchAlert";
 import { useTouchedFields } from "./useTouchedFields";
 import type { RegistrationDraft } from "./registration-defaults";
 
@@ -165,6 +167,23 @@ export function AdherentStep({
           inputProps={{ "data-field": "lastName" }}
         />
       </Stack>
+
+      {draft.ffttLicenseLookup ? (
+        <FfttIdentityMismatchAlert
+          declaredFirstName={draft.firstName}
+          declaredLastName={draft.lastName}
+          declaredSex={draft.sex}
+          lookup={draft.ffttLicenseLookup}
+          onApplyFfttIdentity={() => {
+            if (!draft.ffttLicenseLookup) return;
+            const identityPatch = buildApplyFfttIdentityPatch(draft.ffttLicenseLookup);
+            if (identityPatch.sex) {
+              onSetSex(identityPatch.sex);
+            }
+            onPatch(identityPatch);
+          }}
+        />
+      ) : null}
 
       <FormControl fullWidth required>
         <InputLabel id="sex-label" shrink>

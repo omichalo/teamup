@@ -5,6 +5,8 @@ import { validateOrigin } from "@/lib/auth/csrf-utils";
 import { getClientIp } from "@/lib/auth/request-ip";
 import { enforceRateLimit } from "@/lib/auth/rate-limit-http";
 import { createFFTTAPI } from "@/lib/shared/fftt-utils";
+import { getFirestoreAdmin } from "@/lib/firebase-admin";
+import { findRegistrationLicenseConflicts } from "@/lib/club-registration/find-registration-license-conflicts";
 
 const LICENSE_RE = /^[0-9]{5,12}$/;
 
@@ -39,6 +41,11 @@ export async function POST(req: Request) {
     const body = ((await req.json()) ?? {}) as Record<string, unknown>;
     const licence =
       typeof body.licence === "string" ? body.licence.replace(/\D/g, "") : "";
+    const excludeRegistrationId =
+      typeof body.excludeRegistrationId === "string" &&
+      body.excludeRegistrationId.trim().length > 0
+        ? body.excludeRegistrationId.trim()
+        : null;
 
     if (!LICENSE_RE.test(licence)) {
       return jsonNoStore(
@@ -46,6 +53,13 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
+
+    const db = getFirestoreAdmin();
+    const licenseUsage = await findRegistrationLicenseConflicts(
+      db,
+      licence,
+      excludeRegistrationId
+    );
 
     const api = createFFTTAPI();
     await api.initialize();
@@ -69,11 +83,12 @@ export async function POST(req: Request) {
             nationalite: stringOrUndefined(details.nationalite),
             pointsLicence: numberOrNull(details.pointsLicence),
           },
+          licenseUsage,
         },
         { status: 200 }
       );
     } catch {
-      return jsonNoStore({ found: false }, { status: 200 });
+      return jsonNoStore({ found: false, licenseUsage }, { status: 200 });
     }
   } catch (error) {
     console.error("[api/club/registration/license-lookup POST]", error);

@@ -48,11 +48,19 @@ describe("submitRegistration", () => {
       status: 200,
       json: async () => ({ success: true, id: "reg_abc" }),
     });
-    const r = await submitRegistration(makePayload());
+    const r = await submitRegistration(makePayload(), {
+      attemptId: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+    });
     expect(r).toEqual({ ok: true, id: "reg_abc" });
     expect(global.fetch).toHaveBeenCalledWith(
       "/api/club/registration",
-      expect.objectContaining({ method: "POST", credentials: "include" })
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+        headers: expect.objectContaining({
+          "x-registration-attempt-id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+        }),
+      })
     );
   });
 

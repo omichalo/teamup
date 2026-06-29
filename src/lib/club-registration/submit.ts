@@ -1,4 +1,5 @@
 import type { ClubRegistrationPayload } from "./schema";
+import { SUBMISSION_ATTEMPT_ID_FETCH_HEADER } from "./submission-attempt-id";
 
 export type SubmitResult =
   | { ok: true; id: string }
@@ -20,14 +21,20 @@ export type SubmitResult =
  * distinguer succès / erreur sans throw (UX moins brutale).
  */
 export async function submitRegistration(
-  payload: ClubRegistrationPayload
+  payload: ClubRegistrationPayload,
+  options?: { attemptId?: string }
 ): Promise<SubmitResult> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (options?.attemptId) {
+    headers[SUBMISSION_ATTEMPT_ID_FETCH_HEADER] = options.attemptId;
+  }
+
   let res: Response;
   try {
     res = await fetch("/api/club/registration", {
       method: "POST",
       credentials: "include",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(payload),
     });
   } catch {

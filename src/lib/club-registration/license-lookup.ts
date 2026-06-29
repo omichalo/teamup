@@ -12,9 +12,31 @@ export type FFTTLicenseLookupPlayer = {
   pointsLicence?: number | null;
 };
 
+export type RegistrationLicenseUsageSummary = {
+  blocking: Array<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    displayName: string;
+    status: string;
+  }>;
+  warnings: Array<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    displayName: string;
+    status: string;
+  }>;
+};
+
 export type FFTTLicenseLookupResult =
-  | { ok: true; found: true; player: FFTTLicenseLookupPlayer }
-  | { ok: true; found: false }
+  | {
+      ok: true;
+      found: true;
+      player: FFTTLicenseLookupPlayer;
+      licenseUsage?: RegistrationLicenseUsageSummary;
+    }
+  | { ok: true; found: false; licenseUsage?: RegistrationLicenseUsageSummary }
   | { ok: false; error: string };
 
 export function normalizeFFTTLicenseInput(value: string): string {
@@ -22,7 +44,8 @@ export function normalizeFFTTLicenseInput(value: string): string {
 }
 
 export async function lookupFFTTLicense(
-  licence: string
+  licence: string,
+  options?: { excludeRegistrationId?: string }
 ): Promise<FFTTLicenseLookupResult> {
   let res: Response;
   try {
@@ -30,7 +53,12 @@ export async function lookupFFTTLicense(
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ licence }),
+      body: JSON.stringify({
+        licence,
+        ...(options?.excludeRegistrationId
+          ? { excludeRegistrationId: options.excludeRegistrationId }
+          : {}),
+      }),
     });
   } catch {
     return {
@@ -60,11 +88,23 @@ export async function lookupFFTTLicense(
   const body = json as {
     found?: boolean;
     player?: FFTTLicenseLookupPlayer;
+    licenseUsage?: RegistrationLicenseUsageSummary;
   };
 
+  const licenseUsage = body.licenseUsage;
+
   if (body.found && body.player) {
-    return { ok: true, found: true, player: body.player };
+    return {
+      ok: true,
+      found: true,
+      player: body.player,
+      ...(licenseUsage ? { licenseUsage } : {}),
+    };
   }
 
-  return { ok: true, found: false };
+  return {
+    ok: true,
+    found: false,
+    ...(licenseUsage ? { licenseUsage } : {}),
+  };
 }

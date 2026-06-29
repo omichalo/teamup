@@ -89,6 +89,7 @@ export const AUDIT_ACTIONS = {
   CLUB_REGISTRATION_UPDATED: "club.registration.updated",
   CLUB_REGISTRATION_PAYMENT_REQUESTED: "club.registration.payment_requested",
   CLUB_REGISTRATION_PAYMENT_CONFIRMED: "club.registration.payment_confirmed",
+  CLUB_REGISTRATION_DELETED: "club.registration.deleted",
   CLUB_REGISTRATION_CONFIG_PUBLISHED: "club.registration.config_published",
   CLUB_REGISTRATION_CONFIG_IMPORTED: "club.registration.config_imported",
   TEAM_CREATED: "team.created",

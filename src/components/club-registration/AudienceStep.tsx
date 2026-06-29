@@ -17,14 +17,14 @@ import {
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import dayjs, { type Dayjs } from "dayjs";
 import { isMinorAt } from "@/lib/club-registration/age";
+import { buildApplyFfttIdentityPatch, runFfttLicenseLookupFlow } from "@/lib/club-registration/fftt-license-lookup-flow";
 import {
-  lookupFFTTLicense,
   normalizeFFTTLicenseInput,
+  type RegistrationLicenseUsageSummary,
 } from "@/lib/club-registration/license-lookup";
-import {
-  formatLastNameForDisplay,
-  normalizeLastName,
-} from "@/lib/shared/person-name-format";
+import { formatLastNameForDisplay } from "@/lib/shared/person-name-format";
+import { FfttIdentityMismatchAlert } from "./FfttIdentityMismatchAlert";
+import { FfttLicenseConflictAlert } from "./FfttLicenseConflictAlert";
 import type { RegistrationDraft } from "./registration-defaults";
 
 type Props = {
@@ -34,17 +34,11 @@ type Props = {
   onSetSex: (sex: RegistrationDraft["sex"]) => void;
 };
 
-/**
- * Étape 1 — « Pour qui ? ».
- *
- * Méta-écran ramené aux informations qui orientent le dossier : qui s'inscrit,
- * une éventuelle licence pour préremplir l'identité, et la date de
- * naissance.
- *
- * Le but : engager rapidement l'utilisateur avec un écran très court, et
- * disposer de l'information `âge` avant les étapes suivantes pour faire de la
- * progressive disclosure proprement.
- */
+const EMPTY_LICENSE_USAGE: RegistrationLicenseUsageSummary = {
+  blocking: [],
+  warnings: [],
+};
+
 export function AudienceStep({
   draft,
   onPatch,
@@ -55,6 +49,8 @@ export function AudienceStep({
     "idle" | "loading" | "not_found" | "error"
   >("idle");
   const [lookupError, setLookupError] = useState<string | null>(null);
+  const [licenseUsage, setLicenseUsage] =
+    useState<RegistrationLicenseUsageSummary>(EMPTY_LICENSE_USAGE);
 
   const handleRole = (e: ChangeEvent<HTMLInputElement>) => {
     onSetAdherentRole(e.target.value as RegistrationDraft["adherentRole"]);
@@ -80,34 +76,45 @@ export function AudienceStep({
     });
     setLookupStatus("idle");
     setLookupError(null);
+    setLicenseUsage(EMPTY_LICENSE_USAGE);
   };
 
   const handleLicenseLookup = async () => {
     setLookupStatus("loading");
     setLookupError(null);
-    const result = await lookupFFTTLicense(normalizedLicense);
-    if (!result.ok) {
+    const flow = await runFfttLicenseLookupFlow({
+      licence: normalizedLicense,
+      current: {
+        firstName: draft.firstName,
+        lastName: draft.lastName,
+        sex: draft.sex,
+      },
+    });
+    if (!flow.ok) {
       setLookupStatus("error");
-      setLookupError(result.error);
-      return;
-    }
-    if (!result.found) {
-      setLookupStatus("not_found");
-      onPatch({ ffttLicenseLookup: undefined });
+      setLookupError(flow.error);
       return;
     }
 
-    const { player } = result;
-    if (typeof player.isHomme === "boolean") {
-      onSetSex(player.isHomme ? "male" : "female");
+    setLicenseUsage(flow.licenseUsage);
+
+    if (!flow.found) {
+      setLookupStatus("not_found");
+      onPatch({ ffttLicenseLookup: undefined, ffttLicense: normalizedLicense });
+      return;
     }
-    onPatch({
-      ffttLicense: player.licence,
-      ffttLicenseLookup: player,
-      ...(player.prenom ? { firstName: player.prenom } : {}),
-      ...(player.nom ? { lastName: normalizeLastName(player.nom) } : {}),
-    });
+
+    onPatch(flow.patch);
     setLookupStatus("idle");
+  };
+
+  const handleApplyFfttIdentity = () => {
+    if (!draft.ffttLicenseLookup) return;
+    const identityPatch = buildApplyFfttIdentityPatch(draft.ffttLicenseLookup);
+    if (identityPatch.sex) {
+      onSetSex(identityPatch.sex);
+    }
+    onPatch(identityPatch);
   };
 
   return (
@@ -169,7 +176,7 @@ export function AudienceStep({
           <Button
             type="button"
             variant="outlined"
-            onClick={handleLicenseLookup}
+            onClick={() => void handleLicenseLookup()}
             disabled={!canLookupLicense || lookupStatus === "loading"}
             sx={{
               alignSelf: { xs: "stretch", sm: "flex-start" },
@@ -185,6 +192,12 @@ export function AudienceStep({
             )}
           </Button>
         </Stack>
+
+        <FfttLicenseConflictAlert
+          blocking={licenseUsage.blocking}
+          warnings={licenseUsage.warnings}
+        />
+
         {draft.ffttLicenseLookup ? (
           <Alert severity="success">
             Licence retrouvée&nbsp;: {draft.ffttLicenseLookup.prenom}{" "}
@@ -192,12 +205,23 @@ export function AudienceStep({
             {draft.ffttLicenseLookup.nomClub
               ? ` — ${draft.ffttLicenseLookup.nomClub}`
               : ""}
-            . Vous pourrez vérifier l’identité à l’étape suivante.
+            . Vérifiez l&apos;identité à l&apos;étape suivante si besoin.
           </Alert>
         ) : null}
+
+        {draft.ffttLicenseLookup ? (
+          <FfttIdentityMismatchAlert
+            declaredFirstName={draft.firstName}
+            declaredLastName={draft.lastName}
+            declaredSex={draft.sex}
+            lookup={draft.ffttLicenseLookup}
+            onApplyFfttIdentity={handleApplyFfttIdentity}
+          />
+        ) : null}
+
         {lookupStatus === "not_found" ? (
           <Alert severity="info">
-            Licence introuvable. Vous pouvez continuer sans numéro de licence.
+            Licence introuvable auprès de la FFTT. Vous pouvez continuer sans vérification.
           </Alert>
         ) : null}
         {lookupStatus === "error" ? (
