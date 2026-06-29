@@ -2,30 +2,39 @@
 
 import {
   Box,
-  Button,
   Chip,
   Divider,
   Stack,
   Typography,
 } from "@mui/material";
-import EditIcon from "@mui/icons-material/Edit";
 import { SectionCard } from "@/components/ui";
-import { getEnabledSections, getEnabledSites } from "@/lib/club-registration-config/helpers";
-import { formatRegistrationSiteLabel } from "@/lib/club-registration-config/site-display";
 import { useRegistrationConfigValue } from "@/hooks/useRegistrationConfig";
 import { toFrenchPhoneMaskedDisplay } from "@/lib/club-registration/phone-fr";
 import { isMinorAt } from "@/lib/club-registration/age";
 import type { RegistrationStepId } from "@/lib/club-registration/field-to-step";
-import type {
-  RegistrationDraft,
-  Representative,
-} from "./registration-defaults";
-import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
+import type { RegistrationDraft } from "./registration-defaults";
 import { buildAdminAidRecapFields } from "@/lib/club-registration/recap-aids";
 import { formatLastNameForDisplay } from "@/lib/shared/person-name-format";
 import { ApplicantNotesSection } from "./ApplicantNotesSection";
+import { FfttIdentityMismatchAlert } from "./FfttIdentityMismatchAlert";
 import { RecapPaymentBlock } from "./RecapPaymentBlock";
 import { PricingBreakdown, usePricingQuote } from "./PricingBreakdown";
+import {
+  ADHERENT_ROLE_LABELS,
+  EmailRow,
+  FAMILY_ORDER_LABELS,
+  findCompetitionLabel,
+  findReductionLabel,
+  findSectionLabel,
+  findSlotLabel,
+  MEDICAL_LABELS,
+  minorAuthorizationRecap,
+  PHOTO_LABELS,
+  RecapBlock,
+  type RecapField,
+  ROLE_LABELS,
+  SEX_LABELS,
+} from "./recap-step-utils";
 
 type Props = {
   draft: RegistrationDraft;
@@ -34,174 +43,6 @@ type Props = {
   onEditStep: (stepId: RegistrationStepId) => void;
   onChange: (patch: Partial<RegistrationDraft>) => void;
 };
-
-const ROLE_LABELS: Record<Representative["role"], string> = {
-  mother: "Mère",
-  father: "Père",
-  guardian: "Tuteur / Tutrice",
-  self: "Adhérent(e) lui/elle-même",
-  other: "Autre",
-};
-
-const SEX_LABELS: Record<RegistrationDraft["sex"], string> = {
-  "": "—",
-  female: "Femme",
-  male: "Homme",
-  other: "Autre / Ne pas préciser",
-};
-
-const ADHERENT_ROLE_LABELS: Record<RegistrationDraft["adherentRole"], string> =
-  {
-    self: "Moi-même",
-    minor_dependent: "Un mineur dont je suis le représentant légal",
-    other_adult: "Un autre adulte",
-  };
-
-type MedicalOptionId = Exclude<
-  RegistrationDraft["medicalCertificateDeclaration"],
-  ""
->;
-
-const MEDICAL_LABELS: Record<
-  MedicalOptionId,
-  string
-> = {
-  under_40_all_no: "Moins de 40 ans : aucune réponse « Oui »",
-  over_40_cert_unchanged_all_no:
-    "40 ans et plus, certificat déjà fourni : aucune réponse « Oui »",
-  over_40_first_or_changed_certificate_required:
-    "40 ans et plus, première inscription ou changement de catégorie : certificat requis",
-  questionnaire_yes_certificate_required:
-    "Au moins une réponse « Oui » : certificat requis",
-};
-
-const FAMILY_ORDER_LABELS: Record<
-  RegistrationDraft["familyRegistrationOrder"],
-  string
-> = {
-  none: "Première inscription dans la famille",
-  second: "Deuxième inscription dans la famille",
-  third_or_more: "Troisième inscription ou plus",
-};
-
-const PHOTO_LABELS: Record<RegistrationDraft["photoConsent"], string> = {
-  "": "—",
-  accept: "J’accepte la diffusion de mon image / de celle de mon enfant mineur",
-  refuse: "Je refuse la diffusion de mon image / de celle de mon enfant mineur",
-};
-
-function minorAuthorizationRecap(
-  value: RegistrationDraft["emergencyMedicalAuthorization"],
-  kind: "medical" | "supervision"
-): string {
-  if (value === "yes") return kind === "medical" ? "Autorisée" : "Engagement confirmé";
-  return kind === "medical" ? "Non autorisée" : "Non confirmé";
-}
-
-function findSectionLabel(config: RegistrationConfigV1, id: string): string {
-  return getEnabledSections(config).find((s) => s.id === id)?.label ?? id;
-}
-
-function findSlotLabel(config: RegistrationConfigV1, id: string): string {
-  for (const site of getEnabledSites(config)) {
-    const found = site.slots.find((s) => s.id === id);
-    if (found) return `${formatRegistrationSiteLabel(site)} — ${found.label}`;
-  }
-  return id;
-}
-
-function findReductionLabel(config: RegistrationConfigV1, id: string): string {
-  return config.aidRules.find((r) => r.id === id)?.label ?? id;
-}
-
-function findCompetitionLabel(config: RegistrationConfigV1, id: string): string {
-  return (
-    config.competitions.find((c) => c.id === id)?.formLabel ??
-    config.competitions.find((c) => c.id === id)?.stripeLabel ??
-    id
-  );
-}
-
-type Field = { label: string; value: React.ReactNode };
-
-/**
- * Bloc de récapitulatif : titre + bouton « Modifier » + paires libellé/valeur.
- *
- * Sur mobile (`xs`), libellé et valeur sont empilés verticalement avec un
- * libellé en `caption` discret. À partir de `md`, on bascule sur une grille
- * en deux colonnes avec une largeur fixe pour le libellé, ce qui donne un
- * rendu type « definition list » plus rapide à scanner sur grand écran.
- */
-function RecapBlock({
-  title,
-  onEdit,
-  fields,
-  emptyMessage,
-}: {
-  title: string;
-  onEdit: () => void;
-  fields: Field[];
-  emptyMessage?: string;
-}) {
-  return (
-    <SectionCard
-      title={title}
-      padding="compact"
-      action={
-        <Button
-          size="small"
-          startIcon={<EditIcon fontSize="small" />}
-          onClick={onEdit}
-          aria-label={`Modifier ${title.toLowerCase()}`}
-        >
-          Modifier
-        </Button>
-      }
-    >
-      {fields.length === 0 && emptyMessage ? (
-        <Typography variant="body2" color="text.secondary">
-          {emptyMessage}
-        </Typography>
-      ) : (
-        <Stack
-          divider={<Divider flexItem sx={{ borderColor: "divider" }} />}
-          spacing={1.25}
-        >
-          {fields.map((f, i) => (
-            <Stack
-              key={i}
-              direction={{ xs: "column", md: "row" }}
-              spacing={{ xs: 0.25, md: 2 }}
-              alignItems={{ xs: "stretch", md: "baseline" }}
-            >
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{
-                  fontWeight: 600,
-                  letterSpacing: "0.02em",
-                  textTransform: { xs: "uppercase", md: "none" },
-                  fontSize: { xs: "0.7rem", md: "0.8125rem" },
-                  flexShrink: 0,
-                  width: { md: 200 },
-                }}
-              >
-                {f.label}
-              </Typography>
-              <Typography
-                variant="body2"
-                component="div"
-                sx={{ wordBreak: "break-word", flex: 1, minWidth: 0 }}
-              >
-                {f.value || "—"}
-              </Typography>
-            </Stack>
-          ))}
-        </Stack>
-      )}
-    </SectionCard>
-  );
-}
 
 export function RecapStep({
   draft,
@@ -240,6 +81,15 @@ export function RecapStep({
         Vérifiez votre dossier avant envoi. Vous pouvez revenir sur n’importe
         quelle section avec le bouton « Modifier ».
       </Typography>
+
+      {draft.ffttLicenseLookup ? (
+        <FfttIdentityMismatchAlert
+          declaredFirstName={draft.firstName}
+          declaredLastName={draft.lastName}
+          declaredSex={draft.sex}
+          lookup={draft.ffttLicenseLookup}
+        />
+      ) : null}
 
       <RecapBlock
         title="Type d’inscription"
@@ -283,14 +133,14 @@ export function RecapStep({
                       ? `${draft.ffttLicenseLookup.pointsLicence}`
                       : "—",
                 },
-              ] as Field[])
+              ] as RecapField[])
             : []),
           ...(draft.sex === "female"
             ? [
                 {
                   label: "1ʳᵉ inscription féminine au club",
                   value: draft.firstFemaleRegistrationSqy ? "Oui" : "Non",
-                } as Field,
+                } as RecapField,
               ]
             : []),
           { label: "Ville de naissance", value: draft.birthCity },
@@ -406,7 +256,7 @@ export function RecapStep({
                       "—"
                     ),
                 },
-              ] as Field[])
+              ] as RecapField[])
             : draft.wantsOptionalJersey
               ? ([
                   {
@@ -417,7 +267,7 @@ export function RecapStep({
                     label: "Supplément maillot",
                     value: `${(config.jersey.optionalPriceCents / 100).toFixed(0)} €`,
                   },
-                ] as Field[])
+                ] as RecapField[])
               : []),
         ]}
       />
@@ -462,7 +312,7 @@ export function RecapStep({
                   label: "Prise en charge à l’heure des cours",
                   value: minorAuthorizationRecap(draft.supervisionAcknowledgement, "supervision"),
                 },
-              ] as Field[])
+              ] as RecapField[])
             : []),
           {
             label: "Règlement intérieur",
@@ -541,44 +391,6 @@ export function RecapStep({
       </SectionCard>
 
       <Box />
-    </Stack>
-  );
-}
-
-function EmailRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
-  return (
-    <Stack
-      direction={{ xs: "column", md: "row" }}
-      spacing={{ xs: 0.25, md: 2 }}
-      alignItems={{ xs: "stretch", md: "baseline" }}
-    >
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{
-          fontWeight: 600,
-          letterSpacing: "0.02em",
-          textTransform: { xs: "uppercase", md: "none" },
-          fontSize: { xs: "0.7rem", md: "0.8125rem" },
-          flexShrink: 0,
-          width: { md: 200 },
-        }}
-      >
-        {label}
-      </Typography>
-      <Typography
-        variant="body2"
-        component="div"
-        sx={{ wordBreak: "break-word", flex: 1, minWidth: 0 }}
-      >
-        {value}
-      </Typography>
     </Stack>
   );
 }

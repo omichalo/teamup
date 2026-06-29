@@ -26,7 +26,6 @@ import { PageHeader, SectionCard, StepProgressBar } from "@/components/ui";
 import { normalizeApplicantNotes } from "@/lib/club-registration/applicant-notes";
 import { scrollToFormTarget } from "@/lib/club-registration/scroll-to-form-target";
 import type { ClubRegistrationPayload } from "@/lib/club-registration/schema";
-import { buildRegistrationPayloadSchema } from "@/lib/club-registration/schema";
 import { useRegistrationConfig } from "@/hooks/useRegistrationConfig";
 import { getDefaultRegistrationConfig } from "@/lib/club-registration-config/default-config";
 import { isAtLeast40At, isMinorAt } from "@/lib/club-registration/age";
@@ -46,14 +45,8 @@ import {
   stepsWithError,
   type RegistrationStepId,
 } from "@/lib/club-registration/field-to-step";
-import { submitRegistration } from "@/lib/club-registration/submit";
-import {
-  formatZodIssuesForDebug,
-  logRegistrationFieldErrors,
-  logRegistrationWizardDebug,
-  summarizeRepresentativesForDebug,
-} from "@/lib/club-registration/registration-wizard-debug";
 import { sanitizeSchoolPickupSlotIdsFromConfig } from "@/lib/club-registration-config/helpers";
+import { logRegistrationFieldErrors } from "@/lib/club-registration/registration-wizard-debug";
 import { AudienceStep } from "./AudienceStep";
 import { AdherentStep } from "./AdherentStep";
 import { RepresentativesStep } from "./RepresentativesStep";
@@ -71,6 +64,7 @@ import { useRegistrationWizardHydration } from "./useRegistrationWizardHydration
 import { DraftStorageDisclosure } from "./DraftStorageDisclosure";
 import { AccountEmailTransparencyBanner } from "./AccountEmailTransparencyBanner";
 import { AuthDialog } from "@/components/auth/AuthDialog";
+import { useRegistrationWizardSubmit } from "./useRegistrationWizardSubmit";
 import {
   STEP_DESCRIPTIONS,
   STEP_SHORT_LABELS,
@@ -101,13 +95,6 @@ export function ClubRegistrationWizard({
     storage,
     hydrate: actions.hydrate,
   });
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<
-    Record<string, string[] | undefined> | null
-  >(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [authDialogOpen, setAuthDialogOpen] = useState(false);
-  const pendingPayloadRef = useRef<ClubRegistrationPayload | null>(null);
   const accountEmailAutofillRef = useRef<{
     selfContact?: string;
     representativeContact?: string;
@@ -130,24 +117,6 @@ export function ClubRegistrationWizard({
   const totalSteps = sequence.length;
   const currentStepId = sequence[activeStep] ?? "audience";
 
-  const revealStepValidationError = useCallback(
-    (stepId: RegistrationStepId) => {
-      const result = validateStep(stepId, draft, config);
-      if (result.valid) return true;
-      setSubmitError(result.message);
-      scrollToFormTarget(result.focusSelector, {
-        fallback: () => {
-          stepErrorAlertRef.current?.scrollIntoView({
-            behavior: "smooth",
-            block: "start",
-          });
-        },
-      });
-      return false;
-    },
-    [draft, config]
-  );
-
   /* Si la séquence vient de raccourcir (passage mineur → majeur après coup) et
      que l'utilisateur se trouve au-delà de la dernière étape, on le ramène sur
      la dernière étape valide pour éviter un index hors borne. */
@@ -168,6 +137,159 @@ export function ClubRegistrationWizard({
         .slice(0, sequence.length - 1) // exclure le récap
         .filter((v) => v === null).length,
     [stepValidity, sequence.length]
+  );
+
+  const buildPayload = useCallback((): ClubRegistrationPayload | null => {
+    const {
+      rulesAccepted: _rulesAccepted,
+      sex,
+      photoConsent,
+      wasSqyMemberLastYear,
+      medicalCertificateDeclaration: _decl,
+      medicalQuestionnaire,
+      medicalVeteranPath,
+      applicantNotes: _applicantNotes,
+      ...rest
+    } = draft;
+    void _rulesAccepted;
+    void _decl;
+    void _applicantNotes;
+    const hasVerifiedFfttLicense = Boolean(draft.ffttLicenseLookup?.licence);
+    const medicalCertificateDeclaration = deriveMedicalCertificateDeclaration({
+      birthDate: draft.birthDate,
+      questionnaire: medicalQuestionnaire,
+      veteranPath: medicalVeteranPath,
+      hasVerifiedFfttLicense,
+    });
+    if (
+      sex === "" ||
+      photoConsent === "" ||
+      wasSqyMemberLastYear === undefined ||
+      medicalCertificateDeclaration === "" ||
+      !draft.paymentMethod ||
+      !isMedicalAdminStepComplete({
+        birthDate: draft.birthDate,
+        questionnaire: medicalQuestionnaire,
+        veteranPath: medicalVeteranPath,
+        hasVerifiedFfttLicense,
+      })
+    ) {
+      return null;
+    }
+    const atLeast40 = isAtLeast40At(draft.birthDate);
+    const hadLicense = effectiveHadFfttLicense(
+      medicalVeteranPath,
+      hasVerifiedFfttLicense
+    );
+    const effectiveCompetitorExtras = draft.wantsCompetitorExtras;
+    const minor = isMinorAt(draft.birthDate);
+    const emergencyMedicalAuthorization = minor
+      ? draft.emergencyMedicalAuthorization
+      : ("not_applicable_adult" as const);
+    const supervisionAcknowledgement = minor
+      ? draft.supervisionAcknowledgement
+      : ("not_applicable_adult" as const);
+    return {
+      ...rest,
+      sex,
+      photoConsent,
+      wasSqyMemberLastYear,
+      medicalQuestionnaire: {
+        ...(medicalQuestionnaire.summary !== ""
+          ? { summary: medicalQuestionnaire.summary }
+          : {}),
+        answers: medicalQuestionnaire.answers,
+      },
+      medicalVeteranPath: atLeast40
+        ? hadLicense === "yes"
+          ? {
+              hadFfttLicense: hadLicense,
+              categoryChanged: medicalVeteranPath.categoryChanged as
+                | "yes"
+                | "no",
+            }
+          : { hadFfttLicense: hadLicense as "yes" | "no" }
+        : undefined,
+      medicalCertificateDeclaration,
+      emergencyMedicalAuthorization,
+      supervisionAcknowledgement,
+      internalRulesAccepted: true as const,
+      wantsCompetitorExtras: effectiveCompetitorExtras,
+      competitionJerseySize:
+        effectiveCompetitorExtras && draft.competitionJerseySize
+          ? draft.competitionJerseySize
+          : undefined,
+      wantsOptionalJersey:
+        !effectiveCompetitorExtras && draft.wantsOptionalJersey,
+      optionalJerseySize:
+        !effectiveCompetitorExtras &&
+        draft.wantsOptionalJersey &&
+        draft.optionalJerseySize
+          ? draft.optionalJerseySize
+          : undefined,
+      competitionIds: effectiveCompetitorExtras ? draft.competitionIds : [],
+      schoolPickupSlotIds: sanitizeSchoolPickupSlotIdsFromConfig(
+        config,
+        draft.slotIds,
+        draft.schoolPickupSlotIds
+      ),
+      ...(normalizeApplicantNotes(draft.applicantNotes)
+        ? { applicantNotes: normalizeApplicantNotes(draft.applicantNotes) }
+        : {}),
+      paymentMethod: draft.paymentMethod as ClubRegistrationPayload["paymentMethod"],
+      paymentInstallments: draft.paymentInstallments,
+      paymentAids: draft.paymentAids,
+      holidayVoucherAmountCents: draft.holidayVoucherAmountCents,
+      remainingPaymentMethod:
+        draft.remainingPaymentMethod === ""
+          ? undefined
+          : draft.remainingPaymentMethod,
+      ...((draft.paymentNote ?? "").trim()
+        ? { paymentNote: (draft.paymentNote ?? "").trim() }
+        : {}),
+      ...((draft.specialPaymentNote ?? "").trim()
+        ? { specialPaymentNote: (draft.specialPaymentNote ?? "").trim() }
+        : {}),
+    };
+  }, [config, draft]);
+
+  const {
+    submitError,
+    setSubmitError,
+    fieldErrors,
+    submitting,
+    authDialogOpen,
+    handleSubmit,
+    handleAuthSuccess,
+    clearSubmitFeedback,
+    cancelAuthDialog,
+  } = useRegistrationWizardSubmit({
+    draft,
+    config,
+    sequence,
+    storage,
+    accountEmail,
+    buildPayload,
+    setActiveStep,
+    stepErrorAlertRef,
+  });
+
+  const revealStepValidationError = useCallback(
+    (stepId: RegistrationStepId) => {
+      const result = validateStep(stepId, draft, config);
+      if (result.valid) return true;
+      setSubmitError(result.message);
+      scrollToFormTarget(result.focusSelector, {
+        fallback: () => {
+          stepErrorAlertRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        },
+      });
+      return false;
+    },
+    [config, draft, setSubmitError, stepErrorAlertRef]
   );
 
   /* Auto-save à chaque changement de draft. */
@@ -350,8 +472,7 @@ export function ClubRegistrationWizard({
 
   const handleGoToStep = useCallback(
     (to: number) => {
-      setSubmitError(null);
-      setFieldErrors(null);
+      clearSubmitFeedback();
       if (to === activeStep) return;
       if (to < activeStep) {
         setActiveStep(to);
@@ -376,7 +497,7 @@ export function ClubRegistrationWizard({
       }
       setActiveStep(to);
     },
-    [activeStep, config, draft, sequence]
+    [activeStep, clearSubmitFeedback, config, draft, sequence, setSubmitError]
   );
 
   /** Navigation vers une étape par son identifiant symbolique (utilisée par
@@ -389,241 +510,6 @@ export function ClubRegistrationWizard({
     },
     [handleGoToStep, sequence]
   );
-
-  const buildPayload = (): ClubRegistrationPayload | null => {
-    const {
-      rulesAccepted: _rulesAccepted,
-      sex,
-      photoConsent,
-      wasSqyMemberLastYear,
-      medicalCertificateDeclaration: _decl,
-      medicalQuestionnaire,
-      medicalVeteranPath,
-      applicantNotes: _applicantNotes,
-      ...rest
-    } = draft;
-    void _rulesAccepted;
-    void _decl;
-    void _applicantNotes;
-    const hasVerifiedFfttLicense = Boolean(draft.ffttLicenseLookup?.licence);
-    const medicalCertificateDeclaration = deriveMedicalCertificateDeclaration({
-      birthDate: draft.birthDate,
-      questionnaire: medicalQuestionnaire,
-      veteranPath: medicalVeteranPath,
-      hasVerifiedFfttLicense,
-    });
-    if (
-      sex === "" ||
-      photoConsent === "" ||
-      wasSqyMemberLastYear === undefined ||
-      medicalCertificateDeclaration === "" ||
-      !draft.paymentMethod ||
-      !isMedicalAdminStepComplete({
-        birthDate: draft.birthDate,
-        questionnaire: medicalQuestionnaire,
-        veteranPath: medicalVeteranPath,
-        hasVerifiedFfttLicense,
-      })
-    ) {
-      return null;
-    }
-    const atLeast40 = isAtLeast40At(draft.birthDate);
-    const hadLicense = effectiveHadFfttLicense(
-      medicalVeteranPath,
-      hasVerifiedFfttLicense
-    );
-    const effectiveCompetitorExtras = draft.wantsCompetitorExtras;
-    const minor = isMinorAt(draft.birthDate);
-    const emergencyMedicalAuthorization = minor
-      ? draft.emergencyMedicalAuthorization
-      : ("not_applicable_adult" as const);
-    const supervisionAcknowledgement = minor
-      ? draft.supervisionAcknowledgement
-      : ("not_applicable_adult" as const);
-    return {
-      ...rest,
-      sex,
-      photoConsent,
-      wasSqyMemberLastYear,
-      medicalQuestionnaire: {
-        ...(medicalQuestionnaire.summary !== ""
-          ? { summary: medicalQuestionnaire.summary }
-          : {}),
-        answers: medicalQuestionnaire.answers,
-      },
-      medicalVeteranPath: atLeast40
-        ? hadLicense === "yes"
-          ? {
-              hadFfttLicense: hadLicense,
-              categoryChanged: medicalVeteranPath.categoryChanged as
-                | "yes"
-                | "no",
-            }
-          : { hadFfttLicense: hadLicense as "yes" | "no" }
-        : undefined,
-      medicalCertificateDeclaration,
-      emergencyMedicalAuthorization,
-      supervisionAcknowledgement,
-      internalRulesAccepted: true as const,
-      wantsCompetitorExtras: effectiveCompetitorExtras,
-      competitionJerseySize:
-        effectiveCompetitorExtras && draft.competitionJerseySize
-          ? draft.competitionJerseySize
-          : undefined,
-      wantsOptionalJersey:
-        !effectiveCompetitorExtras && draft.wantsOptionalJersey,
-      optionalJerseySize:
-        !effectiveCompetitorExtras &&
-        draft.wantsOptionalJersey &&
-        draft.optionalJerseySize
-          ? draft.optionalJerseySize
-          : undefined,
-      competitionIds: effectiveCompetitorExtras ? draft.competitionIds : [],
-      schoolPickupSlotIds: sanitizeSchoolPickupSlotIdsFromConfig(
-        config,
-        draft.slotIds,
-        draft.schoolPickupSlotIds
-      ),
-      ...(normalizeApplicantNotes(draft.applicantNotes)
-        ? { applicantNotes: normalizeApplicantNotes(draft.applicantNotes) }
-        : {}),
-      paymentMethod: draft.paymentMethod as ClubRegistrationPayload["paymentMethod"],
-      paymentInstallments: draft.paymentInstallments,
-      paymentAids: draft.paymentAids,
-      holidayVoucherAmountCents: draft.holidayVoucherAmountCents,
-      remainingPaymentMethod:
-        draft.remainingPaymentMethod === ""
-          ? undefined
-          : draft.remainingPaymentMethod,
-      ...((draft.paymentNote ?? "").trim()
-        ? { paymentNote: (draft.paymentNote ?? "").trim() }
-        : {}),
-      ...((draft.specialPaymentNote ?? "").trim()
-        ? { specialPaymentNote: (draft.specialPaymentNote ?? "").trim() }
-        : {}),
-    };
-  };
-
-  const performSubmit = useCallback(
-    async (payload: ClubRegistrationPayload) => {
-      setSubmitError(null);
-      setFieldErrors(null);
-      setSubmitting(true);
-      try {
-        const result = await submitRegistration(payload);
-        if (result.ok) {
-          storage.clear();
-          actions.reset();
-          setActiveStep(0);
-          window.location.assign(
-            `/club/mes-inscriptions?created=${encodeURIComponent(result.id)}`
-          );
-          return;
-        }
-        if (result.fieldErrors) {
-          logRegistrationFieldErrors(
-            "submitRegistration: erreurs serveur",
-            result.fieldErrors,
-            sequence
-          );
-          setFieldErrors(result.fieldErrors);
-        }
-        logRegistrationWizardDebug("submitRegistration: échec", {
-          error: result.error,
-        });
-        setSubmitError(result.error);
-      } finally {
-        setSubmitting(false);
-      }
-    },
-    [actions, sequence, storage]
-  );
-
-  const handleSubmit = async () => {
-    setSubmitError(null);
-    setFieldErrors(null);
-    logRegistrationWizardDebug("handleSubmit: début", {
-      representativesCount: draft.representatives.length,
-      representatives: summarizeRepresentativesForDebug(draft.representatives),
-      slotIdsCount: draft.slotIds.length,
-      wantsCompetitorExtras: draft.wantsCompetitorExtras,
-      competitionJerseySize: draft.competitionJerseySize ?? null,
-      adherentRole: draft.adherentRole,
-    });
-    /* On rejoue la validation de toutes les étapes (hors récap) pour rattraper
-       les cas de navigation libre via le stepper. */
-    for (let i = 0; i < sequence.length - 1; i++) {
-      const stepId = sequence[i];
-      const result = validateStep(stepId, draft, config);
-      if (!result.valid) {
-        logRegistrationWizardDebug("handleSubmit: validateStep échoué", {
-          stepIndex: i,
-          stepId,
-          message: result.message,
-          focusSelector: result.focusSelector,
-          representativesCount: draft.representatives.length,
-        });
-        setActiveStep(i);
-        setSubmitError(result.message);
-        scrollToFormTarget(result.focusSelector, {
-          fallback: () => {
-            stepErrorAlertRef.current?.scrollIntoView({
-              behavior: "smooth",
-              block: "start",
-            });
-          },
-        });
-        return;
-      }
-    }
-    const payload = buildPayload();
-    if (!payload) {
-      logRegistrationWizardDebug("handleSubmit: buildPayload null", {
-        sex: draft.sex,
-        photoConsent: draft.photoConsent,
-        paymentMethod: draft.paymentMethod,
-      });
-      setSubmitError("Certaines informations obligatoires sont manquantes.");
-      return;
-    }
-    const parsed = buildRegistrationPayloadSchema(config).safeParse(payload);
-    if (!parsed.success) {
-      const flat = parsed.error.flatten().fieldErrors as Record<
-        string,
-        string[] | undefined
-      >;
-      logRegistrationWizardDebug("handleSubmit: Zod safeParse échoué", {
-        zodIssues: formatZodIssuesForDebug(parsed.error.issues),
-        flattenFieldErrors: flat,
-        representativesInPayload: summarizeRepresentativesForDebug(
-          payload.representatives
-        ),
-        slotIds: payload.slotIds,
-        schoolPickupSlotIds: payload.schoolPickupSlotIds,
-      });
-      logRegistrationFieldErrors("handleSubmit: étapes en erreur", flat, sequence);
-      setFieldErrors(flat);
-      setSubmitError("Certaines informations sont invalides ou incomplètes.");
-      return;
-    }
-    logRegistrationWizardDebug("handleSubmit: validation OK", {
-      representativesCount: parsed.data.representatives.length,
-    });
-    if (!accountEmail) {
-      pendingPayloadRef.current = payload;
-      setAuthDialogOpen(true);
-      return;
-    }
-    await performSubmit(payload);
-  };
-
-  const handleAuthSuccess = useCallback(async () => {
-    setAuthDialogOpen(false);
-    const payload = pendingPayloadRef.current;
-    pendingPayloadRef.current = null;
-    if (!payload) return;
-    await performSubmit(payload);
-  }, [performSubmit]);
 
   const stepLabel = STEP_TITLES[currentStepId];
   const stepShortLabel = STEP_SHORT_LABELS[currentStepId];
@@ -986,11 +872,7 @@ export function ClubRegistrationWizard({
 
         <AuthDialog
           open={authDialogOpen}
-          onClose={() => {
-            if (submitting) return;
-            setAuthDialogOpen(false);
-            pendingPayloadRef.current = null;
-          }}
+          onClose={cancelAuthDialog}
           defaultMode="login"
           onSuccess={handleAuthSuccess}
           {...(authInitialEmail ? { initialEmail: authInitialEmail } : {})}

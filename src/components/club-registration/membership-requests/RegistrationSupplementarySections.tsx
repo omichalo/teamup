@@ -11,11 +11,16 @@ import {
   Typography,
 } from "@mui/material";
 import { isAtLeast40At } from "@/lib/club-registration/age";
-import { normalizeLastName } from "@/lib/shared/person-name-format";
 import {
-  lookupFFTTLicense,
+  buildApplyFfttIdentityPatch,
+  runFfttLicenseLookupFlow,
+} from "@/lib/club-registration/fftt-license-lookup-flow";
+import {
   normalizeFFTTLicenseInput,
+  type RegistrationLicenseUsageSummary,
 } from "@/lib/club-registration/license-lookup";
+import { FfttIdentityMismatchAlert } from "../FfttIdentityMismatchAlert";
+import { FfttLicenseConflictAlert } from "../FfttLicenseConflictAlert";
 import type { EditableRegistration, FfttLicenseLookup, RegistrationDetail } from "./types";
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
@@ -101,12 +106,25 @@ export type RegistrationFfttPatch = {
 };
 
 type FfttFieldsProps = {
+  registrationId?: string | undefined;
+  firstName: string;
+  lastName: string;
+  sex: EditableRegistration["sex"];
   ffttLicense: string;
   ffttLicenseLookup: FfttLicenseLookup | undefined;
   onPatch: (patch: RegistrationFfttPatch) => void;
 };
 
+const EMPTY_LICENSE_USAGE: RegistrationLicenseUsageSummary = {
+  blocking: [],
+  warnings: [],
+};
+
 export function RegistrationFfttFields({
+  registrationId,
+  firstName,
+  lastName,
+  sex,
   ffttLicense,
   ffttLicenseLookup,
   onPatch,
@@ -115,6 +133,8 @@ export function RegistrationFfttFields({
     "idle" | "loading" | "not_found" | "error"
   >("idle");
   const [lookupError, setLookupError] = useState<string | null>(null);
+  const [licenseUsage, setLicenseUsage] =
+    useState<RegistrationLicenseUsageSummary>(EMPTY_LICENSE_USAGE);
 
   const normalizedLicense = normalizeFFTTLicenseInput(ffttLicense);
   const canLookupLicense = normalizedLicense.length >= 5;
@@ -126,34 +146,38 @@ export function RegistrationFfttFields({
     });
     setLookupStatus("idle");
     setLookupError(null);
+    setLicenseUsage(EMPTY_LICENSE_USAGE);
   };
 
   const handleLicenseLookup = async () => {
     setLookupStatus("loading");
     setLookupError(null);
-    const result = await lookupFFTTLicense(normalizedLicense);
-    if (!result.ok) {
+    const flow = await runFfttLicenseLookupFlow({
+      licence: normalizedLicense,
+      ...(registrationId ? { excludeRegistrationId: registrationId } : {}),
+      current: { firstName, lastName, sex },
+    });
+    if (!flow.ok) {
       setLookupStatus("error");
-      setLookupError(result.error);
-      return;
-    }
-    if (!result.found) {
-      setLookupStatus("not_found");
-      onPatch({ ffttLicenseLookup: undefined });
+      setLookupError(flow.error);
       return;
     }
 
-    const { player } = result;
-    onPatch({
-      ffttLicense: player.licence,
-      ffttLicenseLookup: player,
-      ...(typeof player.isHomme === "boolean"
-        ? { sex: player.isHomme ? "male" : "female" }
-        : {}),
-      ...(player.prenom ? { firstName: player.prenom } : {}),
-      ...(player.nom ? { lastName: normalizeLastName(player.nom) } : {}),
-    });
+    setLicenseUsage(flow.licenseUsage);
+
+    if (!flow.found) {
+      setLookupStatus("not_found");
+      onPatch({ ffttLicenseLookup: undefined, ffttLicense: normalizedLicense });
+      return;
+    }
+
+    onPatch(flow.patch);
     setLookupStatus("idle");
+  };
+
+  const handleApplyFfttIdentity = () => {
+    if (!ffttLicenseLookup) return;
+    onPatch(buildApplyFfttIdentityPatch(ffttLicenseLookup));
   };
 
   return (
@@ -190,13 +214,28 @@ export function RegistrationFfttFields({
           </Button>
         </Stack>
 
+        <FfttLicenseConflictAlert
+          blocking={licenseUsage.blocking}
+          warnings={licenseUsage.warnings}
+        />
+
         {ffttLicenseLookup ? (
           <Alert severity="success">
             Licence retrouvée&nbsp;: {ffttLicenseLookup.prenom}{" "}
             {ffttLicenseLookup.nom}
             {ffttLicenseLookup.nomClub ? ` — ${ffttLicenseLookup.nomClub}` : ""}
-            . Les champs d&apos;identité ont été préremplis si disponibles.
+            .
           </Alert>
+        ) : null}
+
+        {ffttLicenseLookup ? (
+          <FfttIdentityMismatchAlert
+            declaredFirstName={firstName}
+            declaredLastName={lastName}
+            declaredSex={sex}
+            lookup={ffttLicenseLookup}
+            onApplyFfttIdentity={handleApplyFfttIdentity}
+          />
         ) : null}
         {lookupStatus === "not_found" ? (
           <Alert severity="info">

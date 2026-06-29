@@ -11,6 +11,7 @@ type Props = {
   registrationId: string | null;
   statusSummary?: RegistrationSummary | null | undefined;
   onListReload?: MembershipListReloadFn | undefined;
+  onDeleted?: (() => void | Promise<void>) | undefined;
   emptyMessage?: string;
   embedded?: boolean;
   showAlerts?: boolean;
@@ -29,6 +30,7 @@ export function MembershipRequestDetailPanel({
   registrationId,
   statusSummary,
   onListReload,
+  onDeleted,
   emptyMessage = "Sélectionnez une demande pour la relire.",
   embedded = true,
   showAlerts = false,
@@ -57,7 +59,11 @@ export function MembershipRequestDetailPanel({
   ) : (
     <Stack spacing={3}>
       <MembershipRequestDetailFormPrimary detail={detail} hideTitleHeader={showQueueBar} />
-      <MembershipRequestDetailFormSecondary detail={detail} onListReload={onListReload} />
+      <MembershipRequestDetailFormSecondary
+        detail={detail}
+        onListReload={onListReload}
+        onDeleted={onDeleted}
+      />
     </Stack>
   );
 

@@ -358,6 +358,7 @@ export function RegistrationsSpreadsheetClient() {
         onListReload={async () => {
           await reload();
         }}
+        onDeleted={() => setModalRegistrationId(null)}
       />
     </Container>
   );
