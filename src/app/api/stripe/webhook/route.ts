@@ -10,7 +10,10 @@ import {
   normalizeRegistrationPayment,
   paymentToFirestoreUpdate,
 } from "@/lib/club-registration/payment/normalize-payment";
-import { addManualReceivedPayment } from "@/lib/club-registration/payment/payment-mutations";
+import {
+  addManualReceivedPayment,
+  markPaymentFullyPaid,
+} from "@/lib/club-registration/payment/payment-mutations";
 
 type StripeWebhookEvent = {
   id: string;
@@ -19,12 +22,29 @@ type StripeWebhookEvent = {
     object?: {
       id?: string;
       payment_status?: string;
+      amount_total?: number;
       client_reference_id?: string;
       invoice?: string;
       metadata?: Record<string, string>;
     };
   };
 };
+
+const STRIPE_PAID_CHECKOUT_STATUSES = new Set(["paid", "no_payment_required"]);
+
+function resolveStripeCheckoutPaidAmountCents(
+  session: NonNullable<StripeWebhookEvent["data"]>["object"],
+  existing: Record<string, unknown>,
+  basePaymentAmountToPayCents: number | null
+): number {
+  if (typeof session?.amount_total === "number" && session.amount_total > 0) {
+    return session.amount_total;
+  }
+  if (typeof existing.paymentAmountCents === "number" && existing.paymentAmountCents > 0) {
+    return existing.paymentAmountCents;
+  }
+  return basePaymentAmountToPayCents ?? 0;
+}
 
 export async function POST(req: Request) {
   try {
@@ -39,6 +59,16 @@ export async function POST(req: Request) {
     }
 
     const session = event.data?.object;
+    const stripePaymentStatus = session?.payment_status;
+    if (
+      stripePaymentStatus &&
+      !STRIPE_PAID_CHECKOUT_STATUSES.has(stripePaymentStatus)
+    ) {
+      return jsonNoStore(
+        { received: true, ignored: "checkout completed but payment not settled" },
+        { status: 200 }
+      );
+    }
     const registrationId =
       session?.metadata?.registrationId || session?.client_reference_id || null;
     if (!registrationId) {
@@ -54,18 +84,25 @@ export async function POST(req: Request) {
     }
 
     const basePayment = normalizeRegistrationPayment(existing);
-    const amountCents =
-      typeof existing.paymentAmountCents === "number"
-        ? existing.paymentAmountCents
-        : basePayment?.amountToPayCents ?? 0;
+    const amountCents = resolveStripeCheckoutPaidAmountCents(
+      session,
+      existing,
+      basePayment?.amountToPayCents ?? null
+    );
 
     let payment = basePayment;
-    if (payment && amountCents > 0) {
-      payment = addManualReceivedPayment(payment, {
-        method: "card",
-        label: "Paiement Stripe",
-        amountCents,
-        receivedAt: new Date().toISOString(),
+    if (payment) {
+      if (amountCents > 0) {
+        payment = addManualReceivedPayment(payment, {
+          method: "card",
+          label: "Paiement Stripe",
+          amountCents,
+          receivedAt: new Date().toISOString(),
+          recordedBy: "stripe",
+          ...(session?.id ? { note: `Checkout ${session.id}` } : {}),
+        });
+      }
+      payment = markPaymentFullyPaid(payment, {
         recordedBy: "stripe",
         ...(session?.id ? { note: `Checkout ${session.id}` } : {}),
       });
@@ -74,13 +111,12 @@ export async function POST(req: Request) {
     await docRef.set(
       {
         status: "paid",
-        paymentStatus: session?.payment_status ?? "paid",
         stripeCheckoutSessionId: session?.id ?? null,
         stripeInvoiceId: session?.invoice ?? null,
         stripePaymentUrl: null,
         paidAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
-        ...(payment ? paymentToFirestoreUpdate(payment) : {}),
+        ...(payment ? paymentToFirestoreUpdate(payment) : { paymentStatus: "paid" }),
       },
       { merge: true }
     );
@@ -88,7 +124,12 @@ export async function POST(req: Request) {
     logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_PAYMENT_CONFIRMED, "stripe", {
       resource: "clubRegistration",
       resourceId: registrationId,
-      details: { eventId: event.id, checkoutSessionId: session?.id },
+      details: {
+        eventId: event.id,
+        checkoutSessionId: session?.id,
+        donationCents: session?.metadata?.donationCents,
+        donationDiscountCents: session?.metadata?.donationDiscountCents,
+      },
       success: true,
     });
 

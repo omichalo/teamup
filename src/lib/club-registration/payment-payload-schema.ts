@@ -37,6 +37,7 @@ export const paymentPayloadFieldsSchema = {
     (val) => (typeof val === "string" && val.trim() === "" ? undefined : val),
     z.string().trim().max(PAYMENT_NOTE_MAX_LENGTH).optional()
   ),
+  voluntaryDonationCents: z.number().int().min(0).default(0),
 };
 
 export function refinePaymentPayload(

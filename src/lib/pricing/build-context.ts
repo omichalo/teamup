@@ -5,6 +5,8 @@ type RegistrationPricingInput = Pick<
   ClubRegistrationPayload,
   | "birthDate"
   | "mainSectionId"
+  | "slotIds"
+  | "additionalSectionIds"
   | "wantsCompetitorExtras"
   | "wantsOptionalJersey"
   | "competitionIds"
@@ -31,6 +33,13 @@ export function buildPricingContext(
     familyRegistrationOrder: input.familyRegistrationOrder,
     sex: input.sex,
   };
+
+  if (input.slotIds.length > 0) {
+    ctx.slotIds = [...input.slotIds];
+  }
+  if (input.additionalSectionIds.length > 0) {
+    ctx.additionalSectionIds = [...input.additionalSectionIds];
+  }
 
   if (input.pricingDate) {
     ctx.pricingDate = input.pricingDate;

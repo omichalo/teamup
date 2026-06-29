@@ -27,15 +27,14 @@ import {
   type RemainingPaymentMethodId,
 } from "@/lib/club-registration/payment-constants";
 import { calculatePaymentSummary } from "@/lib/club-registration/payment/calculate-payment-summary";
-import {
-  centsToEurosInput,
-  eurosInputToCents,
-  normalizePaymentAidList,
-} from "@/lib/club-registration/payment/payment-draft-helpers";
+import { normalizePaymentAidList } from "@/lib/club-registration/payment/payment-draft-helpers";
 import { BNPL_ADHERENT_WIZARD_MESSAGE } from "@/lib/club-registration/payment/bnpl-checkout-copy";
 import { formatCentsAsEuros } from "@/lib/pricing";
 import type { RegistrationDraft } from "./registration-defaults";
 import { usePricingQuote, type PricingBreakdownDraft } from "./PricingBreakdown";
+import { VoluntaryDonationFields } from "./VoluntaryDonationFields";
+import { EuroMonetaryInputField } from "./EuroMonetaryInputField";
+import { resolveDonationPricing } from "@/lib/pricing/donation-discount";
 
 type Props = {
   draft: RegistrationDraft;
@@ -50,16 +49,20 @@ export function PaymentStep({ draft, onChange }: Props) {
   const quote = usePricingQuote(draft as PricingBreakdownDraft);
 
   const totalCents = quote?.totalCents ?? 0;
+  const donationPricing = quote
+    ? resolveDonationPricing(quote, draft.voluntaryDonationCents ?? 0)
+    : null;
+  const invoiceTotalCents = donationPricing?.invoiceTotalCents ?? totalCents;
 
   const summary = useMemo(
     () =>
       calculatePaymentSummary({
-        totalAmountCents: totalCents,
+        totalAmountCents: invoiceTotalCents,
         aids: normalizePaymentAidList(draft.paymentAids),
         receivedPayments: [],
         currentPaymentStatus: "pending_validation",
       }),
-    [totalCents, draft.paymentAids]
+    [invoiceTotalCents, draft.paymentAids]
   );
 
   const setPaymentMethod = (method: PaymentMethodId) => {
@@ -94,8 +97,22 @@ export function PaymentStep({ draft, onChange }: Props) {
         >
           <Stack spacing={0.5}>
             <Typography variant="body2">
-              Montant total : <strong>{formatCentsAsEuros(totalCents)}</strong>
+              Montant catalogue : <strong>{formatCentsAsEuros(totalCents)}</strong>
             </Typography>
+            {donationPricing && donationPricing.voluntaryDonationCents > 0 ? (
+              <>
+                <Typography variant="body2">
+                  Don :{" "}
+                  <strong>
+                    {formatCentsAsEuros(donationPricing.voluntaryDonationCents)}
+                  </strong>
+                </Typography>
+                <Typography variant="body2">
+                  Remise don :{" "}
+                  <strong>−{formatCentsAsEuros(donationPricing.donationDiscountCents)}</strong>
+                </Typography>
+              </>
+            ) : null}
             <Typography variant="body2">
               Aides déclarées :{" "}
               <strong>{formatCentsAsEuros(summary.assistanceTotalAmountCents)}</strong>
@@ -113,6 +130,12 @@ export function PaymentStep({ draft, onChange }: Props) {
           montants à l&apos;étape « Dossier administratif ».
         </Alert>
       ) : null}
+
+      <VoluntaryDonationFields
+        quote={quote}
+        voluntaryDonationCents={draft.voluntaryDonationCents ?? 0}
+        onChange={(voluntaryDonationCents) => onChange({ voluntaryDonationCents })}
+      />
 
       <Stack spacing={1.5}>
         <Typography variant="subtitle1" component="h3" sx={{ fontWeight: 700 }}>
@@ -183,16 +206,15 @@ export function PaymentStep({ draft, onChange }: Props) {
             Les chèques vacances peuvent couvrir tout ou partie du règlement. En cas
             de complément, le secrétariat vous indiquera la marche à suivre.
           </Alert>
-          <TextField
-            label="Montant prévu en chèques vacances (€)"
-            value={centsToEurosInput(draft.holidayVoucherAmountCents ?? 0)}
-            onChange={(e) =>
-              onChange({
-                holidayVoucherAmountCents: eurosInputToCents(e.target.value) || null,
-              })
+          <EuroMonetaryInputField
+            label="Montant prévu en chèques vacances"
+            amountCents={draft.holidayVoucherAmountCents ?? 0}
+            onCommitCents={(cents) =>
+              onChange({ holidayVoucherAmountCents: cents > 0 ? cents : null })
             }
             fullWidth
-            inputProps={{ "data-field": "holidayVoucherAmountCents" }}
+            dataField="holidayVoucherAmountCents"
+            endAdornment="€"
           />
           <FormControl fullWidth>
             <InputLabel id="remaining-payment-method-label">

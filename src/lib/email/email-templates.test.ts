@@ -2,7 +2,7 @@ import { SQYPING_COLORS, SQYPING_SECRETARIAT_EMAIL } from "@/lib/email/brand";
 import { buildVerificationEmail } from "@/lib/email/auth-emails";
 import { buildPasswordResetEmail } from "@/lib/email/auth-emails";
 import { buildSqyPingEmailLayout } from "@/lib/email/layout";
-import { buildPaymentRequestEmail } from "@/lib/email/payment-email";
+import { buildPaymentRequestEmail, buildPaymentRequestEmailSubject } from "@/lib/email/payment-email";
 import { adaptEmailHtmlForFilePreview } from "@/lib/email/preview";
 import { buildPaymentConfirmedEmail } from "@/lib/email/payment-confirmed-email";
 import { buildPaymentInstructionsEmail } from "@/lib/email/payment-instructions-email";
@@ -253,11 +253,11 @@ describe("buildPaymentRequestEmail", () => {
   };
 
   it("affiche un tableau détaillé quand un devis est fourni", () => {
-    const checkoutUrl = "https://checkout.stripe.com/pay/cs_test";
+    const mesInscriptionsUrl = `${APP_ORIGIN}/club/mes-inscriptions?registration=reg-test-1`;
     const { html, text } = buildPaymentRequestEmail({
+      registrationId: "reg-test-1",
       adherentName: "Marie Dupont",
       amountCents: 15000,
-      checkoutUrl,
       appOrigin: APP_ORIGIN,
       quote,
     });
@@ -265,26 +265,54 @@ describe("buildPaymentRequestEmail", () => {
     expect(html).toContain("Marie Dupont");
     expect(html).toContain("Cotisation loisir");
     expect(html).toContain("150,00");
-    expect(html).toContain(checkoutUrl);
-    expect(html).toContain("Payer");
+    expect(html).toContain(mesInscriptionsUrl);
+    expect(html).toContain("Finaliser mon adhésion");
+    expect(html).not.toContain("checkout.stripe.com");
     expect(html).toContain(BNPL_COPY_TEST_MARKER);
     expect(html).toContain(SQYPING_SECRETARIAT_EMAIL);
     expect(text).toContain("Cotisation loisir");
     expect(text).toContain(BNPL_COPY_TEST_MARKER);
     expect(text).toContain(SQYPING_SECRETARIAT_EMAIL);
-    expect(text).toContain(checkoutUrl);
+    expect(text).toContain(mesInscriptionsUrl);
+    expect(text).toContain("Mes dossiers");
+    expect(text).toContain("24 heures");
   });
 
-  it("fonctionne sans devis détaillé (mode legacy)", () => {
-    const { html } = buildPaymentRequestEmail({
-      adherentName: "Paul Martin",
-      amountCents: 8000,
-      checkoutUrl: "https://checkout.stripe.com/pay/cs_legacy",
+  it("adapte l'objet et l'intro pour un renvoi", () => {
+    const mesInscriptionsUrl = `${APP_ORIGIN}/club/mes-inscriptions?registration=reg-test-1`;
+    const { html, text } = buildPaymentRequestEmail({
+      registrationId: "reg-test-1",
+      adherentName: "Marie Dupont",
+      amountCents: 15000,
       appOrigin: APP_ORIGIN,
-      quote: null,
+      variant: "resend",
     });
 
-    expect(html).toContain("80,00");
-    expect(html).not.toContain("Détail de votre adhésion");
+    expect(buildPaymentRequestEmailSubject("Marie Dupont", "resend")).toContain("Rappel");
+    expect(html).toContain("attend encore votre règlement");
+    expect(html).not.toContain("validé administrativement");
+    expect(html).toContain(mesInscriptionsUrl);
+    expect(text).toContain("attend encore votre règlement");
+  });
+
+  it("affiche le net après aides secrétariat dans le total", () => {
+    const { html } = buildPaymentRequestEmail({
+      registrationId: "reg-test-1",
+      adherentName: "Test User",
+      amountCents: 35_400,
+      appOrigin: APP_ORIGIN,
+      quote,
+      donationPricing: {
+        voluntaryDonationCents: 20_000,
+        donationDiscountCents: 5_000,
+        membershipNetCents: 16_000,
+        invoiceTotalCents: 37_400,
+      },
+      secretariatAids: [{ type: "pass_sport", label: "Pass Sport", amountCents: 2_000 }],
+    });
+
+    expect(html).toContain("Pass Sport");
+    expect(html).toContain("354,00");
+    expect(html).not.toMatch(/Total à régler[\s\S]*374,00/);
   });
 });

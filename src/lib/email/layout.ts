@@ -36,6 +36,8 @@ export type BuildSqyPingEmailLayoutOptions = {
   /** Encart d'information ou d'avertissement. */
   noticeHtml?: string;
   noticeVariant?: EmailNoticeVariant;
+  /** Contenu affiché après le bouton et le lien de secours (mentions légales, rappels…). */
+  afterActionHtml?: string;
 };
 
 function noticeStyles(variant: EmailNoticeVariant): {
@@ -115,6 +117,7 @@ export function buildSqyPingEmailLayout(
     fallbackLink,
     noticeHtml,
     noticeVariant = "info",
+    afterActionHtml,
   } = options;
 
   const safeTitle = escapeHtml(title);
@@ -127,6 +130,7 @@ export function buildSqyPingEmailLayout(
   const actionBlock = primaryAction ? renderPrimaryAction(primaryAction) : "";
   const fallbackBlock = fallbackLink ? renderFallbackLink(fallbackLink) : "";
   const noticeBlock = noticeHtml ? renderNotice(noticeHtml, noticeVariant) : "";
+  const afterActionBlock = afterActionHtml ?? "";
 
   return `<!DOCTYPE html>
 <html lang="fr">
@@ -161,9 +165,10 @@ export function buildSqyPingEmailLayout(
                 ${safeTitle}
               </h1>
               ${bodyHtml}
+              ${noticeBlock}
               ${actionBlock}
               ${fallbackBlock}
-              ${noticeBlock}
+              ${afterActionBlock}
             </td>
           </tr>
           <tr>

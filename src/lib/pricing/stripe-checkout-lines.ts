@@ -1,7 +1,9 @@
 import type { StripePresentationConfig } from "@/lib/club-registration-config/types";
 import { getDefaultRegistrationConfig } from "@/lib/club-registration-config/default-config";
+import type { DonationPricingBreakdown } from "./donation-discount";
 import type { PriceLine, PriceQuote } from "./types";
 import { formatCentsAsEuros, stripeCheckoutLines } from "./format";
+import type { PaymentAid } from "@/lib/club-registration/payment/types";
 
 export type StripeCheckoutLineItem = {
   /** Libellé affiché sur la facture Stripe (ligne produit). */
@@ -14,6 +16,11 @@ export type StripeInvoiceCustomField = {
   name: string;
   value: string;
 };
+
+export type DonationStripeContext = Pick<
+  DonationPricingBreakdown,
+  "voluntaryDonationCents" | "donationDiscountCents"
+>;
 
 const STRIPE_CUSTOM_FIELD_VALUE_MAX = 500;
 
@@ -81,21 +88,46 @@ function buildMembershipStripeLine(
  */
 export function buildStripeInvoiceCustomFields(
   quote: PriceQuote,
-  stripePresentation?: StripePresentationConfig
+  stripePresentation?: StripePresentationConfig,
+  donation?: DonationStripeContext,
+  secretariatAids?: PaymentAid[]
 ): StripeInvoiceCustomField[] {
   const stripe =
     stripePresentation ?? getDefaultRegistrationConfig().stripePresentation;
-  const discountText = formatDiscountBreakdown(quote);
-  if (!discountText) {
-    return [];
-  }
+  const fields: StripeInvoiceCustomField[] = [];
 
-  return [
-    {
+  const discountText = formatDiscountBreakdown(quote);
+  if (discountText) {
+    fields.push({
       name: stripe.discountCustomFieldName,
       value: truncateForStripe(discountText, STRIPE_CUSTOM_FIELD_VALUE_MAX),
-    },
-  ];
+    });
+  }
+
+  if (donation && donation.voluntaryDonationCents > 0) {
+    fields.push({
+      name: "Don et remise adhésion",
+      value: truncateForStripe(
+        `Don : ${formatCentsAsEuros(donation.voluntaryDonationCents)} ; remise 25 % (plaf. 73 €) : −${formatCentsAsEuros(donation.donationDiscountCents)}`,
+        STRIPE_CUSTOM_FIELD_VALUE_MAX
+      ),
+    });
+  }
+
+  const activeAids = (secretariatAids ?? []).filter((aid) => aid.amountCents > 0);
+  if (activeAids.length > 0) {
+    fields.push({
+      name: "Aides secrétariat",
+      value: truncateForStripe(
+        activeAids
+          .map((aid) => `${aid.label} : −${formatCentsAsEuros(aid.amountCents)}`)
+          .join(" ; "),
+        STRIPE_CUSTOM_FIELD_VALUE_MAX
+      ),
+    });
+  }
+
+  return fields;
 }
 
 /**
@@ -105,7 +137,8 @@ export function buildStripeInvoiceCustomFields(
  */
 export function buildStripeCheckoutLineItems(
   quote: PriceQuote,
-  stripePresentation?: StripePresentationConfig
+  stripePresentation?: StripePresentationConfig,
+  donation?: DonationStripeContext
 ): StripeCheckoutLineItem[] {
   const stripe =
     stripePresentation ?? getDefaultRegistrationConfig().stripePresentation;
@@ -142,6 +175,14 @@ export function buildStripeCheckoutLineItems(
     }
   }
 
+  if (donation && donation.voluntaryDonationCents > 0) {
+    items.push({
+      name: stripe.donationLabel,
+      amountCents: donation.voluntaryDonationCents,
+      description: "Don libre au profit du club",
+    });
+  }
+
   return items;
 }
 
@@ -149,13 +190,36 @@ export function sumStripeCheckoutLineItems(items: StripeCheckoutLineItem[]): num
   return items.reduce((sum, item) => sum + item.amountCents, 0);
 }
 
-/** Vérifie la cohérence entre le devis et les lignes envoyées à Stripe. */
+/** Montant encaissé après coupon de remise don (si applicable). */
+export function computeStripeCheckoutPayableCents(
+  quote: PriceQuote,
+  items: StripeCheckoutLineItem[],
+  donation?: DonationStripeContext
+): number {
+  const lineSum = sumStripeCheckoutLineItems(items);
+  const discount = donation?.donationDiscountCents ?? 0;
+  const expectedFromQuote =
+    quote.totalCents + (donation?.voluntaryDonationCents ?? 0) - discount;
+  if (lineSum - discount !== expectedFromQuote) {
+    throw new Error(
+      `Incohérence lignes Stripe : somme ${lineSum} cts, remise ${discount} cts, attendu ${expectedFromQuote} cts`
+    );
+  }
+  return lineSum - discount;
+}
+
+/** Vérifie la cohérence entre le devis, le don et les lignes envoyées à Stripe. */
 export function assertStripeLinesMatchQuote(
   quote: PriceQuote,
-  items: StripeCheckoutLineItem[]
+  items: StripeCheckoutLineItem[],
+  donation?: DonationStripeContext
 ): void {
-  const expected = quote.totalCents;
-  const actual = sumStripeCheckoutLineItems(items);
+  const expected = donation
+    ? quote.totalCents +
+      donation.voluntaryDonationCents -
+      donation.donationDiscountCents
+    : quote.totalCents;
+  const actual = computeStripeCheckoutPayableCents(quote, items, donation);
   if (actual !== expected) {
     throw new Error(
       `Incohérence devis / Stripe : attendu ${expected} cts, obtenu ${actual} cts`

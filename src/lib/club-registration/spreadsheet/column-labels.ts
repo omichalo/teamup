@@ -72,6 +72,8 @@ export const SPREADSHEET_COLUMN_LABELS: Record<SpreadsheetColumnId, string> = {
   remainingPaymentMethod: "Solde à régler par",
   paymentNote: "Note paiement",
   specialPaymentNote: "Note paiement spéciale",
+  voluntaryDonationCents: "Don libre (centimes)",
+  donationDiscountCents: "Remise don (centimes)",
   submittedAt: "Soumis le",
   updatedAt: "Mis à jour le",
 };

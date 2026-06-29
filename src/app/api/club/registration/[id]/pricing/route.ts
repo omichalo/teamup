@@ -8,6 +8,10 @@ import { hasAnyRole, resolveRole, USER_ROLES } from "@/lib/auth/roles";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
 import { AUDIT_ACTIONS, logAuditAction } from "@/lib/auth/audit-logger";
 import { calculateQuoteForRecord } from "@/lib/club-registration-config/pricing-resolve";
+import {
+  readVoluntaryDonationCents,
+  resolveRegistrationDonationPricing,
+} from "@/lib/club-registration/resolve-registration-donation";
 import type { PriceQuote } from "@/lib/pricing/types";
 
 const COLLECTION = "clubRegistrations";
@@ -16,6 +20,8 @@ const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
 const PRICING_INPUT_FIELDS = [
   "birthDate",
   "mainSectionId",
+  "slotIds",
+  "additionalSectionIds",
   "wantsCompetitorExtras",
   "wantsOptionalJersey",
   "competitionIds",
@@ -150,7 +156,9 @@ export async function POST(
         updatedAt: FieldValue.serverTimestamp(),
       };
       if (applyPaymentAmount && quote.totalCents > 0) {
-        patch.paymentAmountCents = quote.totalCents;
+        const donation = resolveRegistrationDonationPricing(quote, merged);
+        patch.paymentAmountCents = donation.invoiceTotalCents;
+        patch.donationDiscountCents = donation.donationDiscountCents;
       }
       if (body.handisportPracticeLevel !== undefined) {
         patch.handisportPracticeLevel = body.handisportPracticeLevel;
@@ -170,11 +178,18 @@ export async function POST(
       });
     }
 
+    const donationCents = readVoluntaryDonationCents(merged);
+    const paymentAmountCents =
+      applyPaymentAmount && result.quote.totalCents > 0
+        ? resolveRegistrationDonationPricing(result.quote, merged).invoiceTotalCents
+        : undefined;
+
     return jsonNoStore(
       {
-        quote,
+        quote: result.quote,
         persisted: persist,
-        paymentAmountCents: applyPaymentAmount ? quote.totalCents : undefined,
+        paymentAmountCents,
+        voluntaryDonationCents: donationCents,
       },
       { status: 200 }
     );

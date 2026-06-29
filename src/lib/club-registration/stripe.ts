@@ -29,6 +29,40 @@ export function getAppBaseUrl(req: Request): string {
   return resolveAppOrigin(req);
 }
 
+export async function createAmountOffCheckoutCoupon(params: {
+  registrationId: string;
+  amountOffCents: number;
+  name: string;
+  kind?: string;
+}): Promise<string> {
+  if (params.amountOffCents <= 0) {
+    throw new Error("Montant de remise invalide");
+  }
+
+  const body = new URLSearchParams();
+  body.set("duration", "once");
+  body.set("amount_off", String(params.amountOffCents));
+  body.set("currency", "eur");
+  body.set("name", params.name);
+  body.set("metadata[registrationId]", params.registrationId);
+  body.set("metadata[kind]", params.kind ?? "checkout_discount");
+
+  const coupon = await postStripeForm<{ id: string }>("/v1/coupons", body);
+  return coupon.id;
+}
+
+/** Coupon de remise liée au don libre (25 %, plaf. 73 €). */
+export async function createDonationDiscountCoupon(params: {
+  registrationId: string;
+  amountOffCents: number;
+  name: string;
+}): Promise<string> {
+  return createAmountOffCheckoutCoupon({
+    ...params,
+    kind: "donation_discount",
+  });
+}
+
 export async function createMembershipCheckoutSession(params: {
   registrationId: string;
   lineItems: StripeCheckoutLineItem[];
@@ -43,6 +77,10 @@ export async function createMembershipCheckoutSession(params: {
   cancelUrl: string;
   /** Champs informatifs sur la facture (ex. détail des remises). */
   invoiceCustomFields?: StripeInvoiceCustomField[];
+  /** Coupons Stripe (remise don, aides secrétariat…) appliqués à la session Checkout. */
+  discountCouponIds?: string[];
+  donationCents?: number;
+  donationDiscountCents?: number;
 }): Promise<StripeCheckoutSession> {
   if (params.lineItems.length === 0) {
     throw new Error("Au moins une ligne de paiement est requise.");
@@ -63,9 +101,20 @@ export async function createMembershipCheckoutSession(params: {
   body.set("metadata[registrationId]", params.registrationId);
   body.set("metadata[catalogVersion]", params.catalogVersion);
   body.set("metadata[quoteHash]", params.quoteHash);
+  if (params.donationCents != null && params.donationCents > 0) {
+    body.set("metadata[donationCents]", String(params.donationCents));
+  }
+  if (params.donationDiscountCents != null && params.donationDiscountCents > 0) {
+    body.set("metadata[donationDiscountCents]", String(params.donationDiscountCents));
+  }
   body.set("payment_intent_data[metadata][registrationId]", params.registrationId);
   body.set("payment_intent_data[metadata][catalogVersion]", params.catalogVersion);
   body.set("payment_intent_data[metadata][quoteHash]", params.quoteHash);
+  const expiresAt = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
+  body.set("expires_at", String(expiresAt));
+  (params.discountCouponIds ?? []).forEach((couponId, index) => {
+    body.set(`discounts[${index}][coupon]`, couponId);
+  });
   body.set("invoice_creation[enabled]", "true");
   body.set("invoice_creation[invoice_data][description]", params.invoiceDescription);
 
@@ -257,38 +306,51 @@ export async function retrieveStripeInvoiceLinks(
   };
 }
 
-/**
- * Crée une facture Stripe "payée hors ligne" pour les encaissements manuels.
- * Permet d'avoir un format de facture homogène (Checkout + hors Checkout).
- */
-export async function createPaidOutOfBandInvoice(params: {
+export type PaidOutOfBandInvoiceParams = {
   registrationId: string;
   customerEmail: string;
-  amountCents: number;
-  description: string;
-}): Promise<{ invoiceId: string }> {
-  if (params.amountCents <= 0) {
-    throw new Error("Montant de facture invalide");
+  customerName: string;
+  invoiceDescription: string;
+  lineItems: StripeCheckoutLineItem[];
+  /** Coupons à appliquer (remise don, aides…), dans l'ordre d'affichage souhaité. */
+  discountCouponIds?: string[];
+};
+
+/**
+ * Crée une facture Stripe "payée hors ligne" pour les encaissements manuels.
+ * Même ventilation multi-lignes (+ coupon remise don) que le Checkout.
+ */
+export async function createPaidOutOfBandInvoice(
+  params: PaidOutOfBandInvoiceParams
+): Promise<{ invoiceId: string }> {
+  if (params.lineItems.length === 0) {
+    throw new Error("Aucune ligne de facture");
   }
 
-  const customerBody = new URLSearchParams();
-  customerBody.set("email", params.customerEmail);
-  customerBody.set("metadata[registrationId]", params.registrationId);
-  const customer = await postStripeForm<{ id: string }>("/v1/customers", customerBody);
+  const customerId = await findOrCreateStripeCheckoutCustomer({
+    registrationId: params.registrationId,
+    customerEmail: params.customerEmail,
+    customerName: params.customerName,
+  });
 
-  const invoiceItemBody = new URLSearchParams();
-  invoiceItemBody.set("customer", customer.id);
-  invoiceItemBody.set("currency", "eur");
-  invoiceItemBody.set("amount", String(params.amountCents));
-  invoiceItemBody.set("description", `Adhésion SQY Ping — dossier ${params.registrationId}`);
-  await postStripeForm<{ id: string }>("/v1/invoiceitems", invoiceItemBody);
+  for (const item of params.lineItems) {
+    const invoiceItemBody = new URLSearchParams();
+    invoiceItemBody.set("customer", customerId);
+    invoiceItemBody.set("currency", "eur");
+    invoiceItemBody.set("amount", String(item.amountCents));
+    invoiceItemBody.set("description", item.description ?? item.name);
+    await postStripeForm<{ id: string }>("/v1/invoiceitems", invoiceItemBody);
+  }
 
   const invoiceBody = new URLSearchParams();
-  invoiceBody.set("customer", customer.id);
-  invoiceBody.set("description", params.description);
+  invoiceBody.set("customer", customerId);
+  invoiceBody.set("description", params.invoiceDescription);
   invoiceBody.set("collection_method", "send_invoice");
   invoiceBody.set("auto_advance", "false");
   invoiceBody.set("metadata[registrationId]", params.registrationId);
+  (params.discountCouponIds ?? []).forEach((couponId, index) => {
+    invoiceBody.set(`discounts[${index}][coupon]`, couponId);
+  });
   const draftInvoice = await postStripeForm<StripeInvoice>("/v1/invoices", invoiceBody);
 
   const finalizedInvoice = await postStripeForm<StripeInvoice>(

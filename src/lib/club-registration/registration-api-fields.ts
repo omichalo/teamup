@@ -70,6 +70,8 @@ export const REGISTRATION_CLIENT_FIELDS = [
   "remainingPaymentMethod",
   "paymentNote",
   "specialPaymentNote",
+  "voluntaryDonationCents",
+  "donationDiscountCents",
 ] as const;
 
 export const MANAGER_EDITABLE_FIELDS = [
@@ -116,4 +118,5 @@ export const MANAGER_EDITABLE_FIELDS = [
   "reviewNotes",
   "paymentAmountCents",
   "handisportPracticeLevel",
+  "voluntaryDonationCents",
 ] as const;

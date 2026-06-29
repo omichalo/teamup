@@ -9,6 +9,17 @@ import { resolveRegistrationContactEmail } from "@/lib/club-registration/resolve
 import { isRegistrationPaidRecord } from "@/lib/club-registration/payment-proof";
 import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
 import {
+  calculateQuoteForRecord,
+  resolveRegistrationConfigForRecord,
+} from "@/lib/club-registration-config/pricing-resolve";
+import { renderInvoiceHeader } from "@/lib/club-registration-config/helpers";
+import { resolveRegistrationDonationPricing } from "@/lib/club-registration/resolve-registration-donation";
+import { createCheckoutDiscountCouponIds } from "@/lib/club-registration/stripe-checkout-discounts";
+import {
+  buildStripeCheckoutLineItems,
+} from "@/lib/pricing/stripe-checkout-lines";
+import type { PriceQuote } from "@/lib/pricing/types";
+import {
   createPaidOutOfBandInvoice,
   pickInvoiceDownloadUrl,
   retrieveStripeInvoiceLinks,
@@ -29,6 +40,14 @@ function resolveInvoiceAmountCents(data: Record<string, unknown>): number {
     return payment.amountToPayCents;
   }
   return 0;
+}
+
+function readStoredQuote(data: Record<string, unknown>): PriceQuote | null {
+  const quote = data.pricingQuote;
+  if (!quote || typeof quote !== "object") {
+    return null;
+  }
+  return quote as PriceQuote;
 }
 
 /**
@@ -96,13 +115,65 @@ export async function GET(
           typeof data.lastName === "string" ? data.lastName : ""
         }`.trim() || "adhérent";
 
-      const created = await createPaidOutOfBandInvoice({
-        registrationId: id,
-        customerEmail: email,
-        amountCents,
-        description: `Adhésion SQY Ping — ${adherentName}`,
-      });
-      invoiceId = created.invoiceId;
+      const quote = readStoredQuote(data) ?? (await calculateQuoteForRecord(data));
+      const pricingConfig = await resolveRegistrationConfigForRecord(data);
+
+      if (quote) {
+        const donationPricing = resolveRegistrationDonationPricing(quote, data);
+        const donationContext =
+          donationPricing.voluntaryDonationCents > 0
+            ? {
+                voluntaryDonationCents: donationPricing.voluntaryDonationCents,
+                donationDiscountCents: donationPricing.donationDiscountCents,
+              }
+            : undefined;
+        const lineItems = buildStripeCheckoutLineItems(
+          quote,
+          pricingConfig.stripePresentation,
+          donationContext
+        );
+        const payment = normalizeRegistrationPayment(data);
+        const discountCouponIds = await createCheckoutDiscountCouponIds({
+          registrationId: id,
+          donationDiscountCents: donationPricing.donationDiscountCents,
+          donationDiscountCouponName:
+            pricingConfig.stripePresentation.donationDiscountCouponName,
+          aids: payment?.aids ?? [],
+        });
+
+        const created = await createPaidOutOfBandInvoice({
+          registrationId: id,
+          customerEmail: email,
+          customerName: adherentName,
+          invoiceDescription: renderInvoiceHeader(
+            pricingConfig.stripePresentation.invoiceHeaderTemplate,
+            {
+              clubName: pricingConfig.meta.clubName,
+              registrationId: id,
+              adherentName,
+            }
+          ),
+          lineItems,
+          discountCouponIds,
+        });
+        invoiceId = created.invoiceId;
+      } else {
+        const created = await createPaidOutOfBandInvoice({
+          registrationId: id,
+          customerEmail: email,
+          customerName: adherentName,
+          invoiceDescription: `Adhésion SQY Ping — ${adherentName}`,
+          lineItems: [
+            {
+              name: "Adhésion SQY Ping",
+              amountCents,
+              description: `Dossier ${id}`,
+            },
+          ],
+        });
+        invoiceId = created.invoiceId;
+      }
+
       await db.collection(COLLECTION).doc(id).set(
         {
           stripeInvoiceId: invoiceId,

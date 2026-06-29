@@ -21,7 +21,8 @@ export {
   buildStripeInvoiceCustomFields,
   formatDiscountBreakdown,
   sumStripeCheckoutLineItems,
-  type StripeCheckoutLineItem,
+  computeStripeCheckoutPayableCents,
+  type DonationStripeContext,
   type StripeInvoiceCustomField,
 } from "./stripe-checkout-lines";
 export {
@@ -30,6 +31,17 @@ export {
   resolveSportAdapteAgeBand,
 } from "./resolve-age-band";
 export { resolveBaseRates } from "./resolve-base-rates";
+export {
+  DONATION_DISCOUNT_MAX_CENTS,
+  DONATION_DISCOUNT_RATE,
+  VOLUNTARY_DONATION_MIN_CENTS,
+  computeDonationDiscountCents,
+  computeInvoiceTotalCents,
+  getMembershipNetCents,
+  isValidVoluntaryDonationCents,
+  resolveDonationPricing,
+  type DonationPricingBreakdown,
+} from "./donation-discount";
 export {
   PRICING_CATALOG_VERSION,
   type FamilyRegistrationOrder,

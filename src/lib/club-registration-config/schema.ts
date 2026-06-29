@@ -5,6 +5,8 @@ import { REGISTRATION_CONFIG_SCHEMA_VERSION } from "./types";
 import type { RegistrationConfigV1 } from "./types";
 import { repairPricingProfiles } from "./pricing-profiles";
 import { repairJerseyConfig } from "./repair-jersey";
+import { repairPricingDevices } from "./pricing-devices";
+import { repairChampYonCatalog } from "./repair-champ-yon-catalog";
 
 const pricingProfileBehaviorSchema = z.enum(["classic_like", "handisport", "sport_adapte"]);
 
@@ -152,11 +154,47 @@ const stripePresentationSchema = z.object({
   competitorJerseyInfoLabel: z.string().trim().min(1).max(300),
   invoiceHeaderTemplate: z.string().trim().min(1).max(300),
   discountCustomFieldName: z.string().trim().min(1).max(200),
+  donationLabel: z.string().trim().min(1).max(200).default("Don libre au club"),
+  donationDiscountCouponName: z
+    .string()
+    .trim()
+    .min(1)
+    .max(200)
+    .default("Remise don — 25 % (plaf. 73 €)"),
 });
 
 const jerseyCatalogSchema = z.object({
   optionalPriceCents: z.number().int().min(0),
   optionalStripeLabel: z.string().trim().min(1).max(300),
+});
+
+const pricingDeviceConditionsSchema = z.object({
+  sectionIds: z.array(z.string().trim().min(1).max(80)).min(1),
+  exactSlotCount: z.number().int().min(0),
+  requiresNoAdditionalSections: z.boolean(),
+  requiresNoCompetitorExtras: z.boolean(),
+  requiresNoCompetitionSelection: z.boolean(),
+});
+
+const pricingDeviceUiCopySchema = z.object({
+  recapHint: z.string().trim().min(1).max(500).optional(),
+  adminBadge: z.string().trim().min(1).max(80).optional(),
+  segmentLabelPrefix: z.string().trim().min(1).max(120).optional(),
+});
+
+const pricingDeviceSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  label: z.string().trim().min(1).max(200),
+  enabled: z.boolean(),
+  sortOrder: z.number().int().min(0),
+  priority: z.number().int().min(0),
+  conditions: pricingDeviceConditionsSchema,
+  pricingProfileId: pricingProfileIdSchema,
+  ageBandProfileId: z.string().trim().min(1).max(80).optional(),
+  stackableWithDiscounts: z.boolean(),
+  includesFfttLicense: z.boolean().default(true),
+  uiCopy: pricingDeviceUiCopySchema.optional(),
+  builtIn: z.boolean().optional(),
 });
 
 const registrationUiCopySchema = z.object({
@@ -200,9 +238,12 @@ export const registrationConfigV1Schema = z
   stripePresentation: stripePresentationSchema,
   jersey: jerseyCatalogSchema.optional(),
   uiCopy: registrationUiCopySchema,
+  pricingDevices: z.array(pricingDeviceSchema).optional(),
 })
   .transform((config) => repairPricingProfiles(config as RegistrationConfigV1))
-  .transform((config) => repairJerseyConfig(config as RegistrationConfigV1));
+  .transform((config) => repairJerseyConfig(config as RegistrationConfigV1))
+  .transform((config) => repairChampYonCatalog(config as RegistrationConfigV1))
+  .transform((config) => repairPricingDevices(config as RegistrationConfigV1));
 
 export const registrationConfigExportSchema = z.object({
   schemaVersion: z.literal(REGISTRATION_CONFIG_SCHEMA_VERSION),

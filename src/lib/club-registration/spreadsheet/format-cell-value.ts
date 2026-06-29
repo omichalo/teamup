@@ -11,9 +11,9 @@ import {
   PAYMENT_STATUS_LABELS,
   REMAINING_PAYMENT_METHOD_LABELS,
   type PaymentMethodId,
-  type PaymentStatusId,
   type RemainingPaymentMethodId,
 } from "@/lib/club-registration/payment-constants";
+import { resolveRegistrationPaymentStatus } from "@/lib/club-registration/resolve-registration-payment-status";
 import {
   REGISTRATION_STATUS_LABELS,
   type RegistrationStatus,
@@ -250,10 +250,10 @@ export function formatSpreadsheetCellValue(
       return typeof value === "string"
         ? (REGISTRATION_STATUS_LABELS[value as RegistrationStatus] ?? value)
         : "";
-    case "paymentStatus":
-      return typeof value === "string"
-        ? (PAYMENT_STATUS_LABELS[value as PaymentStatusId] ?? value)
-        : "";
+    case "paymentStatus": {
+      const resolved = resolveRegistrationPaymentStatus(row);
+      return resolved ? PAYMENT_STATUS_LABELS[resolved] : "";
+    }
     case "paymentMethod":
       return typeof value === "string"
         ? (PAYMENT_METHOD_LABELS[value as PaymentMethodId] ?? value)
@@ -264,6 +264,8 @@ export function formatSpreadsheetCellValue(
         : "";
     case "paymentAmountCents":
     case "holidayVoucherAmountCents":
+    case "voluntaryDonationCents":
+    case "donationDiscountCents":
       return formatCents(value);
     case "submittedAt":
     case "updatedAt":
