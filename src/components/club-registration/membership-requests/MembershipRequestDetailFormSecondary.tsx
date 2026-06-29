@@ -31,15 +31,22 @@ import {
   MEDICAL_CERTIFICATE_STATUS_OPTIONS,
   MEDICAL_OPTIONS,
 } from "./membership-request-detail-shared";
+import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
+import { DeleteRegistrationSection } from "./DeleteRegistrationSection";
 import type { MembershipRequestDetailState } from "./useMembershipRequestDetail";
 import type { EditableRegistration, MembershipListReloadFn } from "./types";
 
 type Props = {
   detail: MembershipRequestDetailState;
   onListReload?: MembershipListReloadFn | undefined;
+  onDeleted?: (() => void | Promise<void>) | undefined;
 };
 
-export function MembershipRequestDetailFormSecondary({ detail, onListReload }: Props) {
+export function MembershipRequestDetailFormSecondary({
+  detail,
+  onListReload,
+  onDeleted,
+}: Props) {
   const {
     config,
     registrationId,
@@ -358,6 +365,21 @@ export function MembershipRequestDetailFormSecondary({ detail, onListReload }: P
         }}
         onRequestPayment={requestPayment}
       />
+
+      {registrationId ? (
+        <DeleteRegistrationSection
+          registrationId={registrationId}
+          firstName={form.firstName}
+          lastName={form.lastName}
+          adherentDisplayName={formatPersonDisplayName(form.firstName, form.lastName)}
+          status={selected.status ?? null}
+          disabled={saving || requestingPayment || persistingQuote}
+          onDeleted={async () => {
+            await onListReload?.({ advance: "always" });
+            await onDeleted?.();
+          }}
+        />
+      ) : null}
     </Stack>
   );
 }

@@ -261,6 +261,14 @@ service cloud.firestore {
     }
 
     // ============================================
+    // Collection: clubRegistrationSubmissionAttempts
+    // ============================================
+    // Idempotence des soumissions (double-clic) — Admin SDK uniquement.
+    match /clubRegistrationSubmissionAttempts/{attemptId} {
+      allow read, write: if false;
+    }
+
+    // ============================================
     // Règle par défaut : refuser tout accès non explicitement autorisé
     // ============================================
     match /{document=**} {

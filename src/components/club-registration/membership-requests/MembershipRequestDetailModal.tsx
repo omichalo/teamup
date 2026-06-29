@@ -18,6 +18,7 @@ type Props = {
   statusSummary?: RegistrationSummary | null | undefined;
   onClose: () => void;
   onListReload?: (() => Promise<void>) | undefined;
+  onDeleted?: (() => void | Promise<void>) | undefined;
 };
 
 export function MembershipRequestDetailModal({
@@ -26,6 +27,7 @@ export function MembershipRequestDetailModal({
   statusSummary,
   onClose,
   onListReload,
+  onDeleted,
 }: Props) {
   useMembershipRequestModalShortcuts({ open, onClose });
 
@@ -56,6 +58,7 @@ export function MembershipRequestDetailModal({
           registrationId={registrationId}
           statusSummary={statusSummary}
           onListReload={onListReload}
+          onDeleted={onDeleted}
           embedded={false}
           showAlerts
           emptyMessage="Chargement du dossier…"

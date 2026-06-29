@@ -196,6 +196,10 @@ export function MembershipRequestDetailFormPrimary({ detail, hideTitleHeader = f
       </Grid>
 
       <RegistrationFfttFields
+        registrationId={selected.id}
+        firstName={form.firstName}
+        lastName={form.lastName}
+        sex={form.sex}
         ffttLicense={form.ffttLicense}
         ffttLicenseLookup={form.ffttLicenseLookup}
         onPatch={patchFfttFields}

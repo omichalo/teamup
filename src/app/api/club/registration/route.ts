@@ -28,7 +28,13 @@ import {
   isApplicantNotesTooLong,
   normalizeApplicantNotes,
 } from "@/lib/club-registration/applicant-notes";
+import { createRegistrationWithIdempotency } from "@/lib/club-registration/create-registration-with-idempotency";
+import {
+  findRegistrationLicenseConflicts,
+  formatBlockingLicenseConflictMessage,
+} from "@/lib/club-registration/find-registration-license-conflicts";
 import { buildRegistrationSubmitDocument } from "@/lib/club-registration/persist-registration-on-submit";
+import { readSubmissionAttemptId } from "@/lib/club-registration/submission-attempt-id";
 import { resolveRegistrationContactEmail } from "@/lib/club-registration/resolve-registration-contact-email";
 import { stripSubmitterEmailFromRegistrationPayload } from "@/lib/club-registration/strip-submitter-email-from-payload";
 import { notifySecretariesOfNewRegistration } from "@/lib/club-registration/dispatch-registration-notifications";
@@ -141,6 +147,8 @@ export async function PATCH(req: Request) {
 
     Object.assign(updates, normalizeRegistrationLastNamePatch(updates));
 
+    const db = getFirestoreAdmin();
+
     if (updates.applicantNotes !== undefined) {
       if (typeof updates.applicantNotes !== "string") {
         return jsonNoStore({ error: "Précisions de l'inscrit invalides" }, { status: 400 });
@@ -193,6 +201,22 @@ export async function PATCH(req: Request) {
           { error: "Numéro de licence invalide" },
           { status: 400 }
         );
+      } else {
+        const licenseConflicts = await findRegistrationLicenseConflicts(
+          db,
+          updates.ffttLicense,
+          id
+        );
+        if (licenseConflicts.blocking.length > 0) {
+          const message = formatBlockingLicenseConflictMessage(licenseConflicts.blocking);
+          return jsonNoStore(
+            {
+              error: message,
+              fieldErrors: { ffttLicense: [message] },
+            },
+            { status: 400 }
+          );
+        }
       }
     }
 
@@ -211,7 +235,6 @@ export async function PATCH(req: Request) {
       }
     }
 
-    const db = getFirestoreAdmin();
     const docRef = db.collection(COLLECTION).doc(id);
     const snap = await docRef.get();
     if (!snap.exists) {
@@ -350,11 +373,38 @@ export async function POST(req: Request) {
     }
 
     const sanitizedPayload = payloadCheck.data;
+
+    if (sanitizedPayload.ffttLicense) {
+      const licenseConflicts = await findRegistrationLicenseConflicts(
+        getFirestoreAdmin(),
+        sanitizedPayload.ffttLicense
+      );
+      if (licenseConflicts.blocking.length > 0) {
+        const message = formatBlockingLicenseConflictMessage(licenseConflicts.blocking);
+        return jsonNoStore(
+          {
+            error: message,
+            fieldErrors: { ffttLicense: [message] },
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     const db = getFirestoreAdmin();
     const now = FieldValue.serverTimestamp();
+    const submissionAttemptId = readSubmissionAttemptId(req);
 
-    const docRef = await db.collection(COLLECTION).add(
-      stripUndefined(
+    const { id: registrationId, duplicated } = await createRegistrationWithIdempotency({
+      db,
+      submitterUid: decoded.uid,
+      attemptId: submissionAttemptId,
+      identity: {
+        firstName: sanitizedPayload.firstName,
+        lastName: sanitizedPayload.lastName,
+        birthDate: sanitizedPayload.birthDate,
+      },
+      documentData: stripUndefined(
         buildRegistrationSubmitDocument({
           payload: sanitizedPayload,
           config: activeConfig,
@@ -366,70 +416,73 @@ export async function POST(req: Request) {
           ),
           now,
         })
-      )
-    );
+      ),
+    });
 
     logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_SUBMITTED, decoded.uid, {
       resource: "clubRegistration",
-      resourceId: docRef.id,
+      resourceId: registrationId,
+      ...(duplicated ? { details: { duplicateSubmission: true } } : {}),
       success: true,
     });
 
-    const adherentName =
-      formatPersonDisplayName(sanitizedPayload.firstName, sanitizedPayload.lastName) ||
-      "adhérent";
-    const appOrigin = getAppBaseUrl(req);
-    const confirmationMail = buildRegistrationSubmittedEmail({
-      adherentName,
-      registrationId: docRef.id,
-      appOrigin,
-    });
-
-    const confirmationRecipients: string[] = [];
-    if (isClubRegistrationManager(role)) {
-      const contactEmail = resolveRegistrationContactEmail({
-        adherentEmail: sanitizedPayload.adherentEmail,
-        representatives: sanitizedPayload.representatives,
+    if (!duplicated) {
+      const adherentName =
+        formatPersonDisplayName(sanitizedPayload.firstName, sanitizedPayload.lastName) ||
+        "adhérent";
+      const appOrigin = getAppBaseUrl(req);
+      const confirmationMail = buildRegistrationSubmittedEmail({
+        adherentName,
+        registrationId,
+        appOrigin,
       });
-      if (contactEmail) {
-        confirmationRecipients.push(contactEmail);
-      }
-    } else {
-      const submitterEmail = decoded.email?.trim();
-      if (submitterEmail) {
-        confirmationRecipients.push(submitterEmail);
-      }
-    }
 
-    for (const to of confirmationRecipients) {
+      const confirmationRecipients: string[] = [];
+      if (isClubRegistrationManager(role)) {
+        const contactEmail = resolveRegistrationContactEmail({
+          adherentEmail: sanitizedPayload.adherentEmail,
+          representatives: sanitizedPayload.representatives,
+        });
+        if (contactEmail) {
+          confirmationRecipients.push(contactEmail);
+        }
+      } else {
+        const submitterEmail = decoded.email?.trim();
+        if (submitterEmail) {
+          confirmationRecipients.push(submitterEmail);
+        }
+      }
+
+      for (const to of confirmationRecipients) {
+        try {
+          await sendMail({
+            to,
+            subject: `Demande d'adhésion reçue — ${adherentName}`,
+            html: confirmationMail.html,
+            text: confirmationMail.text,
+            attachments: [getSqyPingLogoAttachment()],
+          });
+        } catch (emailError) {
+          console.error("[api/club/registration POST] confirmation email", emailError);
+        }
+      }
+
       try {
-        await sendMail({
-          to,
-          subject: `Demande d'adhésion reçue — ${adherentName}`,
-          html: confirmationMail.html,
-          text: confirmationMail.text,
-          attachments: [getSqyPingLogoAttachment()],
+        await notifySecretariesOfNewRegistration({
+          db,
+          req,
+          registrationId,
+          payload: sanitizedPayload,
+          config: activeConfig,
+          submitterAccountEmail: decoded.email ?? null,
+          isMinor: isMinorAt(sanitizedPayload.birthDate),
         });
       } catch (emailError) {
-        console.error("[api/club/registration POST] confirmation email", emailError);
+        console.error("[api/club/registration POST] secretary notification email", emailError);
       }
     }
 
-    try {
-      await notifySecretariesOfNewRegistration({
-        db,
-        req,
-        registrationId: docRef.id,
-        payload: sanitizedPayload,
-        config: activeConfig,
-        submitterAccountEmail: decoded.email ?? null,
-        isMinor: isMinorAt(sanitizedPayload.birthDate),
-      });
-    } catch (emailError) {
-      console.error("[api/club/registration POST] secretary notification email", emailError);
-    }
-
-    return jsonNoStore({ success: true, id: docRef.id }, { status: 200 });
+    return jsonNoStore({ success: true, id: registrationId }, { status: 200 });
   } catch (error) {
     console.error("[api/club/registration POST]", error);
     return jsonNoStore({ error: "Impossible d’enregistrer le dossier" }, { status: 500 });
