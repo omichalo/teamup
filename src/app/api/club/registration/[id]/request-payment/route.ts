@@ -6,15 +6,8 @@ import { jsonNoStore } from "@/lib/http/cache-headers";
 import { adminAuth, getFirestoreAdmin } from "@/lib/firebase-admin";
 import { hasAnyRole, resolveRole, USER_ROLES } from "@/lib/auth/roles";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
-import { buildPaymentInstructionsEmail } from "@/lib/email/payment-instructions-email";
-import { buildPaymentRequestEmail } from "@/lib/email/payment-email";
-import { getSqyPingLogoAttachment } from "@/lib/email/logo-attachment";
-import { sendMail } from "@/lib/mailer";
-import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
-import { AUDIT_ACTIONS, logAuditAction } from "@/lib/auth/audit-logger";
+import { isRegistrationPaidRecord } from "@/lib/club-registration/payment-proof";
 import {
-  createLegacySingleLineCheckoutSession,
-  createMembershipCheckoutSession,
   createStripePaymentForRegistration,
   getAppBaseUrl,
 } from "@/lib/club-registration/stripe";
@@ -22,24 +15,21 @@ import {
   normalizeRegistrationPayment,
   paymentToFirestoreUpdate,
 } from "@/lib/club-registration/payment/normalize-payment";
-import {
-  recalculateRegistrationPayment,
-  regenerateExpectedPayments,
-  setManualFollowUp,
-} from "@/lib/club-registration/payment/payment-mutations";
+import { recalculateRegistrationPayment } from "@/lib/club-registration/payment/payment-mutations";
 import {
   calculateQuoteForRecord,
   resolveRegistrationConfigForRecord,
 } from "@/lib/club-registration-config/pricing-resolve";
-import { renderInvoiceHeader } from "@/lib/club-registration-config/helpers";
-import { hashPriceQuote } from "@/lib/pricing/quote-hash";
-import {
-  assertStripeLinesMatchQuote,
-  buildStripeCheckoutLineItems,
-  buildStripeInvoiceCustomFields,
-} from "@/lib/pricing/stripe-checkout-lines";
+import { resolveRegistrationDonationPricing } from "@/lib/club-registration/resolve-registration-donation";
 import { resolveRegistrationContactEmail } from "@/lib/club-registration/resolve-registration-contact-email";
-import type { RegistrationPayment } from "@/lib/club-registration/payment/types";
+import {
+  persistPaymentRequestedAndNotify,
+  processManualPaymentFollowUp,
+  recalculatePaymentForRequest,
+  validateRegistrationStripeCheckout,
+} from "@/lib/club-registration/request-payment-checkout";
+import { buildMesInscriptionsUrl } from "@/lib/club-registration/mes-inscriptions-url";
+import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
 import type { PriceQuote } from "@/lib/pricing/types";
 
 const COLLECTION = "clubRegistrations";
@@ -85,6 +75,17 @@ export async function POST(
     }
 
     const data = snap.data() ?? {};
+    if (isRegistrationPaidRecord(data)) {
+      return jsonNoStore(
+        {
+          error:
+            "Ce dossier est déjà réglé (paiement enregistré). Impossible de renvoyer un lien de paiement.",
+        },
+        { status: 409 }
+      );
+    }
+
+    const isResend = data.status === "payment_requested";
     const requestedAmount = body.amountCents ?? data.paymentAmountCents;
     if (!Number.isInteger(requestedAmount) || requestedAmount <= 0) {
       return jsonNoStore(
@@ -107,27 +108,22 @@ export async function POST(
         typeof data.lastName === "string" ? data.lastName : undefined
       ) || "adhérent";
     const baseUrl = getAppBaseUrl(req);
-    const successUrl = `${baseUrl}/club/mes-inscriptions?payment=success&registration=${encodeURIComponent(id)}`;
-    const cancelUrl = `${baseUrl}/club/mes-inscriptions?payment=cancelled&registration=${encodeURIComponent(id)}`;
 
     const quote = await resolveQuoteFromRegistration(data);
     const pricingConfig = await resolveRegistrationConfigForRecord(
       data as Record<string, unknown>
     );
+    const donationPricing =
+      quote != null
+        ? resolveRegistrationDonationPricing(quote, data as Record<string, unknown>)
+        : null;
+    const invoiceTotalCents = donationPricing?.invoiceTotalCents ?? quote?.totalCents ?? 0;
 
-    let payment = normalizeRegistrationPayment(data);
-    if (payment && quote) {
-      payment = recalculateRegistrationPayment({
-        ...payment,
-        totalAmountCents: quote.totalCents,
-      });
-      if (
-        payment.paymentMethod === "card" ||
-        payment.paymentMethod === "cheque"
-      ) {
-        payment = regenerateExpectedPayments(payment);
-      }
-    }
+    const payment = recalculatePaymentForRequest(
+      normalizeRegistrationPayment(data),
+      quote,
+      invoiceTotalCents
+    );
 
     const amountToPayCents =
       payment?.amountToPayCents ??
@@ -174,87 +170,23 @@ export async function POST(
     });
 
     if (!stripeCapability.supported) {
-      const paymentInstallments = payment?.paymentInstallments ?? 1;
-      const baseManualPayment: RegistrationPayment =
-        payment ??
-        ({
-          totalAmountCents: quote?.totalCents ?? amountToPayCents,
-          assistanceTotalAmountCents: 0,
-          amountToPayCents,
-          aids: [],
-          paymentMethod,
-          paymentInstallments,
-          expectedPayments: [],
-          receivedPayments: [],
-          paidAmountCents: 0,
-          remainingAmountCents: amountToPayCents,
-          paymentStatus: "waiting_payment",
-        } satisfies RegistrationPayment);
-
-      const manualPayment = setManualFollowUp(baseManualPayment);
-
-      await docRef.set(
-        {
-          status: "payment_requested",
-          ...paymentToFirestoreUpdate(manualPayment),
-          paymentAmountCents: amountToPayCents,
-          paymentRequestedAt: FieldValue.serverTimestamp(),
-          paymentRequestedBy: decoded.uid,
-          paymentEmailSentTo: paymentEmail,
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
-
-      const instructionsMail = buildPaymentInstructionsEmail({
-        adherentName,
-        amountCents: amountToPayCents,
+      const manualResult = await processManualPaymentFollowUp({
+        docRef,
         registrationId: id,
-        appOrigin: baseUrl,
-        paymentMethod: manualPayment.paymentMethod,
-        paymentInstallments: manualPayment.paymentInstallments,
-        expectedPayments: manualPayment.expectedPayments,
-        ...(manualPayment.holidayVoucherAmountCents != null
-          ? { holidayVoucherAmountCents: manualPayment.holidayVoucherAmountCents }
-          : {}),
-        ...(manualPayment.remainingPaymentMethod
-          ? { remainingPaymentMethod: manualPayment.remainingPaymentMethod }
-          : {}),
-        ...(manualPayment.specialPaymentNote
-          ? { specialPaymentNote: manualPayment.specialPaymentNote }
-          : {}),
-        ...(manualPayment.paymentNote ? { paymentNote: manualPayment.paymentNote } : {}),
+        payment,
         quote,
+        donationPricing,
+        amountToPayCents,
+        paymentMethod,
+        paymentEmail,
+        adherentName,
+        baseUrl,
+        requestedByUid: decoded.uid,
       });
 
-      try {
-        await sendMail({
-          to: paymentEmail,
-          subject: `Instructions de règlement — adhésion ${adherentName}`,
-          html: instructionsMail.html,
-          text: instructionsMail.text,
-          attachments: [getSqyPingLogoAttachment()],
-        });
-      } catch (emailError) {
-        console.error("[api/club/registration/request-payment] instructions email", emailError);
-        return jsonNoStore(
-          {
-            error: "Dossier mis à jour mais l'e-mail d'instructions n'a pas pu être envoyé.",
-          },
-          { status: 500 }
-        );
+      if (!manualResult.success) {
+        return jsonNoStore({ error: manualResult.error }, { status: 500 });
       }
-
-      logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_PAYMENT_REQUESTED, decoded.uid, {
-        resource: "clubRegistration",
-        resourceId: id,
-        details: {
-          amountCents: amountToPayCents,
-          manualFollowUp: true,
-          paymentMethod: manualPayment.paymentMethod,
-        },
-        success: true,
-      });
 
       return jsonNoStore(
         {
@@ -267,157 +199,38 @@ export async function POST(
       );
     }
 
-    let session;
-    const useQuoteLineItems =
-      quote &&
-      quote.totalCents > 0 &&
-      amountToPayCents === quote.totalCents;
-
-    if (useQuoteLineItems && quote) {
-      const stripePresentation = pricingConfig.stripePresentation;
-      const stripeLineItems = buildStripeCheckoutLineItems(quote, stripePresentation);
-      const invoiceCustomFields = buildStripeInvoiceCustomFields(quote, stripePresentation);
-      assertStripeLinesMatchQuote(quote, stripeLineItems);
-
-      session = await createMembershipCheckoutSession({
-        registrationId: id,
-        lineItems: stripeLineItems,
-        customerEmail: paymentEmail,
-        customerName: adherentName,
-        invoiceDescription: renderInvoiceHeader(stripePresentation.invoiceHeaderTemplate, {
-          clubName: pricingConfig.meta.clubName,
-          registrationId: id,
-          adherentName,
-        }),
-        catalogVersion: quote.catalogVersion,
-        quoteHash: hashPriceQuote(quote),
-        invoiceCustomFields,
-        successUrl,
-        cancelUrl,
-      });
-
-      const waitingPayment = payment
-        ? recalculateRegistrationPayment({
-            ...payment,
-            paymentStatus: "waiting_payment",
-          })
-        : null;
-
-      await docRef.set(
-        {
-          status: "payment_requested",
-          ...(waitingPayment ? paymentToFirestoreUpdate(waitingPayment) : {}),
-          paymentAmountCents: amountToPayCents,
-          paymentStatus: "pending",
-          paymentRequestedAt: FieldValue.serverTimestamp(),
-          paymentRequestedBy: decoded.uid,
-          paymentEmailSentTo: paymentEmail,
-          stripeCheckoutSessionId: session.id,
-          stripeCheckoutUrl: session.url,
-          pricingQuote: quote,
-          pricingQuoteStatus: "validated",
-          paymentStripeLineItems: stripeLineItems,
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
-
-      const paymentMail = buildPaymentRequestEmail({
-        adherentName,
-        amountCents: amountToPayCents,
-        checkoutUrl: session.url ?? "",
-        appOrigin: baseUrl,
-        quote: quote,
-      });
-
-      await sendMail({
-        to: paymentEmail,
-        subject: `Paiement de votre adhésion SQY Ping - ${adherentName}`,
-        text: paymentMail.text,
-        html: paymentMail.html,
-        attachments: [getSqyPingLogoAttachment()],
-      });
-
-      logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_PAYMENT_REQUESTED, decoded.uid, {
-        resource: "clubRegistration",
-        resourceId: id,
-        details: {
-          amountCents: amountToPayCents,
-          stripeCheckoutSessionId: session.id,
-          lineCount: stripeLineItems.length,
-          catalogVersion: quote.catalogVersion,
-        },
-        success: true,
-      });
-    } else {
-      session = await createLegacySingleLineCheckoutSession({
-        registrationId: id,
-        amountCents: amountToPayCents,
-        customerEmail: paymentEmail,
-        adherentName,
-        successUrl,
-        cancelUrl,
-      });
-
-      const waitingPayment = payment
-        ? recalculateRegistrationPayment({
-            ...payment,
-            paymentStatus: "waiting_payment",
-          })
-        : null;
-
-      await docRef.set(
-        {
-          status: "payment_requested",
-          ...(waitingPayment ? paymentToFirestoreUpdate(waitingPayment) : {}),
-          paymentAmountCents: amountToPayCents,
-          paymentStatus: "pending",
-          paymentRequestedAt: FieldValue.serverTimestamp(),
-          paymentRequestedBy: decoded.uid,
-          paymentEmailSentTo: paymentEmail,
-          stripeCheckoutSessionId: session.id,
-          stripeCheckoutUrl: session.url,
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
-
-      const paymentMail = buildPaymentRequestEmail({
-        adherentName,
-        amountCents: amountToPayCents,
-        checkoutUrl: session.url ?? "",
-        appOrigin: baseUrl,
-        quote: null,
-      });
-
-      await sendMail({
-        to: paymentEmail,
-        subject: `Paiement de votre adhésion SQY Ping - ${adherentName}`,
-        text: paymentMail.text,
-        html: paymentMail.html,
-        attachments: [getSqyPingLogoAttachment()],
-      });
-
-      logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_PAYMENT_REQUESTED, decoded.uid, {
-        resource: "clubRegistration",
-        resourceId: id,
-        details: {
-          amountCents: amountToPayCents,
-          stripeCheckoutSessionId: session.id,
-          legacy: true,
-        },
-        success: true,
-      });
+    const checkoutValidation = validateRegistrationStripeCheckout({
+      quote,
+      donationPricing,
+      pricingConfig,
+      payment,
+      amountToPayCents,
+    });
+    if (!checkoutValidation.ok) {
+      return jsonNoStore(checkoutValidation.body, { status: checkoutValidation.status });
     }
 
-    if (!session.url) {
-      return jsonNoStore(
-        { error: "Stripe n'a pas retourné de lien de paiement." },
-        { status: 502 }
-      );
-    }
+    await persistPaymentRequestedAndNotify({
+      docRef,
+      registrationId: id,
+      payment,
+      quote,
+      donationPricing,
+      amountToPayCents,
+      paymentEmail,
+      adherentName,
+      baseUrl,
+      requestedByUid: decoded.uid,
+      isResend,
+    });
 
-    return jsonNoStore({ success: true, checkoutUrl: session.url }, { status: 200 });
+    return jsonNoStore(
+      {
+        success: true,
+        mesInscriptionsUrl: buildMesInscriptionsUrl(baseUrl, id),
+      },
+      { status: 200 }
+    );
   } catch (error) {
     console.error("[api/club/registration/request-payment]", error);
     return jsonNoStore(

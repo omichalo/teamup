@@ -3,6 +3,8 @@ import type { FamilyRegistrationOrder, PricingContext } from "./types";
 type RegistrationPricingRecord = {
   birthDate?: string;
   mainSectionId?: string;
+  slotIds?: string[];
+  additionalSectionIds?: string[];
   wantsCompetitorExtras?: boolean;
   wantsOptionalJersey?: boolean;
   competitionIds?: string[];
@@ -65,6 +67,19 @@ export function buildPricingContextFromRecord(
 
   if (Array.isArray(record.reductionTypes) && record.reductionTypes.length > 0) {
     ctx.reductionTypes = record.reductionTypes.filter(
+      (id): id is string => typeof id === "string"
+    );
+  }
+
+  if (Array.isArray(record.slotIds) && record.slotIds.length > 0) {
+    ctx.slotIds = record.slotIds.filter((id): id is string => typeof id === "string");
+  }
+
+  if (
+    Array.isArray(record.additionalSectionIds) &&
+    record.additionalSectionIds.length > 0
+  ) {
+    ctx.additionalSectionIds = record.additionalSectionIds.filter(
       (id): id is string => typeof id === "string"
     );
   }

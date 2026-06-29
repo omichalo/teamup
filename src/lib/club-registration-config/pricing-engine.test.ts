@@ -10,6 +10,8 @@ function ctx(
 ): PricingContext {
   return {
     mainSectionId: "voisins",
+    slotIds: [],
+    additionalSectionIds: [],
     wantsCompetitorExtras: false,
     wantsOptionalJersey: false,
     competitionIds: [],
@@ -27,7 +29,11 @@ function expectTotals(
   const membership = quote.lines.find((l) => l.id === "membership");
   const license = quote.lines.find((l) => l.id === "fftt_license");
   expect(membership?.amountCents).toBe(expected.membership);
-  expect(license?.amountCents).toBe(expected.license);
+  if (expected.license === 0) {
+    expect(license).toBeUndefined();
+  } else {
+    expect(license?.amountCents).toBe(expected.license);
+  }
   expect(quote.totalCents).toBe(expected.total);
 }
 
@@ -118,5 +124,68 @@ describe("calculateQuoteFromConfig — aides admin_review", () => {
     );
     expect(quote.requiresAdminReview).toBe(true);
     expect(quote.warnings).toHaveLength(0);
+  });
+});
+
+describe("calculateQuoteFromConfig — dispositif CHAMP'YON", () => {
+  const champYonCtx = {
+    mainSectionId: "trappes",
+    slotIds: ["trappes-mer-1730-jeunes-loisir-compet"],
+    additionalSectionIds: [] as string[],
+  };
+
+  it("applique 105 € sans licence pour moins de 15 ans", () => {
+    const quote = calculateQuoteFromConfig(
+      ctx({ birthDate: "2014-06-01", ...champYonCtx }),
+      config
+    );
+    expect(quote.appliedPricingDeviceId).toBe("champ-yon");
+    expect(quote.segmentLabel).toContain("CHAMP'YON");
+    expect(quote.lines.some((line) => line.id === "fftt_license")).toBe(false);
+    expectTotals(quote, { membership: 10_500, license: 0, total: 10_500 });
+  });
+
+  it("applique 115 € sans licence pour 15 ans et plus", () => {
+    const quote = calculateQuoteFromConfig(
+      ctx({ birthDate: "2005-01-01", ...champYonCtx }),
+      config
+    );
+    expect(quote.lines.some((line) => line.id === "fftt_license")).toBe(false);
+    expectTotals(quote, { membership: 11_500, license: 0, total: 11_500 });
+  });
+
+  it("inclut Baby Ping dans la tranche moins de 15 ans", () => {
+    const quote = calculateQuoteFromConfig(
+      ctx({ birthDate: "2020-01-01", ...champYonCtx }),
+      config
+    );
+    expectTotals(quote, { membership: 10_500, license: 0, total: 10_500 });
+  });
+
+  it("n'applique pas les remises famille", () => {
+    const quote = calculateQuoteFromConfig(
+      ctx({
+        birthDate: "2014-06-01",
+        ...champYonCtx,
+        familyRegistrationOrder: "second",
+      }),
+      config
+    );
+    expect(quote.lines.some((line) => line.kind === "discount_family")).toBe(false);
+    expect(quote.totalCents).toBe(10_500);
+  });
+
+  it("retombe sur la grille classique avec 2 créneaux", () => {
+    const quote = calculateQuoteFromConfig(
+      ctx({
+        birthDate: "2014-06-01",
+        mainSectionId: "trappes",
+        slotIds: ["trappes-mer-1730-jeunes-loisir-compet", "lv-jeu-1800-jeunes-loisirs"],
+        additionalSectionIds: [],
+      }),
+      config
+    );
+    expect(quote.appliedPricingDeviceId).toBeUndefined();
+    expectTotals(quote, { membership: 16_000, license: 4_500, total: 20_500 });
   });
 });

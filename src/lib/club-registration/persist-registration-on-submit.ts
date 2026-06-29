@@ -22,6 +22,8 @@ export function buildRegistrationSubmitDocument(params: {
   const pricingCtx = buildPricingContext({
     birthDate: payload.birthDate,
     mainSectionId: payload.mainSectionId,
+    slotIds: payload.slotIds,
+    additionalSectionIds: payload.additionalSectionIds,
     wantsCompetitorExtras: payload.wantsCompetitorExtras,
     wantsOptionalJersey: payload.wantsOptionalJersey,
     competitionIds: payload.competitionIds,
@@ -49,6 +51,7 @@ export function buildRegistrationSubmitDocument(params: {
     remainingPaymentMethod: payload.remainingPaymentMethod ?? "",
     paymentNote: payload.paymentNote ?? "",
     specialPaymentNote: payload.specialPaymentNote ?? "",
+    voluntaryDonationCents: payload.voluntaryDonationCents,
   });
 
   const {
@@ -72,6 +75,7 @@ export function buildRegistrationSubmitDocument(params: {
 
   return {
     ...storedPayload,
+    voluntaryDonationCents: payload.voluntaryDonationCents,
     ...paymentToFirestoreUpdate(payment),
     pricingQuote: quote,
     pricingQuoteStatus: "proposed",

@@ -2,6 +2,7 @@ import {
   canMarkCertificateReceived,
   canMarkCertificateValidated,
   canQuickRequestPayment,
+  canQuickResendPaymentLink,
   resolveQuickPaymentAmountCents,
 } from "./registration-card-quick-actions";
 import type { RegistrationSummary } from "@/components/club-registration/membership-requests/types";
@@ -44,6 +45,58 @@ describe("registration-card-quick-actions", () => {
     expect(
       canQuickRequestPayment(
         baseSummary({ status: "payment_requested", paymentAmountCents: 22_400 })
+      )
+    ).toBe(false);
+  });
+
+  it("allows quick resend for payment_requested card dossiers", () => {
+    expect(
+      canQuickResendPaymentLink(
+        baseSummary({
+          status: "payment_requested",
+          paymentAmountCents: 22_400,
+          payment: {
+            paymentMethod: "card",
+            amountToPayCents: 22_400,
+            totalAmountCents: 22_400,
+            assistanceTotalAmountCents: 0,
+            aids: [],
+            paymentInstallments: 1,
+            expectedPayments: [],
+            receivedPayments: [],
+            paidAmountCents: 0,
+            remainingAmountCents: 22_400,
+            paymentStatus: "waiting_payment",
+          },
+        })
+      )
+    ).toBe(true);
+    expect(
+      canQuickResendPaymentLink(
+        baseSummary({ status: "in_review", paymentAmountCents: 22_400 })
+      )
+    ).toBe(false);
+    expect(
+      canQuickResendPaymentLink(
+        baseSummary({
+          status: "payment_requested",
+          paymentStatus: "pending",
+          paidAt: "2026-06-27T08:31:30.000Z",
+          paymentAmountCents: 22_400,
+          payment: {
+            paymentMethod: "card",
+            amountToPayCents: 22_400,
+            totalAmountCents: 22_400,
+            assistanceTotalAmountCents: 0,
+            aids: [],
+            paymentInstallments: 1,
+            expectedPayments: [],
+            receivedPayments: [],
+            paidAmountCents: 0,
+            remainingAmountCents: 22_400,
+            paymentStatus: "waiting_payment",
+          },
+        })
       )
     ).toBe(false);
   });

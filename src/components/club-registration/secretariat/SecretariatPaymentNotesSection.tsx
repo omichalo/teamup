@@ -18,6 +18,11 @@ import {
 import {
   BNPL_SECRETARIAT_ALERT,
   BNPL_SECRETARIAT_PAYMENT_TOOLTIP,
+  CHECKOUT_LINK_VALIDITY_NOTICE,
+  SECRETARIAT_INITIAL_PAYMENT_BUTTON,
+  SECRETARIAT_RESEND_PAYMENT_BUTTON,
+  SECRETARIAT_RESEND_PAYMENT_TOOLTIP,
+  SECRETARIAT_SELF_SERVICE_HINT,
 } from "@/lib/club-registration/payment/bnpl-checkout-copy";
 import {
   PAYMENT_METHOD_LABELS,
@@ -29,6 +34,9 @@ type Props = {
   reviewNotes: string;
   onAmountEurosChange: (value: string) => void;
   onReviewNotesChange: (value: string) => void;
+  registrationStatus?: string | null;
+  paymentRequestedAt?: string | null;
+  paymentAmountCents?: number | null;
   paymentEmailSentTo?: string | null | undefined;
   paymentMethod?: PaymentMethodId | null | undefined;
   saving: boolean;
@@ -40,11 +48,35 @@ type Props = {
 
 const tooltipEnterProps = { enterDelay: 400, enterNextDelay: 400 } as const;
 
+function formatPaymentRequestedAt(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  try {
+    return new Date(iso).toLocaleDateString("fr-FR", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  } catch {
+    return null;
+  }
+}
+
+function formatAmountCents(cents: number | null | undefined): string | null {
+  if (typeof cents !== "number") return null;
+  return new Intl.NumberFormat("fr-FR", {
+    style: "currency",
+    currency: "EUR",
+  }).format(cents / 100);
+}
+
 export function SecretariatPaymentNotesSection({
   amountEuros,
   reviewNotes,
   onAmountEurosChange,
   onReviewNotesChange,
+  registrationStatus,
+  paymentRequestedAt,
+  paymentAmountCents,
   paymentEmailSentTo,
   paymentMethod,
   saving,
@@ -54,6 +86,22 @@ export function SecretariatPaymentNotesSection({
   onRequestPayment,
 }: Props) {
   const canSendStripeEmail = paymentMethod === "card";
+  const isPaid = registrationStatus === "paid";
+  const isPaymentResend = registrationStatus === "payment_requested" && !isPaid;
+  const paymentButtonLabel = isPaymentResend
+    ? canSendStripeEmail
+      ? SECRETARIAT_RESEND_PAYMENT_BUTTON
+      : "Renvoyer les instructions de règlement"
+    : SECRETARIAT_INITIAL_PAYMENT_BUTTON;
+  const paymentTooltip = isPaymentResend
+    ? canSendStripeEmail
+      ? SECRETARIAT_RESEND_PAYMENT_TOOLTIP
+      : "Renvoie l'e-mail d'instructions de règlement au contact du dossier."
+    : canSendStripeEmail
+      ? BNPL_SECRETARIAT_PAYMENT_TOOLTIP
+      : "Enregistre le dossier puis bascule en suivi adapté : pas de lien de paiement automatique pour ce mode de règlement.";
+  const requestedAtLabel = formatPaymentRequestedAt(paymentRequestedAt);
+  const formattedAmount = formatAmountCents(paymentAmountCents);
 
   return (
     <>
@@ -64,7 +112,8 @@ export function SecretariatPaymentNotesSection({
       {paymentMethod === "card" ? (
         <Alert severity="info" variant="outlined">
           Mode <strong>carte bancaire</strong> : un lien Stripe Checkout sera envoyé par
-          e-mail. {BNPL_SECRETARIAT_ALERT}
+          e-mail. {BNPL_SECRETARIAT_ALERT} {CHECKOUT_LINK_VALIDITY_NOTICE}{" "}
+          {SECRETARIAT_SELF_SERVICE_HINT}
         </Alert>
       ) : null}
 
@@ -105,7 +154,19 @@ export function SecretariatPaymentNotesSection({
         </Grid>
       </Grid>
 
-      {paymentEmailSentTo ? (
+      {isPaymentResend && canSendStripeEmail ? (
+        <Alert severity="warning" variant="outlined">
+          Paiement en attente
+          {requestedAtLabel ? ` depuis le ${requestedAtLabel}` : ""}
+          {formattedAmount ? ` — montant : ${formattedAmount}` : ""}.
+          {paymentEmailSentTo ? (
+            <>
+              {" "}
+              Dernier e-mail envoyé à <strong>{paymentEmailSentTo}</strong>.
+            </>
+          ) : null}
+        </Alert>
+      ) : paymentEmailSentTo ? (
         <Alert severity="info">
           Dernière demande de paiement par e-mail envoyée à {paymentEmailSentTo}.
         </Alert>
@@ -128,27 +189,25 @@ export function SecretariatPaymentNotesSection({
             </Button>
           </span>
         </Tooltip>
-        <Tooltip
-          title={
-            canSendStripeEmail
-              ? BNPL_SECRETARIAT_PAYMENT_TOOLTIP
-              : "Enregistre le dossier puis bascule en suivi adapté : pas de lien de paiement automatique pour ce mode de règlement."
-          }
-          slotProps={{ popper: { sx: { maxWidth: 340 } } }}
-          {...tooltipEnterProps}
-        >
-          <span>
-            <Button
-              variant="contained"
-              color="secondary"
-              startIcon={<MarkEmailReadIcon />}
-              onClick={() => void onRequestPayment()}
-              disabled={saving || requestingPayment || persistingQuote}
-            >
-              {requestingPayment ? "Envoi..." : "Valider et demander le paiement"}
-            </Button>
-          </span>
-        </Tooltip>
+        {isPaid ? null : (
+          <Tooltip
+            title={paymentTooltip}
+            slotProps={{ popper: { sx: { maxWidth: 340 } } }}
+            {...tooltipEnterProps}
+          >
+            <span>
+              <Button
+                variant="contained"
+                color="secondary"
+                startIcon={<MarkEmailReadIcon />}
+                onClick={() => void onRequestPayment()}
+                disabled={saving || requestingPayment || persistingQuote}
+              >
+                {requestingPayment ? "Envoi..." : paymentButtonLabel}
+              </Button>
+            </span>
+          </Tooltip>
+        )}
       </Stack>
     </>
   );

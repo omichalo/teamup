@@ -2,14 +2,24 @@ import { computeAgeAt } from "@/lib/club-registration/age";
 import type { PriceLine, PriceQuote, PricingContext } from "@/lib/pricing/types";
 import { getPricingProfileBehavior } from "./pricing-profiles";
 import { getSectionById } from "./helpers";
+import {
+  formatSegmentLabelWithDevice,
+  resolveActivePricingDevice,
+} from "./pricing-devices";
 import type {
   AgeBand,
   AgeBandProfile,
   DiscountRule,
+  PricingDevice,
   RateTableEntry,
   RegistrationConfigV1,
 } from "./types";
 import { normalizeCompetitionIdsFromConfig } from "./helpers";
+
+type RateResolutionOverrides = {
+  pricingProfile: string;
+  ageBandProfileId: string;
+};
 
 function parsePricingDate(isoDate?: string): Date {
   if (!isoDate) return new Date();
@@ -62,7 +72,8 @@ function matchesRateEntry(match: RateTableEntry["match"], ctx: RateLookupContext
 
 function resolveRatesFromConfig(
   config: RegistrationConfigV1,
-  ctx: PricingContext
+  ctx: PricingContext,
+  overrides?: RateResolutionOverrides
 ):
   | { ok: true; rates: { membershipCents: number; licenseCents: number; segmentLabel: string } }
   | { ok: false; warning: string } {
@@ -71,7 +82,9 @@ function resolveRatesFromConfig(
     return { ok: false, warning: "Section principale inconnue ou désactivée." };
   }
 
-  const profile = config.ageBandProfiles[section.ageBandProfileId];
+  const pricingProfile = overrides?.pricingProfile ?? section.pricingProfile;
+  const ageBandProfileId = overrides?.ageBandProfileId ?? section.ageBandProfileId;
+  const profile = config.ageBandProfiles[ageBandProfileId];
   if (!profile) {
     return {
       ok: false,
@@ -80,10 +93,10 @@ function resolveRatesFromConfig(
   }
 
   const lookup: RateLookupContext = {
-    pricingProfile: section.pricingProfile,
+    pricingProfile,
   };
 
-  const behavior = getPricingProfileBehavior(config, section.pricingProfile);
+  const behavior = getPricingProfileBehavior(config, pricingProfile);
 
   if (behavior === "handisport") {
     lookup.wantsCompetitorExtras = ctx.wantsCompetitorExtras;
@@ -280,6 +293,16 @@ function applyAidRules(
   return { lines, warnings, requiresAdminReview };
 }
 
+function buildRateResolutionOverrides(
+  device: PricingDevice,
+  section: NonNullable<ReturnType<typeof getSectionById>>
+): RateResolutionOverrides {
+  return {
+    pricingProfile: device.pricingProfileId,
+    ageBandProfileId: device.ageBandProfileId ?? section.ageBandProfileId,
+  };
+}
+
 /**
  * Calcule un devis à partir du contexte et d'une configuration paramétrable.
  */
@@ -291,7 +314,12 @@ export function calculateQuoteFromConfig(
   let requiresAdminReview = false;
   const stripe = config.stripePresentation;
 
-  const base = resolveRatesFromConfig(config, ctx);
+  const activeDevice = resolveActivePricingDevice(ctx, config);
+  const section = getSectionById(config, ctx.mainSectionId);
+  const rateOverrides =
+    activeDevice && section ? buildRateResolutionOverrides(activeDevice, section) : undefined;
+
+  const base = resolveRatesFromConfig(config, ctx, rateOverrides);
   if (!base.ok) {
     return {
       catalogVersion: config.meta.catalogVersion,
@@ -305,6 +333,9 @@ export function calculateQuoteFromConfig(
   }
 
   const { rates } = base;
+  const segmentLabel = formatSegmentLabelWithDevice(rates.segmentLabel, activeDevice);
+  const includeFfttLicense = activeDevice ? activeDevice.includesFfttLicense : true;
+  const licenseCents = includeFfttLicense ? rates.licenseCents : 0;
   const lines: PriceLine[] = [
     {
       id: "membership",
@@ -313,16 +344,18 @@ export function calculateQuoteFromConfig(
       amountCents: rates.membershipCents,
       source: "catalog",
     },
-    {
+  ];
+
+  if (licenseCents > 0) {
+    lines.push({
       id: "fftt_license",
       kind: "fftt_license",
       label: stripe.licenseLabel,
-      amountCents: rates.licenseCents,
+      amountCents: licenseCents,
       source: "catalog",
-    },
-  ];
+    });
+  }
 
-  const section = getSectionById(config, ctx.mainSectionId);
   if (ctx.wantsCompetitorExtras && section) {
     lines.push({
       id: "competitor_jersey_info",
@@ -345,7 +378,10 @@ export function calculateQuoteFromConfig(
   lines.push(...competitions.lines);
   warnings.push(...competitions.warnings);
 
-  lines.push(...buildMembershipDiscountLines(config, ctx, rates.membershipCents));
+  const applyDiscounts = activeDevice?.stackableWithDiscounts !== false;
+  if (applyDiscounts) {
+    lines.push(...buildMembershipDiscountLines(config, ctx, rates.membershipCents));
+  }
 
   const aids = applyAidRules(config, ctx, rates.membershipCents);
   lines.push(...aids.lines);
@@ -357,13 +393,23 @@ export function calculateQuoteFromConfig(
   );
   const totalCents = sumLines(lines.filter((l) => l.kind !== "info"));
 
+  if (activeDevice?.uiCopy?.recapHint) {
+    warnings.push(activeDevice.uiCopy.recapHint);
+  }
+
   return {
     catalogVersion: config.meta.catalogVersion,
-    segmentLabel: rates.segmentLabel,
+    segmentLabel,
     lines,
     subtotalCents,
     totalCents: Math.max(0, totalCents),
     warnings: [...new Set(warnings)],
     requiresAdminReview,
+    ...(activeDevice
+      ? {
+          appliedPricingDeviceId: activeDevice.id,
+          appliedPricingDeviceLabel: activeDevice.label,
+        }
+      : {}),
   };
 }

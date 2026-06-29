@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import {
   Alert,
   Box,
+  Chip,
   Stack,
   Table,
   TableBody,
@@ -22,11 +23,18 @@ import type { PriceQuote } from "@/lib/pricing/types";
 import { calculatePaymentSummary } from "@/lib/club-registration/payment/calculate-payment-summary";
 import { normalizePaymentAidList } from "@/lib/club-registration/payment/payment-draft-helpers";
 import type { RegistrationDraft } from "./registration-defaults";
+import {
+  PricingBreakdownDonationRows,
+  useDonationPricing,
+  useEstimatedInvoiceTotalCents as useEstimatedInvoiceTotalFromQuote,
+} from "./pricing-breakdown-donation";
 
 export type PricingBreakdownDraft = Pick<
   RegistrationDraft,
   | "birthDate"
   | "mainSectionId"
+  | "slotIds"
+  | "additionalSectionIds"
   | "wantsCompetitorExtras"
   | "wantsOptionalJersey"
   | "competitionIds"
@@ -36,12 +44,15 @@ export type PricingBreakdownDraft = Pick<
   | "reductionTypes"
 > & {
   paymentAids?: RegistrationDraft["paymentAids"];
+  voluntaryDonationCents?: number;
 };
 
 function toPricingContextInput(draft: PricingBreakdownDraft) {
   const input = {
     birthDate: draft.birthDate,
     mainSectionId: draft.mainSectionId,
+    slotIds: draft.slotIds ?? [],
+    additionalSectionIds: draft.additionalSectionIds ?? [],
     wantsCompetitorExtras: draft.wantsCompetitorExtras,
     wantsOptionalJersey: draft.wantsOptionalJersey,
     competitionIds: draft.competitionIds,
@@ -72,9 +83,15 @@ export function usePricingQuote(draft: PricingBreakdownDraft) {
   }, [draft, config]);
 }
 
+export function useEstimatedInvoiceTotalCents(draft: PricingBreakdownDraft): number | null {
+  const quote = usePricingQuote(draft);
+  return useEstimatedInvoiceTotalFromQuote(quote, draft);
+}
+
 function useDeclarativeAidSummary(
   quote: PriceQuote | null,
-  draft: PricingBreakdownDraft
+  draft: PricingBreakdownDraft,
+  invoiceTotalCents: number
 ) {
   return useMemo(() => {
     if (!quote) return null;
@@ -83,16 +100,18 @@ function useDeclarativeAidSummary(
       (draft.reductionTypes?.length ?? 0) > 0 || aids.length > 0;
     if (!hasDeclarativeAids) return null;
     return calculatePaymentSummary({
-      totalAmountCents: quote.totalCents,
+      totalAmountCents: invoiceTotalCents,
       aids,
       receivedPayments: [],
     });
-  }, [quote, draft.reductionTypes, draft.paymentAids]);
+  }, [quote, draft.reductionTypes, draft.paymentAids, invoiceTotalCents]);
 }
 
 export function PricingBreakdown({ draft, variant = "full" }: Props) {
   const quote = usePricingQuote(draft);
-  const aidSummary = useDeclarativeAidSummary(quote, draft);
+  const donationPricing = useDonationPricing(quote, draft);
+  const invoiceTotalCents = donationPricing?.invoiceTotalCents ?? quote?.totalCents ?? 0;
+  const aidSummary = useDeclarativeAidSummary(quote, draft, invoiceTotalCents);
   const declaredAids = useMemo(
     () =>
       normalizePaymentAidList(draft.paymentAids ?? []).filter(
@@ -135,8 +154,21 @@ export function PricingBreakdown({ draft, variant = "full" }: Props) {
         <Typography variant="caption" color="text.secondary">
           {quote.segmentLabel}
         </Typography>
+        {donationPricing ? (
+          <>
+            <Typography variant="caption" color="text.secondary">
+              Catalogue : {formatCentsAsEuros(quote.totalCents)}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Don : {formatCentsAsEuros(donationPricing.voluntaryDonationCents)}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Remise don : −{formatCentsAsEuros(donationPricing.donationDiscountCents)}
+            </Typography>
+          </>
+        ) : null}
         <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-          Total estimé : {formatCentsAsEuros(quote.totalCents)}
+          Total estimé : {formatCentsAsEuros(invoiceTotalCents)}
         </Typography>
         {aidSummary ? (
           <>
@@ -165,13 +197,23 @@ export function PricingBreakdown({ draft, variant = "full" }: Props) {
 
   return (
     <Stack spacing={isSidebar ? 0.5 : 1.5}>
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ lineHeight: 1.3, display: "block" }}
-      >
-        {quote.segmentLabel}
-      </Typography>
+      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ lineHeight: 1.3, display: "block" }}
+        >
+          {quote.segmentLabel}
+        </Typography>
+        {quote.appliedPricingDeviceLabel ? (
+          <Chip
+            size="small"
+            color="warning"
+            label={quote.appliedPricingDeviceLabel}
+            sx={{ height: 20, fontSize: "0.6875rem" }}
+          />
+        ) : null}
+      </Stack>
 
       <Box sx={{ overflowX: "auto" }}>
         <Table size="small" aria-label="Détail tarifaire estimé">
@@ -195,6 +237,12 @@ export function PricingBreakdown({ draft, variant = "full" }: Props) {
                 </TableCell>
               </TableRow>
             ))}
+            {donationPricing ? (
+              <PricingBreakdownDonationRows
+                donationPricing={donationPricing}
+                cellSx={cellSx}
+              />
+            ) : null}
             <TableRow>
               <TableCell
                 sx={{
@@ -205,7 +253,7 @@ export function PricingBreakdown({ draft, variant = "full" }: Props) {
                   fontSize: isSidebar ? "0.875rem" : undefined,
                 }}
               >
-                Total estimé
+                {donationPricing ? "Total avec don" : "Total estimé"}
               </TableCell>
               <TableCell
                 align="right"
@@ -217,7 +265,7 @@ export function PricingBreakdown({ draft, variant = "full" }: Props) {
                   fontSize: isSidebar ? "0.875rem" : undefined,
                 }}
               >
-                {formatCentsAsEuros(quote.totalCents)}
+                {formatCentsAsEuros(invoiceTotalCents)}
               </TableCell>
             </TableRow>
             {aidSummary ? (

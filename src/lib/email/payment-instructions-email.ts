@@ -5,7 +5,7 @@ import {
   type PaymentMethodId,
   type RemainingPaymentMethodId,
 } from "@/lib/club-registration/payment-constants";
-import type { ExpectedPayment } from "@/lib/club-registration/payment/types";
+import type { ExpectedPayment, PaymentAid } from "@/lib/club-registration/payment/types";
 import { SQYPING_COLORS, SQYPING_EMAIL_APP_NAME, SQYPING_SECRETARIAT_EMAIL } from "@/lib/email/brand";
 import { escapeHtml } from "@/lib/email/escape-html";
 import {
@@ -21,12 +21,14 @@ import {
   formatEurosForEmail,
   formatQuoteBreakdownHtmlForEmail,
   formatQuoteBreakdownText,
+  type QuoteBreakdownEmailOptions,
 } from "@/lib/email/payment-email";
 import {
   BNPL_INSTRUCTIONS_CARD_HTML,
   BNPL_INSTRUCTIONS_CARD_TEXT,
 } from "@/lib/club-registration/payment/bnpl-checkout-copy";
 import type { PriceQuote } from "@/lib/pricing/types";
+import type { DonationPricingBreakdown } from "@/lib/pricing/donation-discount";
 
 export type PaymentInstructionsEmailContent = {
   adherentName: string;
@@ -41,6 +43,8 @@ export type PaymentInstructionsEmailContent = {
   specialPaymentNote?: string;
   paymentNote?: string;
   quote?: PriceQuote | null;
+  donationPricing?: DonationPricingBreakdown | null;
+  secretariatAids?: PaymentAid[];
 };
 
 function formatExpectedPaymentsHtml(expectedPayments: ExpectedPayment[]): string {
@@ -207,15 +211,21 @@ export function buildPaymentInstructionsEmail(
     appOrigin,
     paymentNote,
     quote,
+    donationPricing,
+    secretariatAids,
   } = options;
 
   const safeName = escapeHtml(adherentName);
   const formattedAmount = formatEurosForEmail(amountCents);
   const hasDetailedQuote = Boolean(quote && quote.lines.length > 0);
+  const breakdownOptions: QuoteBreakdownEmailOptions = {
+    amountToPayCents: amountCents,
+    ...(secretariatAids?.length ? { secretariatAids } : {}),
+  };
   const mesInscriptionsUrl = `${appOrigin.replace(/\/$/, "")}/club/mes-inscriptions?registration=${encodeURIComponent(registrationId)}`;
 
   const breakdownBlock = hasDetailedQuote
-    ? `${emailSectionTitle("Détail de votre adhésion")}${formatQuoteBreakdownHtmlForEmail(quote!)}`
+    ? `${emailSectionTitle("Détail de votre adhésion")}${formatQuoteBreakdownHtmlForEmail(quote!, donationPricing, breakdownOptions)}`
     : emailParagraph(
         `Montant à régler : <strong style="color: ${SQYPING_COLORS.primary.main};">${escapeHtml(formattedAmount)}</strong>`
       );
@@ -262,7 +272,7 @@ export function buildPaymentInstructionsEmail(
   ];
 
   if (hasDetailedQuote) {
-    textLines.push("Détail :", formatQuoteBreakdownText(quote!), "");
+    textLines.push("Détail :", formatQuoteBreakdownText(quote!, donationPricing, breakdownOptions), "");
   } else {
     textLines.push(`Montant à régler : ${formattedAmount}.`, "");
   }

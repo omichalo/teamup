@@ -35,6 +35,7 @@ import {
   DEFAULT_JERSEY_SIZE_HELPER,
   DEFAULT_OPTIONAL_JERSEY_OPT_IN_LABEL,
 } from "./repair-jersey";
+import { buildDefaultPricingDevices } from "./pricing-devices";
 
 function sectionPricingProfile(id: string): RegistrationSection["pricingProfile"] {
   if (id === "handisport") return "handisport";
@@ -177,7 +178,34 @@ function buildRateTable(): RateTableEntry[] {
       segmentLabel: "Sport adapté — Compétiteur (21 ans et plus)",
     },
   ];
-  return [...classicAndSpecialty, ...buildEcoleRateEntries(classicAndSpecialty)];
+  return [...classicAndSpecialty, ...buildEcoleRateEntries(classicAndSpecialty), ...buildChampYonRateEntries()];
+}
+
+function buildChampYonRateEntries(): RateTableEntry[] {
+  return [
+    {
+      id: "champ_yon_leisure_under15",
+      match: {
+        pricingProfile: "champ_yon",
+        ageBandId: "under_15",
+        wantsCompetitorExtras: false,
+      },
+      membershipCents: 10_500,
+      licenseCents: 0,
+      segmentLabel: "Loisirs — Moins de 15 ans",
+    },
+    {
+      id: "champ_yon_leisure_adult",
+      match: {
+        pricingProfile: "champ_yon",
+        ageBandId: "adult_15_plus",
+        wantsCompetitorExtras: false,
+      },
+      membershipCents: 11_500,
+      licenseCents: 0,
+      segmentLabel: "Loisirs — 15 ans et plus",
+    },
+  ];
 }
 
 function buildCompetitionBundles(): CompetitionBundle[] {
@@ -276,6 +304,14 @@ export function buildDefaultRegistrationConfig(): RegistrationConfigV1 {
           { id: "adult_15_plus", minAge: 15, label: "15 ans et plus" },
         ],
       },
+      champ_yon: {
+        id: "champ_yon",
+        label: "CHAMP'YON",
+        bands: [
+          { id: "under_15", minAge: 0, maxAge: 14, label: "Moins de 15 ans" },
+          { id: "adult_15_plus", minAge: 15, label: "15 ans et plus" },
+        ],
+      },
     },
     rateTable: buildRateTable(),
     discountRules: [
@@ -318,6 +354,8 @@ export function buildDefaultRegistrationConfig(): RegistrationConfigV1 {
         "Maillot compétiteur inclus dans l'adhésion (15 € — renouvellement tous les deux ans)",
       invoiceHeaderTemplate: "Adhésion {{clubName}} — dossier {{registrationId}}",
       discountCustomFieldName: "Remises sur adhésion",
+      donationLabel: "Don libre au club",
+      donationDiscountCouponName: "Remise don — 25 % (plaf. 73 €)",
     },
     jersey: { ...DEFAULT_JERSEY_CATALOG },
     uiCopy: {
@@ -336,6 +374,7 @@ export function buildDefaultRegistrationConfig(): RegistrationConfigV1 {
       jerseySizeHelper: DEFAULT_JERSEY_SIZE_HELPER,
       optionalJerseyOptInLabel: DEFAULT_OPTIONAL_JERSEY_OPT_IN_LABEL,
     },
+    pricingDevices: buildDefaultPricingDevices(),
   };
 }
 

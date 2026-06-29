@@ -12,9 +12,9 @@ import {
 } from "@/lib/club-registration/registration-status";
 import {
   PAYMENT_STATUS_LABELS,
-  PAYMENT_STATUS_IDS,
   type PaymentStatusId,
 } from "@/lib/club-registration/payment-constants";
+import { resolveRegistrationPaymentStatus } from "@/lib/club-registration/resolve-registration-payment-status";
 
 export type SpreadsheetQuickFilters = {
   registrationStatuses: RegistrationStatus[];
@@ -113,11 +113,7 @@ export function getRowRegistrationStatus(
 }
 
 export function getRowPaymentStatus(row: RegistrationClientRecord): PaymentStatusId | null {
-  const status = row.paymentStatus;
-  return typeof status === "string" &&
-    (PAYMENT_STATUS_IDS as readonly string[]).includes(status)
-    ? (status as PaymentStatusId)
-    : null;
+  return resolveRegistrationPaymentStatus(row);
 }
 
 export function getRowMedicalCertificateStatus(

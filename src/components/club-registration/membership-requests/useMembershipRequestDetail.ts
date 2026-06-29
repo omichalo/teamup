@@ -9,7 +9,7 @@ import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/no
 import { calculatePaymentSummary } from "@/lib/club-registration/payment/calculate-payment-summary";
 import { normalizePaymentAidList } from "@/lib/club-registration/payment/payment-draft-helpers";
 import type { Representative } from "@/lib/club-registration/schema";
-import { buildPricingContext, calculateQuote } from "@/lib/pricing";
+import { buildPricingContext, calculateQuote, resolveDonationPricing } from "@/lib/pricing";
 import type { RegistrationFfttPatch } from "./RegistrationSupplementarySections";
 import { toEditableRegistration } from "./to-editable-registration";
 import {
@@ -108,8 +108,12 @@ export function useMembershipRequestDetail(
 
   const expectedPayableAfterAidsCents = useMemo(() => {
     if (!form || !liveQuote || liveQuote.totalCents <= 0) return null;
+    const invoiceTotal = resolveDonationPricing(
+      liveQuote,
+      form.voluntaryDonationCents ?? 0
+    ).invoiceTotalCents;
     return calculatePaymentSummary({
-      totalAmountCents: liveQuote.totalCents,
+      totalAmountCents: invoiceTotal,
       aids: normalizePaymentAidList(form.paymentAids ?? []),
       receivedPayments: [],
     }).amountToPayCents;
@@ -258,6 +262,7 @@ export function useMembershipRequestDetail(
             competitionIds: form.competitionIds,
             applicantNotes: form.applicantNotes.trim() || undefined,
             reviewNotes: form.reviewNotes,
+            voluntaryDonationCents: form.voluntaryDonationCents,
             ...(amountCents !== null ? { paymentAmountCents: amountCents } : {}),
           }),
         }
@@ -284,8 +289,12 @@ export function useMembershipRequestDetail(
       setError("Impossible d'appliquer un montant : devis incomplet ou nul.");
       return;
     }
+    const invoiceTotal = resolveDonationPricing(
+      liveQuote,
+      form.voluntaryDonationCents ?? 0
+    ).invoiceTotalCents;
     const payable = calculatePaymentSummary({
-      totalAmountCents: liveQuote.totalCents,
+      totalAmountCents: invoiceTotal,
       aids: normalizePaymentAidList(form.paymentAids ?? []),
       receivedPayments: [],
     }).amountToPayCents;
@@ -337,6 +346,10 @@ export function useMembershipRequestDetail(
       return;
     }
 
+    const isResend = selected?.status === "payment_requested";
+    const paymentEmail =
+      typeof selected?.paymentEmailSentTo === "string" ? selected.paymentEmailSentTo : null;
+
     setRequestingPayment(true);
     setError(null);
     setSuccess(null);
@@ -360,11 +373,19 @@ export function useMembershipRequestDetail(
         setSuccess(
           typeof json.message === "string"
             ? json.message
-            : "Dossier validé. Un e-mail d'instructions de règlement a été envoyé au contact du dossier."
+            : isResend
+              ? `Instructions de règlement renvoyées${paymentEmail ? ` à ${paymentEmail}` : ""}.`
+              : "Dossier validé. Un e-mail d'instructions de règlement a été envoyé au contact du dossier."
+        );
+      } else if (isResend) {
+        setSuccess(
+          paymentEmail
+            ? `Rappel envoyé à ${paymentEmail} — l'adhérent peut régler depuis Mes dossiers.`
+            : "Rappel envoyé au contact du dossier — paiement via Mes dossiers."
         );
       } else {
         setSuccess(
-          "Un e-mail avec un lien de paiement sécurisé a été envoyé au contact du dossier."
+          "Dossier validé. Un e-mail avec le lien vers Mes dossiers a été envoyé au contact du dossier."
         );
       }
       await reloadQueueAndRefreshDetail("always");

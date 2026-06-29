@@ -62,4 +62,13 @@ describe("buildStripeCheckoutLineItems", () => {
     expect(items.some((i) => i.name === "Championnat de Paris")).toBe(true);
     expect(sumStripeCheckoutLineItems(items)).toBe(quote.totalCents);
   });
+
+  it("ajoute une ligne don et valide le total après remise", () => {
+    const quote = calculateQuote(ctx({ birthDate: "2014-06-01" }));
+    const donation = { voluntaryDonationCents: 10_000, donationDiscountCents: 2_500 };
+    const items = buildStripeCheckoutLineItems(quote, undefined, donation);
+    expect(items.some((i) => i.name === "Don libre au club")).toBe(true);
+    expect(sumStripeCheckoutLineItems(items)).toBe(quote.totalCents + 10_000);
+    expect(() => assertStripeLinesMatchQuote(quote, items, donation)).not.toThrow();
+  });
 });

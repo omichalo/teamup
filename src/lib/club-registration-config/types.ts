@@ -147,12 +147,56 @@ export type StripePresentationConfig = {
   competitorJerseyInfoLabel: string;
   invoiceHeaderTemplate: string;
   discountCustomFieldName: string;
+  /** Ligne facture Stripe pour le don libre. */
+  donationLabel: string;
+  /** Libellé du coupon de remise don affiché sur la facture. */
+  donationDiscountCouponName: string;
 };
 
 /** Tarification et libellé Stripe du maillot commandé hors section compétiteur. */
 export type JerseyCatalogConfig = {
   optionalPriceCents: number;
   optionalStripeLabel: string;
+};
+
+export type PricingDeviceConditions = {
+  /** Sections principales éligibles (ex. trappes, la-verriere). */
+  sectionIds: string[];
+  /** Nombre exact de créneaux requis (ex. 1). */
+  exactSlotCount: number;
+  /** Aucune section complémentaire cochée. */
+  requiresNoAdditionalSections: boolean;
+  /** Section compétiteur désactivée. */
+  requiresNoCompetitorExtras: boolean;
+  /** Aucune compétition sélectionnée. */
+  requiresNoCompetitionSelection: boolean;
+};
+
+export type PricingDeviceUiCopy = {
+  recapHint?: string | undefined;
+  adminBadge?: string | undefined;
+  segmentLabelPrefix?: string | undefined;
+};
+
+export type PricingDevice = {
+  id: string;
+  label: string;
+  enabled: boolean;
+  sortOrder: number;
+  /** Priorité de résolution (plus élevé = évalué en premier). */
+  priority: number;
+  conditions: PricingDeviceConditions;
+  /** Profil tarifaire substitué lorsque le dispositif s'applique. */
+  pricingProfileId: string;
+  /** Profil de tranches d'âge (défaut : celui de la section). */
+  ageBandProfileId?: string | undefined;
+  /** Remises catalogue (famille, 1re féminine) cumulables ou non. */
+  stackableWithDiscounts: boolean;
+  /** Facturer la ligne licence FFTT lorsque le dispositif s'applique. */
+  includesFfttLicense: boolean;
+  uiCopy?: PricingDeviceUiCopy | undefined;
+  /** Livré avec l'application : réinjecté si absent d'une config importée. */
+  builtIn?: boolean | undefined;
 };
 
 export type SchoolPickupServiceCopy = {
@@ -188,6 +232,7 @@ export type RegistrationConfigV1 = {
   stripePresentation: StripePresentationConfig;
   jersey: JerseyCatalogConfig;
   uiCopy: RegistrationUiCopy;
+  pricingDevices: PricingDevice[];
 };
 
 export type RegistrationConfigExport = {

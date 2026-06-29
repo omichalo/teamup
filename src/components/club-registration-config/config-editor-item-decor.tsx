@@ -74,6 +74,11 @@ export const discountRuleDecor: ConfigEditorItemDecor = {
   Icon: resolveConfigEditorIcon("local_offer"),
 };
 
+export const pricingDeviceDecor: ConfigEditorItemDecor = {
+  accent: "warning",
+  Icon: resolveConfigEditorIcon("emoji_events"),
+};
+
 export const aidRuleDecor: ConfigEditorItemDecor = {
   accent: "info",
   Icon: resolveConfigEditorIcon("volunteer"),

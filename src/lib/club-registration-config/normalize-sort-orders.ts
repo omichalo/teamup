@@ -2,6 +2,8 @@ import type { RegistrationConfigV1, RegistrationSiteSlot } from "./types";
 import { repairAidRulesForm } from "./aid-rules";
 import { repairPricingProfiles } from "./pricing-profiles";
 import { repairSiteLinkedSectionIds } from "./site-section-links";
+import { repairPricingDevices } from "./pricing-devices";
+import { repairChampYonCatalog } from "./repair-champ-yon-catalog";
 import { sortBySortOrder } from "./sort-order";
 
 /** Normalise sortOrder pour les configs importées ou legacy (créneaux sans ordre). */
@@ -34,7 +36,11 @@ export function normalizeRegistrationConfigSortOrders(
     }),
   };
 
-  return repairPricingProfiles(repairAidRulesForm(repairSiteLinkedSectionIds(withSortOrders)));
+  return repairPricingProfiles(
+    repairPricingDevices(
+      repairChampYonCatalog(repairAidRulesForm(repairSiteLinkedSectionIds(withSortOrders)))
+    )
+  );
 }
 
 export function getSortedSiteSlots(slots: readonly RegistrationSiteSlot[]): RegistrationSiteSlot[] {

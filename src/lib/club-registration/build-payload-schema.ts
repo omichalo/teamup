@@ -24,6 +24,7 @@ import {
 } from "./payment-payload-schema";
 import { isValidFrenchPhoneSurface, normalizeFrenchPhoneInput } from "./phone-fr";
 import { calculateQuoteFromConfig } from "@/lib/club-registration-config/pricing-engine";
+import { isValidVoluntaryDonationCents, getMembershipNetCents, computeInvoiceTotalCents } from "@/lib/pricing/donation-discount";
 import { buildPricingContext } from "@/lib/pricing/build-context";
 import {
   adherentRoleSchema,
@@ -418,6 +419,8 @@ export function buildRegistrationPayloadSchema(config: RegistrationConfigV1) {
       const pricingCtx = buildPricingContext({
         birthDate: data.birthDate,
         mainSectionId: data.mainSectionId,
+        slotIds: data.slotIds,
+        additionalSectionIds: data.additionalSectionIds,
         wantsCompetitorExtras: data.wantsCompetitorExtras,
         wantsOptionalJersey: data.wantsOptionalJersey,
         competitionIds: data.competitionIds,
@@ -427,7 +430,22 @@ export function buildRegistrationPayloadSchema(config: RegistrationConfigV1) {
         reductionTypes: data.reductionTypes,
       });
       const quote = calculateQuoteFromConfig(pricingCtx, config);
-      refinePaymentPayload(data, ctx, quote.totalCents);
+
+      if (!isValidVoluntaryDonationCents(data.voluntaryDonationCents)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Le don libre doit être de 0 € ou d'au moins 1 €.",
+          path: ["voluntaryDonationCents"],
+        });
+      }
+
+      const membershipNet = getMembershipNetCents(quote);
+      const invoiceTotalCents = computeInvoiceTotalCents(
+        quote.totalCents,
+        data.voluntaryDonationCents,
+        membershipNet
+      );
+      refinePaymentPayload(data, ctx, invoiceTotalCents);
     })
   );
 }

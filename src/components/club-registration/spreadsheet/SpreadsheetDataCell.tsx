@@ -3,10 +3,8 @@
 import { Chip } from "@mui/material";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import type { RegistrationClientRecord } from "@/lib/club-registration/map-registration-doc-to-client";
-import {
-  PAYMENT_STATUS_LABELS,
-  type PaymentStatusId,
-} from "@/lib/club-registration/payment-constants";
+import { PAYMENT_STATUS_LABELS } from "@/lib/club-registration/payment-constants";
+import { resolveRegistrationPaymentStatus } from "@/lib/club-registration/resolve-registration-payment-status";
 import {
   REGISTRATION_STATUS_COLORS,
   REGISTRATION_STATUS_LABELS,
@@ -57,11 +55,11 @@ export function SpreadsheetDataCell({ columnId, row, config, context }: Props) {
   }
 
   if (columnId === "paymentStatus") {
-    const status = typeof row.paymentStatus === "string" ? row.paymentStatus : "";
-    if (status in PAYMENT_STATUS_LABELS) {
+    const status = resolveRegistrationPaymentStatus(row);
+    if (status) {
       return (
         <StatusChip
-          label={PAYMENT_STATUS_LABELS[status as PaymentStatusId]}
+          label={PAYMENT_STATUS_LABELS[status]}
           color={status === "paid" ? "success" : status === "partially_paid" ? "warning" : "info"}
         />
       );

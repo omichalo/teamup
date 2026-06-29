@@ -13,6 +13,7 @@ export const BUILTIN_PRICING_PROFILE_IDS = [
   "handisport",
   "sport_adapte",
   "ecole",
+  "champ_yon",
 ] as const;
 
 export type BuiltinPricingProfileId = (typeof BUILTIN_PRICING_PROFILE_IDS)[number];
@@ -55,6 +56,15 @@ export function buildDefaultPricingProfilesRecord(): Record<string, PricingProfi
       sortOrder: 3,
       accent: "success",
       iconKey: "school",
+      behavior: "classic_like",
+      builtIn: true,
+    },
+    {
+      id: "champ_yon",
+      label: "CHAMP'YON",
+      sortOrder: 4,
+      accent: "warning",
+      iconKey: "emoji_events",
       behavior: "classic_like",
       builtIn: true,
     },

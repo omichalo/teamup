@@ -24,6 +24,7 @@ import { DiscountRulesEditor } from "./DiscountRulesEditor";
 import { AidRulesEditor } from "./AidRulesEditor";
 import { StripePresentationEditor } from "./StripePresentationEditor";
 import { ExportImportPanel } from "./ExportImportPanel";
+import { PricingDevicesEditor } from "./PricingDevicesEditor";
 import { useRegistrationConfigDraft } from "./useRegistrationConfigDraft";
 import {
   CONFIG_PAGE_BLOCK_SPACING,
@@ -41,6 +42,7 @@ const TABS = [
   "Compétitions",
   "Profils d'âge",
   "Tarifs",
+  "Dispositifs",
   "Remises",
   "Aides",
   "Stripe",
@@ -114,10 +116,11 @@ export function RegistrationConfigClient() {
             {tab === 4 && <CompetitionsEditor config={draft} onChange={updateDraft} />}
             {tab === 5 && <AgeBandsEditor config={draft} onChange={updateDraft} />}
             {tab === 6 && <RateTableEditor config={draft} onChange={updateDraft} />}
-            {tab === 7 && <DiscountRulesEditor config={draft} onChange={updateDraft} />}
-            {tab === 8 && <AidRulesEditor config={draft} onChange={updateDraft} />}
-            {tab === 9 && <StripePresentationEditor config={draft} onChange={updateDraft} />}
-            {tab === 10 && <ExportImportPanel config={draft} onImported={() => void load()} />}
+            {tab === 7 && <PricingDevicesEditor config={draft} onChange={updateDraft} />}
+            {tab === 8 && <DiscountRulesEditor config={draft} onChange={updateDraft} />}
+            {tab === 9 && <AidRulesEditor config={draft} onChange={updateDraft} />}
+            {tab === 10 && <StripePresentationEditor config={draft} onChange={updateDraft} />}
+            {tab === 11 && <ExportImportPanel config={draft} onImported={() => void load()} />}
           </Box>
         </Paper>
       </Stack>

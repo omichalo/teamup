@@ -9,6 +9,13 @@ function mockStripeFetch() {
   global.fetch = jest.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
 
+    if (url.includes("/v1/customers?")) {
+      return {
+        ok: true,
+        json: async () => ({ data: [] }),
+      } as Response;
+    }
+
     if (url.endsWith("/v1/customers")) {
       return {
         ok: true,
@@ -59,27 +66,49 @@ describe("createPaidOutOfBandInvoice", () => {
     delete process.env.STRIPE_SECRET_KEY;
   });
 
-  it("crée, finalise et marque payée une facture Stripe hors ligne", async () => {
+  it("crée, finalise et marque payée une facture multi-lignes", async () => {
     const result = await createPaidOutOfBandInvoice({
       registrationId: "reg_1",
       customerEmail: "adherent@example.com",
-      amountCents: 12000,
-      description: "Adhésion SQY Ping — Ada Lovelace",
+      customerName: "Ada Lovelace",
+      invoiceDescription: "Adhésion SQY Ping — Ada Lovelace",
+      lineItems: [
+        { name: "Adhésion club", amountCents: 10_000 },
+        { name: "Licence", amountCents: 2_000 },
+      ],
     });
 
     expect(result).toEqual({ invoiceId: "in_paid" });
-    expect(global.fetch).toHaveBeenCalledTimes(5);
+    expect(global.fetch).toHaveBeenCalledTimes(7);
   });
 
-  it("refuse un montant nul ou négatif", async () => {
+  it("applique plusieurs coupons de remise", async () => {
+    const result = await createPaidOutOfBandInvoice({
+      registrationId: "reg_1",
+      customerEmail: "adherent@example.com",
+      customerName: "Ada Lovelace",
+      invoiceDescription: "Adhésion SQY Ping — Ada Lovelace",
+      lineItems: [
+        { name: "Adhésion club", amountCents: 10_000 },
+        { name: "Don libre au club", amountCents: 4_000 },
+      ],
+      discountCouponIds: ["coupon_don", "coupon_pass_sport"],
+    });
+
+    expect(result).toEqual({ invoiceId: "in_paid" });
+    expect(global.fetch).toHaveBeenCalledTimes(7);
+  });
+
+  it("refuse une facture sans lignes", async () => {
     await expect(
       createPaidOutOfBandInvoice({
         registrationId: "reg_1",
         customerEmail: "adherent@example.com",
-        amountCents: 0,
-        description: "Adhésion SQY Ping — Ada Lovelace",
+        customerName: "Ada Lovelace",
+        invoiceDescription: "Adhésion SQY Ping — Ada Lovelace",
+        lineItems: [],
       })
-    ).rejects.toThrow("Montant de facture invalide");
+    ).rejects.toThrow("Aucune ligne de facture");
   });
 });
 

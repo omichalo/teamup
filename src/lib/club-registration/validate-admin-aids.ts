@@ -14,6 +14,8 @@ type DraftSlice = Pick<
   RegistrationDraft,
   | "birthDate"
   | "mainSectionId"
+  | "slotIds"
+  | "additionalSectionIds"
   | "wantsCompetitorExtras"
   | "wantsOptionalJersey"
   | "competitionIds"
@@ -34,6 +36,8 @@ function quoteTotalCents(
     buildPricingContext({
       birthDate: draft.birthDate,
       mainSectionId: draft.mainSectionId,
+      slotIds: draft.slotIds ?? [],
+      additionalSectionIds: draft.additionalSectionIds ?? [],
       wantsCompetitorExtras: draft.wantsCompetitorExtras,
       wantsOptionalJersey: draft.wantsOptionalJersey,
       competitionIds: draft.competitionIds,
