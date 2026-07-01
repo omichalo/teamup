@@ -1,8 +1,7 @@
 export const runtime = "nodejs";
 
 import { jsonNoStore } from "@/lib/http/cache-headers";
-import { cookies } from "next/headers";
-import type { NextRequest } from "next/server";
+import { withAuth } from "@/lib/auth/api-utils";
 import {
   initializeFirebaseAdmin,
   adminAuth,
@@ -11,8 +10,6 @@ import {
 import {
   USER_ROLES,
   COACH_REQUEST_STATUS,
-  hasAnyRole,
-  resolveRole,
 } from "@/lib/auth/roles";
 import { FieldValue } from "firebase-admin/firestore";
 import type { CoachRequestStatus, UserRole } from "@/types";
@@ -26,7 +23,7 @@ interface CoachRequestUpdatePayload {
   message?: string | null;
 }
 
-export async function PATCH(req: NextRequest) {
+export const PATCH = withAuth(async (req: Request, context: unknown) => {
   try {
     // Valider l'origine de la requête pour prévenir les attaques CSRF
     if (!validateOrigin(req)) {
@@ -40,24 +37,7 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-    if (!sessionCookie) {
-      return jsonNoStore(
-        { success: false, error: "Session cookie requis" },
-        { status: 401 }
-      );
-    }
-
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    const role = resolveRole(decoded.role as string | undefined);
-
-    if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
-      return jsonNoStore(
-        { success: false, error: "Accès refusé" },
-        { status: 403 }
-      );
-    }
+    const { decoded } = context as { decoded: { uid: string } };
 
     const {
       userId,
@@ -156,4 +136,4 @@ export async function PATCH(req: NextRequest) {
       { status: 500 }
     );
   }
-}
+}, [USER_ROLES.ADMIN]);
