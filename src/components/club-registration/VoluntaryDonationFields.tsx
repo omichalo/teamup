@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Box,
   Checkbox,
@@ -15,6 +15,7 @@ import {
   getMembershipNetCents,
 } from "@/lib/pricing";
 import type { PriceQuote } from "@/lib/pricing/types";
+import { eurosInputToCents } from "@/lib/club-registration/payment/payment-draft-helpers";
 import { EuroMonetaryInputField } from "./EuroMonetaryInputField";
 
 type Props = {
@@ -33,13 +34,13 @@ export function VoluntaryDonationFields({
   idPrefix = "donation",
 }: Props) {
   const wantsDonation = voluntaryDonationCents > 0;
-  const [draftDonationCents, setDraftDonationCents] = useState(voluntaryDonationCents);
+  const [draftText, setDraftText] = useState("");
 
-  useEffect(() => {
-    setDraftDonationCents(voluntaryDonationCents);
-  }, [voluntaryDonationCents]);
-
-  const previewCents = wantsDonation ? draftDonationCents || voluntaryDonationCents : 0;
+  const previewCents = (() => {
+    if (!wantsDonation) return 0;
+    if (draftText.trim()) return eurosInputToCents(draftText);
+    return voluntaryDonationCents;
+  })();
 
   const preview = (() => {
     if (!quote || !wantsDonation || previewCents <= 0) {
@@ -54,18 +55,18 @@ export function VoluntaryDonationFields({
   })();
 
   const toggleDonation = (checked: boolean) => {
+    setDraftText("");
     if (!checked) {
-      setDraftDonationCents(0);
       onChange(0);
       return;
     }
-    setDraftDonationCents(VOLUNTARY_DONATION_MIN_CENTS);
     onChange(VOLUNTARY_DONATION_MIN_CENTS);
   };
 
   const commitDonation = (cents: number) => {
-    const next = cents > 0 ? Math.max(cents, VOLUNTARY_DONATION_MIN_CENTS) : VOLUNTARY_DONATION_MIN_CENTS;
-    setDraftDonationCents(next);
+    setDraftText("");
+    const next =
+      cents > 0 ? Math.max(cents, VOLUNTARY_DONATION_MIN_CENTS) : VOLUNTARY_DONATION_MIN_CENTS;
     onChange(next);
   };
 
@@ -94,7 +95,7 @@ export function VoluntaryDonationFields({
           label="Montant du don"
           amountCents={voluntaryDonationCents}
           onCommitCents={commitDonation}
-          onDraftCents={setDraftDonationCents}
+          onDraftText={setDraftText}
           minCentsOnBlur={VOLUNTARY_DONATION_MIN_CENTS}
           fullWidth
           disabled={disabled}

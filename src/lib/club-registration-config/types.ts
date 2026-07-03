@@ -138,6 +138,8 @@ export type AidRule = {
   helperText?: string | undefined;
   /** Plafond facultatif du montant saisi par la famille (centimes). */
   maxAmountCents?: number | undefined;
+  /** Montant exact imposé (centimes) — le champ est prérempli et non modifiable. */
+  fixedAmountCents?: number | undefined;
 };
 
 export type StripePresentationConfig = {

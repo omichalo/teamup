@@ -12,6 +12,7 @@ type Props = {
   sx?: SxProps<Theme>;
   dataField: string;
   helperText?: string;
+  disabled?: boolean;
 };
 
 /** Montant en euros pour une aide (délègue à {@link EuroMonetaryInputField}). */
@@ -20,6 +21,7 @@ export function AidEuroAmountField({
   amountCents,
   onCommitCents,
   required = false,
+  disabled = false,
   size = "small",
   sx,
   dataField,
@@ -31,6 +33,7 @@ export function AidEuroAmountField({
       amountCents={amountCents}
       onCommitCents={onCommitCents}
       required={required}
+      disabled={disabled}
       size={size}
       dataField={dataField}
       selectAllOnFocus={true}
