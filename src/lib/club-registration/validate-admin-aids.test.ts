@@ -57,4 +57,25 @@ describe("validateAdminAids", () => {
     expect(issue?.message).toMatch(/50,00/);
     expect(issue?.focusSelector).toBe('[data-field="paymentAid.pass_sport"]');
   });
+
+  it("exige le montant fixe configuré pour l'aide", () => {
+    const fixedConfig = {
+      ...config,
+      aidRules: config.aidRules.map((rule) =>
+        rule.id === "pass_sport"
+          ? { ...rule, fixedAmountCents: 5_000, maxAmountCents: undefined }
+          : rule
+      ),
+    };
+    const issue = validateAdminAids(
+      {
+        ...baseDraft,
+        reductionTypes: ["pass_sport"],
+        paymentAids: [{ type: "pass_sport", label: "Pass Sport", amountCents: 4_999 }],
+      },
+      fixedConfig
+    );
+    expect(issue?.message).toMatch(/50,00/);
+    expect(issue?.focusSelector).toBe('[data-field="paymentAid.pass_sport"]');
+  });
 });

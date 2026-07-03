@@ -1,5 +1,5 @@
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
-import { findAidRuleById, getAidRuleMaxAmountCents } from "@/lib/club-registration-config/aid-rules";
+import { findAidRuleById, getAidRuleFixedAmountCents, getAidRuleMaxAmountCents } from "@/lib/club-registration-config/aid-rules";
 import { buildPricingContext, calculateQuote, formatCentsAsEuros } from "@/lib/pricing";
 import { calculatePaymentSummary } from "@/lib/club-registration/payment/calculate-payment-summary";
 import { findPaymentAid, normalizePaymentAidList } from "@/lib/club-registration/payment/payment-draft-helpers";
@@ -69,6 +69,15 @@ export function validateAdminAids(
     }
 
     const rule = findAidRuleById(config, reductionId);
+    const fixedAmountCents = rule ? getAidRuleFixedAmountCents(rule) : undefined;
+    if (fixedAmountCents !== undefined && entry.amountCents !== fixedAmountCents) {
+      const label = rule?.label ?? reductionId;
+      return {
+        message: `Le montant pour « ${label} » doit être de ${formatCentsAsEuros(fixedAmountCents)}.`,
+        focusSelector: `[data-field="paymentAid.${reductionId}"]`,
+      };
+    }
+
     const maxAmountCents = rule ? getAidRuleMaxAmountCents(rule) : undefined;
     if (maxAmountCents !== undefined && entry.amountCents > maxAmountCents) {
       const label = rule?.label ?? reductionId;

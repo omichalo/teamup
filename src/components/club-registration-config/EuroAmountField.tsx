@@ -2,14 +2,18 @@
 
 import { InputAdornment, TextField } from "@mui/material";
 import type { SxProps, Theme } from "@mui/material/styles";
-import { centsToEuroInput, euroInputToCents } from "./config-editor-utils";
+import { useEuroMonetaryTextInput } from "@/lib/club-registration/payment/use-euro-monetary-text-input";
 
 type Props = {
   label: string;
-  valueCents: number;
+  valueCents?: number | undefined;
   onChangeCents: (cents: number) => void;
   size?: "small" | "medium";
   fullWidth?: boolean;
+  disabled?: boolean;
+  /** Montant facultatif : vide tant qu'aucune valeur n'est enregistrée. */
+  allowEmpty?: boolean;
+  helperText?: string;
   sx?: SxProps<Theme>;
 };
 
@@ -19,17 +23,31 @@ export function EuroAmountField({
   onChangeCents,
   size = "small",
   fullWidth = false,
+  disabled = false,
+  allowEmpty = false,
+  helperText,
   sx,
 }: Props) {
+  const { text, handleFocus, handleChange, handleBlur } = useEuroMonetaryTextInput({
+    amountCents: valueCents,
+    allowEmpty,
+    selectAllOnFocus: true,
+  });
+
   return (
     <TextField
       label={label}
       size={size}
-      type="number"
       fullWidth={fullWidth}
-      value={centsToEuroInput(valueCents)}
-      onChange={(e) => onChangeCents(euroInputToCents(e.target.value))}
-      inputProps={{ min: 0, step: 0.01 }}
+      disabled={disabled}
+      value={text}
+      onChange={(e) => handleChange(e.target.value)}
+      onFocus={handleFocus}
+      onBlur={() => handleBlur(onChangeCents)}
+      inputProps={{ inputMode: "decimal", autoComplete: "off" }}
+      InputLabelProps={{ shrink: true }}
+      placeholder="0,00"
+      {...(helperText !== undefined ? { helperText } : {})}
       InputProps={{
         endAdornment: <InputAdornment position="end">€</InputAdornment>,
       }}
