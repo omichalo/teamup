@@ -29,11 +29,13 @@ export function competitionSummaryMeta(comp: {
   enabled: boolean;
   formGroup: "youth" | "other";
   priceCents: number;
+  requiresAvailabilityCommitment?: boolean | undefined;
 }): string {
   const parts = [
     comp.formGroup === "youth" ? "Jeunes" : "Autres",
     `${centsToEuroInput(comp.priceCents)} €`,
   ];
+  if (comp.requiresAvailabilityCommitment) parts.push("Engagement disponibilité");
   if (!comp.enabled) parts.push("Masquée");
   return parts.join(" · ");
 }

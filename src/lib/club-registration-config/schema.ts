@@ -64,6 +64,7 @@ const registrationCompetitionSchema = z.object({
   priceCents: z.number().int().min(0),
   formGroup: z.enum(["youth", "other"]),
   enabled: z.boolean(),
+  requiresAvailabilityCommitment: z.boolean().optional(),
 });
 
 const competitionBundleSchema = z.object({
@@ -236,6 +237,7 @@ const registrationUiCopySchema = z.object({
   competitorJerseyHelper: z.string().trim().min(1).max(500).optional(),
   jerseySizeHelper: z.string().trim().min(1).max(500).optional(),
   optionalJerseyOptInLabel: z.string().trim().min(1).max(500).optional(),
+  competitionAvailabilityCommitmentNotice: z.string().trim().min(1).max(2000).optional(),
 });
 
 export const registrationConfigV1Schema = z

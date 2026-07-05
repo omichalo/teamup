@@ -206,6 +206,20 @@ export function CompetitionsEditor({ config, onChange }: Props) {
                 sx={configEditorSwitchLabelSx}
                 control={
                   <Switch
+                    checked={comp.requiresAvailabilityCommitment === true}
+                    onChange={(e) =>
+                      updateCompetition(comp.id, {
+                        requiresAvailabilityCommitment: e.target.checked,
+                      })
+                    }
+                  />
+                }
+                label="Afficher l'engagement de disponibilité (amendes forfaits)"
+              />
+              <FormControlLabel
+                sx={configEditorSwitchLabelSx}
+                control={
+                  <Switch
                     checked={comp.enabled}
                     onChange={(e) => updateCompetition(comp.id, { enabled: e.target.checked })}
                   />

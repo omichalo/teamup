@@ -26,6 +26,8 @@ import {
   PracticeCompetitorJerseyField,
   PracticeOptionalJerseySection,
 } from "./PracticeJerseySection";
+import { CompetitionAvailabilityCommitmentAlert } from "./CompetitionAvailabilityCommitmentAlert";
+import { getCompetitionsRequiringAvailabilityCommitment } from "@/lib/club-registration-config/competition-availability-commitment";
 
 type Props = {
   draft: RegistrationDraft;
@@ -77,6 +79,10 @@ export function PracticeStep({ draft, onChange }: Props) {
     (c) => c.enabled && c.formGroup === "other"
   );
   const youthBundle = config.competitionBundles[0];
+  const commitmentCompetitions = getCompetitionsRequiringAvailabilityCommitment(
+    config,
+    draft.competitionIds
+  );
 
   const [expandedSiteIds, setExpandedSiteIds] = useState<Set<string>>(() =>
     siteIdsMatchingMainSection(draft.mainSectionId, getEnabledSites(config))
@@ -329,6 +335,13 @@ export function PracticeStep({ draft, onChange }: Props) {
                 />
               ))}
             </FormGroup>
+          </Box>
+
+          <Box sx={{ mt: 1 }}>
+            <CompetitionAvailabilityCommitmentAlert
+              config={config}
+              competitions={commitmentCompetitions}
+            />
           </Box>
         </Stack>
       )}
