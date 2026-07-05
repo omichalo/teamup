@@ -35,6 +35,7 @@ import {
   DEFAULT_JERSEY_SIZE_HELPER,
   DEFAULT_OPTIONAL_JERSEY_OPT_IN_LABEL,
 } from "./repair-jersey";
+import { DEFAULT_COMPETITION_AVAILABILITY_COMMITMENT_NOTICE } from "./competition-availability-commitment";
 import { buildDefaultPricingDevices } from "./pricing-devices";
 
 function sectionPricingProfile(id: string): RegistrationSection["pricingProfile"] {
@@ -267,6 +268,7 @@ export function buildDefaultRegistrationConfig(): RegistrationConfigV1 {
       priceCents: COMPETITION_PRICE_CENTS[comp.id] ?? 0,
       formGroup: youthIds.has(comp.id) ? "youth" : "other",
       enabled: true,
+      requiresAvailabilityCommitment: true,
     })),
     competitionBundles: buildCompetitionBundles(),
     ageBandProfiles: {
@@ -373,6 +375,8 @@ export function buildDefaultRegistrationConfig(): RegistrationConfigV1 {
       competitorJerseyHelper: DEFAULT_COMPETITOR_JERSEY_HELPER,
       jerseySizeHelper: DEFAULT_JERSEY_SIZE_HELPER,
       optionalJerseyOptInLabel: DEFAULT_OPTIONAL_JERSEY_OPT_IN_LABEL,
+      competitionAvailabilityCommitmentNotice:
+        DEFAULT_COMPETITION_AVAILABILITY_COMMITMENT_NOTICE,
     },
     pricingDevices: buildDefaultPricingDevices(),
   };

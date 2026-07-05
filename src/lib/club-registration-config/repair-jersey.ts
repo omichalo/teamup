@@ -1,5 +1,7 @@
 import type { JerseyCatalogConfig, RegistrationConfigV1 } from "./types";
 
+import { DEFAULT_COMPETITION_AVAILABILITY_COMMITMENT_NOTICE } from "./competition-availability-commitment";
+
 export const DEFAULT_JERSEY_CATALOG: JerseyCatalogConfig = {
   optionalPriceCents: 3_500,
   optionalStripeLabel: "Maillot de compétition",
@@ -31,6 +33,9 @@ export function repairJerseyConfig(config: RegistrationConfigV1): RegistrationCo
       jerseySizeHelper: config.uiCopy.jerseySizeHelper ?? DEFAULT_JERSEY_SIZE_HELPER,
       optionalJerseyOptInLabel:
         config.uiCopy.optionalJerseyOptInLabel ?? DEFAULT_OPTIONAL_JERSEY_OPT_IN_LABEL,
+      competitionAvailabilityCommitmentNotice:
+        config.uiCopy.competitionAvailabilityCommitmentNotice ??
+        DEFAULT_COMPETITION_AVAILABILITY_COMMITMENT_NOTICE,
     },
   };
 }

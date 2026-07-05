@@ -60,6 +60,8 @@ export type RegistrationCompetition = {
   priceCents: number;
   formGroup: "youth" | "other";
   enabled: boolean;
+  /** Affiche l'engagement de disponibilité (amendes forfaits) lorsque l'option est cochée. */
+  requiresAvailabilityCommitment?: boolean | undefined;
 };
 
 export type CompetitionBundle = {
@@ -218,6 +220,8 @@ export type RegistrationUiCopy = {
   jerseySizeHelper: string;
   /** Libellé de la case à cocher maillot hors section compétiteur. */
   optionalJerseyOptInLabel: string;
+  /** Rappel affiché lors de la sélection d'une compétition avec engagement de disponibilité. */
+  competitionAvailabilityCommitmentNotice?: string | undefined;
 };
 
 export type RegistrationConfigV1 = {
