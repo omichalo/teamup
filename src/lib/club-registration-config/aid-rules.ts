@@ -51,9 +51,16 @@ export function getAidRuleHelperText(rule: AidRule): string | undefined {
 }
 
 export function getAidRuleMaxAmountCents(rule: AidRule): number | undefined {
+  if (getAidRuleFixedAmountCents(rule) !== undefined) return undefined;
   const max = rule.maxAmountCents;
   if (max === undefined || max <= 0) return undefined;
   return max;
+}
+
+export function getAidRuleFixedAmountCents(rule: AidRule): number | undefined {
+  const fixed = rule.fixedAmountCents;
+  if (fixed === undefined || fixed <= 0) return undefined;
+  return fixed;
 }
 
 export function findAidRuleById(

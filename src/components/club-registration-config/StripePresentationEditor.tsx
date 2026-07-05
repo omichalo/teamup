@@ -145,6 +145,18 @@ export function StripePresentationEditor({ config, onChange }: Props) {
             onChange={(e) => updateUiCopy({ optionalJerseyOptInLabel: e.target.value })}
             fullWidth
           />
+          <TextField
+            label="Engagement de disponibilité — compétitions (formulaire)"
+            size="small"
+            value={config.uiCopy.competitionAvailabilityCommitmentNotice ?? ""}
+            onChange={(e) =>
+              updateUiCopy({ competitionAvailabilityCommitmentNotice: e.target.value })
+            }
+            multiline
+            minRows={4}
+            fullWidth
+            helperText="Affiché lors d'une inscription à une compétition avec engagement de disponibilité."
+          />
         </Stack>
       </ConfigEditorCard>
 

@@ -1,20 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { InputAdornment, TextField } from "@mui/material";
 import type { SxProps, Theme } from "@mui/material/styles";
-import {
-  centsToEurosInput,
-  eurosInputToCents,
-  sanitizeEurosMonetaryInput,
-} from "@/lib/club-registration/payment/payment-draft-helpers";
+import { useEuroMonetaryTextInput } from "@/lib/club-registration/payment/use-euro-monetary-text-input";
 
 type Props = {
   label: string;
   amountCents: number;
   onCommitCents: (cents: number) => void;
-  /** Mise à jour optionnelle pendant la frappe (aperçu, sans valider le formulaire). */
-  onDraftCents?: (cents: number) => void;
+  /** Texte brut pendant la frappe (aperçu sans formater ni valider le formulaire). */
+  onDraftText?: (text: string) => void;
   /** Si défini, le montant est relevé à ce minimum au blur (ex. don 1 €). */
   minCentsOnBlur?: number;
   required?: boolean;
@@ -33,13 +29,13 @@ type Props = {
 
 /**
  * Saisie euros (virgule) : texte local pendant la frappe, conversion en centimes au blur.
- * Évite les effacements impossibles dus au formatage « 1,00 » à chaque touche.
+ * Évite le formatage « 5,00 » à chaque touche qui empêche de saisir « 50 ».
  */
 export function EuroMonetaryInputField({
   label,
   amountCents,
   onCommitCents,
-  onDraftCents,
+  onDraftText,
   minCentsOnBlur,
   required = false,
   disabled = false,
@@ -53,24 +49,12 @@ export function EuroMonetaryInputField({
   selectAllOnFocus = true,
   endAdornment,
 }: Props) {
-  const [text, setText] = useState(() => centsToEurosInput(amountCents));
-  const focusedRef = useRef(false);
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    if (!focusedRef.current) {
-      setText(centsToEurosInput(amountCents));
-    }
-  }, [amountCents]);
-
-  const commitFromText = (raw: string) => {
-    let cents = eurosInputToCents(raw);
-    if (minCentsOnBlur != null && cents > 0 && cents < minCentsOnBlur) {
-      cents = minCentsOnBlur;
-    }
-    onCommitCents(cents);
-    setText(cents > 0 ? centsToEurosInput(cents) : "");
-  };
+  const { text, handleFocus, handleChange, handleBlur } = useEuroMonetaryTextInput({
+    amountCents,
+    allowEmpty: true,
+    selectAllOnFocus,
+    ...(onDraftText ? { onTextChange: onDraftText } : {}),
+  });
 
   return (
     <TextField
@@ -81,23 +65,10 @@ export function EuroMonetaryInputField({
       required={required}
       fullWidth={fullWidth}
       size={size}
-      onChange={(e) => {
-        const next = sanitizeEurosMonetaryInput(e.target.value);
-        setText(next);
-        onDraftCents?.(eurosInputToCents(next));
-      }}
-      onFocus={(e) => {
-        focusedRef.current = true;
-        if (selectAllOnFocus) {
-          e.target.select();
-        }
-      }}
-      onBlur={() => {
-        focusedRef.current = false;
-        commitFromText(text);
-      }}
+      onChange={(e) => handleChange(e.target.value)}
+      onFocus={handleFocus}
+      onBlur={() => handleBlur(onCommitCents, minCentsOnBlur)}
       InputLabelProps={{ shrink: true }}
-      inputRef={inputRef}
       inputProps={{
         ...(dataField ? { "data-field": dataField } : {}),
         inputMode: "decimal",

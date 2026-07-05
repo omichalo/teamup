@@ -1,14 +1,15 @@
 "use client";
 
-import { InputAdornment, MenuItem, Stack, TextField, Typography } from "@mui/material";
+import { MenuItem, Stack, TextField, Typography } from "@mui/material";
 import type {
   AidRule,
   AidRuleFormPresentation,
   RegistrationConfigV1,
 } from "@/lib/club-registration-config/types";
 import { moveArrayItem } from "@/lib/club-registration-config/sort-order";
-import { getAidRuleMaxAmountCents } from "@/lib/club-registration-config/aid-rules";
-import { generateConfigItemId, centsToEuroInput, euroInputToCents } from "./config-editor-utils";
+import { getAidRuleFixedAmountCents, getAidRuleMaxAmountCents } from "@/lib/club-registration-config/aid-rules";
+import { EuroAmountField } from "./EuroAmountField";
+import { generateConfigItemId, centsToEuroInput } from "./config-editor-utils";
 import {
   ConfigEditorAddButton,
   ConfigEditorCollapsibleItem,
@@ -37,9 +38,14 @@ function defaultAidForm(): AidRuleFormPresentation {
 function aidSummaryMeta(rule: AidRule, form: AidRuleFormPresentation): string | undefined {
   const parts: string[] = [];
   if (form.style === "toggle") parts.push("Interrupteur avec code de référence");
-  const maxCents = getAidRuleMaxAmountCents(rule);
-  if (maxCents !== undefined) {
-    parts.push(`Plafond ${centsToEuroInput(maxCents)} €`);
+  const fixedCents = getAidRuleFixedAmountCents(rule);
+  if (fixedCents !== undefined) {
+    parts.push(`Montant fixe ${centsToEuroInput(fixedCents)} €`);
+  } else {
+    const maxCents = getAidRuleMaxAmountCents(rule);
+    if (maxCents !== undefined) {
+      parts.push(`Plafond ${centsToEuroInput(maxCents)} €`);
+    }
   }
   return parts.length > 0 ? parts.join(" · ") : undefined;
 }
@@ -123,27 +129,35 @@ export function AidRulesEditor({ config, onChange }: Props) {
               minRows={2}
               helperText="Affiché aux familles à côté de l'aide (conditions, montant indicatif, etc.)."
             />
-            <TextField
+            <EuroAmountField
               label="Montant maximum (facultatif)"
-              size="small"
-              type="number"
-              value={
-                rule.maxAmountCents !== undefined ? centsToEuroInput(rule.maxAmountCents) : ""
-              }
-              onChange={(e) => {
-                const raw = e.target.value;
-                if (!raw.trim()) {
+              valueCents={rule.maxAmountCents}
+              onChangeCents={(cents) => {
+                if (cents <= 0) {
                   updateRule(index, { maxAmountCents: undefined });
                   return;
                 }
-                updateRule(index, { maxAmountCents: euroInputToCents(raw) });
+                updateRule(index, { maxAmountCents: cents, fixedAmountCents: undefined });
               }}
+              allowEmpty
+              disabled={rule.fixedAmountCents !== undefined}
               fullWidth
-              inputProps={{ min: 0, step: 0.01 }}
-              InputProps={{
-                endAdornment: <InputAdornment position="end">€</InputAdornment>,
-              }}
               helperText="Plafond du montant saisi par la famille. Laisser vide pour aucune limite."
+            />
+            <EuroAmountField
+              label="Montant fixe (facultatif)"
+              valueCents={rule.fixedAmountCents}
+              onChangeCents={(cents) => {
+                if (cents <= 0) {
+                  updateRule(index, { fixedAmountCents: undefined });
+                  return;
+                }
+                updateRule(index, { fixedAmountCents: cents, maxAmountCents: undefined });
+              }}
+              allowEmpty
+              disabled={rule.maxAmountCents !== undefined}
+              fullWidth
+              helperText="Montant imposé et non modifiable par la famille. Incompatible avec un plafond."
             />
             <Typography variant="caption" color="text.secondary" display="block">
               Identifiant technique : <strong>{rule.id}</strong>

@@ -64,6 +64,7 @@ const registrationCompetitionSchema = z.object({
   priceCents: z.number().int().min(0),
   formGroup: z.enum(["youth", "other"]),
   enabled: z.boolean(),
+  requiresAvailabilityCommitment: z.boolean().optional(),
 });
 
 const competitionBundleSchema = z.object({
@@ -133,19 +134,39 @@ const aidRuleFormPresentationSchema = z.discriminatedUnion("style", [
   }),
 ]);
 
-const aidRuleSchema = z.object({
-  id: z.string().trim().min(1).max(80),
-  label: z.string().trim().min(1).max(200),
-  effect: aidRuleEffectSchema,
-  form: aidRuleFormPresentationSchema.optional(),
-  helperText: optionalTrimmedLabelSchema(500),
-  maxAmountCents: z
-    .number()
-    .int()
-    .min(0)
-    .optional()
-    .transform((value) => (value !== undefined && value > 0 ? value : undefined)),
-});
+const aidRuleSchema = z
+  .object({
+    id: z.string().trim().min(1).max(80),
+    label: z.string().trim().min(1).max(200),
+    effect: aidRuleEffectSchema,
+    form: aidRuleFormPresentationSchema.optional(),
+    helperText: optionalTrimmedLabelSchema(500),
+    maxAmountCents: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .transform((value) => (value !== undefined && value > 0 ? value : undefined)),
+    fixedAmountCents: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .transform((value) => (value !== undefined && value > 0 ? value : undefined)),
+  })
+  .superRefine((rule, ctx) => {
+    if (
+      rule.maxAmountCents !== undefined &&
+      rule.fixedAmountCents !== undefined
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          "Une aide ne peut pas avoir à la fois un montant maximum et un montant fixe.",
+        path: ["fixedAmountCents"],
+      });
+    }
+  });
 
 const stripePresentationSchema = z.object({
   membershipLabel: z.string().trim().min(1).max(200),
@@ -216,6 +237,7 @@ const registrationUiCopySchema = z.object({
   competitorJerseyHelper: z.string().trim().min(1).max(500).optional(),
   jerseySizeHelper: z.string().trim().min(1).max(500).optional(),
   optionalJerseyOptInLabel: z.string().trim().min(1).max(500).optional(),
+  competitionAvailabilityCommitmentNotice: z.string().trim().min(1).max(2000).optional(),
 });
 
 export const registrationConfigV1Schema = z
