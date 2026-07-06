@@ -1,8 +1,6 @@
 import { jsonNoStore } from "@/lib/http/cache-headers";
-import type { NextRequest } from "next/server";
-import { cookies } from "next/headers";
-import { adminAuth } from "@/lib/firebase-admin";
-import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
+import { withAuth } from "@/lib/auth/api-utils";
+import { USER_ROLES } from "@/lib/auth/roles";
 import {
   createInitializedFFTTApi,
   resolveEquipeByTeamId,
@@ -32,28 +30,10 @@ export interface PoolRankingEntry {
  * Si phase est fourni (aller|retour), utilise l'équipe FFTT dont la division correspond à cette phase.
  * Réservé aux coachs et admins.
  */
-export async function GET(req: NextRequest) {
+export const GET = withAuth(async (req: Request) => {
   try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-    if (!sessionCookie) {
-      return jsonNoStore(
-        { error: "Authentification requise" },
-        { status: 401 }
-      );
-    }
-
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    const role = resolveRole(decoded.role as string | undefined);
-
-    if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
-      return jsonNoStore(
-        { error: "Accès refusé" },
-        { status: 403 }
-      );
-    }
-
-    const teamId = req.nextUrl.searchParams.get("teamId");
+    const { searchParams } = new URL(req.url);
+    const teamId = searchParams.get("teamId");
     if (!teamId || !teamId.trim()) {
       return jsonNoStore(
         { error: "Paramètre teamId requis" },
@@ -61,7 +41,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const phaseParam = req.nextUrl.searchParams.get("phase");
+    const phaseParam = searchParams.get("phase");
     const phase =
       phaseParam === "retour" || phaseParam === "aller" ? phaseParam : null;
 
@@ -135,4 +115,4 @@ export async function GET(req: NextRequest) {
       { status: 500 }
     );
   }
-}
+}, [USER_ROLES.ADMIN, USER_ROLES.COACH]);
