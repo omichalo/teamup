@@ -1,4 +1,4 @@
-import { isAtLeast40At } from "./age";
+import { isAtLeast65At, isMinorAt } from "./age";
 import type { ClubRegistrationPayload } from "./schema";
 
 export const MEDICAL_YES_NO_VALUES = ["yes", "no"] as const;
@@ -7,12 +7,27 @@ export type MedicalYesNo = (typeof MEDICAL_YES_NO_VALUES)[number];
 export const MEDICAL_QUESTIONNAIRE_SUMMARY_VALUES = [
   "all_no",
   "has_yes",
+  "pps_declared",
+  "certificate_choice",
 ] as const;
 export type MedicalQuestionnaireSummary =
   (typeof MEDICAL_QUESTIONNAIRE_SUMMARY_VALUES)[number];
 
+export const MEDICAL_CERTIFICATE_DECLARATION_VALUES = [
+  "minor_all_no",
+  "minor_yes_certificate_required",
+  "adult_pps_declared",
+  "adult_certificate_required",
+  "senior_certificate_required",
+  // Rétrocompatibilité dossiers antérieurs (saison ≤ 2025/2026)
+  "under_40_all_no",
+  "over_40_cert_unchanged_all_no",
+  "over_40_first_or_changed_certificate_required",
+  "questionnaire_yes_certificate_required",
+] as const;
+
 export type MedicalQuestionnaire = {
-  /** Résultat agrégé du questionnaire FFTT (UI actuelle). */
+  /** Résultat agrégé du parcours médical (questionnaire mineur ou PPS adulte). */
   summary: MedicalQuestionnaireSummary | "";
   /** Réponses individuelles (Q1, Q2, …) — extensible ; vide tant que l’UI ne les collecte pas. */
   answers: Record<string, MedicalYesNo>;
@@ -43,8 +58,8 @@ export function effectiveHadFfttLicense(
 }
 
 /**
- * Dérive la déclaration agrégée (enum historique) à partir du dossier médical détaillé.
- * Aligné sur le parcours AdminStep (âge, licence vérifiée, parcours vétéran).
+ * Dérive la déclaration agrégée à partir du dossier médical détaillé.
+ * Saison 2026/2027 : PPS pour les adultes ; parcours vétéran à partir de 65 ans.
  */
 export function deriveMedicalCertificateDeclaration(params: {
   birthDate: string;
@@ -52,33 +67,38 @@ export function deriveMedicalCertificateDeclaration(params: {
   veteranPath: MedicalVeteranPath;
   hasVerifiedFfttLicense: boolean;
 }): MedicalCertificateDeclaration | "" {
-  const atLeast40 = isAtLeast40At(params.birthDate);
   const { summary } = params.questionnaire;
 
-  if (!atLeast40) {
-    if (summary === "all_no") return "under_40_all_no";
-    if (summary === "has_yes") return "questionnaire_yes_certificate_required";
+  if (isMinorAt(params.birthDate)) {
+    if (summary === "all_no") return "minor_all_no";
+    if (summary === "has_yes") return "minor_yes_certificate_required";
     return "";
   }
 
-  const hadLicense = effectiveHadFfttLicense(
-    params.veteranPath,
-    params.hasVerifiedFfttLicense
-  );
-  const { categoryChanged } = params.veteranPath;
+  if (isAtLeast65At(params.birthDate)) {
+    const hadLicense = effectiveHadFfttLicense(
+      params.veteranPath,
+      params.hasVerifiedFfttLicense
+    );
+    const { categoryChanged } = params.veteranPath;
 
-  if (!params.hasVerifiedFfttLicense && hadLicense === "no") {
-    return "over_40_first_or_changed_certificate_required";
+    if (!params.hasVerifiedFfttLicense && hadLicense === "no") {
+      return "senior_certificate_required";
+    }
+    if (hadLicense !== "yes") return "";
+
+    if (categoryChanged === "yes") {
+      return "senior_certificate_required";
+    }
+    if (categoryChanged !== "no") return "";
+
+    if (summary === "pps_declared") return "adult_pps_declared";
+    if (summary === "certificate_choice") return "adult_certificate_required";
+    return "";
   }
-  if (hadLicense !== "yes") return "";
 
-  if (categoryChanged === "yes") {
-    return "over_40_first_or_changed_certificate_required";
-  }
-  if (categoryChanged !== "no") return "";
-
-  if (summary === "all_no") return "over_40_cert_unchanged_all_no";
-  if (summary === "has_yes") return "questionnaire_yes_certificate_required";
+  if (summary === "pps_declared") return "adult_pps_declared";
+  if (summary === "certificate_choice") return "adult_certificate_required";
   return "";
 }
 
@@ -93,26 +113,35 @@ export function inferMedicalDossierFromDeclaration(
     return { questionnaire, veteranPath };
   }
 
-  const atLeast40 = isAtLeast40At(birthDate);
+  const senior = isAtLeast65At(birthDate);
 
   switch (declaration) {
+    case "minor_all_no":
     case "under_40_all_no":
       questionnaire.summary = "all_no";
       break;
+    case "minor_yes_certificate_required":
     case "questionnaire_yes_certificate_required":
-      questionnaire.summary = "has_yes";
+      questionnaire.summary = isMinorAt(birthDate) ? "has_yes" : "certificate_choice";
       break;
+    case "adult_pps_declared":
+      questionnaire.summary = "pps_declared";
+      break;
+    case "adult_certificate_required":
+      questionnaire.summary = "certificate_choice";
+      break;
+    case "senior_certificate_required":
     case "over_40_first_or_changed_certificate_required":
-      if (atLeast40) {
+      if (senior) {
         veteranPath.hadFfttLicense = "no";
       } else {
-        questionnaire.summary = "has_yes";
+        questionnaire.summary = "certificate_choice";
       }
       break;
     case "over_40_cert_unchanged_all_no":
       veteranPath.hadFfttLicense = "yes";
       veteranPath.categoryChanged = "no";
-      questionnaire.summary = "all_no";
+      questionnaire.summary = senior ? "pps_declared" : "all_no";
       break;
     default:
       break;
@@ -127,9 +156,7 @@ export function isMedicalAdminStepComplete(params: {
   veteranPath: MedicalVeteranPath;
   hasVerifiedFfttLicense: boolean;
 }): boolean {
-  return (
-    deriveMedicalCertificateDeclaration(params) !== ""
-  );
+  return deriveMedicalCertificateDeclaration(params) !== "";
 }
 
 export function syncMedicalCertificateDeclaration<
@@ -151,4 +178,29 @@ export function syncMedicalCertificateDeclaration<
     return draft;
   }
   return { ...draft, medicalCertificateDeclaration: declaration };
+}
+
+/** True si le parcours vétéran (licence / catégorie) s’applique à cette date de naissance. */
+export function isSeniorMedicalVeteranPath(birthDate: string): boolean {
+  return isAtLeast65At(birthDate);
+}
+
+/** True si l’adhérent doit choisir PPS ou certificat (adulte sans obligation certificat vétéran). */
+export function needsAdultPpsOrCertificateChoice(params: {
+  birthDate: string;
+  questionnaire: MedicalQuestionnaire;
+  veteranPath: MedicalVeteranPath;
+  hasVerifiedFfttLicense: boolean;
+}): boolean {
+  if (isMinorAt(params.birthDate)) return false;
+  if (!isAtLeast65At(params.birthDate)) return true;
+
+  const hadLicense = effectiveHadFfttLicense(
+    params.veteranPath,
+    params.hasVerifiedFfttLicense
+  );
+  if (!params.hasVerifiedFfttLicense && hadLicense === "no") return false;
+  if (hadLicense !== "yes") return false;
+  if (params.veteranPath.categoryChanged === "yes") return false;
+  return params.veteranPath.categoryChanged === "no";
 }

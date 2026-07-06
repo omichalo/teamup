@@ -93,7 +93,7 @@ describe("format complex field helpers", () => {
   it("formate le questionnaire médical", () => {
     expect(
       formatMedicalQuestionnaireForSpreadsheet({ summary: "has_yes", answers: { q1: "yes" } })
-    ).toContain("Au moins une réponse Oui");
+    ).toContain("Au moins une réponse « Oui »");
   });
 
   it("formate la licence", () => {

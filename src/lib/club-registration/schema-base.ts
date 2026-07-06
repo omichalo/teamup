@@ -39,7 +39,9 @@ export const adherentRoleSchema = z.enum([
 export type AdherentRole = z.infer<typeof adherentRoleSchema>;
 
 export const medicalQuestionnaireSchema = z.object({
-  summary: z.enum(["all_no", "has_yes"]).optional(),
+  summary: z
+    .enum(["all_no", "has_yes", "pps_declared", "certificate_choice"])
+    .optional(),
   answers: z.record(z.string(), medicalYesNoSchema).default({}),
 });
 

@@ -7,69 +7,99 @@ import {
 } from "./medical-dossier";
 
 describe("medical-dossier", () => {
-  const under40Birth = "2000-04-12";
-  const over40Birth = "1970-04-12";
+  const minorBirth = "2015-04-12";
+  const adultBirth = "2000-04-12";
+  const seniorBirth = "1960-04-12";
 
-  it("dérive under_40_all_no pour un mineur de parcours avec toutes les réponses non", () => {
+  it("dérive minor_all_no pour un mineur avec toutes les réponses non", () => {
     expect(
       deriveMedicalCertificateDeclaration({
-        birthDate: under40Birth,
+        birthDate: minorBirth,
         questionnaire: { summary: "all_no", answers: {} },
         veteranPath: createEmptyMedicalVeteranPath(),
         hasVerifiedFfttLicense: false,
       })
-    ).toBe("under_40_all_no");
+    ).toBe("minor_all_no");
   });
 
-  it("dérive questionnaire_yes pour au moins une réponse oui", () => {
+  it("dérive minor_yes_certificate_required pour un mineur avec au moins un oui", () => {
     expect(
       deriveMedicalCertificateDeclaration({
-        birthDate: under40Birth,
+        birthDate: minorBirth,
         questionnaire: { summary: "has_yes", answers: {} },
         veteranPath: createEmptyMedicalVeteranPath(),
         hasVerifiedFfttLicense: false,
       })
-    ).toBe("questionnaire_yes_certificate_required");
+    ).toBe("minor_yes_certificate_required");
   });
 
-  it("dérive le certificat obligatoire pour une première licence à 40+", () => {
+  it("dérive adult_pps_declared pour un adulte 18-64 ans", () => {
     expect(
       deriveMedicalCertificateDeclaration({
-        birthDate: over40Birth,
+        birthDate: adultBirth,
+        questionnaire: { summary: "pps_declared", answers: {} },
+        veteranPath: createEmptyMedicalVeteranPath(),
+        hasVerifiedFfttLicense: false,
+      })
+    ).toBe("adult_pps_declared");
+  });
+
+  it("dérive adult_certificate_required pour un adulte choisissant le certificat", () => {
+    expect(
+      deriveMedicalCertificateDeclaration({
+        birthDate: adultBirth,
+        questionnaire: { summary: "certificate_choice", answers: {} },
+        veteranPath: createEmptyMedicalVeteranPath(),
+        hasVerifiedFfttLicense: false,
+      })
+    ).toBe("adult_certificate_required");
+  });
+
+  it("dérive senior_certificate_required pour une première licence à 65 ans et plus", () => {
+    expect(
+      deriveMedicalCertificateDeclaration({
+        birthDate: seniorBirth,
         questionnaire: createEmptyMedicalQuestionnaire(),
         veteranPath: { hadFfttLicense: "no", categoryChanged: "" },
         hasVerifiedFfttLicense: false,
       })
-    ).toBe("over_40_first_or_changed_certificate_required");
+    ).toBe("senior_certificate_required");
   });
 
-  it("dérive le parcours vétéran inchangé avec questionnaire tout non", () => {
+  it("dérive adult_pps_declared pour un senior sans changement de catégorie vétéran", () => {
     expect(
       deriveMedicalCertificateDeclaration({
-        birthDate: over40Birth,
-        questionnaire: { summary: "all_no", answers: {} },
+        birthDate: seniorBirth,
+        questionnaire: { summary: "pps_declared", answers: {} },
         veteranPath: { hadFfttLicense: "yes", categoryChanged: "no" },
         hasVerifiedFfttLicense: false,
       })
-    ).toBe("over_40_cert_unchanged_all_no");
+    ).toBe("adult_pps_declared");
   });
 
-  it("reconstruit le dossier depuis une déclaration agrégée existante", () => {
+  it("reconstruit le dossier depuis une déclaration PPS adulte", () => {
     const inferred = inferMedicalDossierFromDeclaration(
-      "over_40_cert_unchanged_all_no",
-      over40Birth
+      "adult_pps_declared",
+      adultBirth
+    );
+    expect(inferred.questionnaire.summary).toBe("pps_declared");
+  });
+
+  it("reconstruit le parcours vétéran senior depuis senior_certificate_required", () => {
+    const inferred = inferMedicalDossierFromDeclaration(
+      "senior_certificate_required",
+      seniorBirth
     );
     expect(inferred.veteranPath).toEqual({
-      hadFfttLicense: "yes",
-      categoryChanged: "no",
+      hadFfttLicense: "no",
+      categoryChanged: "",
     });
-    expect(inferred.questionnaire.summary).toBe("all_no");
   });
 
   it("considère le parcours admin incomplet tant que les réponses manquent", () => {
     expect(
       isMedicalAdminStepComplete({
-        birthDate: over40Birth,
+        birthDate: seniorBirth,
         questionnaire: createEmptyMedicalQuestionnaire(),
         veteranPath: createEmptyMedicalVeteranPath(),
         hasVerifiedFfttLicense: false,

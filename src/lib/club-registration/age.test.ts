@@ -1,4 +1,4 @@
-import { computeAgeAt, isAdultAt, isAtLeast40At, isMinorAt } from "./age";
+import { computeAgeAt, isAdultAt, isAtLeast40At, isAtLeast65At, isMinorAt } from "./age";
 
 /**
  * On utilise `new Date(y, m, d)` (heure locale) pour éviter les pièges
@@ -52,6 +52,16 @@ describe("isMinorAt", () => {
   it("retourne false pour une date vide ou invalide (pas de présomption)", () => {
     expect(isMinorAt("", localDate(2025, 6, 1))).toBe(false);
     expect(isMinorAt("not-a-date", localDate(2025, 6, 1))).toBe(false);
+  });
+});
+
+describe("isAtLeast65At", () => {
+  it("true le jour des 65 ans", () => {
+    expect(isAtLeast65At("1961-05-11", localDate(2026, 5, 11))).toBe(true);
+  });
+
+  it("false la veille des 65 ans", () => {
+    expect(isAtLeast65At("1961-05-12", localDate(2026, 5, 11))).toBe(false);
   });
 });
 

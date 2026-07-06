@@ -51,12 +51,7 @@ const SEX_LABELS: Record<string, string> = {
   other: "Autre / Ne pas préciser",
 };
 
-const MEDICAL_DECLARATION_LABELS: Record<string, string> = {
-  under_40_all_no: "Moins de 40 ans : aucune réponse Oui",
-  over_40_cert_unchanged_all_no: "40 ans et plus, certificat déjà fourni",
-  over_40_first_or_changed_certificate_required: "40 ans et plus : certificat requis",
-  questionnaire_yes_certificate_required: "Au moins une réponse Oui : certificat requis",
-};
+import { MEDICAL_CERTIFICATE_DECLARATION_LABELS } from "@/lib/club-registration/medical-declaration-labels";
 
 const FAMILY_ORDER_LABELS: Record<string, string> = {
   none: "Première inscription dans la famille",
@@ -226,7 +221,7 @@ export function formatSpreadsheetCellValue(
       return formatStringArray(value, (id) => findSlotLabel(config, id));
     case "medicalCertificateDeclaration":
       return typeof value === "string"
-        ? (MEDICAL_DECLARATION_LABELS[value] ?? value)
+        ? (MEDICAL_CERTIFICATE_DECLARATION_LABELS[value] ?? value)
         : "";
     case "medicalCertificateStatus":
       return typeof value === "string"

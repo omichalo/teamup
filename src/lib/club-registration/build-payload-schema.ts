@@ -9,11 +9,14 @@ import {
 import { getToggleAidRules } from "@/lib/club-registration-config/aid-rules";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import { preprocessRegistrationPayloadInput } from "./reduction-reference-codes";
-import { isAtLeast40At, isMinorAt } from "./age";
+import { isMinorAt } from "./age";
 import {
   createEmptyMedicalVeteranPath,
   deriveMedicalCertificateDeclaration,
   effectiveHadFfttLicense,
+  isSeniorMedicalVeteranPath,
+  needsAdultPpsOrCertificateChoice,
+  MEDICAL_CERTIFICATE_DECLARATION_VALUES,
   type MedicalQuestionnaire,
   type MedicalVeteranPath,
 } from "./medical-dossier";
@@ -114,12 +117,7 @@ export function buildRegistrationPayloadSchema(config: RegistrationConfigV1) {
       schoolPickupSlotIds: z.array(z.string()).default([]),
       medicalQuestionnaire: medicalQuestionnaireSchema,
       medicalVeteranPath: medicalVeteranPathSchema.optional(),
-      medicalCertificateDeclaration: z.enum([
-        "under_40_all_no",
-        "over_40_cert_unchanged_all_no",
-        "over_40_first_or_changed_certificate_required",
-        "questionnaire_yes_certificate_required",
-      ]),
+      medicalCertificateDeclaration: z.enum(MEDICAL_CERTIFICATE_DECLARATION_VALUES),
       wantsRegistrationCertificate: z.boolean(),
       familyRegistrationOrder: z.enum(["none", "second", "third_or_more"]),
       reductionTypes: z.array(z.enum(reductionIds)).default([]),
@@ -249,7 +247,8 @@ export function buildRegistrationPayloadSchema(config: RegistrationConfigV1) {
         });
       }
 
-      const atLeast40 = isAtLeast40At(data.birthDate);
+      const senior = isSeniorMedicalVeteranPath(data.birthDate);
+      const minor = isMinorAt(data.birthDate);
       const decl = data.medicalCertificateDeclaration;
       const hasVerifiedFfttLicense = Boolean(data.ffttLicenseLookup?.licence);
       const veteranPath: MedicalVeteranPath = data.medicalVeteranPath
@@ -276,7 +275,7 @@ export function buildRegistrationPayloadSchema(config: RegistrationConfigV1) {
           path: ["medicalCertificateDeclaration"],
         });
       }
-      if (atLeast40 && !data.medicalVeteranPath) {
+      if (senior && !data.medicalVeteranPath) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "Complétez le parcours médical vétéran (licence).",
@@ -284,61 +283,84 @@ export function buildRegistrationPayloadSchema(config: RegistrationConfigV1) {
         });
       }
 
-      const needsQuestionnaireSummary =
-        !atLeast40 ||
-        (effectiveHadFfttLicense(veteranPath, hasVerifiedFfttLicense) === "yes" &&
-          veteranPath.categoryChanged === "no");
-      if (needsQuestionnaireSummary && !data.medicalQuestionnaire.summary) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Indiquez le résultat de votre questionnaire de santé.",
-          path: ["medicalQuestionnaire", "summary"],
-        });
+      if (minor) {
+        if (!data.medicalQuestionnaire.summary) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Indiquez le résultat du questionnaire de santé mineur.",
+            path: ["medicalQuestionnaire", "summary"],
+          });
+        }
+        if (data.medicalVeteranPath) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message:
+              "Le parcours licence vétéran ne s'applique pas aux mineurs.",
+            path: ["medicalVeteranPath"],
+          });
+        }
+        const minorDecls = ["minor_all_no", "minor_yes_certificate_required"] as const;
+        if (!minorDecls.includes(decl as (typeof minorDecls)[number])) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "La déclaration médicale ne correspond pas à un mineur.",
+            path: ["medicalCertificateDeclaration"],
+          });
+        }
+      } else if (senior) {
+        if (
+          data.medicalVeteranPath &&
+          effectiveHadFfttLicense(veteranPath, hasVerifiedFfttLicense) === "yes" &&
+          data.medicalVeteranPath.categoryChanged === undefined
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Indiquez si votre catégorie vétéran a changé.",
+            path: ["medicalVeteranPath", "categoryChanged"],
+          });
+        }
+        if (
+          needsAdultPpsOrCertificateChoice({
+            birthDate: data.birthDate,
+            questionnaire,
+            veteranPath,
+            hasVerifiedFfttLicense,
+          }) &&
+          !data.medicalQuestionnaire.summary
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Indiquez comment vous remplissez l’obligation médicale FFTT.",
+            path: ["medicalQuestionnaire", "summary"],
+          });
+        }
+      } else {
+        if (!data.medicalQuestionnaire.summary) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Indiquez comment vous remplissez l’obligation médicale FFTT.",
+            path: ["medicalQuestionnaire", "summary"],
+          });
+        }
+        if (data.medicalVeteranPath) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message:
+              "Le parcours licence vétéran ne s'applique qu'aux 65 ans et plus.",
+            path: ["medicalVeteranPath"],
+          });
+        }
+        const adultDecls = ["adult_pps_declared", "adult_certificate_required"] as const;
+        if (!adultDecls.includes(decl as (typeof adultDecls)[number])) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message:
+              "La déclaration médicale ne correspond pas à un adulte de 18 à 64 ans.",
+            path: ["medicalCertificateDeclaration"],
+          });
+        }
       }
 
-      if (
-        atLeast40 &&
-        data.medicalVeteranPath &&
-        effectiveHadFfttLicense(veteranPath, hasVerifiedFfttLicense) === "yes" &&
-        data.medicalVeteranPath.categoryChanged === undefined
-      ) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Indiquez si votre catégorie vétéran a changé.",
-          path: ["medicalVeteranPath", "categoryChanged"],
-        });
-      }
-
-      if (!atLeast40 && data.medicalVeteranPath) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message:
-            "Le parcours licence vétéran ne s'applique pas aux moins de 40 ans.",
-          path: ["medicalVeteranPath"],
-        });
-      }
-      if (
-        !atLeast40 &&
-        (decl === "over_40_cert_unchanged_all_no" ||
-          decl === "over_40_first_or_changed_certificate_required")
-      ) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message:
-            "Cette option est réservée aux adhérents de 40 ans et plus ; choisissez l'option < 40 ans appropriée.",
-          path: ["medicalCertificateDeclaration"],
-        });
-      }
-      if (atLeast40 && decl === "under_40_all_no") {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message:
-            "L'option « moins de 40 ans » n'est pas applicable à votre date de naissance.",
-          path: ["medicalCertificateDeclaration"],
-        });
-      }
-
-      const minor = isMinorAt(data.birthDate);
       if (!minor && !data.adherentEmail?.trim()) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,

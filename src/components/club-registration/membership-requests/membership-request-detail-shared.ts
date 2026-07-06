@@ -12,6 +12,8 @@ import {
 } from "@/lib/club-registration/registration-status";
 import type { Representative } from "@/lib/club-registration/schema";
 import { buildPricingContext, type FamilyRegistrationOrder } from "@/lib/pricing";
+import { MEDICAL_CERTIFICATE_DECLARATION_VALUES } from "@/lib/club-registration/medical-dossier";
+import { MEDICAL_CERTIFICATE_DECLARATION_LABELS } from "@/lib/club-registration/medical-declaration-labels";
 import type { EditableRegistration } from "./types";
 
 export const ADHERENT_ROLE_OPTIONS = [
@@ -34,21 +36,12 @@ export const REPRESENTATIVE_ROLE_OPTIONS = [
   { value: "other", label: "Autre" },
 ] as const;
 
-export const MEDICAL_OPTIONS = [
-  { value: "under_40_all_no", label: "Moins de 40 ans : aucune réponse Oui" },
-  {
-    value: "over_40_cert_unchanged_all_no",
-    label: "40 ans et plus, certificat déjà fourni : aucune réponse Oui",
-  },
-  {
-    value: "over_40_first_or_changed_certificate_required",
-    label: "40 ans et plus : certificat requis",
-  },
-  {
-    value: "questionnaire_yes_certificate_required",
-    label: "Au moins une réponse Oui : certificat requis",
-  },
-] as const;
+export const MEDICAL_OPTIONS = MEDICAL_CERTIFICATE_DECLARATION_VALUES.map(
+  (value) => ({
+    value,
+    label: MEDICAL_CERTIFICATE_DECLARATION_LABELS[value] ?? value,
+  })
+);
 
 export const MEDICAL_CERTIFICATE_STATUS_OPTIONS = MEDICAL_CERTIFICATE_STATUS_VALUES.map(
   (value) => ({
