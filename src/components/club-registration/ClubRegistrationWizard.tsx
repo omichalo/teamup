@@ -28,7 +28,7 @@ import { scrollToFormTarget } from "@/lib/club-registration/scroll-to-form-targe
 import type { ClubRegistrationPayload } from "@/lib/club-registration/schema";
 import { useRegistrationConfig } from "@/hooks/useRegistrationConfig";
 import { getDefaultRegistrationConfig } from "@/lib/club-registration-config/default-config";
-import { isAtLeast40At, isMinorAt } from "@/lib/club-registration/age";
+import { isAtLeast65At, isMinorAt } from "@/lib/club-registration/age";
 import {
   shouldAutofillAdherentEmailFromAccount,
   shouldAutofillRepresentativeEmailFromAccount,
@@ -176,7 +176,7 @@ export function ClubRegistrationWizard({
     ) {
       return null;
     }
-    const atLeast40 = isAtLeast40At(draft.birthDate);
+    const senior = isAtLeast65At(draft.birthDate);
     const hadLicense = effectiveHadFfttLicense(
       medicalVeteranPath,
       hasVerifiedFfttLicense
@@ -200,7 +200,7 @@ export function ClubRegistrationWizard({
           : {}),
         answers: medicalQuestionnaire.answers,
       },
-      medicalVeteranPath: atLeast40
+      medicalVeteranPath: senior
         ? hadLicense === "yes"
           ? {
               hadFfttLicense: hadLicense,

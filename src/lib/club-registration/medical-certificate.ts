@@ -19,6 +19,10 @@ export const MEDICAL_CERTIFICATE_STATUS_LABELS: Record<
 };
 
 export const MEDICAL_CERTIFICATE_REQUIRED_DECLARATIONS = [
+  "minor_yes_certificate_required",
+  "adult_certificate_required",
+  "senior_certificate_required",
+  // Rétrocompatibilité dossiers antérieurs
   "over_40_first_or_changed_certificate_required",
   "questionnaire_yes_certificate_required",
 ] as const;

@@ -13,10 +13,9 @@ function formatYesNo(value: unknown): string {
   return "";
 }
 
-const MEDICAL_QUESTIONNAIRE_SUMMARY_LABELS: Record<string, string> = {
-  all_no: "Aucune réponse Oui",
-  has_yes: "Au moins une réponse Oui",
-};
+import { MEDICAL_QUESTIONNAIRE_SUMMARY_LABELS } from "@/lib/club-registration/medical-declaration-labels";
+
+const MEDICAL_QUESTIONNAIRE_SUMMARY_LABELS_SPREADSHEET = MEDICAL_QUESTIONNAIRE_SUMMARY_LABELS;
 
 export function formatMedicalQuestionnaireForSpreadsheet(value: unknown): string {
   if (!value || typeof value !== "object") return "";
@@ -24,8 +23,8 @@ export function formatMedicalQuestionnaireForSpreadsheet(value: unknown): string
   const data = value as { summary?: unknown; answers?: unknown };
   const parts: string[] = [];
 
-  if (typeof data.summary === "string" && data.summary in MEDICAL_QUESTIONNAIRE_SUMMARY_LABELS) {
-    parts.push(MEDICAL_QUESTIONNAIRE_SUMMARY_LABELS[data.summary]!);
+  if (typeof data.summary === "string" && data.summary in MEDICAL_QUESTIONNAIRE_SUMMARY_LABELS_SPREADSHEET) {
+    parts.push(MEDICAL_QUESTIONNAIRE_SUMMARY_LABELS_SPREADSHEET[data.summary]!);
   }
 
   if (data.answers && typeof data.answers === "object" && !Array.isArray(data.answers)) {

@@ -6,8 +6,8 @@
  * - `isAdultAt` : true si la personne est majeure (>= 18 ans) à la date `at`.
  * - `isMinorAt` : inverse de `isAdultAt`. False si `birthDate` est vide ou invalide
  *   (pas de présomption de minorité).
- * - `isAtLeast40At` : true si la personne a 40 ans ou plus à la date `at`. Utilisé
- *   pour orienter le choix du questionnaire médical.
+ * - `isAtLeast40At` : true si la personne a 40 ans ou plus (legacy / rétrocompat).
+ * - `isAtLeast65At` : true si la personne a 65 ans ou plus. Parcours vétéran FFTT.
  *
  * La référence `at` est paramétrable pour faciliter les tests et garantir la stabilité
  * (ne pas dépendre directement de `Date.now()`).
@@ -54,8 +54,19 @@ export function isMinorAt(birthDate: string, at: Date = new Date()): boolean {
   return years !== null && years < 18;
 }
 
-/** True si la personne a 40 ans ou plus (questionnaire médical : seuil FFTT). */
+/** True si la personne a 40 ans ou plus (seuil historique, rétrocompat dossiers). */
 export function isAtLeast40At(birthDate: string, at: Date = new Date()): boolean {
   const years = computeAgeAt(birthDate, at);
   return years !== null && years >= 40;
+}
+
+/** True si la personne a 65 ans ou plus (parcours vétéran / certificat FFTT). */
+export function isAtLeast65At(birthDate: string, at: Date = new Date()): boolean {
+  const years = computeAgeAt(birthDate, at);
+  return years !== null && years >= 65;
+}
+
+/** Adulte majeur (≥ 18 ans) soumis au PPS ou au choix certificat (18–64 ans). */
+export function isAdultPpsEligibleAt(birthDate: string, at: Date = new Date()): boolean {
+  return isAdultAt(birthDate, at) && !isAtLeast65At(birthDate, at);
 }

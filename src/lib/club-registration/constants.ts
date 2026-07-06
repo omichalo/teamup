@@ -216,4 +216,5 @@ export const CLUB_REGISTRATION_DOCUMENTS = {
 export const CLUB_REGISTRATION_EXTERNAL_LINKS = {
   ...CLUB_REGISTRATION_DOCUMENTS,
   siteClub: "https://www.sqyping.fr",
+  espaceLicencieFftt: "https://malicence.fftt.com/",
 } as const;
