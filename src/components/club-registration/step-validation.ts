@@ -1,10 +1,12 @@
-import { isAtLeast40At, isMinorAt } from "@/lib/club-registration/age";
+import { isMinorAt } from "@/lib/club-registration/age";
 import { getDefaultRegistrationConfig } from "@/lib/club-registration-config/default-config";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import type { RegistrationStepId } from "@/lib/club-registration/field-to-step";
 import {
   effectiveHadFfttLicense,
   isMedicalAdminStepComplete,
+  isSeniorMedicalVeteranPath,
+  needsAdultPpsOrCertificateChoice,
 } from "@/lib/club-registration/medical-dossier";
 import { isApplicantNotesTooLong } from "@/lib/club-registration/applicant-notes";
 import { validatePaymentDraft } from "@/lib/club-registration/payment/validate-payment-draft";
@@ -24,32 +26,40 @@ function invalid(
 }
 
 function getMedicalFocusSelector(draft: RegistrationDraft): string {
-  const atLeast40 = isAtLeast40At(draft.birthDate);
+  const minor = isMinorAt(draft.birthDate);
+  const senior = isSeniorMedicalVeteranPath(draft.birthDate);
   const hasVerified = Boolean(draft.ffttLicenseLookup?.licence);
   const hadLicense = effectiveHadFfttLicense(
     draft.medicalVeteranPath,
     hasVerified
   );
 
-  if (!atLeast40) {
+  if (minor) {
     if (!draft.medicalQuestionnaire.summary) {
       return "#medical-questionnaire-label";
     }
     return "#medical-dossier-section";
   }
 
-  if (!hasVerified && draft.medicalVeteranPath.hadFfttLicense === "") {
-    return "#medical-first-label";
+  if (senior) {
+    if (!hasVerified && draft.medicalVeteranPath.hadFfttLicense === "") {
+      return "#medical-first-label";
+    }
+    if (hadLicense === "yes" && draft.medicalVeteranPath.categoryChanged === "") {
+      return "#medical-category-label";
+    }
   }
-  if (hadLicense === "yes" && draft.medicalVeteranPath.categoryChanged === "") {
-    return "#medical-category-label";
-  }
+
   if (
-    hadLicense === "yes" &&
-    draft.medicalVeteranPath.categoryChanged === "no" &&
+    needsAdultPpsOrCertificateChoice({
+      birthDate: draft.birthDate,
+      questionnaire: draft.medicalQuestionnaire,
+      veteranPath: draft.medicalVeteranPath,
+      hasVerifiedFfttLicense: hasVerified,
+    }) &&
     !draft.medicalQuestionnaire.summary
   ) {
-    return "#medical-questionnaire-veteran-label";
+    return senior ? "#medical-pps-senior-label" : "#medical-pps-adult-label";
   }
   return "#medical-dossier-section";
 }
@@ -235,7 +245,8 @@ export function validateStep(
   }
 
   if (stepId === "admin") {
-    const atLeast40 = isAtLeast40At(draft.birthDate);
+    const senior = isSeniorMedicalVeteranPath(draft.birthDate);
+    const minor = isMinorAt(draft.birthDate);
     const decl = draft.medicalCertificateDeclaration;
     if (
       !decl ||
@@ -251,20 +262,21 @@ export function validateStep(
         getMedicalFocusSelector(draft)
       );
     }
-    if (
-      !atLeast40 &&
-      (decl === "over_40_cert_unchanged_all_no" ||
-        decl === "over_40_first_or_changed_certificate_required")
-    ) {
+    if (minor && decl !== "minor_all_no" && decl !== "minor_yes_certificate_required") {
       return invalid(
-        "La déclaration médicale sélectionnée est réservée aux 40 ans et plus.",
+        "La déclaration médicale ne correspond pas à un mineur.",
         "#medical-dossier-section"
       );
     }
-    if (atLeast40 && decl === "under_40_all_no") {
+    if (
+      !minor &&
+      !senior &&
+      decl !== "adult_pps_declared" &&
+      decl !== "adult_certificate_required"
+    ) {
       return invalid(
-        "La déclaration médicale « moins de 40 ans » n’est pas applicable à votre date de naissance.",
-        "#medical-dossier-section"
+        "Indiquez comment vous remplissez l’obligation médicale FFTT.",
+        "#medical-pps-adult-label"
       );
     }
     const aidIssue = validateAdminAids(draft, config);

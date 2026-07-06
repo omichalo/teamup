@@ -29,7 +29,7 @@ function renderStep(overrides: Partial<RegistrationDraft> = {}) {
   return { onChange };
 }
 
-describe("AdminStep — questionnaire de santé conditionnel", () => {
+describe("AdminStep — déclaration médicale PPS", () => {
   it("propose le questionnaire MINEUR pour un adhérent mineur", () => {
     const minorBirthDate = new Date();
     minorBirthDate.setFullYear(minorBirthDate.getFullYear() - 10);
@@ -39,36 +39,57 @@ describe("AdminStep — questionnaire de santé conditionnel", () => {
       screen.getByRole("link", { name: /questionnaire de santé mineur/i })
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: /questionnaire de santé majeur/i })
+      screen.queryByText(/Parcours Prévention Santé/i)
     ).not.toBeInTheDocument();
   });
 
-  it("propose le questionnaire MAJEUR pour un adhérent adulte (< 40 ans)", () => {
+  it("propose le PPS pour un adulte de 18 à 64 ans", () => {
     renderStep({ birthDate: "2000-04-12" });
+    expect(screen.getByText(/Parcours Prévention Santé/i)).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /questionnaire de santé majeur/i })
-    ).toBeInTheDocument();
+      screen.getByRole("link", { name: /espace licencié FFTT/i })
+    ).toHaveAttribute("href", "https://malicence.fftt.com/");
     expect(
-      screen.queryByRole("link", { name: /questionnaire de santé mineur/i })
-    ).not.toBeInTheDocument();
-  });
-
-  it("propose le questionnaire MAJEUR pour un adhérent de 40 ans et plus", () => {
-    renderStep({ birthDate: "1970-04-12" });
-    expect(
-      screen.getByRole("link", { name: /questionnaire de santé majeur/i })
+      screen.getByRole("radiogroup", {
+        name: /obligation médicale FFTT/i,
+      })
     ).toBeInTheDocument();
   });
 
-  it("ne signale pas une incompatibilité médicale sur un brouillon initial 40+", () => {
-    renderStep({ birthDate: "1970-04-12" });
-    expect(
-      screen.queryByText(/précédemment sélectionnée.*compatible/i)
-    ).not.toBeInTheDocument();
+  it("enregistre adult_pps_declared quand l'adulte choisit le PPS", () => {
+    const { onChange } = renderStep({ birthDate: "2000-04-12" });
+
+    fireEvent.click(
+      screen.getByLabelText(/je compléterai le PPS/i)
+    );
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        medicalCertificateDeclaration: "adult_pps_declared",
+        medicalQuestionnaire: expect.objectContaining({ summary: "pps_declared" }),
+      })
+    );
   });
 
-  it("demande un certificat pour une première licence à 40 ans et plus", () => {
-    const { onChange } = renderStep({ birthDate: "1970-04-12" });
+  it("enregistre adult_certificate_required quand l'adulte choisit le certificat", () => {
+    const { onChange } = renderStep({ birthDate: "2000-04-12" });
+
+    fireEvent.click(
+      screen.getByLabelText(/je fournirai un certificat médical/i)
+    );
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        medicalCertificateDeclaration: "adult_certificate_required",
+        medicalQuestionnaire: expect.objectContaining({
+          summary: "certificate_choice",
+        }),
+      })
+    );
+  });
+
+  it("demande un certificat pour une première licence à 65 ans et plus", () => {
+    const { onChange } = renderStep({ birthDate: "1960-04-12" });
 
     fireEvent.click(
       within(
@@ -78,38 +99,14 @@ describe("AdminStep — questionnaire de santé conditionnel", () => {
 
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({
-        medicalCertificateDeclaration:
-          "over_40_first_or_changed_certificate_required",
+        medicalCertificateDeclaration: "senior_certificate_required",
         medicalVeteranPath: expect.objectContaining({ hadFfttLicense: "no" }),
       })
     );
   });
 
-  it("demande un certificat pour un changement de catégorie vétéran", () => {
-    const { onChange } = renderStep({ birthDate: "1970-04-12" });
-
-    fireEvent.click(
-      within(
-        screen.getByRole("radiogroup", { name: /déjà eu une licence/i })
-      ).getByLabelText(/déjà été licencié FFTT/i)
-    );
-    fireEvent.click(
-      within(
-        screen.getByRole("radiogroup", { name: /changé de catégorie vétéran/i })
-      ).getByLabelText("Oui")
-    );
-
-    expect(onChange).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        medicalCertificateDeclaration:
-          "over_40_first_or_changed_certificate_required",
-        medicalVeteranPath: expect.objectContaining({ categoryChanged: "yes" }),
-      })
-    );
-  });
-
-  it("propose le questionnaire santé si le certificat 40+ reste valable", () => {
-    const { onChange } = renderStep({ birthDate: "1970-04-12" });
+  it("propose le choix PPS si le certificat senior n'est pas requis", () => {
+    const { onChange } = renderStep({ birthDate: "1960-04-12" });
 
     fireEvent.click(
       within(
@@ -121,29 +118,25 @@ describe("AdminStep — questionnaire de santé conditionnel", () => {
         screen.getByRole("radiogroup", { name: /changé de catégorie vétéran/i })
       ).getByLabelText("Non")
     );
-    fireEvent.click(
-      within(
-        screen.getByRole("radiogroup", { name: /questionnaire de santé/i })
-      ).getByLabelText(/toutes mes réponses sont/i)
-    );
+    fireEvent.click(screen.getByLabelText(/je compléterai le PPS/i));
 
     expect(onChange).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        medicalCertificateDeclaration: "over_40_cert_unchanged_all_no",
-        medicalQuestionnaire: expect.objectContaining({ summary: "all_no" }),
+        medicalCertificateDeclaration: "adult_pps_declared",
+        medicalQuestionnaire: expect.objectContaining({ summary: "pps_declared" }),
       })
     );
   });
 
   it("ne demande pas si le joueur a déjà eu une licence quand elle a été retrouvée", () => {
     renderStep({
-      birthDate: "1970-04-12",
+      birthDate: "1960-04-12",
       ffttLicense: "7864877",
       ffttLicenseLookup: {
         licence: "7864877",
         nom: "MICHALOWICZ",
         prenom: "Olivier",
-        categorie: "V50",
+        categorie: "V60",
       },
     });
 
@@ -155,47 +148,16 @@ describe("AdminStep — questionnaire de santé conditionnel", () => {
     ).toBeInTheDocument();
   });
 
-  it("persiste le parcours vétéran dans le draft (rechargement)", () => {
-    const draft: RegistrationDraft = {
-      ...createEmptyDraft(),
-      birthDate: "1970-04-12",
-      medicalVeteranPath: {
-        hadFfttLicense: "yes",
-        categoryChanged: "no",
-      },
-      medicalQuestionnaire: { summary: "all_no", answers: {} },
-      medicalCertificateDeclaration: "over_40_cert_unchanged_all_no",
-    };
-    const onChange = jest.fn();
-    render(<AdminStep draft={draft} onChange={onChange} />);
+  it("affiche un message informatif sans bloquer quand le PPS est déclaré", () => {
+    renderStep({
+      birthDate: "2000-04-12",
+      medicalQuestionnaire: { summary: "pps_declared", answers: {} },
+      medicalCertificateDeclaration: "adult_pps_declared",
+    });
 
     expect(
-      within(
-        screen.getByRole("radiogroup", { name: /changé de catégorie vétéran/i })
-      ).getByLabelText("Non")
-    ).toBeChecked();
-    expect(
-      within(
-        screen.getByRole("radiogroup", { name: /questionnaire de santé/i })
-      ).getByLabelText(/toutes mes réponses sont/i)
-    ).toBeChecked();
-  });
-
-  it("demande un certificat si une réponse du questionnaire santé est positive", () => {
-    const { onChange } = renderStep({ birthDate: "2000-04-12" });
-
-    fireEvent.click(
-      within(
-        screen.getByRole("radiogroup", { name: /questionnaire de santé/i })
-      ).getByLabelText(/au moins une réponse/i)
-    );
-
-    expect(onChange).toHaveBeenCalledWith(
-      expect.objectContaining({
-        medicalCertificateDeclaration: "questionnaire_yes_certificate_required",
-        medicalQuestionnaire: expect.objectContaining({ summary: "has_yes" }),
-      })
-    );
+      screen.getByRole("alert")
+    ).toHaveTextContent(/inscription au club peut être finalisée/i);
   });
 });
 

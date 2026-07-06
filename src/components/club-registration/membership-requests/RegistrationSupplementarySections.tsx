@@ -10,7 +10,8 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { isAtLeast40At } from "@/lib/club-registration/age";
+import { isAtLeast65At } from "@/lib/club-registration/age";
+import { MEDICAL_QUESTIONNAIRE_SUMMARY_LABELS } from "@/lib/club-registration/medical-declaration-labels";
 import {
   buildApplyFfttIdentityPatch,
   runFfttLicenseLookupFlow,
@@ -54,10 +55,7 @@ const YES_NO_LABELS: Record<string, string> = {
   no: "Non",
 };
 
-const QUESTIONNAIRE_SUMMARY_LABELS: Record<string, string> = {
-  all_no: "Toutes les réponses sont « Non »",
-  has_yes: "Au moins une réponse « Oui »",
-};
+const QUESTIONNAIRE_SUMMARY_LABELS = MEDICAL_QUESTIONNAIRE_SUMMARY_LABELS;
 
 type SubmissionContextProps = {
   submitterAccountEmail: string | undefined;
@@ -311,19 +309,23 @@ type MedicalDossierDetailProps = {
 export function RegistrationMedicalDossierDetail({
   registration,
 }: MedicalDossierDetailProps) {
-  const atLeast40 = isAtLeast40At(registration.birthDate ?? "");
+  const senior = isAtLeast65At(registration.birthDate ?? "");
   const summary = registration.medicalQuestionnaire?.summary;
   const veteranPath = registration.medicalVeteranPath;
   const hasVerifiedFfttLicense = Boolean(registration.ffttLicenseLookup?.licence);
 
-  const hasQuestionnaireDetail = summary === "all_no" || summary === "has_yes";
+  const hasQuestionnaireDetail =
+    summary === "all_no" ||
+    summary === "has_yes" ||
+    summary === "pps_declared" ||
+    summary === "certificate_choice";
   const hasVeteranDetail =
-    atLeast40 &&
+    senior &&
     (hasVerifiedFfttLicense ||
       veteranPath?.hadFfttLicense === "yes" ||
       veteranPath?.hadFfttLicense === "no");
   const hasCategoryDetail =
-    atLeast40 &&
+    senior &&
     (veteranPath?.categoryChanged === "yes" || veteranPath?.categoryChanged === "no");
 
   if (!hasQuestionnaireDetail && !hasVeteranDetail && !hasCategoryDetail) {
@@ -339,7 +341,7 @@ export function RegistrationMedicalDossierDetail({
         {hasQuestionnaireDetail ? (
           <Grid size={{ xs: 12, sm: 6 }}>
             <ReadOnlyField
-              label="Résultat du questionnaire de santé"
+              label="Parcours médical déclaré"
               value={QUESTIONNAIRE_SUMMARY_LABELS[summary ?? ""] ?? "—"}
             />
           </Grid>

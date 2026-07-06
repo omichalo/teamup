@@ -55,7 +55,7 @@ export function toEditableRegistration(
     slotIds: registration.slotIds ?? [],
     schoolPickupSlotIds: registration.schoolPickupSlotIds ?? [],
     medicalCertificateDeclaration:
-      registration.medicalCertificateDeclaration ?? "under_40_all_no",
+      registration.medicalCertificateDeclaration ?? "adult_pps_declared",
     medicalCertificateStatus: normalizeMedicalCertificateStatus(
       registration.medicalCertificateStatus,
       registration.medicalCertificateDeclaration

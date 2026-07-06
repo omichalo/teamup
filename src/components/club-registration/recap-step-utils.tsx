@@ -11,6 +11,7 @@ import { SectionCard } from "@/components/ui";
 import { getEnabledSections, getEnabledSites } from "@/lib/club-registration-config/helpers";
 import { formatRegistrationSiteLabel } from "@/lib/club-registration-config/site-display";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
+import { MEDICAL_CERTIFICATE_DECLARATION_LABELS } from "@/lib/club-registration/medical-declaration-labels";
 import type {
   RegistrationDraft,
   Representative,
@@ -43,15 +44,8 @@ type MedicalOptionId = Exclude<
   ""
 >;
 
-export const MEDICAL_LABELS: Record<MedicalOptionId, string> = {
-  under_40_all_no: "Moins de 40 ans : aucune réponse « Oui »",
-  over_40_cert_unchanged_all_no:
-    "40 ans et plus, certificat déjà fourni : aucune réponse « Oui »",
-  over_40_first_or_changed_certificate_required:
-    "40 ans et plus, première inscription ou changement de catégorie : certificat requis",
-  questionnaire_yes_certificate_required:
-    "Au moins une réponse « Oui » : certificat requis",
-};
+export const MEDICAL_LABELS: Record<MedicalOptionId, string> =
+  MEDICAL_CERTIFICATE_DECLARATION_LABELS as Record<MedicalOptionId, string>;
 
 export const FAMILY_ORDER_LABELS: Record<
   RegistrationDraft["familyRegistrationOrder"],

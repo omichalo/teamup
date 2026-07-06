@@ -1,6 +1,7 @@
 import { APPLICANT_NOTES_MAX_LENGTH } from "./applicant-notes";
 import { clubRegistrationPayloadSchema } from "./schema";
 import { inferMedicalDossierFromDeclaration } from "./medical-dossier";
+import { isAtLeast65At, isMinorAt } from "./age";
 
 /**
  * Helper qui construit un payload valide minimal pour un adulte qui s'inscrit lui-même,
@@ -11,7 +12,8 @@ function buildPayload(
 ) {
   const birthDate = overrides.birthDate ?? "2000-04-12";
   const medicalCertificateDeclaration =
-    overrides.medicalCertificateDeclaration ?? "under_40_all_no";
+    overrides.medicalCertificateDeclaration ??
+    (isMinorAt(birthDate) ? "minor_all_no" : "adult_pps_declared");
   const inferred = inferMedicalDossierFromDeclaration(
     medicalCertificateDeclaration,
     birthDate
@@ -26,8 +28,8 @@ function buildPayload(
     lastName: "Dupont",
     sex: "male" as const,
     birthCity: "Paris",
-    /* Date choisie pour rester un majeur < 40 ans quelle que soit l'année du run
-       du test (compatible avec la déclaration `under_40_all_no` par défaut). */
+    /* Date choisie pour rester un majeur 18-64 ans quelle que soit l'année du run
+       du test (compatible avec la déclaration `adult_pps_declared` par défaut). */
     birthDate,
     adherentEmail: "olivier@example.com",
     adherentPhonePrimary: "0612345678",
@@ -76,6 +78,15 @@ function buildPayload(
       ...(categoryChanged !== ""
         ? { categoryChanged: categoryChanged as "yes" | "no" }
         : {}),
+    };
+  } else if (
+    overrides.medicalVeteranPath === undefined &&
+    isAtLeast65At(birthDate) &&
+    medicalCertificateDeclaration === "adult_pps_declared"
+  ) {
+    merged.medicalVeteranPath = {
+      hadFfttLicense: "yes",
+      categoryChanged: "no",
     };
   }
   return merged;
@@ -395,11 +406,12 @@ describe("clubRegistrationPayloadSchema", () => {
     expect(r.success).toBe(false);
   });
 
-  it("refuse une déclaration médicale `over_40_*` pour un moins de 40 ans", () => {
+  it("refuse une déclaration médicale senior pour un adulte de 18 à 64 ans", () => {
     const r = clubRegistrationPayloadSchema.safeParse(
       buildPayload({
         birthDate: "1995-04-12",
-        medicalCertificateDeclaration: "over_40_cert_unchanged_all_no",
+        medicalCertificateDeclaration: "senior_certificate_required",
+        medicalVeteranPath: { hadFfttLicense: "no" },
       })
     );
     expect(r.success).toBe(false);
@@ -410,11 +422,13 @@ describe("clubRegistrationPayloadSchema", () => {
     }
   });
 
-  it("refuse une déclaration médicale `under_40_all_no` pour un ≥ 40 ans", () => {
+  it("refuse une déclaration médicale mineur pour un senior", () => {
     const r = clubRegistrationPayloadSchema.safeParse(
       buildPayload({
         birthDate: "1960-04-12",
-        medicalCertificateDeclaration: "under_40_all_no",
+        medicalCertificateDeclaration: "minor_all_no",
+        medicalQuestionnaire: { summary: "all_no", answers: {} },
+        medicalVeteranPath: { hadFfttLicense: "yes", categoryChanged: "no" },
       })
     );
     expect(r.success).toBe(false);
@@ -425,11 +439,13 @@ describe("clubRegistrationPayloadSchema", () => {
     }
   });
 
-  it("accepte la nouvelle option `over_40_first_or_changed_certificate_required` pour un ≥ 40 ans", () => {
+  it("accepte senior_certificate_required pour un adhérent de 65 ans et plus", () => {
     const r = clubRegistrationPayloadSchema.safeParse(
       buildPayload({
         birthDate: "1960-04-12",
-        medicalCertificateDeclaration: "over_40_first_or_changed_certificate_required",
+        medicalCertificateDeclaration: "senior_certificate_required",
+        medicalVeteranPath: { hadFfttLicense: "no" },
+        medicalQuestionnaire: { answers: {} },
       })
     );
     expect(r.success).toBe(true);
@@ -515,18 +531,19 @@ describe("clubRegistrationPayloadSchema", () => {
     }
   });
 
-  it("accepte `questionnaire_yes_certificate_required` quel que soit l'âge", () => {
+  it("accepte adult_certificate_required pour un adulte et un senior", () => {
     const young = clubRegistrationPayloadSchema.safeParse(
       buildPayload({
         birthDate: "1995-04-12",
-        medicalCertificateDeclaration: "questionnaire_yes_certificate_required",
+        medicalCertificateDeclaration: "adult_certificate_required",
+        medicalQuestionnaire: { summary: "certificate_choice", answers: {} },
       })
     );
     const old = clubRegistrationPayloadSchema.safeParse(
       buildPayload({
         birthDate: "1960-04-12",
-        medicalCertificateDeclaration: "questionnaire_yes_certificate_required",
-        medicalQuestionnaire: { summary: "has_yes", answers: {} },
+        medicalCertificateDeclaration: "adult_certificate_required",
+        medicalQuestionnaire: { summary: "certificate_choice", answers: {} },
         medicalVeteranPath: { hadFfttLicense: "yes", categoryChanged: "no" },
       })
     );
