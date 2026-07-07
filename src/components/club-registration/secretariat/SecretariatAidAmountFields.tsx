@@ -1,6 +1,6 @@
 "use client";
 
-import { Box, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Stack, Typography } from "@mui/material";
 import {
   findAidRuleById,
   getAidRuleFixedAmountCents,
@@ -33,6 +33,46 @@ const AID_AMOUNT_FIELD_SX = {
 function aidMaxAmountHelperText(ruleMaxCents: number | undefined): string | undefined {
   if (ruleMaxCents === undefined) return undefined;
   return `Montant maximum : ${formatCentsAsEuros(ruleMaxCents)}`;
+}
+
+function FixedAidAmountRow({
+  ruleLabel,
+  ruleId,
+  fixedAmountCents,
+  dossierAmountCents,
+  onApplyFixedAmount,
+}: {
+  ruleLabel: string;
+  ruleId: string;
+  fixedAmountCents: number;
+  dossierAmountCents: number;
+  onApplyFixedAmount: () => void;
+}) {
+  const hasMismatch = dossierAmountCents !== fixedAmountCents;
+
+  return (
+    <Stack spacing={1} data-field={`paymentAid.${ruleId}`}>
+      <Typography variant="body2">
+        <strong>{ruleLabel}</strong> — montant fixe paramétré :{" "}
+        {formatCentsAsEuros(fixedAmountCents)}
+      </Typography>
+      {hasMismatch ? (
+        <Alert
+          severity="warning"
+          variant="outlined"
+          action={
+            <Button color="inherit" size="small" onClick={onApplyFixedAmount}>
+              Appliquer le montant fixe
+            </Button>
+          }
+        >
+          Le dossier indique {formatCentsAsEuros(dossierAmountCents)} pour cette aide, alors que
+          le paramétrage impose {formatCentsAsEuros(fixedAmountCents)}. L&apos;enregistrement
+          sera refusé tant que les montants ne correspondent pas.
+        </Alert>
+      ) : null}
+    </Stack>
+  );
 }
 
 export function SecretariatAidAmountFields({
@@ -89,14 +129,14 @@ export function SecretariatAidAmountFields({
 
             if (fixedAmountCents !== undefined) {
               return (
-                <Typography
+                <FixedAidAmountRow
                   key={rule.id}
-                  variant="body2"
-                  data-field={`paymentAid.${rule.id}`}
-                >
-                  <strong>{rule.label}</strong> — montant fixe :{" "}
-                  {formatCentsAsEuros(fixedAmountCents)}
-                </Typography>
+                  ruleId={rule.id}
+                  ruleLabel={rule.label}
+                  fixedAmountCents={fixedAmountCents}
+                  dossierAmountCents={aid?.amountCents ?? 0}
+                  onApplyFixedAmount={() => updateAidAmount(rule.id, fixedAmountCents)}
+                />
               );
             }
 
