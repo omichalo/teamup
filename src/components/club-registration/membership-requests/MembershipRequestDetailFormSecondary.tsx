@@ -20,6 +20,7 @@ import { ReductionReferenceCodeAdminFields } from "../ReductionReferenceCodeAdmi
 import { RegistrationMultiSelectField } from "../RegistrationMultiSelectField";
 import type { RegistrationDraft } from "../registration-defaults";
 import { PaymentTrackingSection } from "../secretariat/PaymentTrackingSection";
+import { SecretariatAidAmountFields } from "../secretariat/SecretariatAidAmountFields";
 import { SecretariatPaymentNotesSection } from "../secretariat/SecretariatPaymentNotesSection";
 import { RegistrationMedicalDossierDetail } from "./RegistrationSupplementarySections";
 import { DetailSectionTitle } from "./DetailSectionTitle";
@@ -61,6 +62,7 @@ export function MembershipRequestDetailFormSecondary({
     amountDiffersFromQuote,
     fetchDetail,
     updateField,
+    updateReductionTypes,
     updateMedicalDeclaration,
     applyCalculatedAmount,
     persistQuote,
@@ -157,7 +159,7 @@ export function MembershipRequestDetailFormSecondary({
               value: reduction.id,
               label: reduction.label,
             }))}
-            onChange={(value) => updateField("reductionTypes", value)}
+            onChange={(value) => updateReductionTypes(value)}
           />
         </Grid>
         <ReductionReferenceCodeAdminFields
@@ -165,6 +167,13 @@ export function MembershipRequestDetailFormSecondary({
           reductionTypes={form.reductionTypes}
           reductionReferenceCodes={form.reductionReferenceCodes}
           onReferenceCodesChange={(codes) => updateField("reductionReferenceCodes", codes)}
+        />
+        <SecretariatAidAmountFields
+          config={config}
+          reductionTypes={form.reductionTypes}
+          reductionReferenceCodes={form.reductionReferenceCodes}
+          paymentAids={form.paymentAids}
+          onPaymentAidsChange={(paymentAids) => updateField("paymentAids", paymentAids)}
         />
         <Grid size={{ xs: 12, sm: 6 }}>
           <FormControlLabel

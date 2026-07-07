@@ -20,6 +20,7 @@ import {
 import type { DonationPricingBreakdown } from "@/lib/pricing/donation-discount";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import type { RegistrationPayment } from "@/lib/club-registration/payment/types";
+import { formatRegistrationPaymentEmailsForStorage } from "@/lib/club-registration/resolve-registration-contact-email";
 import type { PriceQuote } from "@/lib/pricing/types";
 
 export function validateRegistrationStripeCheckout(params: {
@@ -104,7 +105,7 @@ export function buildPaymentRequestedFirestoreUpdate(params: {
   donationPricing: DonationPricingBreakdown | null;
   amountToPayCents: number;
   requestedByUid: string;
-  paymentEmail: string;
+  paymentEmails: string[];
 }): DocumentData {
   const waitingPayment = params.payment
     ? recalculateRegistrationPayment({
@@ -125,7 +126,7 @@ export function buildPaymentRequestedFirestoreUpdate(params: {
     paymentStatus: "pending",
     paymentRequestedAt: FieldValue.serverTimestamp(),
     paymentRequestedBy: params.requestedByUid,
-    paymentEmailSentTo: params.paymentEmail,
+    paymentEmailSentTo: formatRegistrationPaymentEmailsForStorage(params.paymentEmails),
     stripeCheckoutSessionId: FieldValue.delete(),
     stripeCheckoutUrl: FieldValue.delete(),
     updatedAt: FieldValue.serverTimestamp(),
@@ -148,7 +149,7 @@ export async function persistPaymentRequestedAndNotify(params: {
   quote: PriceQuote | null;
   donationPricing: DonationPricingBreakdown | null;
   amountToPayCents: number;
-  paymentEmail: string;
+  paymentEmails: string[];
   adherentName: string;
   baseUrl: string;
   requestedByUid: string;
@@ -161,7 +162,7 @@ export async function persistPaymentRequestedAndNotify(params: {
       donationPricing: params.donationPricing,
       amountToPayCents: params.amountToPayCents,
       requestedByUid: params.requestedByUid,
-      paymentEmail: params.paymentEmail,
+      paymentEmails: params.paymentEmails,
     }),
     { merge: true }
   );
@@ -183,7 +184,7 @@ export async function persistPaymentRequestedAndNotify(params: {
   });
 
   await sendMail({
-    to: params.paymentEmail,
+    to: params.paymentEmails,
     subject: buildPaymentRequestEmailSubject(params.adherentName, emailVariant),
     text: paymentMail.text,
     html: paymentMail.html,

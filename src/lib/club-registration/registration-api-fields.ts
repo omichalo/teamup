@@ -45,6 +45,7 @@ export const REGISTRATION_CLIENT_FIELDS = [
   "isMinor",
   "submitterUid",
   "submitterAccountEmail",
+  "submitterRole",
   "schemaVersion",
   "status",
   "reviewNotes",
@@ -117,6 +118,7 @@ export const MANAGER_EDITABLE_FIELDS = [
   "applicantNotes",
   "reviewNotes",
   "paymentAmountCents",
+  "paymentAids",
   "handisportPracticeLevel",
   "voluntaryDonationCents",
 ] as const;

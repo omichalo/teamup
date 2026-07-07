@@ -47,6 +47,7 @@ export const SPREADSHEET_COLUMN_LABELS: Record<SpreadsheetColumnId, string> = {
   isMinor: "Mineur",
   submitterUid: "Soumettant du dossier",
   submitterAccountEmail: "E-mail compte soumettant",
+  submitterRole: "Rôle compte soumettant",
   schemaVersion: "Version schéma",
   status: "Statut dossier",
   reviewNotes: "Notes secrétariat",
