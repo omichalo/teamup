@@ -32,7 +32,7 @@ export type RegistrationsSpreadsheetPreferences = {
   updatedAt?: string | null;
 };
 
-const DEFAULT_HIDDEN_COLUMN_IDS = new Set<SpreadsheetColumnId>(["submitterUid"]);
+const DEFAULT_HIDDEN_COLUMN_IDS = new Set<SpreadsheetColumnId>(["submitterUid", "submitterRole"]);
 
 /** Ordre par défaut : champs utiles au secrétariat en tête, identifiants techniques à la fin. */
 const DEFAULT_COLUMN_ORDER: SpreadsheetColumnId[] = [

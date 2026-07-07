@@ -29,6 +29,7 @@ import { validateRegistrationStripeCheckout } from "@/lib/club-registration/paym
 import type { DonationPricingBreakdown } from "@/lib/pricing/donation-discount";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import type { RegistrationPayment } from "@/lib/club-registration/payment/types";
+import { formatRegistrationPaymentEmailsForStorage } from "@/lib/club-registration/resolve-registration-contact-email";
 import type { PriceQuote } from "@/lib/pricing/types";
 
 export {
@@ -52,7 +53,7 @@ export async function processManualPaymentFollowUp(params: {
   donationPricing: DonationPricingBreakdown | null;
   amountToPayCents: number;
   paymentMethod: RegistrationPayment["paymentMethod"];
-  paymentEmail: string;
+  paymentEmails: string[];
   adherentName: string;
   baseUrl: string;
   requestedByUid: string;
@@ -85,7 +86,7 @@ export async function processManualPaymentFollowUp(params: {
       donationDiscountCents: params.donationPricing?.donationDiscountCents ?? 0,
       paymentRequestedAt: FieldValue.serverTimestamp(),
       paymentRequestedBy: params.requestedByUid,
-      paymentEmailSentTo: params.paymentEmail,
+      paymentEmailSentTo: formatRegistrationPaymentEmailsForStorage(params.paymentEmails),
       updatedAt: FieldValue.serverTimestamp(),
     },
     { merge: true }
@@ -116,7 +117,7 @@ export async function processManualPaymentFollowUp(params: {
 
   try {
     await sendMail({
-      to: params.paymentEmail,
+      to: params.paymentEmails,
       subject: `Instructions de règlement — adhésion ${params.adherentName}`,
       html: instructionsMail.html,
       text: instructionsMail.text,

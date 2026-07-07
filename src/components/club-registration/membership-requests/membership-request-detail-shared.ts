@@ -2,6 +2,13 @@ import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types"
 import { getEnabledSites } from "@/lib/club-registration-config/helpers";
 import { formatRegistrationSiteLabel } from "@/lib/club-registration-config/site-display";
 import {
+  syncPaymentAidsWithReductionTypes,
+} from "@/lib/club-registration/payment/payment-draft-helpers";
+import {
+  stripUnselectedReductionReferenceCodes,
+} from "@/lib/club-registration/reduction-reference-codes";
+import { validateAdminAids } from "@/lib/club-registration/validate-admin-aids";
+import {
   MEDICAL_CERTIFICATE_STATUS_LABELS,
   MEDICAL_CERTIFICATE_STATUS_VALUES,
 } from "@/lib/club-registration/medical-certificate";
@@ -113,6 +120,50 @@ export function parseAmountCents(value: string): number | null {
   const amount = Number(normalized);
   if (!Number.isFinite(amount) || amount < 0) return null;
   return Math.round(amount * 100);
+}
+
+export function buildEditableReductionTypesUpdate(
+  form: EditableRegistration,
+  reductionTypes: string[],
+  config: RegistrationConfigV1
+): Pick<EditableRegistration, "reductionTypes" | "paymentAids" | "reductionReferenceCodes"> {
+  const labelsByType = Object.fromEntries(config.aidRules.map((rule) => [rule.id, rule.label]));
+  return {
+    reductionTypes,
+    paymentAids: syncPaymentAidsWithReductionTypes(
+      form.paymentAids,
+      reductionTypes,
+      labelsByType
+    ),
+    reductionReferenceCodes: stripUnselectedReductionReferenceCodes(
+      form.reductionReferenceCodes,
+      new Set(reductionTypes)
+    ),
+  };
+}
+
+export function validateEditableRegistrationAids(
+  form: EditableRegistration,
+  config: RegistrationConfigV1
+): string | null {
+  const issue = validateAdminAids(
+    {
+      birthDate: form.birthDate,
+      mainSectionId: form.mainSectionId,
+      slotIds: form.slotIds,
+      additionalSectionIds: form.additionalSectionIds,
+      wantsCompetitorExtras: form.wantsCompetitorExtras,
+      wantsOptionalJersey: form.wantsOptionalJersey,
+      competitionIds: form.competitionIds,
+      familyRegistrationOrder: form.familyRegistrationOrder as FamilyRegistrationOrder,
+      sex: form.sex,
+      firstFemaleRegistrationSqy: form.firstFemaleRegistrationSqy,
+      reductionTypes: form.reductionTypes,
+      paymentAids: form.paymentAids,
+    },
+    config
+  );
+  return issue?.message ?? null;
 }
 
 export function registrationStatusChipProps(status: string | undefined): {

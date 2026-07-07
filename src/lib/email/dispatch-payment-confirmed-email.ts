@@ -1,6 +1,6 @@
 import type { DocumentData } from "firebase-admin/firestore";
 import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
-import { resolveRegistrationContactEmail } from "@/lib/club-registration/resolve-registration-contact-email";
+import { resolveRegistrationPaymentRecipientEmails } from "@/lib/club-registration/resolve-registration-contact-email";
 import { getSqyPingLogoAttachment } from "@/lib/email/logo-attachment";
 import {
   buildPaymentConfirmedEmail,
@@ -28,8 +28,8 @@ export async function dispatchPaymentConfirmedEmail(params: {
   source: PaymentConfirmedSource;
   req?: Request;
 }): Promise<boolean> {
-  const contactEmail = resolveRegistrationContactEmail(params.data);
-  if (!contactEmail) {
+  const paymentEmails = resolveRegistrationPaymentRecipientEmails(params.data);
+  if (paymentEmails.length === 0) {
     return false;
   }
 
@@ -51,7 +51,7 @@ export async function dispatchPaymentConfirmedEmail(params: {
   });
 
   await sendMail({
-    to: contactEmail,
+    to: paymentEmails,
     subject: `Paiement enregistré — adhésion ${adherentName}`,
     html: mail.html,
     text: mail.text,
