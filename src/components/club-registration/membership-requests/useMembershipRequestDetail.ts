@@ -16,6 +16,8 @@ import {
   createEmptyRepresentative,
   formToPricingInput,
   parseAmountCents,
+  buildEditableReductionTypesUpdate,
+  validateEditableRegistrationAids,
 } from "./membership-request-detail-shared";
 import type {
   EditableRegistration,
@@ -133,6 +135,17 @@ export function useMembershipRequestDetail(
     setForm((current) => (current ? { ...current, [field]: value } : current));
   };
 
+  const updateReductionTypes = (reductionTypes: string[]) => {
+    setForm((current) =>
+      current
+        ? {
+            ...current,
+            ...buildEditableReductionTypesUpdate(current, reductionTypes, config),
+          }
+        : current
+    );
+  };
+
   const patchFfttFields = (patch: RegistrationFfttPatch) => {
     setForm((current) => (current ? { ...current, ...patch } : current));
   };
@@ -206,6 +219,12 @@ export function useMembershipRequestDetail(
       return false;
     }
 
+    const aidValidationError = validateEditableRegistrationAids(form, config);
+    if (aidValidationError) {
+      setError(aidValidationError);
+      return false;
+    }
+
     setSaving(true);
     setError(null);
     setSuccess(null);
@@ -263,6 +282,7 @@ export function useMembershipRequestDetail(
             applicantNotes: form.applicantNotes.trim() || undefined,
             reviewNotes: form.reviewNotes,
             voluntaryDonationCents: form.voluntaryDonationCents,
+            paymentAids: form.paymentAids,
             ...(amountCents !== null ? { paymentAmountCents: amountCents } : {}),
           }),
         }
@@ -417,6 +437,7 @@ export function useMembershipRequestDetail(
     amountDiffersFromQuote,
     fetchDetail,
     updateField,
+    updateReductionTypes,
     patchFfttFields,
     updateMedicalDeclaration,
     updateRepresentative,

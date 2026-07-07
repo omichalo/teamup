@@ -1,4 +1,5 @@
 import { FieldValue } from "firebase-admin/firestore";
+import type { UserRole } from "@/lib/auth/roles";
 import type { MedicalCertificateStatus } from "@/lib/club-registration/medical-certificate";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import { calculateQuoteWithConfig } from "@/lib/club-registration-config/pricing-resolve";
@@ -12,12 +13,21 @@ export function buildRegistrationSubmitDocument(params: {
   config: RegistrationConfigV1;
   submitterUid: string;
   submitterAccountEmail: string | null;
+  submitterRole: UserRole;
   isMinor: boolean;
   medicalCertificateStatus: MedicalCertificateStatus;
   now: ReturnType<typeof FieldValue.serverTimestamp>;
 }): Record<string, unknown> {
-  const { payload, config, submitterUid, submitterAccountEmail, isMinor, medicalCertificateStatus, now } =
-    params;
+  const {
+    payload,
+    config,
+    submitterUid,
+    submitterAccountEmail,
+    submitterRole,
+    isMinor,
+    medicalCertificateStatus,
+    now,
+  } = params;
 
   const pricingCtx = buildPricingContext({
     birthDate: payload.birthDate,
@@ -84,6 +94,7 @@ export function buildRegistrationSubmitDocument(params: {
     medicalCertificateStatus,
     submitterUid,
     submitterAccountEmail,
+    submitterRole,
     schemaVersion: 1,
     status: "submitted",
     submittedAt: now,

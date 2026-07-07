@@ -45,6 +45,13 @@ const ADHERENT_ROLE_LABELS: Record<string, string> = {
   other_adult: "Autre adulte",
 };
 
+const SUBMITTER_ROLE_LABELS: Record<string, string> = {
+  admin: "Administrateur",
+  secretary: "Secrétariat",
+  coach: "Coach",
+  player: "Joueur",
+};
+
 const SEX_LABELS: Record<string, string> = {
   female: "Femme",
   male: "Homme",
@@ -190,6 +197,8 @@ export function formatSpreadsheetCellValue(
       return formatLastNameForDisplay(typeof value === "string" ? value : undefined);
     case "submitterUid":
       return resolveSpreadsheetUserLabel(value, context, row.submitterAccountEmail);
+    case "submitterRole":
+      return typeof value === "string" ? (SUBMITTER_ROLE_LABELS[value] ?? value) : "";
     case "paymentRequestedBy":
     case "medicalCertificateStatusUpdatedBy":
       return resolveSpreadsheetUserLabel(value, context);

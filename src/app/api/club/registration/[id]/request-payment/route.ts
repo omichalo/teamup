@@ -21,7 +21,9 @@ import {
   resolveRegistrationConfigForRecord,
 } from "@/lib/club-registration-config/pricing-resolve";
 import { resolveRegistrationDonationPricing } from "@/lib/club-registration/resolve-registration-donation";
-import { resolveRegistrationContactEmail } from "@/lib/club-registration/resolve-registration-contact-email";
+import {
+  resolveRegistrationPaymentRecipientEmails,
+} from "@/lib/club-registration/resolve-registration-contact-email";
 import {
   persistPaymentRequestedAndNotify,
   processManualPaymentFollowUp,
@@ -94,7 +96,8 @@ export async function POST(
       );
     }
 
-    const paymentEmail = resolveRegistrationContactEmail(data);
+    const paymentEmails = resolveRegistrationPaymentRecipientEmails(data);
+    const paymentEmail = paymentEmails[0] ?? null;
     if (!paymentEmail) {
       return jsonNoStore(
         { error: "Aucune adresse e-mail exploitable pour envoyer la demande de paiement." },
@@ -178,7 +181,7 @@ export async function POST(
         donationPricing,
         amountToPayCents,
         paymentMethod,
-        paymentEmail,
+        paymentEmails,
         adherentName,
         baseUrl,
         requestedByUid: decoded.uid,
@@ -217,7 +220,7 @@ export async function POST(
       quote,
       donationPricing,
       amountToPayCents,
-      paymentEmail,
+      paymentEmails,
       adherentName,
       baseUrl,
       requestedByUid: decoded.uid,
