@@ -9,6 +9,11 @@ service cloud.firestore {
     function isAuthenticated() {
       return request.auth != null;
     }
+
+    // Vérifie si l'email de l'utilisateur est vérifié
+    function isVerified() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
     
     // Récupère le rôle de l'utilisateur depuis les custom claims
     function authRole() {
@@ -19,21 +24,21 @@ service cloud.firestore {
     
     // Vérifie si l'utilisateur est admin
     function isAdmin() {
-      return authRole() == "admin";
+      return isVerified() && authRole() == "admin";
     }
     
     // Vérifie si l'utilisateur est coach ou admin
     function isCoach() {
-      return isAdmin() || authRole() == "coach";
+      return isAdmin() || (isVerified() && authRole() == "coach");
     }
 
     // Secrétariat (gestion des dossiers d'inscription côté client limitée ; API Admin SDK en prod)
     function isSecretary() {
-      return authRole() == "secretary";
+      return isVerified() && authRole() == "secretary";
     }
 
     function isClubRegistrationManager() {
-      return isAdmin() || isSecretary();
+      return isVerified() && (isAdmin() || isSecretary());
     }
 
     // Liste client : uniquement ses propres dossiers (requête filtrée + plafond).
