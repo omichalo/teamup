@@ -22,11 +22,24 @@ export type LicenseValidationPage = {
   nextCursor: string | null;
 };
 
+/**
+ * Firestore `==` ignore les docs sans le champ. Or les dossiers créés avant
+ * l’introduction de `licenseValidationStatus` n’ont pas ce champ : ils doivent
+ * compter comme `to_do` (voir `normalizeLicenseValidationStatus`).
+ * On ne pousse donc le filtre Firestore que pour les statuts explicitement
+ * renseignés (`done`, `other_federation`).
+ */
+function canFilterLicenseStatusInFirestore(
+  statusFilter: LicenseValidationListFilter
+): boolean {
+  return statusFilter === "done" || statusFilter === "other_federation";
+}
+
 function applyLicenseValidationStatusFilter(
   query: Query,
   statusFilter: LicenseValidationListFilter
 ): Query {
-  if (statusFilter === "all") {
+  if (!canFilterLicenseStatusInFirestore(statusFilter)) {
     return query;
   }
   return query.where("licenseValidationStatus", "==", statusFilter);
@@ -36,7 +49,7 @@ function matchesSubmittedStatus(status: string | null): boolean {
   return typeof status === "string" && SUBMITTED_STATUSES.includes(status);
 }
 
-function matchesLicenseStatusFilter(
+export function matchesLicenseStatusFilter(
   item: LicenseValidationListItem,
   statusFilter: LicenseValidationListFilter
 ): boolean {
