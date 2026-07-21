@@ -57,6 +57,7 @@ export function markExpectedPaymentReceived(
     amountCents: number;
     receivedAt: string;
     note?: string;
+    reference?: string;
     recordedBy?: string;
   }
 ): RegistrationPayment | null {
@@ -74,6 +75,7 @@ export function markExpectedPaymentReceived(
     receivedAt: input.receivedAt,
     expectedPaymentId: expected.id,
     ...(input.recordedBy ? { recordedBy: input.recordedBy } : {}),
+    ...(input.reference ? { reference: input.reference } : {}),
     ...(input.note ? { note: input.note } : {}),
   };
 
@@ -116,6 +118,7 @@ export function addManualReceivedPayment(
     amountCents: number;
     receivedAt: string;
     note?: string;
+    reference?: string;
     recordedBy?: string;
   }
 ): RegistrationPayment {
@@ -126,6 +129,7 @@ export function addManualReceivedPayment(
     amountCents: Math.max(0, input.amountCents),
     receivedAt: input.receivedAt,
     ...(input.recordedBy ? { recordedBy: input.recordedBy } : {}),
+    ...(input.reference ? { reference: input.reference } : {}),
     ...(input.note ? { note: input.note } : {}),
   };
 

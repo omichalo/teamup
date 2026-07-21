@@ -3,7 +3,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { User } from "@/types";
-import { USER_ROLES } from "@/lib/auth/roles";
+import {
+  hasPlayerLikeAccess,
+  isAssistantSecretary,
+  USER_ROLES,
+} from "@/lib/auth/roles";
 
 // Stub minimal pour compatibilité avec l'ancien code
 // Le nouveau système utilise les cookies HTTP-only côté serveur
@@ -43,6 +47,8 @@ export const useAuth = () => {
     await fetchUser();
   };
 
+  const role = user?.role;
+
   return {
     user,
     firebaseUser: user,
@@ -50,11 +56,13 @@ export const useAuth = () => {
     signOut,
     signIn: async () => ({ success: false, error: "Use /login page" }),
     signUp: async () => ({ success: false, error: "Use /signup page" }),
-    isAdmin: user?.role === USER_ROLES.ADMIN,
-    isSecretary: user?.role === USER_ROLES.SECRETARY,
+    isAdmin: role === USER_ROLES.ADMIN,
+    isSecretary: role === USER_ROLES.SECRETARY,
+    isAssistantSecretary: isAssistantSecretary(role),
+    isPlayerLike: hasPlayerLikeAccess(role),
     isCoach:
-      user?.role === USER_ROLES.COACH || user?.role === USER_ROLES.ADMIN,
-    isPlayer: user?.role === USER_ROLES.PLAYER,
+      role === USER_ROLES.COACH || role === USER_ROLES.ADMIN,
+    isPlayer: role === USER_ROLES.PLAYER,
     refreshUser,
     sendEmailVerification: async () => {},
   };

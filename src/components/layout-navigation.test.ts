@@ -8,12 +8,13 @@ describe("buildLayoutNavigation", () => {
   const base = {
     hasUser: true,
     isAdmin: false,
-    isPlayer: false,
+    isPlayerLike: false,
+    isAssistantSecretary: false,
     isSecretary: false,
   };
 
   it("returns player primary links with updated labels", () => {
-    const nav = buildLayoutNavigation({ ...base, isPlayer: true });
+    const nav = buildLayoutNavigation({ ...base, isPlayerLike: true });
     expect(nav.primary.map((item) => item.href)).toEqual([
       "/joueur",
       "/club/inscription",
@@ -25,6 +26,20 @@ describe("buildLayoutNavigation", () => {
       "Mes dossiers",
     ]);
     expect(nav.groups).toHaveLength(0);
+  });
+
+  it("adds license validation page for assistant secretary", () => {
+    const nav = buildLayoutNavigation({
+      ...base,
+      isPlayerLike: true,
+      isAssistantSecretary: true,
+    });
+    expect(nav.primary.map((item) => item.href)).toEqual([
+      "/joueur",
+      "/club/inscription",
+      "/club/mes-inscriptions",
+      "/club/validations-licence",
+    ]);
   });
 
   it("keeps secretary work in primary and adhesions in group", () => {
@@ -40,6 +55,7 @@ describe("buildLayoutNavigation", () => {
       "/club/adhesions-tableau",
       "/club/parametrage-inscription",
       "/club/inscription",
+      "/club/validations-licence",
     ]);
   });
 
@@ -80,6 +96,7 @@ describe("buildLayoutNavigation", () => {
       "/club/adhesions-tableau",
       "/club/parametrage-inscription",
       "/club/inscription",
+      "/club/validations-licence",
     ]);
   });
 });
@@ -88,13 +105,14 @@ describe("buildLayoutAccountMenuItems", () => {
   const base = {
     hasUser: true,
     isAdmin: false,
-    isPlayer: false,
+    isPlayerLike: false,
+    isAssistantSecretary: false,
     isSecretary: false,
   };
 
-  it("returns no account menu for players", () => {
+  it("returns no account menu for player-like roles", () => {
     expect(
-      buildLayoutAccountMenuItems({ ...base, isPlayer: true }).map(
+      buildLayoutAccountMenuItems({ ...base, isPlayerLike: true }).map(
         (item) => item.href
       )
     ).toEqual([]);
@@ -118,13 +136,13 @@ describe("buildLayoutAccountMenuItems", () => {
 
 describe("resolveLayoutHomeHref", () => {
   it("routes each role to its home", () => {
-    expect(resolveLayoutHomeHref({ isPlayer: true, isSecretary: false })).toBe(
+    expect(resolveLayoutHomeHref({ isPlayerLike: true, isSecretary: false })).toBe(
       "/joueur"
     );
-    expect(resolveLayoutHomeHref({ isPlayer: false, isSecretary: true })).toBe(
+    expect(resolveLayoutHomeHref({ isPlayerLike: false, isSecretary: true })).toBe(
       "/club/demandes-adhesion"
     );
-    expect(resolveLayoutHomeHref({ isPlayer: false, isSecretary: false })).toBe(
+    expect(resolveLayoutHomeHref({ isPlayerLike: false, isSecretary: false })).toBe(
       "/"
     );
   });

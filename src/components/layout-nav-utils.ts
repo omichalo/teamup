@@ -37,10 +37,10 @@ export function layoutNavButtonStateSx(active: boolean) {
 }
 
 export function resolveLayoutHomeHref(options: {
-  isPlayer: boolean;
+  isPlayerLike: boolean;
   isSecretary: boolean;
 }): string {
-  if (options.isPlayer) {
+  if (options.isPlayerLike) {
     return "/joueur";
   }
   if (options.isSecretary) {

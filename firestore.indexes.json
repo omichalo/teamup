@@ -43,6 +43,20 @@
       ]
     },
     {
+      "collectionGroup": "clubRegistrations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "licenseValidationStatus",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "submittedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "appSuggestions",
       "queryScope": "COLLECTION",
       "fields": [

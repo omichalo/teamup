@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
-import { USER_ROLES, resolveRole, hasAnyRole } from "@/lib/auth/roles";
+import { USER_ROLES, resolveRole, hasAnyRole, hasPlayerLikeAccess } from "@/lib/auth/roles";
 import { validateInternalRedirect } from "@/lib/auth/redirect-utils";
 
 const PROTECTED_PREFIXES = [
@@ -82,7 +82,7 @@ export async function middleware(req: NextRequest) {
       if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
         // Rediriger vers la page joueur si l'utilisateur est un joueur, sinon vers la page d'accueil
         const url = req.nextUrl.clone();
-        url.pathname = hasAnyRole(role, [USER_ROLES.PLAYER]) ? "/joueur" : "/";
+        url.pathname = hasPlayerLikeAccess(role) ? "/joueur" : "/";
         return NextResponse.redirect(url);
       }
     }

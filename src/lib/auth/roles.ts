@@ -5,6 +5,7 @@ export type { UserRole };
 export const USER_ROLES = {
   ADMIN: "admin",
   SECRETARY: "secretary",
+  ASSISTANT_SECRETARY: "assistant_secretary",
   COACH: "coach",
   PLAYER: "player",
 } as const satisfies Record<string, UserRole>;
@@ -20,8 +21,14 @@ export const ROLE_PRIORITY: Record<UserRole, number> = {
   [USER_ROLES.ADMIN]: 3,
   [USER_ROLES.SECRETARY]: 2,
   [USER_ROLES.COACH]: 2,
+  [USER_ROLES.ASSISTANT_SECRETARY]: 1,
   [USER_ROLES.PLAYER]: 1,
 };
+
+export const PLAYER_LIKE_ROLES = [
+  USER_ROLES.PLAYER,
+  USER_ROLES.ASSISTANT_SECRETARY,
+] as const;
 
 export const DEFAULT_ROLE: UserRole = USER_ROLES.PLAYER;
 
@@ -37,8 +44,15 @@ export const isCoach = (role?: UserRole | null): boolean =>
 export const isSecretary = (role?: UserRole | null): boolean =>
   role === USER_ROLES.SECRETARY;
 
+export const isAssistantSecretary = (role?: UserRole | null): boolean =>
+  role === USER_ROLES.ASSISTANT_SECRETARY;
+
 export const isPlayer = (role?: UserRole | null): boolean =>
   role === USER_ROLES.PLAYER;
+
+export const hasPlayerLikeAccess = (
+  role?: UserRole | null
+): boolean => hasAnyRole(role ?? null, PLAYER_LIKE_ROLES);
 
 export const resolveRole = (role?: string | null): UserRole => {
   if (!role) {
@@ -48,6 +62,7 @@ export const resolveRole = (role?: string | null): UserRole => {
   if (
     role === USER_ROLES.ADMIN ||
     role === USER_ROLES.SECRETARY ||
+    role === USER_ROLES.ASSISTANT_SECRETARY ||
     role === USER_ROLES.COACH
   ) {
     return role;

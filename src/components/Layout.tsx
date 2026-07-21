@@ -42,7 +42,8 @@ interface LayoutProps {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { user, signOut, isAdmin, isPlayer, isSecretary } = useAuth();
+  const { user, signOut, isAdmin, isPlayerLike, isAssistantSecretary, isSecretary } =
+    useAuth();
 
   const router = useRouter();
   const pathname = usePathname();
@@ -53,10 +54,11 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     () => ({
       hasUser: Boolean(user),
       isAdmin,
-      isPlayer,
+      isPlayerLike,
+      isAssistantSecretary,
       isSecretary,
     }),
-    [isAdmin, isPlayer, isSecretary, user]
+    [isAdmin, isAssistantSecretary, isPlayerLike, isSecretary, user]
   );
 
   const navigation = useMemo(
@@ -72,9 +74,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const homeHref = useMemo(
     () =>
       user
-        ? resolveLayoutHomeHref({ isPlayer, isSecretary })
+        ? resolveLayoutHomeHref({ isPlayerLike, isSecretary })
         : "/",
-    [isPlayer, isSecretary, user]
+    [isPlayerLike, isSecretary, user]
   );
 
   const handleMenu = (event: React.MouseEvent<HTMLElement>) => {

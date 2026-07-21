@@ -11,6 +11,7 @@ import {
   paymentToFirestoreUpdate,
 } from "@/lib/club-registration/payment/normalize-payment";
 import { markExpectedPaymentReceived } from "@/lib/club-registration/payment/payment-mutations";
+import { normalizePaymentReference } from "@/lib/club-registration/payment/payment-reference";
 
 const COLLECTION = "clubRegistrations";
 
@@ -33,6 +34,7 @@ export async function POST(
       amountCents?: number;
       receivedAt?: string;
       note?: string;
+      reference?: string;
     };
 
     const db = getFirestoreAdmin();
@@ -62,10 +64,12 @@ export async function POST(
         ? body.receivedAt
         : new Date().toISOString();
 
+    const reference = normalizePaymentReference(body.reference);
     const next = markExpectedPaymentReceived(payment, expectedId, {
       amountCents,
       receivedAt,
       recordedBy: auth.uid,
+      ...(reference ? { reference } : {}),
       ...(typeof body.note === "string" && body.note.trim()
         ? { note: body.note.trim() }
         : {}),

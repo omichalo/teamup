@@ -148,6 +148,9 @@ export function UsersManagementTable({
                     <MenuItem value={USER_ROLES.SECRETARY}>
                       {getRoleLabel(USER_ROLES.SECRETARY)}
                     </MenuItem>
+                    <MenuItem value={USER_ROLES.ASSISTANT_SECRETARY}>
+                      {getRoleLabel(USER_ROLES.ASSISTANT_SECRETARY)}
+                    </MenuItem>
                     <MenuItem
                       value={USER_ROLES.ADMIN}
                       disabled={
