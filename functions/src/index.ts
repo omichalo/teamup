@@ -12,7 +12,13 @@ import {
 } from "./sync-wrappers";
 import { ffttSyncFunctions } from "./sync-runtime";
 
-const ALLOWED_ROLES = new Set(["admin", "secretary", "coach", "player"]);
+const ALLOWED_ROLES = new Set([
+  "admin",
+  "secretary",
+  "assistant_secretary",
+  "coach",
+  "player",
+]);
 const ALLOWED_COACH_STATUSES = new Set([
   "none",
   "pending",
@@ -20,16 +26,23 @@ const ALLOWED_COACH_STATUSES = new Set([
   "rejected",
 ]);
 
-const resolveRole = (role: unknown): "admin" | "secretary" | "coach" | "player" => {
+type AllowedRole =
+  | "admin"
+  | "secretary"
+  | "assistant_secretary"
+  | "coach"
+  | "player";
+
+const resolveRole = (role: unknown): AllowedRole => {
   if (typeof role === "string" && ALLOWED_ROLES.has(role)) {
-    return role as "admin" | "secretary" | "coach" | "player";
+    return role as AllowedRole;
   }
   return "player";
 };
 
 const resolveCoachStatus = (
   status: unknown,
-  role: "admin" | "secretary" | "coach" | "player"
+  role: AllowedRole
 ): "none" | "pending" | "approved" | "rejected" => {
   if (role === "coach") {
     if (typeof status === "string" && ALLOWED_COACH_STATUSES.has(status)) {

@@ -21,6 +21,10 @@ import {
   centsToEurosInput,
   eurosInputToCents,
 } from "@/lib/club-registration/payment/payment-draft-helpers";
+import {
+  PAYMENT_REFERENCE_MAX_LENGTH,
+  paymentReferenceFieldLabel,
+} from "@/lib/club-registration/payment/payment-reference";
 
 type Props = {
   open: boolean;
@@ -31,6 +35,7 @@ type Props = {
     amountCents: number;
     receivedAt: string;
     note?: string;
+    reference?: string;
   }) => Promise<void>;
 };
 
@@ -41,8 +46,12 @@ export function AddManualPaymentDialog({ open, onClose, onSubmit }: Props) {
   const [receivedAt, setReceivedAt] = useState(
     new Date().toISOString().slice(0, 10)
   );
+  const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const showReferenceField =
+    method === "cheque" || method === "holiday_vouchers";
 
   const handleSubmit = async () => {
     const amountCents = eurosInputToCents(amountEuros);
@@ -54,10 +63,12 @@ export function AddManualPaymentDialog({ open, onClose, onSubmit }: Props) {
         label,
         amountCents,
         receivedAt: new Date(receivedAt).toISOString(),
+        ...(reference.trim() ? { reference: reference.trim() } : {}),
         ...(note.trim() ? { note: note.trim() } : {}),
       });
       onClose();
       setAmountEuros("");
+      setReference("");
       setNote("");
       setLabel("");
     } finally {
@@ -109,6 +120,16 @@ export function AddManualPaymentDialog({ open, onClose, onSubmit }: Props) {
             fullWidth
             InputLabelProps={{ shrink: true }}
           />
+          {showReferenceField ? (
+            <TextField
+              label={paymentReferenceFieldLabel(method)}
+              value={reference}
+              onChange={(e) => setReference(e.target.value)}
+              fullWidth
+              inputProps={{ maxLength: PAYMENT_REFERENCE_MAX_LENGTH }}
+              helperText="Facultatif — utile pour le suivi comptable."
+            />
+          ) : null}
           <TextField
             label="Note interne"
             value={note}

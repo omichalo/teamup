@@ -12,6 +12,7 @@ import {
   paymentToFirestoreUpdate,
 } from "@/lib/club-registration/payment/normalize-payment";
 import { addManualReceivedPayment } from "@/lib/club-registration/payment/payment-mutations";
+import { normalizePaymentReference } from "@/lib/club-registration/payment/payment-reference";
 
 const COLLECTION = "clubRegistrations";
 
@@ -36,6 +37,7 @@ export async function POST(
       amountCents?: number;
       receivedAt?: string;
       note?: string;
+      reference?: string;
     };
 
     if (!isReceivedMethodIdSafe(body.method)) {
@@ -62,12 +64,14 @@ export async function POST(
       return jsonNoStore({ error: "Aucune donnée de paiement sur ce dossier" }, { status: 400 });
     }
 
+    const reference = normalizePaymentReference(body.reference);
     const next = addManualReceivedPayment(payment, {
       method: body.method,
       label: body.label ?? "",
       amountCents: body.amountCents as number,
       receivedAt,
       recordedBy: auth.uid,
+      ...(reference ? { reference } : {}),
       ...(typeof body.note === "string" && body.note.trim()
         ? { note: body.note.trim() }
         : {}),

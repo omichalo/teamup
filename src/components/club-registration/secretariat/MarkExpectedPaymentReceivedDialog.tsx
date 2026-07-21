@@ -9,12 +9,19 @@ import {
   DialogContentText,
   DialogTitle,
   TextField,
+  Alert,
+  Stack,
+  Typography,
 } from "@mui/material";
 import type { ExpectedPayment } from "@/lib/club-registration/payment/types";
 import {
   centsToEurosInput,
   eurosInputToCents,
 } from "@/lib/club-registration/payment/payment-draft-helpers";
+import {
+  PAYMENT_REFERENCE_MAX_LENGTH,
+  paymentReferenceFieldLabel,
+} from "@/lib/club-registration/payment/payment-reference";
 
 type Props = {
   open: boolean;
@@ -24,6 +31,7 @@ type Props = {
     amountCents: number;
     receivedAt: string;
     note?: string;
+    reference?: string;
   }) => Promise<void>;
 };
 
@@ -37,13 +45,26 @@ export function MarkExpectedPaymentReceivedDialog({
   const [receivedAt, setReceivedAt] = useState(
     new Date().toISOString().slice(0, 10)
   );
+  const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const expectedEuros = expected
+    ? centsToEurosInput(expected.expectedAmountCents)
+    : "";
+  const expectedCents = expected?.expectedAmountCents ?? 0;
+  const receivedCentsPreview = eurosInputToCents(amountEuros);
+  const diffCentsPreview = receivedCentsPreview - expectedCents;
+  const hasMismatchPreview =
+    expected && receivedCentsPreview > 0 && diffCentsPreview !== 0;
+  const showReferenceField =
+    expected?.method === "cheque" || expected?.method === "holiday_vouchers";
 
   useEffect(() => {
     if (expected) {
       setAmountEuros(centsToEurosInput(expected.expectedAmountCents));
       setReceivedAt(new Date().toISOString().slice(0, 10));
+      setReference("");
       setNote("");
     }
   }, [expected]);
@@ -57,6 +78,7 @@ export function MarkExpectedPaymentReceivedDialog({
       await onSubmit({
         amountCents,
         receivedAt: new Date(receivedAt).toISOString(),
+        ...(reference.trim() ? { reference: reference.trim() } : {}),
         ...(note.trim() ? { note: note.trim() } : {}),
       });
       onClose();
@@ -73,6 +95,20 @@ export function MarkExpectedPaymentReceivedDialog({
           Confirmez le montant et la date réels de réception pour cette ligne du plan de
           paiement.
         </DialogContentText>
+        {expected ? (
+          <Stack spacing={1} sx={{ mb: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Montant attendu : <strong>{expectedEuros}</strong> €
+            </Typography>
+            {hasMismatchPreview ? (
+              <Alert severity="warning">
+                Montant reçu différent (reçu :{" "}
+                <strong>{centsToEurosInput(receivedCentsPreview)}</strong> € · attendu :{" "}
+                <strong>{expectedEuros}</strong> €). Le solde sera recalculé.
+              </Alert>
+            ) : null}
+          </Stack>
+        ) : null}
         <TextField
           label="Montant reçu (€)"
           value={amountEuros}
@@ -89,6 +125,17 @@ export function MarkExpectedPaymentReceivedDialog({
           InputLabelProps={{ shrink: true }}
           sx={{ mb: 2 }}
         />
+        {showReferenceField ? (
+          <TextField
+            label={paymentReferenceFieldLabel(expected?.method)}
+            value={reference}
+            onChange={(e) => setReference(e.target.value)}
+            fullWidth
+            sx={{ mb: 2 }}
+            inputProps={{ maxLength: PAYMENT_REFERENCE_MAX_LENGTH }}
+            helperText="Facultatif — utile pour le suivi comptable."
+          />
+        ) : null}
         <TextField
           label="Note"
           value={note}

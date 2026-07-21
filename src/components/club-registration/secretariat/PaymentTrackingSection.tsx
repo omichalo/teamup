@@ -260,6 +260,7 @@ export function PaymentTrackingSection({
               <TableRow>
                 <TableCell>Date</TableCell>
                 <TableCell>Libellé</TableCell>
+                <TableCell>N° / réf.</TableCell>
                 <TableCell align="right">Montant</TableCell>
               </TableRow>
             </TableHead>
@@ -270,6 +271,7 @@ export function PaymentTrackingSection({
                     {new Date(line.receivedAt).toLocaleDateString("fr-FR")}
                   </TableCell>
                   <TableCell>{line.label}</TableCell>
+                  <TableCell>{line.reference?.trim() || "—"}</TableCell>
                   <TableCell align="right">
                     {formatCentsAsEuros(line.amountCents)}
                   </TableCell>

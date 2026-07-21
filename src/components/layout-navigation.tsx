@@ -16,6 +16,7 @@ import {
   TableChart,
   TipsAndUpdates,
   Tune,
+  VerifiedUser,
 } from "@mui/icons-material";
 
 export interface LayoutNavigationItem {
@@ -96,6 +97,11 @@ const NAV = {
     href: "/admin",
     icon: <AdminPanelSettings />,
   },
+  validationsLicence: {
+    label: "Licences & encaissements",
+    href: "/club/validations-licence",
+    icon: <VerifiedUser />,
+  },
 } as const satisfies Record<string, LayoutNavigationItem>;
 
 export const LAYOUT_NAV = NAV;
@@ -103,7 +109,8 @@ export const LAYOUT_NAV = NAV;
 type LayoutNavOptions = {
   hasUser: boolean;
   isAdmin: boolean;
-  isPlayer: boolean;
+  isPlayerLike: boolean;
+  isAssistantSecretary: boolean;
   isSecretary: boolean;
 };
 
@@ -117,8 +124,8 @@ export function hasLayoutNavigation(nav: LayoutNavigationStructure): boolean {
 export function buildLayoutAccountMenuItems(
   options: LayoutNavOptions
 ): LayoutNavigationItem[] {
-  const { hasUser, isAdmin, isPlayer, isSecretary } = options;
-  if (!hasUser || isPlayer) {
+  const { hasUser, isAdmin, isPlayerLike, isSecretary } = options;
+  if (!hasUser || isPlayerLike) {
     return [];
   }
 
@@ -136,16 +143,22 @@ export function buildLayoutAccountMenuItems(
 export function buildLayoutNavigation(
   options: LayoutNavOptions
 ): LayoutNavigationStructure {
-  const { hasUser, isAdmin, isPlayer, isSecretary } = options;
+  const { hasUser, isAdmin, isPlayerLike, isAssistantSecretary, isSecretary } =
+    options;
   if (!hasUser) {
     return { primary: [], groups: [] };
   }
 
-  if (isPlayer) {
-    return {
-      primary: [NAV.accueil, NAV.nouvelleAdhesion, NAV.mesDossiers],
-      groups: [],
-    };
+  if (isPlayerLike) {
+    const primary: LayoutNavigationItem[] = [
+      NAV.accueil,
+      NAV.nouvelleAdhesion,
+      NAV.mesDossiers,
+    ];
+    if (isAssistantSecretary) {
+      primary.push(NAV.validationsLicence);
+    }
+    return { primary, groups: [] };
   }
 
   if (isSecretary) {
@@ -155,7 +168,12 @@ export function buildLayoutNavigation(
         {
           id: "adhesions",
           label: "Adhésions",
-          items: [NAV.tableauAdhesions, NAV.campagnesTarifs, NAV.apercuFormulaire],
+          items: [
+            NAV.tableauAdhesions,
+            NAV.campagnesTarifs,
+            NAV.apercuFormulaire,
+            NAV.validationsLicence,
+          ],
         },
       ],
     };
@@ -183,7 +201,12 @@ export function buildLayoutNavigation(
         {
           id: "adhesions",
           label: "Adhésions",
-          items: [NAV.tableauAdhesions, NAV.campagnesTarifs, NAV.apercuFormulaire],
+          items: [
+            NAV.tableauAdhesions,
+            NAV.campagnesTarifs,
+            NAV.apercuFormulaire,
+            NAV.validationsLicence,
+          ],
         },
       ],
     };

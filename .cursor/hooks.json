@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": ".cursor/hooks/ensure-dev-server.sh"
+      }
+    ],
+    "afterShellExecution": [
+      {
+        "command": ".cursor/hooks/ensure-dev-server.sh",
+        "matcher": "npm run (check|build|deploy|functions:deploy|deploy:)|git push|firebase deploy|lsof -ti:3000"
+      }
+    ],
+    "stop": [
+      {
+        "command": ".cursor/hooks/ensure-dev-on-stop.sh"
+      }
+    ]
+  }
+}

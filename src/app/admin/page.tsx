@@ -484,6 +484,8 @@ export default function AdminPage() {
         return "admin";
       case USER_ROLES.SECRETARY:
         return "secrétaire";
+      case USER_ROLES.ASSISTANT_SECRETARY:
+        return "secrétaire adjoint";
       case USER_ROLES.COACH:
         return "coach";
       default:
