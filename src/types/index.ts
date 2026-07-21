@@ -159,7 +159,12 @@ export interface ClubSettings {
   updatedAt: Date;
 }
 
-export type UserRole = "admin" | "secretary" | "coach" | "player";
+export type UserRole =
+  | "admin"
+  | "secretary"
+  | "assistant_secretary"
+  | "coach"
+  | "player";
 
 export type CoachRequestStatus = "none" | "pending" | "approved" | "rejected";
 

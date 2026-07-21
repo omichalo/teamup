@@ -30,6 +30,7 @@ build/
 **/build/
 
 # misc
+.dev-server.pid
 .DS_Store
 *.pem
 *.log

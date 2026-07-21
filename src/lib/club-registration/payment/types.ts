@@ -31,6 +31,8 @@ export type ReceivedPayment = {
   amountCents: number;
   receivedAt: string;
   recordedBy?: string;
+  /** N° de chèque / chèque vacances ou autre référence (optionnel). */
+  reference?: string;
   note?: string;
   expectedPaymentId?: string;
 };

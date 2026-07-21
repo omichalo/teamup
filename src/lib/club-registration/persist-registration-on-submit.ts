@@ -92,6 +92,7 @@ export function buildRegistrationSubmitDocument(params: {
     pricingQuoteComputedAt: now,
     isMinor,
     medicalCertificateStatus,
+    licenseValidationStatus: "to_do",
     submitterUid,
     submitterAccountEmail,
     submitterRole,
