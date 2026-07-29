@@ -1,27 +1,14 @@
 export const runtime = "nodejs";
 
 import { jsonNoStore } from "@/lib/http/cache-headers";
-import { cookies } from "next/headers";
-import { adminAuth } from "@/lib/firebase-admin";
+import { withAuth } from "@/lib/auth/api-utils";
+import { USER_ROLES } from "@/lib/auth/roles";
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const DISCORD_SERVER_ID = process.env.DISCORD_SERVER_ID;
 
-export async function GET() {
+export const GET = withAuth(async () => {
   try {
-    // Vérifier l'authentification
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-    
-    if (!sessionCookie) {
-      return jsonNoStore(
-        { success: false, error: "Non authentifié" },
-        { status: 401 }
-      );
-    }
-
-    await adminAuth.verifySessionCookie(sessionCookie, true);
-
     if (!DISCORD_TOKEN || !DISCORD_SERVER_ID) {
       return jsonNoStore(
         { success: false, error: "Configuration Discord manquante" },
@@ -31,8 +18,6 @@ export async function GET() {
 
     // Récupérer la liste des membres du serveur Discord
     console.log("[Discord Members] Début de la récupération des membres");
-    console.log("[Discord Members] DISCORD_SERVER_ID:", DISCORD_SERVER_ID);
-    console.log("[Discord Members] DISCORD_TOKEN présent:", !!DISCORD_TOKEN);
     
     const members: Array<{ id: string; username: string; displayName: string; discriminator: string }> = [];
     let after: string | null = null;
@@ -40,7 +25,6 @@ export async function GET() {
 
     do {
       const url: string = `https://discord.com/api/v10/guilds/${DISCORD_SERVER_ID}/members?limit=${limit}${after ? `&after=${after}` : ""}`;
-      console.log("[Discord Members] Requête URL:", url.replace(DISCORD_TOKEN || "", "[TOKEN_HIDDEN]"));
       
       const response: Response = await fetch(url, {
         headers: {
@@ -49,12 +33,9 @@ export async function GET() {
         },
       });
 
-      console.log("[Discord Members] Status de la réponse:", response.status, response.statusText);
-
       if (!response.ok) {
         const errorText = await response.text();
         console.error("[Discord Members] Erreur lors de la récupération des membres:", errorText);
-        console.error("[Discord Members] Status:", response.status);
         
         let errorMessage = "Erreur lors de la récupération des membres Discord";
         try {
@@ -68,14 +49,14 @@ export async function GET() {
           // Si l'erreur n'est pas du JSON, utiliser le message d'erreur tel quel
         }
         
+        // Security: Ne pas renvoyer details: errorText pour éviter de fuiter des infos internes
         return jsonNoStore(
-          { success: false, error: errorMessage, details: errorText },
+          { success: false, error: errorMessage },
           { status: response.status }
         );
       }
 
       const data: Array<{ user?: { id: string; username: string; bot?: boolean; global_name?: string; discriminator?: string }; nick?: string }> = await response.json();
-      console.log("[Discord Members] Nombre de membres reçus:", data.length);
       
       for (const member of data) {
         if (member.user && !member.user.bot) {
@@ -89,8 +70,6 @@ export async function GET() {
         }
       }
 
-      console.log("[Discord Members] Membres non-bots ajoutés:", members.length);
-
       // Vérifier s'il y a plus de membres à récupérer
       if (data.length === limit && data[data.length - 1].user) {
         after = data[data.length - 1].user!.id;
@@ -98,8 +77,6 @@ export async function GET() {
         after = null;
       }
     } while (after);
-
-    console.log("[Discord Members] Total de membres récupérés:", members.length);
 
     // Trier par nom d'affichage
     members.sort((a, b) => a.displayName.localeCompare(b.displayName));
@@ -112,5 +89,4 @@ export async function GET() {
       { status: 500 }
     );
   }
-}
-
+}, [USER_ROLES.ADMIN, USER_ROLES.COACH]);
