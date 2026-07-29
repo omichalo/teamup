@@ -20,7 +20,17 @@ export async function GET() {
       );
     }
 
-    await adminAuth.verifySessionCookie(sessionCookie, true);
+    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+
+    // Vérifier l'autorisation (seuls les admins et coachs peuvent voir les membres Discord)
+    const { resolveRole, hasAnyRole, USER_ROLES } = await import("@/lib/auth/roles");
+    const role = resolveRole(decoded.role as string | undefined);
+    if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
+      return jsonNoStore(
+        { success: false, error: "Accès refusé" },
+        { status: 403 }
+      );
+    }
 
     if (!DISCORD_TOKEN || !DISCORD_SERVER_ID) {
       return jsonNoStore(
