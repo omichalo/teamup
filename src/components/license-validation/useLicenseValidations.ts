@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { LicenseValidationListFilter } from "@/lib/license-validation/license-validation-status";
+import type { LicenseValidationPaymentListFilter } from "@/lib/license-validation/payment-status-filter";
 import type { LicenseValidationListItem } from "@/lib/license-validation/map-registration";
 
 type PageInfo = {
@@ -12,6 +13,8 @@ type PageInfo = {
 export function useLicenseValidations(initialStatus: LicenseValidationListFilter = "all") {
   const [statusFilter, setStatusFilter] =
     useState<LicenseValidationListFilter>(initialStatus);
+  const [paymentStatusFilter, setPaymentStatusFilter] =
+    useState<LicenseValidationPaymentListFilter>("paid");
   const [searchInput, setSearchInput] = useState("");
   const [registrations, setRegistrations] = useState<LicenseValidationListItem[]>([]);
   const [pageInfo, setPageInfo] = useState<PageInfo>({
@@ -27,6 +30,9 @@ export function useLicenseValidations(initialStatus: LicenseValidationListFilter
       const params = new URLSearchParams();
       if (statusFilter !== "all") {
         params.set("status", statusFilter);
+      }
+      if (paymentStatusFilter !== "all") {
+        params.set("paymentStatus", paymentStatusFilter);
       }
       if (searchInput.trim().length >= 2) {
         params.set("q", searchInput.trim());
@@ -52,7 +58,7 @@ export function useLicenseValidations(initialStatus: LicenseValidationListFilter
         nextCursor: typeof json.nextCursor === "string" ? json.nextCursor : null,
       });
     },
-    [searchInput, statusFilter]
+    [paymentStatusFilter, searchInput, statusFilter]
   );
 
   const reload = useCallback(async () => {
@@ -89,6 +95,8 @@ export function useLicenseValidations(initialStatus: LicenseValidationListFilter
   return {
     statusFilter,
     setStatusFilter,
+    paymentStatusFilter,
+    setPaymentStatusFilter,
     searchInput,
     setSearchInput,
     registrations,

@@ -6,11 +6,9 @@ import {
   Box,
   Button,
   Container,
-  Grid,
   Paper,
   Tab,
   Tabs,
-  Typography,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
@@ -21,11 +19,31 @@ import { LicenseValidationListPanel } from "@/components/license-validation/Lice
 import { LicenseValidationPaymentDetailPanel } from "@/components/license-validation/LicenseValidationPaymentDetailPanel";
 import { LicenseValidationPaymentSearchPanel } from "@/components/license-validation/LicenseValidationPaymentSearchPanel";
 import {
-  LICENSE_VALIDATION_WORKSPACE_DESCRIPTIONS,
   LICENSE_VALIDATION_WORKSPACE_LABELS,
   type LicenseValidationWorkspace,
 } from "@/components/license-validation/license-validation-workspace";
 import { useLicenseValidations } from "@/components/license-validation/useLicenseValidations";
+
+const workspaceShellSx = {
+  display: { xs: "flex", lg: "grid" },
+  flexDirection: { xs: "column" },
+  gridTemplateColumns: { lg: "minmax(300px, 380px) minmax(0, 1fr)" },
+  alignItems: "stretch",
+  border: 1,
+  borderColor: "divider",
+  borderRadius: 2,
+  overflow: "hidden",
+  bgcolor: "background.paper",
+  minHeight: { xs: 420, lg: "calc(100vh - 220px)" },
+  height: { lg: "calc(100vh - 220px)" },
+} as const;
+
+const columnSx = {
+  minHeight: 0,
+  overflowY: "auto",
+  overscrollBehavior: "contain",
+  p: 2,
+} as const;
 
 function WorkspaceTabPanel({
   active,
@@ -39,7 +57,7 @@ function WorkspaceTabPanel({
   if (active !== workspace) {
     return null;
   }
-  return <Box sx={{ pt: 3 }}>{children}</Box>;
+  return <Box sx={{ pt: 2 }}>{children}</Box>;
 }
 
 export function LicenseValidationsContainer() {
@@ -49,6 +67,8 @@ export function LicenseValidationsContainer() {
   const {
     statusFilter,
     setStatusFilter,
+    paymentStatusFilter,
+    setPaymentStatusFilter,
     searchInput,
     setSearchInput,
     registrations,
@@ -73,7 +93,6 @@ export function LicenseValidationsContainer() {
       <PageHeader
         eyebrow="Secrétariat"
         title="Adhésions — licences et encaissements"
-        subtitle="Deux espaces de travail distincts selon l'action à réaliser."
         actions={
           workspace === "licenses" ? (
             <Button
@@ -88,7 +107,7 @@ export function LicenseValidationsContainer() {
         marginBottom={2}
       />
 
-      <Paper sx={{ px: { xs: 1, sm: 2 }, pt: 1 }}>
+      <Paper sx={{ px: { xs: 1, sm: 2 }, pt: 1, pb: 1 }}>
         <Tabs
           value={workspace}
           onChange={(_event, value: LicenseValidationWorkspace) => setWorkspace(value)}
@@ -108,10 +127,6 @@ export function LicenseValidationsContainer() {
             label={LICENSE_VALIDATION_WORKSPACE_LABELS.payments}
           />
         </Tabs>
-
-        <Typography variant="body2" color="text.secondary" sx={{ px: 1, pb: 1 }}>
-          {LICENSE_VALIDATION_WORKSPACE_DESCRIPTIONS[workspace]}
-        </Typography>
       </Paper>
 
       {error && workspace === "licenses" ? (
@@ -121,54 +136,64 @@ export function LicenseValidationsContainer() {
       ) : null}
 
       <WorkspaceTabPanel active={workspace} workspace="licenses">
-        <Grid container spacing={3}>
-          <Grid size={{ xs: 12, lg: 4 }}>
-            <Paper sx={{ p: 2, minHeight: 480 }}>
-              <LicenseValidationListPanel
-                registrations={registrations}
-                selectedId={licenseSelectedId}
-                statusFilter={statusFilter}
-                searchInput={searchInput}
-                loading={loadingList}
-                loadingMore={loadingMore}
-                hasNextPage={pageInfo.hasNextPage}
-                onSelect={setLicenseSelectedId}
-                onStatusFilterChange={setStatusFilter}
-                onSearchInputChange={setSearchInput}
-                onLoadMore={() => void loadMore()}
-              />
-            </Paper>
-          </Grid>
-          <Grid size={{ xs: 12, lg: 8 }}>
-            <Paper sx={{ p: 2, minHeight: 480 }}>
-              <LicenseValidationLicenseDetailPanel
-                registrationId={licenseSelectedId}
-                onSaved={handleLicenseSaved}
-              />
-            </Paper>
-          </Grid>
-        </Grid>
+        <Box sx={workspaceShellSx}>
+          <Box
+            sx={{
+              ...columnSx,
+              borderBottom: { xs: 1, lg: 0 },
+              borderRight: { lg: 1 },
+              borderColor: "divider",
+              maxHeight: { xs: 420, lg: "none" },
+            }}
+          >
+            <LicenseValidationListPanel
+              registrations={registrations}
+              selectedId={licenseSelectedId}
+              statusFilter={statusFilter}
+              paymentStatusFilter={paymentStatusFilter}
+              searchInput={searchInput}
+              loading={loadingList}
+              loadingMore={loadingMore}
+              hasNextPage={pageInfo.hasNextPage}
+              onSelect={setLicenseSelectedId}
+              onStatusFilterChange={setStatusFilter}
+              onPaymentStatusFilterChange={setPaymentStatusFilter}
+              onSearchInputChange={setSearchInput}
+              onLoadMore={() => void loadMore()}
+            />
+          </Box>
+          <Box sx={columnSx}>
+            <LicenseValidationLicenseDetailPanel
+              registrationId={licenseSelectedId}
+              onSaved={handleLicenseSaved}
+            />
+          </Box>
+        </Box>
       </WorkspaceTabPanel>
 
       <WorkspaceTabPanel active={workspace} workspace="payments">
-        <Grid container spacing={3}>
-          <Grid size={{ xs: 12, md: 5, lg: 4 }}>
-            <Paper sx={{ p: 2, minHeight: 480 }}>
-              <LicenseValidationPaymentSearchPanel
-                selectedId={paymentSelectedId}
-                onSelectRegistration={setPaymentSelectedId}
-              />
-            </Paper>
-          </Grid>
-          <Grid size={{ xs: 12, md: 7, lg: 8 }}>
-            <Paper sx={{ p: 2, minHeight: 480 }}>
-              <LicenseValidationPaymentDetailPanel
-                registrationId={paymentSelectedId}
-                onSaved={handlePaymentSaved}
-              />
-            </Paper>
-          </Grid>
-        </Grid>
+        <Box sx={workspaceShellSx}>
+          <Box
+            sx={{
+              ...columnSx,
+              borderBottom: { xs: 1, lg: 0 },
+              borderRight: { lg: 1 },
+              borderColor: "divider",
+              maxHeight: { xs: 420, lg: "none" },
+            }}
+          >
+            <LicenseValidationPaymentSearchPanel
+              selectedId={paymentSelectedId}
+              onSelectRegistration={setPaymentSelectedId}
+            />
+          </Box>
+          <Box sx={columnSx}>
+            <LicenseValidationPaymentDetailPanel
+              registrationId={paymentSelectedId}
+              onSaved={handlePaymentSaved}
+            />
+          </Box>
+        </Box>
       </WorkspaceTabPanel>
     </Container>
   );
