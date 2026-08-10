@@ -23,8 +23,8 @@ export const LICENSE_VALIDATION_PAYMENT_FILTER_LABELS: Record<
 > = {
   all: "Tous",
   paid: "Payé",
-  partially_paid: "Paiement partiel",
-  unpaid: "Paiement en attente",
+  partially_paid: "Partiel",
+  unpaid: "En attente",
 };
 
 const UNPAID_PAYMENT_STATUSES: ReadonlySet<PaymentStatusId> = new Set([
