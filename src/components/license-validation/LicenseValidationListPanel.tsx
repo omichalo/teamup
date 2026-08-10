@@ -5,9 +5,6 @@ import {
   Button,
   Chip,
   CircularProgress,
-  List,
-  ListItemButton,
-  ListItemText,
   Stack,
   TextField,
   Typography,
@@ -17,6 +14,11 @@ import {
   LICENSE_VALIDATION_STATUS_VALUES,
   type LicenseValidationListFilter,
 } from "@/lib/license-validation/license-validation-status";
+import {
+  LICENSE_VALIDATION_PAYMENT_FILTER_LABELS,
+  LICENSE_VALIDATION_PAYMENT_FILTER_VALUES,
+  type LicenseValidationPaymentListFilter,
+} from "@/lib/license-validation/payment-status-filter";
 import type { LicenseValidationListItem } from "@/lib/license-validation/map-registration";
 import { LicenseValidationLineSecondaryText } from "@/components/license-validation/LicenseValidationLineSecondaryText";
 
@@ -24,12 +26,14 @@ type Props = {
   registrations: LicenseValidationListItem[];
   selectedId: string | null;
   statusFilter: LicenseValidationListFilter;
+  paymentStatusFilter: LicenseValidationPaymentListFilter;
   searchInput: string;
   loading: boolean;
   loadingMore: boolean;
   hasNextPage: boolean;
   onSelect: (id: string) => void;
   onStatusFilterChange: (filter: LicenseValidationListFilter) => void;
+  onPaymentStatusFilterChange: (filter: LicenseValidationPaymentListFilter) => void;
   onSearchInputChange: (value: string) => void;
   onLoadMore: () => void;
 };
@@ -38,12 +42,14 @@ export function LicenseValidationListPanel({
   registrations,
   selectedId,
   statusFilter,
+  paymentStatusFilter,
   searchInput,
   loading,
   loadingMore,
   hasNextPage,
   onSelect,
   onStatusFilterChange,
+  onPaymentStatusFilterChange,
   onSearchInputChange,
   onLoadMore,
 }: Props) {
@@ -57,33 +63,45 @@ export function LicenseValidationListPanel({
         fullWidth
       />
 
-      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-        <Chip
-          label="Tous"
-          clickable
-          color={statusFilter === "all" ? "primary" : "default"}
-          onClick={() => onStatusFilterChange("all")}
-        />
-        {LICENSE_VALIDATION_STATUS_VALUES.map((status) => (
+      <Stack spacing={0.75}>
+        <Typography variant="caption" color="text.secondary">
+          Licence
+        </Typography>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
           <Chip
-            key={status}
-            label={LICENSE_VALIDATION_STATUS_LABELS[status]}
+            label="Tous"
             clickable
-            color={statusFilter === status ? "primary" : "default"}
-            onClick={() => onStatusFilterChange(status)}
+            color={statusFilter === "all" ? "primary" : "default"}
+            onClick={() => onStatusFilterChange("all")}
           />
-        ))}
+          {LICENSE_VALIDATION_STATUS_VALUES.map((status) => (
+            <Chip
+              key={status}
+              label={LICENSE_VALIDATION_STATUS_LABELS[status]}
+              clickable
+              color={statusFilter === status ? "primary" : "default"}
+              onClick={() => onStatusFilterChange(status)}
+            />
+          ))}
+        </Stack>
       </Stack>
 
-      <Box>
-        <Typography variant="caption" color="text.secondary" display="block">
-          Statuts d’une ligne :
+      <Stack spacing={0.75}>
+        <Typography variant="caption" color="text.secondary">
+          Paiement
         </Typography>
-        <Typography variant="caption" color="text.secondary" display="block">
-          Licence = suivi licence FFTT / Compétiteur = Oui/Non / Paiement =
-          statut paiement.
-        </Typography>
-      </Box>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          {LICENSE_VALIDATION_PAYMENT_FILTER_VALUES.map((filter) => (
+            <Chip
+              key={filter}
+              label={LICENSE_VALIDATION_PAYMENT_FILTER_LABELS[filter]}
+              clickable
+              color={paymentStatusFilter === filter ? "primary" : "default"}
+              onClick={() => onPaymentStatusFilterChange(filter)}
+            />
+          ))}
+        </Stack>
+      </Stack>
 
       {loading ? (
         <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
@@ -92,32 +110,53 @@ export function LicenseValidationListPanel({
       ) : registrations.length === 0 ? (
         <Typography color="text.secondary">Aucun dossier trouvé.</Typography>
       ) : (
-        <List disablePadding>
+        <Stack spacing={0.5}>
           {registrations.map((registration) => {
             const name = [registration.firstName, registration.lastName]
               .filter(Boolean)
               .join(" ");
+            const selected = registration.id === selectedId;
             return (
-              <ListItemButton
+              <Box
                 key={registration.id}
-                selected={registration.id === selectedId}
+                component="button"
+                type="button"
                 onClick={() => onSelect(registration.id)}
-                sx={{ borderRadius: 1, mb: 0.5 }}
+                sx={{
+                  display: "block",
+                  width: "100%",
+                  textAlign: "left",
+                  border: 1,
+                  borderColor: selected ? "primary.main" : "divider",
+                  bgcolor: selected ? "action.selected" : "transparent",
+                  borderRadius: 1.5,
+                  px: 1.5,
+                  py: 1.25,
+                  cursor: "pointer",
+                  font: "inherit",
+                  color: "inherit",
+                  "&:hover": {
+                    borderColor: "primary.light",
+                    bgcolor: selected ? "action.selected" : "action.hover",
+                  },
+                }}
               >
-                <ListItemText
-                  primary={name || "Adhérent"}
-                  secondary={
-                    <LicenseValidationLineSecondaryText registration={registration} />
-                  }
-                />
-              </ListItemButton>
+                <Typography
+                  variant="subtitle2"
+                  fontWeight={700}
+                  color={selected ? "primary.main" : "text.primary"}
+                >
+                  {name || "Adhérent"}
+                </Typography>
+                <LicenseValidationLineSecondaryText registration={registration} />
+              </Box>
             );
           })}
-        </List>
+        </Stack>
       )}
 
       {hasNextPage ? (
-        <Button onClick={() => void onLoadMore()} disabled={loadingMore}>
+        <Button onClick={() => void onLoadMore()} disabled={loadingMore} variant="outlined">
           {loadingMore ? "Chargement…" : "Charger plus"}
         </Button>
       ) : null}

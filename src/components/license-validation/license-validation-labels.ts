@@ -1,5 +1,5 @@
-import { MEDICAL_CERTIFICATE_STATUS_LABELS } from "@/lib/club-registration/medical-certificate";
 import { PAYMENT_STATUS_LABELS } from "@/lib/club-registration/payment-constants";
+import { formatMedicalFollowUpLabel } from "@/lib/club-registration/medical-certificate";
 import { LICENSE_VALIDATION_STATUS_LABELS } from "@/lib/license-validation/license-validation-status";
 
 export { LICENSE_VALIDATION_STATUS_LABELS };
@@ -15,15 +15,12 @@ export function formatPaidLabel(paymentStatus: string | null): string {
   return PAYMENT_STATUS_LABELS[paymentStatus as keyof typeof PAYMENT_STATUS_LABELS] ?? paymentStatus;
 }
 
-export function formatMedicalCertificateLabel(status: string | null): string {
-  if (!status) {
-    return "—";
-  }
-  return (
-    MEDICAL_CERTIFICATE_STATUS_LABELS[
-      status as keyof typeof MEDICAL_CERTIFICATE_STATUS_LABELS
-    ] ?? status
-  );
+/** Synthèse secrétariat : OK / PPS attendu / certificat attendu ou reçu. */
+export function formatMedicalCertificateLabel(
+  status: string | null,
+  declaration?: string | null
+): string {
+  return formatMedicalFollowUpLabel(declaration, status);
 }
 
 export function formatAttestationLabel(wantsRegistrationCertificate: boolean): string {
