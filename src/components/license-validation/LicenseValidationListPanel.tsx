@@ -67,7 +67,7 @@ export function LicenseValidationListPanel({
         <Typography variant="caption" color="text.secondary">
           Licence
         </Typography>
-        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+        <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
           <Chip
             label="Tous"
             clickable
@@ -90,7 +90,7 @@ export function LicenseValidationListPanel({
         <Typography variant="caption" color="text.secondary">
           Paiement
         </Typography>
-        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+        <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
           {LICENSE_VALIDATION_PAYMENT_FILTER_VALUES.map((filter) => (
             <Chip
               key={filter}
