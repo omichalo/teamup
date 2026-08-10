@@ -125,11 +125,9 @@ export function LicenseValidationPaymentSearchPanel({
                     <Typography variant="subtitle1" fontWeight={600}>
                       {name || "Adhérent"}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      <LicenseValidationLineSecondaryText
-                        registration={registration}
-                      />
-                    </Typography>
+                    <LicenseValidationLineSecondaryText
+                      registration={registration}
+                    />
                   </CardContent>
                 </CardActionArea>
               </Card>

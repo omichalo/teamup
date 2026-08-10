@@ -5,9 +5,9 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
   Divider,
   FormControl,
+  Grid,
   InputLabel,
   MenuItem,
   Select,
@@ -28,6 +28,7 @@ import {
   formatMedicalCertificateLabel,
   formatPaidLabel,
 } from "@/components/license-validation/license-validation-labels";
+import { LicenseValidationLineSecondaryText } from "@/components/license-validation/LicenseValidationLineSecondaryText";
 import { useLicenseValidationDetail } from "@/components/license-validation/useLicenseValidationDetail";
 
 type Props = {
@@ -35,9 +36,16 @@ type Props = {
   onSaved: () => Promise<void>;
 };
 
-function ReadOnlyField({ label, value }: { label: string; value: string }) {
+function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <TextField label={label} value={value} fullWidth size="small" disabled />
+    <Stack spacing={0.25} sx={{ minWidth: 0 }}>
+      <Typography variant="caption" color="text.secondary">
+        {label}
+      </Typography>
+      <Typography variant="body2" sx={{ wordBreak: "break-word" }}>
+        {value}
+      </Typography>
+    </Stack>
   );
 }
 
@@ -128,82 +136,118 @@ export function LicenseValidationLicenseDetailPanel({
       ? detail.ffttLicenseLookup.licence
       : null;
 
+  const infoFields: Array<{ label: string; value: string; fullWidth?: boolean }> = [
+    { label: "Date de naissance", value: formatBirthDate(detail.birthDate) },
+    { label: "Ville de naissance", value: detail.birthCity || "—" },
+    {
+      label: "E-mail",
+      value: detail.adherentEmail || "—",
+      fullWidth: !lookupLicense,
+    },
+  ];
+  if (lookupLicense) {
+    infoFields.push({
+      label: "Licence enregistrée (dossier)",
+      value: lookupLicense,
+    });
+  }
+  infoFields.push(
+    {
+      label: "Adresse",
+      value: formatRegistrationAddress(detail) || "—",
+      fullWidth: true,
+    },
+    {
+      label: "Compétiteur",
+      value: formatCompetitorLabel(detail.wantsCompetitorExtras),
+    },
+    { label: "Paiement", value: formatPaidLabel(detail.paymentStatus) },
+    {
+      label: "Suivi médical",
+      value: formatMedicalCertificateLabel(
+        detail.medicalCertificateStatus,
+        detail.medicalCertificateDeclaration
+      ),
+    },
+    {
+      label: "Attestation d'inscription",
+      value: formatAttestationLabel(detail.wantsRegistrationCertificate),
+    }
+  );
+
   return (
     <Stack spacing={2.5}>
-      <Box>
-        <Typography variant="h6" component="h2" sx={{ mb: 0.75 }}>
+      <Stack spacing={1}>
+        <Typography variant="h6" component="h2">
           {[detail.firstName, detail.lastName].filter(Boolean).join(" ")}
         </Typography>
-        <Chip
-          size="small"
-          label={LICENSE_VALIDATION_STATUS_LABELS[detail.licenseValidationStatus]}
-        />
-      </Box>
+        <LicenseValidationLineSecondaryText registration={detail} />
+      </Stack>
 
-      <Stack spacing={1.5}>
-        <Typography variant="subtitle2" color="text.secondary">
-          Informations adhérent
-        </Typography>
-        <ReadOnlyField label="Prénom" value={detail.firstName || "—"} />
-        <ReadOnlyField label="Nom" value={detail.lastName || "—"} />
-        <ReadOnlyField label="E-mail" value={detail.adherentEmail || "—"} />
-        <ReadOnlyField label="Date de naissance" value={formatBirthDate(detail.birthDate)} />
-        <ReadOnlyField label="Ville de naissance" value={detail.birthCity || "—"} />
-        <ReadOnlyField label="Adresse" value={formatRegistrationAddress(detail) || "—"} />
-        <ReadOnlyField
-          label="Compétiteur"
-          value={formatCompetitorLabel(detail.wantsCompetitorExtras)}
-        />
-        <ReadOnlyField label="Payé ?" value={formatPaidLabel(detail.paymentStatus)} />
-        <ReadOnlyField
-          label="Certificat médical"
-          value={formatMedicalCertificateLabel(detail.medicalCertificateStatus)}
-        />
-        <ReadOnlyField
-          label="Attestation d'inscription"
-          value={formatAttestationLabel(detail.wantsRegistrationCertificate)}
-        />
-        {lookupLicense ? (
-          <ReadOnlyField label="Licence enregistrée (dossier)" value={lookupLicense} />
-        ) : null}
+      <Stack
+        spacing={1.5}
+        sx={{
+          p: 2,
+          borderRadius: 2,
+          border: 1,
+          borderColor: "divider",
+          bgcolor: "grey.50",
+        }}
+      >
+        <Typography variant="subtitle2">Saisie licence</Typography>
+        <Grid container spacing={1.5}>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <TextField
+              label="Nouveau numéro de licence"
+              value={ffttLicense}
+              onChange={(e) => setFfttLicense(e.target.value.replace(/\D/g, ""))}
+              fullWidth
+              size="small"
+              inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel id="license-validation-status-label">Statut licence</InputLabel>
+              <Select
+                labelId="license-validation-status-label"
+                label="Statut licence"
+                value={licenseValidationStatus}
+                onChange={(e) =>
+                  setLicenseValidationStatus(e.target.value as LicenseValidationStatus)
+                }
+              >
+                {LICENSE_VALIDATION_STATUS_VALUES.map((status) => (
+                  <MenuItem key={status} value={status}>
+                    {LICENSE_VALIDATION_STATUS_LABELS[status]}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+        </Grid>
+        {saveError ? <Alert severity="error">{saveError}</Alert> : null}
+        <Button variant="contained" onClick={() => void handleSave()} disabled={saving}>
+          {saving ? "Enregistrement…" : "Enregistrer la licence"}
+        </Button>
       </Stack>
 
       <Divider />
 
       <Stack spacing={1.5}>
         <Typography variant="subtitle2" color="text.secondary">
-          Saisie licence
+          Informations adhérent
         </Typography>
-        <TextField
-          label="Nouveau numéro de licence"
-          value={ffttLicense}
-          onChange={(e) => setFfttLicense(e.target.value.replace(/\D/g, ""))}
-          fullWidth
-          size="small"
-          inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
-          helperText="Seul champ modifiable de la fiche."
-        />
-        <FormControl fullWidth size="small">
-          <InputLabel id="license-validation-status-label">Statut licence</InputLabel>
-          <Select
-            labelId="license-validation-status-label"
-            label="Statut licence"
-            value={licenseValidationStatus}
-            onChange={(e) =>
-              setLicenseValidationStatus(e.target.value as LicenseValidationStatus)
-            }
-          >
-            {LICENSE_VALIDATION_STATUS_VALUES.map((status) => (
-              <MenuItem key={status} value={status}>
-                {LICENSE_VALIDATION_STATUS_LABELS[status]}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        {saveError ? <Alert severity="error">{saveError}</Alert> : null}
-        <Button variant="contained" onClick={() => void handleSave()} disabled={saving}>
-          {saving ? "Enregistrement…" : "Enregistrer la licence"}
-        </Button>
+        <Grid container spacing={1.5}>
+          {infoFields.map((field) => (
+            <Grid
+              key={field.label}
+              size={{ xs: 12, sm: field.fullWidth ? 12 : 6 }}
+            >
+              <InfoRow label={field.label} value={field.value} />
+            </Grid>
+          ))}
+        </Grid>
       </Stack>
     </Stack>
   );

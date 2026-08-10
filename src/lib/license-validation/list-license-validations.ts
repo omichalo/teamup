@@ -8,6 +8,10 @@ import {
   resolveLicenseValidationListFilter,
   type LicenseValidationListFilter,
 } from "@/lib/license-validation/license-validation-status";
+import {
+  matchesPaymentStatusFilter,
+  type LicenseValidationPaymentListFilter,
+} from "@/lib/license-validation/payment-status-filter";
 import { registrationMatchesLicenseValidationSearch } from "@/lib/license-validation/search-registrations";
 
 export const LICENSE_VALIDATION_PAGE_SIZE_DEFAULT = 25;
@@ -92,6 +96,7 @@ export async function listLicenseValidations(
   db: Firestore,
   params: {
     statusFilter: LicenseValidationListFilter;
+    paymentStatusFilter?: LicenseValidationPaymentListFilter;
     pageSize: number;
     cursor?: string | null;
     searchQuery?: string | null;
@@ -102,6 +107,7 @@ export async function listLicenseValidations(
     LICENSE_VALIDATION_PAGE_SIZE_MAX
   );
   const searchQuery = params.searchQuery?.trim() ?? "";
+  const paymentStatusFilter = params.paymentStatusFilter ?? "all";
 
   const summaries = await fetchLicenseValidationSummaries(
     db,
@@ -112,6 +118,7 @@ export async function listLicenseValidations(
   const filtered = summaries.filter(
     (item) =>
       matchesLicenseStatusFilter(item, params.statusFilter) &&
+      matchesPaymentStatusFilter(item.paymentStatus, paymentStatusFilter) &&
       registrationMatchesLicenseValidationSearch(item, searchQuery)
   );
 
@@ -151,3 +158,4 @@ export async function searchLicenseValidations(
 }
 
 export { resolveLicenseValidationListFilter };
+export { resolveLicenseValidationPaymentListFilter } from "@/lib/license-validation/payment-status-filter";

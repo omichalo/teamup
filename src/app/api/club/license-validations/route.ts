@@ -8,6 +8,7 @@ import {
   LICENSE_VALIDATION_PAGE_SIZE_MAX,
   listLicenseValidations,
   resolveLicenseValidationListFilter,
+  resolveLicenseValidationPaymentListFilter,
 } from "@/lib/license-validation/list-license-validations";
 
 export async function GET(req: Request) {
@@ -19,6 +20,9 @@ export async function GET(req: Request) {
 
     const url = new URL(req.url);
     const statusFilter = resolveLicenseValidationListFilter(url.searchParams.get("status"));
+    const paymentStatusFilter = resolveLicenseValidationPaymentListFilter(
+      url.searchParams.get("paymentStatus")
+    );
     const rawLimit = Number.parseInt(url.searchParams.get("limit") ?? "", 10);
     const pageSize = Number.isFinite(rawLimit)
       ? Math.min(Math.max(rawLimit, 1), LICENSE_VALIDATION_PAGE_SIZE_MAX)
@@ -29,6 +33,7 @@ export async function GET(req: Request) {
     const db = getFirestoreAdmin();
     const page = await listLicenseValidations(db, {
       statusFilter,
+      paymentStatusFilter,
       pageSize,
       cursor,
       searchQuery,
