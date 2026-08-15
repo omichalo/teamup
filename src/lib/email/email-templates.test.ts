@@ -3,6 +3,10 @@ import { buildVerificationEmail } from "@/lib/email/auth-emails";
 import { buildPasswordResetEmail } from "@/lib/email/auth-emails";
 import { buildSqyPingEmailLayout } from "@/lib/email/layout";
 import { buildPaymentRequestEmail, buildPaymentRequestEmailSubject } from "@/lib/email/payment-email";
+import {
+  buildRemainingBalancePaymentEmail,
+  buildRemainingBalancePaymentEmailSubject,
+} from "@/lib/email/remaining-balance-payment-email";
 import { adaptEmailHtmlForFilePreview } from "@/lib/email/preview";
 import { buildPaymentConfirmedEmail } from "@/lib/email/payment-confirmed-email";
 import { buildPaymentInstructionsEmail } from "@/lib/email/payment-instructions-email";
@@ -314,5 +318,32 @@ describe("buildPaymentRequestEmail", () => {
     expect(html).toContain("Pass Sport");
     expect(html).toContain("354,00");
     expect(html).not.toMatch(/Total à régler[\s\S]*374,00/);
+  });
+});
+
+describe("buildRemainingBalancePaymentEmail", () => {
+  it("pointe vers le lien Stripe du solde", () => {
+    const checkoutUrl = "https://checkout.stripe.com/c/pay/cs_test_remaining";
+    const { html, text } = buildRemainingBalancePaymentEmail({
+      adherentName: "Lucille Mougeotte",
+      remainingAmountCents: 20_200,
+      paidAmountCents: 500,
+      amountToPayCents: 20_700,
+      checkoutUrl,
+      appOrigin: APP_ORIGIN,
+      originalPaymentMethod: "holiday_vouchers",
+    });
+
+    expect(buildRemainingBalancePaymentEmailSubject("Lucille Mougeotte")).toContain(
+      "Solde"
+    );
+    expect(html).toContain(checkoutUrl);
+    expect(html).toContain("202,00");
+    expect(html).toContain("5,00");
+    expect(html).toContain("Chèques vacances");
+    expect(html).toContain(BNPL_COPY_TEST_MARKER);
+    expect(html).toContain("24 heures");
+    expect(text).toContain(checkoutUrl);
+    expect(text).toContain("Solde à régler : 202,00");
   });
 });

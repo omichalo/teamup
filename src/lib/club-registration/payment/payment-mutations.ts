@@ -110,6 +110,27 @@ export function cancelExpectedPayment(
   return recalculateRegistrationPayment({ ...payment, expectedPayments });
 }
 
+/** Annule toutes les échéances encore « expected » (ex. solde réglé par lien CB). */
+export function cancelAllPendingExpectedPayments(
+  payment: RegistrationPayment,
+  note?: string
+): RegistrationPayment {
+  const trimmedNote = note?.trim();
+  const hasPending = payment.expectedPayments.some((line) => line.status === "expected");
+  if (!hasPending) {
+    return payment;
+  }
+
+  const expectedPayments = payment.expectedPayments.map((line) => {
+    if (line.status !== "expected") return line;
+    const cancelled: ExpectedPayment = { ...line, status: "cancelled" };
+    if (trimmedNote) cancelled.note = trimmedNote;
+    return cancelled;
+  });
+
+  return recalculateRegistrationPayment({ ...payment, expectedPayments });
+}
+
 export function addManualReceivedPayment(
   payment: RegistrationPayment,
   input: {

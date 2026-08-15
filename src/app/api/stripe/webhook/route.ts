@@ -11,9 +11,10 @@ import {
   paymentToFirestoreUpdate,
 } from "@/lib/club-registration/payment/normalize-payment";
 import {
-  addManualReceivedPayment,
-  markPaymentFullyPaid,
-} from "@/lib/club-registration/payment/payment-mutations";
+  applyStripeCheckoutPaymentToRegistration,
+  isRemainingBalanceCheckoutSession,
+  resolveStripeCheckoutPaidAmountCents,
+} from "@/lib/club-registration/payment/apply-stripe-checkout-payment";
 
 type StripeWebhookEvent = {
   id: string;
@@ -31,20 +32,6 @@ type StripeWebhookEvent = {
 };
 
 const STRIPE_PAID_CHECKOUT_STATUSES = new Set(["paid", "no_payment_required"]);
-
-function resolveStripeCheckoutPaidAmountCents(
-  session: NonNullable<StripeWebhookEvent["data"]>["object"],
-  existing: Record<string, unknown>,
-  basePaymentAmountToPayCents: number | null
-): number {
-  if (typeof session?.amount_total === "number" && session.amount_total > 0) {
-    return session.amount_total;
-  }
-  if (typeof existing.paymentAmountCents === "number" && existing.paymentAmountCents > 0) {
-    return existing.paymentAmountCents;
-  }
-  return basePaymentAmountToPayCents ?? 0;
-}
 
 export async function POST(req: Request) {
   try {
@@ -83,40 +70,53 @@ export async function POST(req: Request) {
       return jsonNoStore({ received: true, duplicate: true }, { status: 200 });
     }
 
+    const remainingBalance = isRemainingBalanceCheckoutSession(session);
     const basePayment = normalizeRegistrationPayment(existing);
-    const amountCents = resolveStripeCheckoutPaidAmountCents(
+    const amountCents = resolveStripeCheckoutPaidAmountCents({
       session,
-      existing,
-      basePayment?.amountToPayCents ?? null
-    );
+      fallbackPaymentAmountCents:
+        typeof existing.paymentAmountCents === "number"
+          ? existing.paymentAmountCents
+          : null,
+      fallbackAmountToPayCents: basePayment?.amountToPayCents ?? null,
+      remainingBalance,
+    });
 
     let payment = basePayment;
+    let fullyPaid = !remainingBalance;
     if (payment) {
-      if (amountCents > 0) {
-        payment = addManualReceivedPayment(payment, {
-          method: "card",
-          label: "Paiement Stripe",
-          amountCents,
-          receivedAt: new Date().toISOString(),
-          recordedBy: "stripe",
-          ...(session?.id ? { note: `Checkout ${session.id}` } : {}),
-        });
-      }
-      payment = markPaymentFullyPaid(payment, {
-        recordedBy: "stripe",
-        ...(session?.id ? { note: `Checkout ${session.id}` } : {}),
+      const applied = applyStripeCheckoutPaymentToRegistration({
+        payment,
+        amountCents,
+        ...(session?.id ? { sessionId: session.id } : {}),
+        remainingBalance,
       });
+      payment = applied.payment;
+      fullyPaid = applied.fullyPaid;
+    } else if (!remainingBalance) {
+      fullyPaid = true;
+    } else {
+      fullyPaid = false;
     }
 
     await docRef.set(
       {
-        status: "paid",
+        ...(fullyPaid
+          ? {
+              status: "paid",
+              paidAt: FieldValue.serverTimestamp(),
+            }
+          : {}),
         stripeCheckoutSessionId: session?.id ?? null,
         stripeInvoiceId: session?.invoice ?? null,
         stripePaymentUrl: null,
-        paidAt: FieldValue.serverTimestamp(),
+        stripeCheckoutUrl: null,
         updatedAt: FieldValue.serverTimestamp(),
-        ...(payment ? paymentToFirestoreUpdate(payment) : { paymentStatus: "paid" }),
+        ...(payment
+          ? paymentToFirestoreUpdate(payment)
+          : fullyPaid
+            ? { paymentStatus: "paid" }
+            : {}),
       },
       { merge: true }
     );
@@ -127,13 +127,17 @@ export async function POST(req: Request) {
       details: {
         eventId: event.id,
         checkoutSessionId: session?.id,
+        checkoutKind: session?.metadata?.checkoutKind ?? "full",
+        remainingBalance,
+        fullyPaid,
+        amountCents,
         donationCents: session?.metadata?.donationCents,
         donationDiscountCents: session?.metadata?.donationDiscountCents,
       },
       success: true,
     });
 
-    if (amountCents > 0) {
+    if (fullyPaid && amountCents > 0) {
       try {
         await dispatchPaymentConfirmedEmail({
           registrationId,
@@ -149,7 +153,7 @@ export async function POST(req: Request) {
       }
     }
 
-    return jsonNoStore({ received: true }, { status: 200 });
+    return jsonNoStore({ received: true, fullyPaid }, { status: 200 });
   } catch (error) {
     console.error("[api/stripe/webhook]", error);
     return jsonNoStore({ error: "Webhook Stripe impossible à traiter" }, { status: 500 });
