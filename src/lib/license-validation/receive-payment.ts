@@ -11,13 +11,15 @@ import {
   normalizeRegistrationPayment,
   paymentToFirestoreUpdate,
 } from "@/lib/club-registration/payment/normalize-payment";
-import type { ReceivedPaymentMethodId } from "@/lib/club-registration/payment-constants";
+import {
+  RECEIVED_PAYMENT_METHOD_IDS,
+  RECEIVED_PAYMENT_METHOD_LABELS,
+  type ReceivedPaymentMethodId,
+} from "@/lib/club-registration/payment-constants";
 import { normalizePaymentReference } from "@/lib/club-registration/payment/payment-reference";
+import { wouldCreateOverpayment } from "@/lib/club-registration/payment/overpayment";
 
-const ALLOWED_METHODS = new Set<ReceivedPaymentMethodId>([
-  "cheque",
-  "holiday_vouchers",
-]);
+const ALLOWED_METHODS = new Set<ReceivedPaymentMethodId>(RECEIVED_PAYMENT_METHOD_IDS);
 
 export type ReceiveLicenseValidationPaymentInput = {
   mode?: "expected" | "manual";
@@ -28,15 +30,19 @@ export type ReceiveLicenseValidationPaymentInput = {
   receivedAt?: string;
   note?: string;
   reference?: string;
+  /** Requis si le montant dépasse le reste dû (trop-perçu). */
+  confirmOverpayment?: boolean;
 };
 
 export type ReceiveLicenseValidationPaymentResult =
   | { ok: true }
-  | { ok: false; status: number; error: string };
+  | { ok: false; status: number; error: string; code?: string };
 
 function isAllowedMethod(method: string): method is ReceivedPaymentMethodId {
   return ALLOWED_METHODS.has(method as ReceivedPaymentMethodId);
 }
+
+export { wouldCreateOverpayment };
 
 export async function receiveLicenseValidationPayment(
   db: Firestore,
@@ -71,6 +77,17 @@ export async function receiveLicenseValidationPayment(
     if (!Number.isInteger(body.amountCents) || (body.amountCents as number) <= 0) {
       return { ok: false, status: 400, error: "Montant invalide" };
     }
+    if (
+      wouldCreateOverpayment(payment.remainingAmountCents, body.amountCents as number) &&
+      body.confirmOverpayment !== true
+    ) {
+      return {
+        ok: false,
+        status: 400,
+        error: "Ce montant dépasse le reste dû. Confirmez le trop-perçu.",
+        code: "OVERPAYMENT_CONFIRMATION_REQUIRED",
+      };
+    }
     nextPayment = markExpectedPaymentReceived(payment, body.expectedId, {
       amountCents: body.amountCents as number,
       receivedAt,
@@ -85,15 +102,28 @@ export async function receiveLicenseValidationPayment(
       return {
         ok: false,
         status: 400,
-        error: "Seuls les chèques et chèques vacances sont autorisés",
+        error: "Moyen de paiement invalide",
       };
     }
     if (!Number.isInteger(body.amountCents) || (body.amountCents as number) <= 0) {
       return { ok: false, status: 400, error: "Montant invalide" };
     }
+    if (
+      wouldCreateOverpayment(payment.remainingAmountCents, body.amountCents as number) &&
+      body.confirmOverpayment !== true
+    ) {
+      return {
+        ok: false,
+        status: 400,
+        error: "Ce montant dépasse le reste dû. Confirmez le trop-perçu.",
+        code: "OVERPAYMENT_CONFIRMATION_REQUIRED",
+      };
+    }
     nextPayment = addManualReceivedPayment(payment, {
       method: body.method,
-      label: body.label ?? "",
+      label:
+        (typeof body.label === "string" && body.label.trim()) ||
+        RECEIVED_PAYMENT_METHOD_LABELS[body.method],
       amountCents: body.amountCents as number,
       receivedAt,
       recordedBy: actorUid,
@@ -119,7 +149,14 @@ export async function receiveLicenseValidationPayment(
   logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_PAYMENT_CONFIRMED, actorUid, {
     resource: "clubRegistration",
     resourceId: registrationId,
-    details: { scope: "license_validation_payment" },
+    details: {
+      scope: "license_validation_payment",
+      mode: body.mode ?? "manual",
+      overpayment: wouldCreateOverpayment(
+        payment.remainingAmountCents,
+        body.amountCents as number
+      ),
+    },
     success: true,
   });
 
@@ -136,10 +173,14 @@ export async function receiveLicenseValidationPaymentFromRequest(
     return jsonNoStore({ error: "Invalid origin" }, { status: 403 });
   }
 
-  const body = ((await req.json().catch(() => ({}))) ?? {}) as ReceiveLicenseValidationPaymentInput;
+  const body = ((await req.json().catch(() => ({}))) ??
+    {}) as ReceiveLicenseValidationPaymentInput;
   const result = await receiveLicenseValidationPayment(db, registrationId, actorUid, body);
   if (!result.ok) {
-    return jsonNoStore({ error: result.error }, { status: result.status });
+    return jsonNoStore(
+      { error: result.error, ...(result.code ? { code: result.code } : {}) },
+      { status: result.status }
+    );
   }
   return jsonNoStore({ success: true });
 }
