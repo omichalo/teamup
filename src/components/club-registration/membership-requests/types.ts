@@ -1,5 +1,9 @@
 import type { MedicalCertificateStatus } from "@/lib/club-registration/medical-certificate";
 import type {
+  PpsFollowUpEvent,
+  PpsFollowUpStatus,
+} from "@/lib/club-registration/pps-follow-up";
+import type {
   MedicalQuestionnairePayload,
   MedicalVeteranPathPayload,
   Representative,
@@ -29,6 +33,7 @@ export type RegistrationSummary = {
   mainSectionId?: string;
   medicalCertificateDeclaration?: string;
   medicalCertificateStatus?: MedicalCertificateStatus;
+  ppsFollowUpStatus?: PpsFollowUpStatus;
   status?: string;
   paymentAmountCents?: number;
   voluntaryDonationCents?: number;
@@ -70,6 +75,9 @@ export type RegistrationDetail = RegistrationSummary & {
   medicalVeteranPath?: MedicalVeteranPathPayload;
   medicalCertificateStatusUpdatedAt?: string | null;
   medicalCertificateStatusUpdatedBy?: string;
+  ppsFollowUpUpdatedAt?: string | null;
+  ppsFollowUpUpdatedBy?: string;
+  ppsFollowUpEvents?: PpsFollowUpEvent[];
   wantsRegistrationCertificate?: boolean;
   familyRegistrationOrder?: string;
   reductionTypes?: string[];

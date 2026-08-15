@@ -41,6 +41,8 @@ export function MembershipRequestsClient() {
     setStatusFilter,
     medicalCertificateFilter,
     setMedicalCertificateFilter,
+    ppsFollowUpFilter,
+    setPpsFollowUpFilter,
     searchInput,
     setSearchInput,
     registrations,
@@ -50,9 +52,11 @@ export function MembershipRequestsClient() {
     error: listError,
     reload,
     loadMore,
+    patchRegistration,
   } = useManagedRegistrations({
     statusFilter: initialUrlState.statusFilter,
     medicalCertificateFilter: initialUrlState.medicalCertificateFilter,
+    ppsFollowUpFilter: initialUrlState.ppsFollowUpFilter,
   });
   const [selectedId, setSelectedId] = useState<string | null>(initialUrlState.selectedId);
   const [mobileListVisible, setMobileListVisible] = useState(true);
@@ -102,9 +106,10 @@ export function MembershipRequestsClient() {
     syncToUrl({
       statusFilter,
       medicalCertificateFilter,
+      ppsFollowUpFilter,
       selectedId,
     });
-  }, [medicalCertificateFilter, selectedId, statusFilter, syncToUrl]);
+  }, [medicalCertificateFilter, ppsFollowUpFilter, selectedId, statusFilter, syncToUrl]);
 
   useEffect(() => {
     if (registrations.length === 0) {
@@ -175,6 +180,8 @@ export function MembershipRequestsClient() {
       onStatusFilterChange={setStatusFilter}
       medicalCertificateFilter={medicalCertificateFilter}
       onMedicalCertificateFilterChange={setMedicalCertificateFilter}
+      ppsFollowUpFilter={ppsFollowUpFilter}
+      onPpsFollowUpFilterChange={setPpsFollowUpFilter}
       searchInput={searchInput}
       onSearchInputChange={setSearchInput}
       pageInfo={pageInfo}
@@ -202,6 +209,9 @@ export function MembershipRequestsClient() {
       registrationId={selectedId}
       statusSummary={selectedSummary}
       onListReload={handleListReloadWithSummary}
+      onPpsFollowUpPatched={(id, next) => {
+        patchRegistration(id, { ppsFollowUpStatus: next.status });
+      }}
       showAlerts
       queuePosition={position}
       queueTotal={total}

@@ -5,6 +5,7 @@ export const SPREADSHEET_USER_UID_FIELDS = [
   "submitterUid",
   "paymentRequestedBy",
   "medicalCertificateStatusUpdatedBy",
+  "ppsFollowUpUpdatedBy",
 ] as const;
 
 export type SpreadsheetUserLabelRecord = {

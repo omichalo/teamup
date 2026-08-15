@@ -28,12 +28,13 @@ export function formatSexLabel(sex: string | null | undefined): string {
   return SEX_LABELS[sex] ?? sex;
 }
 
-/** Synthèse secrétariat : OK / PPS attendu / certificat attendu ou reçu. */
+/** Synthèse secrétariat : OK / PPS attendu|non fait / certificat attendu ou reçu. */
 export function formatMedicalCertificateLabel(
   status: string | null,
-  declaration?: string | null
+  declaration?: string | null,
+  ppsFollowUpStatus?: string | null
 ): string {
-  return formatMedicalFollowUpLabel(declaration, status);
+  return formatMedicalFollowUpLabel(declaration, status, ppsFollowUpStatus);
 }
 
 export function formatAttestationLabel(wantsRegistrationCertificate: boolean): string {

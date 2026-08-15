@@ -3,6 +3,10 @@ import {
   normalizeMedicalCertificateStatus,
 } from "@/lib/club-registration/medical-certificate";
 import {
+  readPpsFollowUpState,
+  type PpsFollowUpState,
+} from "@/lib/club-registration/pps-follow-up";
+import {
   resolveRegistrationPaymentStatus,
 } from "@/lib/club-registration/resolve-registration-payment-status";
 import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
@@ -56,6 +60,7 @@ export type LicenseValidationDetail = LicenseValidationListItem & {
   medicalCertificateDeclaration: string | null;
   medicalCertificateStatus: string | null;
   medicalQuestionnaire: Record<string, unknown> | null;
+  ppsFollowUp: PpsFollowUpState;
   wantsRegistrationCertificate: boolean;
   payment: RegistrationPayment | null;
   contactEmails: RegistrationDisplayContactEmail[];
@@ -125,6 +130,7 @@ export function mapRegistrationToLicenseValidationDetail(
       data.medicalQuestionnaire !== null
         ? (data.medicalQuestionnaire as Record<string, unknown>)
         : null,
+    ppsFollowUp: readPpsFollowUpState(data, medicalCertificateDeclaration),
     wantsRegistrationCertificate: readBoolean(data, "wantsRegistrationCertificate"),
     payment: normalizeRegistrationPayment(data),
     contactEmails: resolveRegistrationDisplayContactEmails(data),

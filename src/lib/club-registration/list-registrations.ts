@@ -5,6 +5,11 @@ import {
   summaryMedicalCertificateStatus,
   type ManagedListMedicalCertificateFilter,
 } from "@/lib/club-registration/medical-certificate";
+import {
+  matchesPpsFollowUpFilter,
+  normalizePpsFollowUpStatus,
+  type ManagedListPpsFollowUpFilter,
+} from "@/lib/club-registration/pps-follow-up";
 import { hasPaymentProofAvailable } from "@/lib/club-registration/payment-proof";
 import {
   ACTIONABLE_REGISTRATION_STATUSES,
@@ -24,6 +29,7 @@ export const LIST_FIELDS = [
   "adherentEmail",
   "medicalCertificateDeclaration",
   "medicalCertificateStatus",
+  "ppsFollowUpStatus",
   "status",
   "submitterUid",
   "submitterAccountEmail",
@@ -59,6 +65,12 @@ export function mapRegistrationDocToSummary(
   summary.medicalCertificateStatus = normalizeMedicalCertificateStatus(
     data.medicalCertificateStatus,
     data.medicalCertificateDeclaration
+  );
+  summary.ppsFollowUpStatus = normalizePpsFollowUpStatus(
+    data.ppsFollowUpStatus,
+    typeof data.medicalCertificateDeclaration === "string"
+      ? data.medicalCertificateDeclaration
+      : undefined
   );
   const submittedAtMs: number = data.submittedAt?.toMillis?.() ?? 0;
   summary.submittedAt = data.submittedAt?.toDate?.()?.toISOString?.() ?? null;
@@ -217,6 +229,7 @@ export type ManagedRegistrationsPage = {
 export type ListManagedRegistrationsParams = {
   statusFilter: ManagedListStatusFilter;
   medicalCertificateFilter?: ManagedListMedicalCertificateFilter;
+  ppsFollowUpFilter?: ManagedListPpsFollowUpFilter;
   pageSize: number;
   cursor?: string | null;
   searchQuery?: string | null;
@@ -225,7 +238,8 @@ export type ListManagedRegistrationsParams = {
 function needsClientSideFiltering(params: ListManagedRegistrationsParams): boolean {
   const searchQuery = params.searchQuery?.trim() ?? "";
   const medicalFilter = params.medicalCertificateFilter ?? "all";
-  return searchQuery.length >= 2 || medicalFilter !== "all";
+  const ppsFilter = params.ppsFollowUpFilter ?? "all";
+  return searchQuery.length >= 2 || medicalFilter !== "all" || ppsFilter !== "all";
 }
 
 function filterManagedSummaries(
@@ -233,12 +247,23 @@ function filterManagedSummaries(
   params: ListManagedRegistrationsParams & { searchQuery: string }
 ): RegistrationListSummary[] {
   const medicalFilter = params.medicalCertificateFilter ?? "all";
-  return summaries.filter(
-    (summary) =>
+  const ppsFilter = params.ppsFollowUpFilter ?? "all";
+  return summaries.filter((summary) => {
+    const declaration =
+      typeof summary.medicalCertificateDeclaration === "string"
+        ? summary.medicalCertificateDeclaration
+        : undefined;
+    const ppsStatus = normalizePpsFollowUpStatus(
+      summary.ppsFollowUpStatus,
+      declaration
+    );
+    return (
       matchesManagedStatusFilter(summary, params.statusFilter) &&
       matchesMedicalCertificateFilter(summary, medicalFilter) &&
+      matchesPpsFollowUpFilter(ppsStatus, ppsFilter) &&
       registrationMatchesSearch(summary, params.searchQuery)
-  );
+    );
+  });
 }
 
 export async function listManagedRegistrations(

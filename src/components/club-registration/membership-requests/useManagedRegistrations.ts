@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ManagedListMedicalCertificateFilter } from "@/lib/club-registration/medical-certificate";
+import type { ManagedListPpsFollowUpFilter } from "@/lib/club-registration/pps-follow-up";
 import type { ManagedListUrlState } from "@/lib/club-registration/managed-list-url-state";
 import type { ManagedListStatusFilter } from "@/lib/club-registration/registration-status";
 import type { RegistrationSummary } from "./types";
@@ -22,6 +23,7 @@ type ManagedRegistrationsResponse = {
 function buildManagedRegistrationsUrl(params: {
   statusFilter: ManagedListStatusFilter;
   medicalCertificateFilter: ManagedListMedicalCertificateFilter;
+  ppsFollowUpFilter: ManagedListPpsFollowUpFilter;
   searchQuery: string;
   cursor?: string | null | undefined;
 }): string {
@@ -30,6 +32,9 @@ function buildManagedRegistrationsUrl(params: {
   url.searchParams.set("status", params.statusFilter);
   if (params.medicalCertificateFilter !== "all") {
     url.searchParams.set("medicalCertificate", params.medicalCertificateFilter);
+  }
+  if (params.ppsFollowUpFilter !== "all") {
+    url.searchParams.set("ppsFollowUp", params.ppsFollowUpFilter);
   }
   if (params.searchQuery.trim().length >= 2) {
     url.searchParams.set("q", params.searchQuery.trim());
@@ -40,14 +45,21 @@ function buildManagedRegistrationsUrl(params: {
   return url.pathname + url.search;
 }
 
-type InitialState = Pick<ManagedListUrlState, "statusFilter" | "medicalCertificateFilter">;
+type InitialState = Pick<
+  ManagedListUrlState,
+  "statusFilter" | "medicalCertificateFilter" | "ppsFollowUpFilter"
+>;
 
 export function useManagedRegistrations(initial?: InitialState) {
   const [statusFilter, setStatusFilter] = useState<ManagedListStatusFilter>(
     initial?.statusFilter ?? "actionable"
   );
   const [medicalCertificateFilter, setMedicalCertificateFilter] =
-    useState<ManagedListMedicalCertificateFilter>(initial?.medicalCertificateFilter ?? "all");
+    useState<ManagedListMedicalCertificateFilter>(
+      initial?.medicalCertificateFilter ?? "all"
+    );
+  const [ppsFollowUpFilter, setPpsFollowUpFilter] =
+    useState<ManagedListPpsFollowUpFilter>(initial?.ppsFollowUpFilter ?? "all");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [registrations, setRegistrations] = useState<RegistrationSummary[]>([]);
@@ -76,6 +88,7 @@ export function useManagedRegistrations(initial?: InitialState) {
       cursor?: string | null;
       status: ManagedListStatusFilter;
       medical: ManagedListMedicalCertificateFilter;
+      pps: ManagedListPpsFollowUpFilter;
       query: string;
     }) => {
       const requestId = ++requestIdRef.current;
@@ -91,6 +104,7 @@ export function useManagedRegistrations(initial?: InitialState) {
           buildManagedRegistrationsUrl({
             statusFilter: options.status,
             medicalCertificateFilter: options.medical,
+            ppsFollowUpFilter: options.pps,
             searchQuery: options.query,
             cursor: options.cursor,
           }),
@@ -141,18 +155,20 @@ export function useManagedRegistrations(initial?: InitialState) {
       append: false,
       status: statusFilter,
       medical: medicalCertificateFilter,
+      pps: ppsFollowUpFilter,
       query: searchQuery,
     });
-  }, [fetchPage, medicalCertificateFilter, searchQuery, statusFilter]);
+  }, [fetchPage, medicalCertificateFilter, ppsFollowUpFilter, searchQuery, statusFilter]);
 
   useEffect(() => {
     void fetchPage({
       append: false,
       status: statusFilter,
       medical: medicalCertificateFilter,
+      pps: ppsFollowUpFilter,
       query: searchQuery,
     });
-  }, [fetchPage, medicalCertificateFilter, searchQuery, statusFilter]);
+  }, [fetchPage, medicalCertificateFilter, ppsFollowUpFilter, searchQuery, statusFilter]);
 
   const loadMore = useCallback(async () => {
     if (!pageInfo.hasNextPage || !pageInfo.nextCursor || loadingMore || loadingList) {
@@ -163,6 +179,7 @@ export function useManagedRegistrations(initial?: InitialState) {
       cursor: pageInfo.nextCursor,
       status: statusFilter,
       medical: medicalCertificateFilter,
+      pps: ppsFollowUpFilter,
       query: searchQuery,
     });
   }, [
@@ -172,15 +189,29 @@ export function useManagedRegistrations(initial?: InitialState) {
     medicalCertificateFilter,
     pageInfo.hasNextPage,
     pageInfo.nextCursor,
+    ppsFollowUpFilter,
     searchQuery,
     statusFilter,
   ]);
+
+  const patchRegistration = useCallback(
+    (id: string, patch: Partial<RegistrationSummary>) => {
+      setRegistrations((current) =>
+        current.map((registration) =>
+          registration.id === id ? { ...registration, ...patch } : registration
+        )
+      );
+    },
+    []
+  );
 
   return {
     statusFilter,
     setStatusFilter,
     medicalCertificateFilter,
     setMedicalCertificateFilter,
+    ppsFollowUpFilter,
+    setPpsFollowUpFilter,
     searchInput,
     setSearchInput,
     searchQuery,
@@ -192,5 +223,6 @@ export function useManagedRegistrations(initial?: InitialState) {
     setError,
     reload,
     loadMore,
+    patchRegistration,
   };
 }

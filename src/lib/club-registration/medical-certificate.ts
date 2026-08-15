@@ -129,12 +129,14 @@ export function matchesMedicalCertificateFilter(
 export type MedicalFollowUpKind =
   | "ok"
   | "pps_expected"
+  | "pps_checked_incomplete"
   | "certificate_expected"
   | "certificate_received";
 
 export const MEDICAL_FOLLOW_UP_LABELS: Record<MedicalFollowUpKind, string> = {
   ok: "OK",
   pps_expected: "PPS attendu",
+  pps_checked_incomplete: "PPS non fait",
   certificate_expected: "Certificat médical attendu",
   certificate_received: "Certificat médical reçu",
 };
@@ -161,16 +163,29 @@ function resolveCertificateFollowUpKind(
   return "certificate_expected";
 }
 
+function resolvePpsFollowUpKind(
+  ppsFollowUpStatus: string | null | undefined
+): MedicalFollowUpKind {
+  if (ppsFollowUpStatus === "ok") {
+    return "ok";
+  }
+  if (ppsFollowUpStatus === "checked_incomplete") {
+    return "pps_checked_incomplete";
+  }
+  return "pps_expected";
+}
+
 export function resolveMedicalFollowUpKind(
   declaration: string | null | undefined,
-  status: string | null | undefined
+  status: string | null | undefined,
+  ppsFollowUpStatus?: string | null
 ): MedicalFollowUpKind | null {
-  if (!declaration && !status) {
+  if (!declaration && !status && !ppsFollowUpStatus) {
     return null;
   }
 
   if (declaration && PPS_EQUIVALENT_DECLARATIONS.has(declaration)) {
-    return "pps_expected";
+    return resolvePpsFollowUpKind(ppsFollowUpStatus);
   }
 
   if (declaration && OK_WITHOUT_FOLLOW_UP_DECLARATIONS.has(declaration)) {
@@ -196,8 +211,9 @@ export function resolveMedicalFollowUpKind(
 
 export function formatMedicalFollowUpLabel(
   declaration: string | null | undefined,
-  status: string | null | undefined
+  status: string | null | undefined,
+  ppsFollowUpStatus?: string | null
 ): string {
-  const kind = resolveMedicalFollowUpKind(declaration, status);
+  const kind = resolveMedicalFollowUpKind(declaration, status, ppsFollowUpStatus);
   return kind ? MEDICAL_FOLLOW_UP_LABELS[kind] : "—";
 }

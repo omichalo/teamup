@@ -34,6 +34,7 @@ import {
 } from "@/components/license-validation/license-validation-labels";
 import { LicenseValidationLineSecondaryText } from "@/components/license-validation/LicenseValidationLineSecondaryText";
 import { useLicenseValidationDetail } from "@/components/license-validation/useLicenseValidationDetail";
+import { PpsFollowUpPanel } from "@/components/club-registration/PpsFollowUpPanel";
 
 type Props = {
   registrationId: string | null;
@@ -57,7 +58,7 @@ export function LicenseValidationLicenseDetailPanel({
   registrationId,
   onSaved,
 }: Props) {
-  const { detail, loading, error, reload } = useLicenseValidationDetail(registrationId);
+  const { detail, loading, error, reload, setDetail } = useLicenseValidationDetail(registrationId);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [ffttLicense, setFfttLicense] = useState("");
@@ -210,7 +211,8 @@ export function LicenseValidationLicenseDetailPanel({
       label: "Suivi médical",
       value: formatMedicalCertificateLabel(
         detail.medicalCertificateStatus,
-        detail.medicalCertificateDeclaration
+        detail.medicalCertificateDeclaration,
+        detail.ppsFollowUp.status
       ),
     },
     {
@@ -275,6 +277,19 @@ export function LicenseValidationLicenseDetailPanel({
           {saving ? "Enregistrement…" : "Enregistrer la licence"}
         </Button>
       </Stack>
+
+      {registrationId ? (
+        <PpsFollowUpPanel
+          registrationId={registrationId}
+          medicalCertificateDeclaration={detail.medicalCertificateDeclaration}
+          ppsFollowUp={detail.ppsFollowUp}
+          onUpdated={(next) => {
+            setDetail((current) =>
+              current ? { ...current, ppsFollowUp: next } : current
+            );
+          }}
+        />
+      ) : null}
 
       <Divider />
 

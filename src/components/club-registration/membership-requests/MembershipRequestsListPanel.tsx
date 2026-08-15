@@ -29,9 +29,15 @@ import {
   type ManagedListMedicalCertificateFilter,
   type MedicalCertificateStatus,
 } from "@/lib/club-registration/medical-certificate";
+import {
+  PPS_FOLLOW_UP_STATUS_LABELS,
+  type ManagedListPpsFollowUpFilter,
+  type PpsFollowUpStatus,
+} from "@/lib/club-registration/pps-follow-up";
 import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
 import { PaymentSummaryCard } from "../secretariat/PaymentSummaryCard";
 import { ManagedListMedicalCertificateChips } from "./ManagedListMedicalCertificateChips";
+import { ManagedListPpsFollowUpChips } from "./ManagedListPpsFollowUpChips";
 import { ManagedListSavedViewsBar } from "./ManagedListSavedViewsBar";
 import { MembershipRequestCardQuickActions } from "./MembershipRequestCardQuickActions";
 import type { ManagedRegistrationsPageInfo } from "./useManagedRegistrations";
@@ -76,6 +82,8 @@ type MembershipRequestsListPanelProps = {
   onStatusFilterChange: (value: ManagedListStatusFilter) => void;
   medicalCertificateFilter: ManagedListMedicalCertificateFilter;
   onMedicalCertificateFilterChange: (value: ManagedListMedicalCertificateFilter) => void;
+  ppsFollowUpFilter: ManagedListPpsFollowUpFilter;
+  onPpsFollowUpFilterChange: (value: ManagedListPpsFollowUpFilter) => void;
   searchInput: string;
   onSearchInputChange: (value: string) => void;
   pageInfo: ManagedRegistrationsPageInfo;
@@ -98,6 +106,8 @@ export function MembershipRequestsListPanel({
   onStatusFilterChange,
   medicalCertificateFilter,
   onMedicalCertificateFilterChange,
+  ppsFollowUpFilter,
+  onPpsFollowUpFilterChange,
   searchInput,
   onSearchInputChange,
   pageInfo,
@@ -113,8 +123,10 @@ export function MembershipRequestsListPanel({
 }: MembershipRequestsListPanelProps) {
   const searchActive = searchInput.trim().length >= 2;
   const medicalFilterActive = medicalCertificateFilter !== "all";
+  const ppsFilterActive = ppsFollowUpFilter !== "all";
   const showResultCount =
-    searchActive || (medicalFilterActive && pageInfo.totalMatched != null);
+    searchActive ||
+    ((medicalFilterActive || ppsFilterActive) && pageInfo.totalMatched != null);
   const hasActiveSelection = selectedId != null;
   const activeTabIndex = MANAGED_LIST_STATUS_FILTER_OPTIONS.findIndex(
     (option) => option.value === statusFilter
@@ -174,6 +186,10 @@ export function MembershipRequestsListPanel({
         value={medicalCertificateFilter}
         onChange={onMedicalCertificateFilterChange}
       />
+      <ManagedListPpsFollowUpChips
+        value={ppsFollowUpFilter}
+        onChange={onPpsFollowUpFilterChange}
+      />
 
       <Tabs
         value={activeTabIndex >= 0 ? activeTabIndex : 0}
@@ -210,7 +226,7 @@ export function MembershipRequestsListPanel({
         </Box>
       ) : registrations.length === 0 ? (
         <Alert severity="info">
-          {searchActive || medicalFilterActive
+          {searchActive || medicalFilterActive || ppsFilterActive
             ? "Aucun dossier ne correspond à vos critères."
             : "Aucune demande dans cette catégorie pour le moment."}
         </Alert>
@@ -286,6 +302,25 @@ export function MembershipRequestsListPanel({
                           }
                           color={
                             MEDICAL_CERTIFICATE_STATUS_COLOR[registration.medicalCertificateStatus]
+                          }
+                        />
+                      ) : null}
+                      {registration.ppsFollowUpStatus &&
+                      registration.ppsFollowUpStatus !== "not_applicable" ? (
+                        <Chip
+                          size="small"
+                          variant="outlined"
+                          label={
+                            PPS_FOLLOW_UP_STATUS_LABELS[
+                              registration.ppsFollowUpStatus as PpsFollowUpStatus
+                            ]
+                          }
+                          color={
+                            registration.ppsFollowUpStatus === "ok"
+                              ? "success"
+                              : registration.ppsFollowUpStatus === "checked_incomplete"
+                                ? "warning"
+                                : "default"
                           }
                         />
                       ) : null}

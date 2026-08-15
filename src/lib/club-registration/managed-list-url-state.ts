@@ -8,6 +8,10 @@ import {
   type ManagedListMedicalCertificateFilter,
 } from "@/lib/club-registration/medical-certificate";
 import {
+  resolveManagedListPpsFollowUpFilter,
+  type ManagedListPpsFollowUpFilter,
+} from "@/lib/club-registration/pps-follow-up";
+import {
   resolveManagedListStatusFilter,
   type ManagedListStatusFilter,
 } from "@/lib/club-registration/registration-status";
@@ -15,18 +19,23 @@ import {
 export type ManagedListUrlState = {
   statusFilter: ManagedListStatusFilter;
   medicalCertificateFilter: ManagedListMedicalCertificateFilter;
+  ppsFollowUpFilter: ManagedListPpsFollowUpFilter;
   selectedId: string | null;
 };
 
 export function parseManagedListUrlState(
   searchParams: Pick<URLSearchParams, "get">
 ): ManagedListUrlState {
+  const ppsFollowUpFilter = resolveManagedListPpsFollowUpFilter(
+    searchParams.get("pps")
+  );
   const savedViewId = resolveManagedListSavedViewId(searchParams.get("vue"));
   if (savedViewId) {
     const filters = getManagedListFiltersForSavedView(savedViewId);
     return {
       statusFilter: filters.statusFilter,
       medicalCertificateFilter: filters.medicalCertificateFilter,
+      ppsFollowUpFilter,
       selectedId: searchParams.get("id"),
     };
   }
@@ -39,6 +48,7 @@ export function parseManagedListUrlState(
   return {
     statusFilter,
     medicalCertificateFilter,
+    ppsFollowUpFilter,
     selectedId: searchParams.get("id"),
   };
 }
@@ -54,6 +64,7 @@ export function normalizeManagedListUrlState(input: ManagedListUrlState): Manage
     return {
       statusFilter: filters.statusFilter,
       medicalCertificateFilter: filters.medicalCertificateFilter,
+      ppsFollowUpFilter: input.ppsFollowUpFilter,
       selectedId: input.selectedId,
     };
   }
@@ -61,6 +72,7 @@ export function normalizeManagedListUrlState(input: ManagedListUrlState): Manage
   return {
     statusFilter: input.statusFilter,
     medicalCertificateFilter: input.medicalCertificateFilter,
+    ppsFollowUpFilter: input.ppsFollowUpFilter,
     selectedId: input.selectedId,
   };
 }
@@ -74,7 +86,9 @@ export function managedListUrlStatesEqual(
 
   return (
     normalizedLeft.statusFilter === normalizedRight.statusFilter &&
-    normalizedLeft.medicalCertificateFilter === normalizedRight.medicalCertificateFilter &&
+    normalizedLeft.medicalCertificateFilter ===
+      normalizedRight.medicalCertificateFilter &&
+    normalizedLeft.ppsFollowUpFilter === normalizedRight.ppsFollowUpFilter &&
     (normalizedLeft.selectedId ?? null) === (normalizedRight.selectedId ?? null)
   );
 }
@@ -93,6 +107,10 @@ export function buildManagedListQueryString(input: ManagedListUrlState): string 
     if (input.medicalCertificateFilter !== "all") {
       params.set("certificat", input.medicalCertificateFilter);
     }
+  }
+
+  if (input.ppsFollowUpFilter !== "all") {
+    params.set("pps", input.ppsFollowUpFilter);
   }
 
   if (input.selectedId) {
