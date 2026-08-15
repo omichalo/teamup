@@ -2,6 +2,10 @@ import type { PriceQuote } from "@/lib/pricing/types";
 import { resolveDonationPricing } from "@/lib/pricing/donation-discount";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import { calculatePaymentSummary } from "./calculate-payment-summary";
+import {
+  EXCEPTIONAL_DISCOUNT_AID_LABEL,
+  isExceptionalDiscountAidType,
+} from "./exceptional-discount";
 import { generateExpectedPayments } from "./generate-expected-payments";
 import type { PaymentAid, PaymentDraftFields, RegistrationPayment } from "./types";
 import type { PaymentMethodId } from "../payment-constants";
@@ -15,6 +19,9 @@ export type BuildPaymentFromDraftInput = PaymentDraftFields & {
 };
 
 function findAidLabel(config: RegistrationConfigV1, aidType: string): string {
+  if (isExceptionalDiscountAidType(aidType)) {
+    return EXCEPTIONAL_DISCOUNT_AID_LABEL;
+  }
   const rule = config.aidRules.find((r) => r.id === aidType);
   return rule?.label ?? aidType;
 }

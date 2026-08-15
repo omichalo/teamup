@@ -78,4 +78,36 @@ describe("validateAdminAids", () => {
     expect(issue?.message).toMatch(/50,00/);
     expect(issue?.focusSelector).toBe('[data-field="paymentAid.pass_sport"]');
   });
+
+  it("exige un motif pour une remise exceptionnelle avec montant", () => {
+    const issue = validateAdminAids(
+      {
+        ...baseDraft,
+        paymentAids: [
+          { type: "other", label: "Remise exceptionnelle", amountCents: 2_500 },
+        ],
+      },
+      config
+    );
+    expect(issue?.message).toMatch(/motif/i);
+    expect(issue?.focusSelector).toBe('[data-field="paymentAid.other.note"]');
+  });
+
+  it("accepte une remise exceptionnelle avec montant et motif", () => {
+    const issue = validateAdminAids(
+      {
+        ...baseDraft,
+        paymentAids: [
+          {
+            type: "other",
+            label: "Remise exceptionnelle",
+            amountCents: 2_500,
+            note: "Geste commercial",
+          },
+        ],
+      },
+      config
+    );
+    expect(issue).toBeNull();
+  });
 });

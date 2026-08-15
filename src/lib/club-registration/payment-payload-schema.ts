@@ -6,6 +6,7 @@ import {
   PAYMENT_NOTE_MAX_LENGTH,
   REMAINING_PAYMENT_METHOD_IDS,
 } from "./payment-constants";
+import { EXCEPTIONAL_DISCOUNT_AID_LABEL, isExceptionalDiscountAidType } from "./payment/exceptional-discount";
 
 export const paymentAidPayloadSchema = z.object({
   type: z.string().trim().min(1).max(80),
@@ -89,10 +90,10 @@ export function refinePaymentPayload(
   }
 
   for (const aid of data.paymentAids) {
-    if (aid.type === "other" && aid.amountCents > 0 && !aid.note?.trim()) {
+    if (isExceptionalDiscountAidType(aid.type) && aid.amountCents > 0 && !aid.note?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Indiquez un commentaire pour l'autre aide.",
+        message: `Indiquez un motif pour la ${EXCEPTIONAL_DISCOUNT_AID_LABEL.toLowerCase()}.`,
         path: ["paymentAids"],
       });
     }
