@@ -2,6 +2,10 @@ import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types"
 import { findAidRuleById, getAidRuleFixedAmountCents, getAidRuleMaxAmountCents } from "@/lib/club-registration-config/aid-rules";
 import { buildPricingContext, calculateQuote, formatCentsAsEuros } from "@/lib/pricing";
 import { calculatePaymentSummary } from "@/lib/club-registration/payment/calculate-payment-summary";
+import {
+  EXCEPTIONAL_DISCOUNT_AID_LABEL,
+  findExceptionalDiscountAid,
+} from "@/lib/club-registration/payment/exceptional-discount";
 import { findPaymentAid, normalizePaymentAidList } from "@/lib/club-registration/payment/payment-draft-helpers";
 import type { RegistrationDraft } from "@/components/club-registration/registration-defaults";
 
@@ -86,6 +90,14 @@ export function validateAdminAids(
         focusSelector: `[data-field="paymentAid.${reductionId}"]`,
       };
     }
+  }
+
+  const exceptional = findExceptionalDiscountAid(aids);
+  if (exceptional && exceptional.amountCents > 0 && !exceptional.note?.trim()) {
+    return {
+      message: `Indiquez un motif pour la ${EXCEPTIONAL_DISCOUNT_AID_LABEL.toLowerCase()}.`,
+      focusSelector: '[data-field="paymentAid.other.note"]',
+    };
   }
 
   const totalCents = quoteTotalCents(draft, config);

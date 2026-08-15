@@ -6,8 +6,11 @@ import {
   paymentToFirestoreUpdate,
 } from "@/lib/club-registration/payment/normalize-payment";
 import { normalizePaymentAidList } from "@/lib/club-registration/payment/payment-draft-helpers";
-import { recalculateRegistrationPayment } from "@/lib/club-registration/payment/payment-mutations";
-import type { PaymentAid } from "@/lib/club-registration/payment/types";
+import {
+  recalculateRegistrationPayment,
+  regenerateExpectedPayments,
+} from "@/lib/club-registration/payment/payment-mutations";
+import type { PaymentAid, RegistrationPayment } from "@/lib/club-registration/payment/types";
 import { paymentAidPayloadSchema } from "@/lib/club-registration/payment-payload-schema";
 import { validateAdminAids } from "@/lib/club-registration/validate-admin-aids";
 import { PRICING_CATALOG_VERSION, type FamilyRegistrationOrder, type PriceQuote } from "@/lib/pricing/types";
@@ -141,12 +144,32 @@ export function buildManagerRegistrationAidsPatch(
 
   const payment = normalizeRegistrationPayment(currentData);
   if (payment) {
-    const nextPayment = recalculateRegistrationPayment(
-      { ...payment, aids: mergedAids },
-      { preserveManualFollowUp: true }
-    );
+    const nextPayment = syncPaymentAfterAidsChange(payment, mergedAids);
     Object.assign(patch, paymentToFirestoreUpdate(nextPayment));
   }
 
   return patch;
+}
+
+/**
+ * Recalcule totaux après changement d’aides et régénère les échéances chèque
+ * tant qu’aucune n’a encore été encaissée.
+ */
+export function syncPaymentAfterAidsChange(
+  payment: RegistrationPayment,
+  aids: PaymentAid[]
+): RegistrationPayment {
+  let next = recalculateRegistrationPayment(
+    { ...payment, aids },
+    { preserveManualFollowUp: true }
+  );
+
+  const hasReceivedExpected = next.expectedPayments.some(
+    (line) => line.status === "received"
+  );
+  if (!hasReceivedExpected && (next.paymentMethod === "cheque" || next.paymentMethod === "card")) {
+    next = regenerateExpectedPayments(next);
+  }
+
+  return next;
 }
