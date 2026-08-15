@@ -1,3 +1,4 @@
+import { EXCEPTIONAL_DISCOUNT_AID_TYPE } from "./exceptional-discount";
 import type { PaymentAid } from "./types";
 
 export function normalizePaymentAidList(
@@ -84,8 +85,14 @@ export function upsertPaymentAid(
       label: patch.label,
       amountCents: patch.amountCents,
     };
-    if (patch.reference?.trim()) next.reference = patch.reference.trim();
-    if (patch.note?.trim()) next.note = patch.note.trim();
+    // Ne pas trimmer à chaque frappe : sinon un espace final (mot suivant) disparaît.
+    // Le trim d’enregistrement reste côté schéma API / validation.
+    if (patch.reference != null && patch.reference.length > 0) {
+      next.reference = patch.reference;
+    }
+    if (patch.note != null && patch.note.length > 0) {
+      next.note = patch.note;
+    }
     return [...without, next];
   }
   return without;
@@ -95,14 +102,14 @@ export function removePaymentAid(aids: PaymentAid[], type: string): PaymentAid[]
   return aids.filter((a) => a.type !== type);
 }
 
-/** Garde les lignes d’aide alignées sur les cases cochées (+ « autre »). */
+/** Garde les lignes d’aide alignées sur les cases cochées (+ remise exceptionnelle). */
 export function syncPaymentAidsWithReductionTypes(
   paymentAids: PaymentAid[],
   reductionTypes: string[],
   labelsByType: Record<string, string>
 ): PaymentAid[] {
   let next = paymentAids.filter(
-    (a) => a.type === "other" || reductionTypes.includes(a.type)
+    (a) => a.type === EXCEPTIONAL_DISCOUNT_AID_TYPE || reductionTypes.includes(a.type)
   );
 
   for (const type of reductionTypes) {

@@ -38,4 +38,18 @@ describe("upsertPaymentAid retainZero", () => {
     });
     expect(next).toHaveLength(0);
   });
+
+  it("conserve les espaces dans la note pendant la saisie", () => {
+    const next = upsertPaymentAid(
+      [],
+      {
+        type: "other",
+        label: "Remise exceptionnelle",
+        amountCents: 1000,
+        note: "Geste ",
+      },
+      { retainZero: true }
+    );
+    expect(next[0]?.note).toBe("Geste ");
+  });
 });

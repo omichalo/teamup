@@ -2,6 +2,10 @@ import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types"
 import { getCheckboxAidRules, getToggleAidRules } from "@/lib/club-registration-config/aid-rules";
 import { getReductionReferenceCode } from "@/lib/club-registration/reduction-reference-codes";
 import {
+  EXCEPTIONAL_DISCOUNT_AID_LABEL,
+  findExceptionalDiscountAid,
+} from "@/lib/club-registration/payment/exceptional-discount";
+import {
   findPaymentAid,
   normalizePaymentAidList,
 } from "@/lib/club-registration/payment/payment-draft-helpers";
@@ -54,12 +58,12 @@ export function buildAdminAidRecapFields(
     });
   }
 
-  const otherAid = findPaymentAid(paymentAids, "other");
+  const otherAid = findExceptionalDiscountAid(paymentAids);
   if (otherAid && (otherAid.amountCents > 0 || otherAid.note?.trim())) {
     const detail = otherAid.note?.trim()
       ? `${formatAidAmount(otherAid.amountCents)} — ${otherAid.note.trim()}`
       : formatAidAmount(otherAid.amountCents);
-    fields.push({ label: "Autre aide", value: detail });
+    fields.push({ label: EXCEPTIONAL_DISCOUNT_AID_LABEL, value: detail });
   }
 
   return fields;
