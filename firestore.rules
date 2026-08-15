@@ -36,6 +36,14 @@ service cloud.firestore {
       return isAdmin() || isSecretary();
     }
 
+    function isAssistantSecretary() {
+      return authRole() == "assistant_secretary";
+    }
+
+    function isClubRegistrationViewer() {
+      return isClubRegistrationManager() || isAssistantSecretary();
+    }
+
     // Liste client : uniquement ses propres dossiers (requête filtrée + plafond).
     // Les listes secrétariat passent par l'API (Admin SDK).
     function isPersonalClubRegistrationListQuery() {
@@ -214,7 +222,7 @@ service cloud.firestore {
     // peut créer plusieurs dossiers (ex. inscription de 2 enfants). Le couplage 1 dossier ↔ 1 uid
     // est volontairement abandonné.
     //
-    // - get    : owner (submitterUid == uid), admin ou secrétariat
+    // - get    : owner (submitterUid == uid), admin, secrétariat ou secrétaire adjoint
     // - list   : owner uniquement, requête where submitterUid == uid, limit <= 50
     //            (listes secrétariat via API / Admin SDK)
     // - create : owner se déclare comme submitterUid, schemaVersion strict
@@ -222,7 +230,7 @@ service cloud.firestore {
     // - delete : interdit côté client (l'admin gère via Admin SDK)
     match /clubRegistrations/{registrationId} {
       allow get: if isAuthenticated()
-                 && (isClubRegistrationManager()
+                 && (isClubRegistrationViewer()
                      || resource.data.submitterUid == request.auth.uid);
       allow list: if isAuthenticated()
                   && isPersonalClubRegistrationListQuery();

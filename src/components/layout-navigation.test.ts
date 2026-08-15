@@ -38,6 +38,7 @@ describe("buildLayoutNavigation", () => {
       "/joueur",
       "/club/inscription",
       "/club/mes-inscriptions",
+      "/club/adhesions-tableau",
       "/club/validations-licence",
     ]);
   });

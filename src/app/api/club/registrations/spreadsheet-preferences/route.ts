@@ -3,15 +3,14 @@ export const runtime = "nodejs";
 import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
-import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
+import { resolveRole } from "@/lib/auth/roles";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
+import { canAccessRegistrationsSpreadsheet } from "@/lib/club-registration/registration-access";
 import {
   loadRegistrationsSpreadsheetPreferences,
   saveRegistrationsSpreadsheetPreferences,
 } from "@/lib/club-registration/spreadsheet/preferences-store";
 import { validateSpreadsheetPreferencesPayload } from "@/lib/club-registration/spreadsheet/preferences";
-
-const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
 
 /** GET /api/club/registrations/spreadsheet-preferences — préférences colonnes utilisateur. */
 export async function GET() {
@@ -24,7 +23,7 @@ export async function GET() {
 
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     const role = resolveRole(decoded.role as string | undefined);
-    if (!hasAnyRole(role, MANAGER_ROLES)) {
+    if (!canAccessRegistrationsSpreadsheet(role)) {
       return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
     }
 
@@ -53,7 +52,7 @@ export async function PUT(req: Request) {
 
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     const role = resolveRole(decoded.role as string | undefined);
-    if (!hasAnyRole(role, MANAGER_ROLES)) {
+    if (!canAccessRegistrationsSpreadsheet(role)) {
       return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
     }
 
