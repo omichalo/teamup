@@ -1,4 +1,4 @@
-import { matchesLicenseStatusFilter } from "@/lib/license-validation/list-license-validations";
+import { matchesLicenseStatusFilter } from "@/lib/license-validation/license-validation-status";
 import { normalizeLicenseValidationStatus } from "@/lib/license-validation/license-validation-status";
 import type { LicenseValidationListItem } from "@/lib/license-validation/map-registration";
 import {

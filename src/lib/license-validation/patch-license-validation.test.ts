@@ -22,11 +22,15 @@ describe("license validation patch constraints", () => {
 
   it("accepts known statuses", () => {
     expect(isLicenseValidationStatus("done")).toBe(true);
+    expect(isLicenseValidationStatus("validated_without_sport")).toBe(true);
     expect(isLicenseValidationStatus("other_federation")).toBe(true);
   });
 
   it("resolves list filters safely", () => {
     expect(resolveLicenseValidationListFilter("done")).toBe("done");
+    expect(
+      resolveLicenseValidationListFilter("validated_without_sport")
+    ).toBe("validated_without_sport");
     expect(resolveLicenseValidationListFilter("unknown")).toBe("all");
     expect(resolveLicenseValidationListFilter(null)).toBe("all");
   });

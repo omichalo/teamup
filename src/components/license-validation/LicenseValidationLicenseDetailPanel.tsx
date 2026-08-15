@@ -20,20 +20,24 @@ import {
   LICENSE_VALIDATION_STATUS_VALUES,
   type LicenseValidationStatus,
 } from "@/lib/license-validation/license-validation-status";
-import { formatRegistrationAddress } from "@/lib/license-validation/map-registration";
+import {
+  formatRegistrationAddress,
+  type LicenseValidationDetail,
+} from "@/lib/license-validation/map-registration";
 import {
   formatAttestationLabel,
   formatBirthDate,
   formatCompetitorLabel,
   formatMedicalCertificateLabel,
   formatPaidLabel,
+  formatSexLabel,
 } from "@/components/license-validation/license-validation-labels";
 import { LicenseValidationLineSecondaryText } from "@/components/license-validation/LicenseValidationLineSecondaryText";
 import { useLicenseValidationDetail } from "@/components/license-validation/useLicenseValidationDetail";
 
 type Props = {
   registrationId: string | null;
-  onSaved: () => Promise<void>;
+  onSaved: (registration: LicenseValidationDetail) => void | Promise<void>;
 };
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -88,8 +92,9 @@ export function LicenseValidationLicenseDetailPanel({
       if (!res.ok) {
         throw new Error(json.error || "Enregistrement impossible");
       }
+      const registration = json.registration as LicenseValidationDetail;
       await reload();
-      await onSaved();
+      await onSaved(registration);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Erreur inconnue");
     } finally {
@@ -138,19 +143,58 @@ export function LicenseValidationLicenseDetailPanel({
 
   const infoFields: Array<{ label: string; value: string; fullWidth?: boolean }> = [
     { label: "Date de naissance", value: formatBirthDate(detail.birthDate) },
-    { label: "Ville de naissance", value: detail.birthCity || "—" },
-    {
-      label: "E-mail",
-      value: detail.adherentEmail || "—",
-      fullWidth: !lookupLicense,
-    },
+    { label: "Sexe", value: formatSexLabel(detail.sex) },
+    { label: "Ville de naissance", value: detail.birthCity || "—", fullWidth: true },
   ];
-  if (lookupLicense) {
+
+  const contactEmails =
+    detail.contactEmails.length > 0
+      ? detail.contactEmails
+      : detail.adherentEmail
+        ? [{ label: "E-mail adhérent", email: detail.adherentEmail }]
+        : [];
+
+  if (contactEmails.length === 0) {
     infoFields.push({
-      label: "Licence enregistrée (dossier)",
-      value: lookupLicense,
+      label: "E-mail",
+      value: "—",
+      fullWidth: !lookupLicense,
     });
+    if (lookupLicense) {
+      infoFields.push({
+        label: "Licence enregistrée (dossier)",
+        value: lookupLicense,
+      });
+    }
+  } else if (contactEmails.length === 1) {
+    infoFields.push({
+      label: contactEmails[0]!.label,
+      value: contactEmails[0]!.email,
+      fullWidth: !lookupLicense,
+    });
+    if (lookupLicense) {
+      infoFields.push({
+        label: "Licence enregistrée (dossier)",
+        value: lookupLicense,
+      });
+    }
+  } else {
+    for (const contact of contactEmails) {
+      infoFields.push({
+        label: contact.label,
+        value: contact.email,
+        fullWidth: true,
+      });
+    }
+    if (lookupLicense) {
+      infoFields.push({
+        label: "Licence enregistrée (dossier)",
+        value: lookupLicense,
+        fullWidth: true,
+      });
+    }
   }
+
   infoFields.push(
     {
       label: "Adresse",

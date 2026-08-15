@@ -15,6 +15,19 @@ export function formatPaidLabel(paymentStatus: string | null): string {
   return PAYMENT_STATUS_LABELS[paymentStatus as keyof typeof PAYMENT_STATUS_LABELS] ?? paymentStatus;
 }
 
+const SEX_LABELS: Record<string, string> = {
+  female: "Femme",
+  male: "Homme",
+  other: "Autre / Ne pas préciser",
+};
+
+export function formatSexLabel(sex: string | null | undefined): string {
+  if (!sex) {
+    return "—";
+  }
+  return SEX_LABELS[sex] ?? sex;
+}
+
 /** Synthèse secrétariat : OK / PPS attendu / certificat attendu ou reçu. */
 export function formatMedicalCertificateLabel(
   status: string | null,
