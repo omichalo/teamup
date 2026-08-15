@@ -12,7 +12,9 @@ import {
 } from "@mui/material";
 import RateReviewIcon from "@mui/icons-material/RateReview";
 import { PageHeader, SectionCard } from "@/components/ui";
+import { useAuth } from "@/hooks/useAuth";
 import { useRegistrationConfig } from "@/hooks/useRegistrationConfig";
+import { isClubRegistrationManager } from "@/lib/club-registration/registration-access";
 import { buildManagedTreatQueueHref } from "@/lib/club-registration/managed-queue-summary";
 import {
   buildSpreadsheetCsvContent,
@@ -43,9 +45,12 @@ import { useSpreadsheetFilterState } from "./useSpreadsheetFilterState";
 import { useSpreadsheetUrlSync } from "./useSpreadsheetUrlSync";
 
 export function RegistrationsSpreadsheetClient() {
+  const { user } = useAuth();
+  const canTreatDossiers = Boolean(user && isClubRegistrationManager(user.role));
   const { config } = useRegistrationConfig();
   const { initial, syncToUrl } = useSpreadsheetUrlSync();
-  const { summary: queueSummary, loading: queueSummaryLoading } = useManagedQueueSummary();
+  const { summary: queueSummary, loading: queueSummaryLoading } =
+    useManagedQueueSummary(canTreatDossiers);
   const {
     registrations,
     userLabels,
@@ -230,14 +235,16 @@ export function RegistrationsSpreadsheetClient() {
           subtitle="Filtrez, exportez et ouvrez un dossier en modale."
           sx={{ "& h1": { fontSize: { xs: "1.5rem", sm: "1.75rem" } } }}
           actions={
-            <Button
-              component={Link}
-              href={treatQueueHref}
-              variant="outlined"
-              startIcon={<RateReviewIcon />}
-            >
-              {treatQueueLabel}
-            </Button>
+            canTreatDossiers ? (
+              <Button
+                component={Link}
+                href={treatQueueHref}
+                variant="outlined"
+                startIcon={<RateReviewIcon />}
+              >
+                {treatQueueLabel}
+              </Button>
+            ) : undefined
           }
         />
 

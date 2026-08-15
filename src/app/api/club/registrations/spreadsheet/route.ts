@@ -3,11 +3,10 @@ export const runtime = "nodejs";
 import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
-import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
+import { resolveRole } from "@/lib/auth/roles";
+import { canAccessRegistrationsSpreadsheet } from "@/lib/club-registration/registration-access";
 import { listSpreadsheetRegistrations } from "@/lib/club-registration/list-spreadsheet-registrations";
 import { buildSpreadsheetUserLabelDirectory } from "@/lib/club-registration/spreadsheet/build-user-label-directory";
-
-const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
 
 /** GET /api/club/registrations/spreadsheet — export tabulaire (secrétariat). */
 export async function GET() {
@@ -20,7 +19,7 @@ export async function GET() {
 
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     const role = resolveRole(decoded.role as string | undefined);
-    if (!hasAnyRole(role, MANAGER_ROLES)) {
+    if (!canAccessRegistrationsSpreadsheet(role)) {
       return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
     }
 

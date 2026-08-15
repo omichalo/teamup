@@ -5,7 +5,10 @@ import { mapRegistrationDocToClient } from "@/lib/club-registration/map-registra
 import { cookies } from "next/headers";
 import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
-import { canAccessClubRegistration, isClubRegistrationManager } from "@/lib/club-registration/registration-access";
+import {
+  canViewClubRegistration,
+  isClubRegistrationManager,
+} from "@/lib/club-registration/registration-access";
 import { FieldValue } from "firebase-admin/firestore";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
 import { logAuditAction, AUDIT_ACTIONS } from "@/lib/auth/audit-logger";
@@ -50,7 +53,7 @@ function stripUndefined<T extends Record<string, unknown>>(obj: T): Record<strin
   return out;
 }
 
-/** GET /api/club/registration?id={registrationId} — lecture d'un dossier (owner ou admin). */
+/** GET /api/club/registration?id={registrationId} — lecture d'un dossier (owner, secrétariat, secrétaire adjoint). */
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
@@ -80,7 +83,7 @@ export async function GET(req: Request) {
 
     const submitterUid =
       typeof data.submitterUid === "string" ? data.submitterUid : undefined;
-    if (!canAccessClubRegistration(role, submitterUid, decoded.uid)) {
+    if (!canViewClubRegistration(role, submitterUid, decoded.uid)) {
       return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
     }
 

@@ -15,6 +15,7 @@ import {
   Description as DescriptionIcon,
   EventAvailable as EventAvailableIcon,
   SportsTennis as SportsTennisIcon,
+  TableChart as TableChartIcon,
 } from "@mui/icons-material";
 import Link from "next/link";
 import { AuthGuard } from "@/components/AuthGuard";
@@ -31,7 +32,7 @@ type QuickAction = {
 };
 
 export default function PlayerHomePage() {
-  const { user } = useAuth();
+  const { user, isAssistantSecretary } = useAuth();
 
   const quickActions: QuickAction[] = [
     {
@@ -51,6 +52,17 @@ export default function PlayerHomePage() {
       icon: <EventAvailableIcon color="primary" />,
     },
   ];
+
+  if (isAssistantSecretary) {
+    quickActions.push({
+      title: "Tableau des adhésions",
+      description:
+        "Consulter tous les dossiers, filtrer les colonnes et exporter le tableau.",
+      href: "/club/adhesions-tableau",
+      cta: "Ouvrir le tableau",
+      icon: <TableChartIcon color="primary" />,
+    });
+  }
 
   if (user && canAccessLicenseValidation(user.role)) {
     quickActions.push({
