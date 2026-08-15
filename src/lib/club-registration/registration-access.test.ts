@@ -1,5 +1,10 @@
 import { USER_ROLES } from "@/lib/auth/roles";
-import { canAccessClubRegistration, isClubRegistrationManager } from "./registration-access";
+import {
+  canAccessClubRegistration,
+  canAccessRegistrationsSpreadsheet,
+  canViewClubRegistration,
+  isClubRegistrationManager,
+} from "./registration-access";
 
 describe("club registration access", () => {
   const ownerUid = "user-owner";
@@ -9,8 +14,44 @@ describe("club registration access", () => {
     it("autorise admin et secrétariat uniquement", () => {
       expect(isClubRegistrationManager(USER_ROLES.ADMIN)).toBe(true);
       expect(isClubRegistrationManager(USER_ROLES.SECRETARY)).toBe(true);
+      expect(isClubRegistrationManager(USER_ROLES.ASSISTANT_SECRETARY)).toBe(
+        false
+      );
       expect(isClubRegistrationManager(USER_ROLES.COACH)).toBe(false);
       expect(isClubRegistrationManager(USER_ROLES.PLAYER)).toBe(false);
+    });
+  });
+
+  describe("canAccessRegistrationsSpreadsheet", () => {
+    it("autorise admin, secrétariat et secrétaire adjoint", () => {
+      expect(canAccessRegistrationsSpreadsheet(USER_ROLES.ADMIN)).toBe(true);
+      expect(canAccessRegistrationsSpreadsheet(USER_ROLES.SECRETARY)).toBe(true);
+      expect(
+        canAccessRegistrationsSpreadsheet(USER_ROLES.ASSISTANT_SECRETARY)
+      ).toBe(true);
+      expect(canAccessRegistrationsSpreadsheet(USER_ROLES.COACH)).toBe(false);
+      expect(canAccessRegistrationsSpreadsheet(USER_ROLES.PLAYER)).toBe(false);
+    });
+  });
+
+  describe("canViewClubRegistration", () => {
+    it("autorise le secrétaire adjoint sur un dossier tiers", () => {
+      expect(
+        canViewClubRegistration(
+          USER_ROLES.ASSISTANT_SECRETARY,
+          ownerUid,
+          otherUid
+        )
+      ).toBe(true);
+    });
+
+    it("refuse coach et joueur sur le dossier d'un autre", () => {
+      expect(
+        canViewClubRegistration(USER_ROLES.COACH, ownerUid, otherUid)
+      ).toBe(false);
+      expect(
+        canViewClubRegistration(USER_ROLES.PLAYER, ownerUid, otherUid)
+      ).toBe(false);
     });
   });
 
@@ -24,9 +65,26 @@ describe("club registration access", () => {
       ).toBe(true);
     });
 
+    it("refuse le secrétaire adjoint sur un dossier tiers", () => {
+      expect(
+        canAccessClubRegistration(
+          USER_ROLES.ASSISTANT_SECRETARY,
+          ownerUid,
+          otherUid
+        )
+      ).toBe(false);
+    });
+
     it("autorise le propriétaire (submitterUid)", () => {
       expect(
         canAccessClubRegistration(USER_ROLES.PLAYER, ownerUid, ownerUid)
+      ).toBe(true);
+      expect(
+        canAccessClubRegistration(
+          USER_ROLES.ASSISTANT_SECRETARY,
+          ownerUid,
+          ownerUid
+        )
       ).toBe(true);
     });
 

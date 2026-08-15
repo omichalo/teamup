@@ -156,7 +156,7 @@ export function buildLayoutNavigation(
       NAV.mesDossiers,
     ];
     if (isAssistantSecretary) {
-      primary.push(NAV.validationsLicence);
+      primary.push(NAV.tableauAdhesions, NAV.validationsLicence);
     }
     return { primary, groups: [] };
   }
