@@ -1,6 +1,11 @@
 "use client";
 
 import { Alert, Box, Card, CardContent, CircularProgress, Stack, Typography } from "@mui/material";
+import { PpsFollowUpPanel } from "@/components/club-registration/PpsFollowUpPanel";
+import {
+  readPpsFollowUpState,
+  type PpsFollowUpState,
+} from "@/lib/club-registration/pps-follow-up";
 import { MembershipRequestDetailFormPrimary } from "./MembershipRequestDetailFormPrimary";
 import { MembershipRequestDetailFormSecondary } from "./MembershipRequestDetailFormSecondary";
 import type { MembershipListReloadFn, RegistrationSummary } from "./types";
@@ -11,6 +16,7 @@ type Props = {
   registrationId: string | null;
   statusSummary?: RegistrationSummary | null | undefined;
   onListReload?: MembershipListReloadFn | undefined;
+  onPpsFollowUpPatched?: (id: string, next: PpsFollowUpState) => void;
   onDeleted?: (() => void | Promise<void>) | undefined;
   emptyMessage?: string;
   embedded?: boolean;
@@ -30,6 +36,7 @@ export function MembershipRequestDetailPanel({
   registrationId,
   statusSummary,
   onListReload,
+  onPpsFollowUpPatched,
   onDeleted,
   emptyMessage = "Sélectionnez une demande pour la relire.",
   embedded = true,
@@ -59,6 +66,20 @@ export function MembershipRequestDetailPanel({
   ) : (
     <Stack spacing={3}>
       <MembershipRequestDetailFormPrimary detail={detail} hideTitleHeader={showQueueBar} />
+      {registrationId && selected ? (
+        <PpsFollowUpPanel
+          registrationId={registrationId}
+          medicalCertificateDeclaration={selected.medicalCertificateDeclaration}
+          ppsFollowUp={readPpsFollowUpState(
+            selected as unknown as Record<string, unknown>,
+            selected.medicalCertificateDeclaration
+          )}
+          onUpdated={(next) => {
+            detail.applyPpsFollowUp(next);
+            onPpsFollowUpPatched?.(registrationId, next);
+          }}
+        />
+      ) : null}
       <MembershipRequestDetailFormSecondary
         detail={detail}
         onListReload={onListReload}

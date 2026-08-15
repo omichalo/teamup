@@ -104,3 +104,70 @@ export function resolveRegistrationPaymentRecipientEmails(data: DocumentData): s
 export function formatRegistrationPaymentEmailsForStorage(emails: string[]): string {
   return emails.join(", ");
 }
+
+export type RegistrationDisplayContactEmail = {
+  label: string;
+  email: string;
+};
+
+const REPRESENTATIVE_ROLE_LABELS: Record<string, string> = {
+  mother: "mère",
+  father: "père",
+  guardian: "tuteur / tutrice",
+  self: "adhérent(e)",
+  other: "autre",
+};
+
+/**
+ * Contacts e-mail à afficher au secrétariat : e-mail adhérent (s’il existe)
+ * puis tous les représentants légaux. Compte soumettant en dernier recours.
+ */
+export function resolveRegistrationDisplayContactEmails(
+  data: DocumentData
+): RegistrationDisplayContactEmail[] {
+  const contacts: RegistrationDisplayContactEmail[] = [];
+  const seen = new Set<string>();
+
+  const push = (label: string, rawEmail: string) => {
+    const email = trimEmail(rawEmail);
+    const key = email.toLowerCase();
+    if (!email || !isValidEmail(email) || seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    contacts.push({ label, email });
+  };
+
+  if (typeof data.adherentEmail === "string") {
+    push("E-mail adhérent", data.adherentEmail);
+  }
+
+  if (Array.isArray(data.representatives)) {
+    for (const rep of data.representatives) {
+      if (typeof rep?.email !== "string" || !isValidEmail(rep.email)) {
+        continue;
+      }
+      const roleLabel =
+        typeof rep.role === "string"
+          ? REPRESENTATIVE_ROLE_LABELS[rep.role] ?? "représentant"
+          : "représentant";
+      const name = [rep.firstName, rep.lastName]
+        .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
+        .join(" ")
+        .trim();
+      const label = name
+        ? `E-mail (${roleLabel}, ${name})`
+        : `E-mail (${roleLabel})`;
+      push(label, rep.email);
+    }
+  }
+
+  if (contacts.length === 0) {
+    const submitterEmail = resolveSubmitterAccountEmail(data);
+    if (submitterEmail) {
+      push("E-mail compte soumettant", submitterEmail);
+    }
+  }
+
+  return contacts;
+}

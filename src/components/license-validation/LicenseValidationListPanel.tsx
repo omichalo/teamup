@@ -103,7 +103,7 @@ export function LicenseValidationListPanel({
         </Stack>
       </Stack>
 
-      {loading ? (
+      {loading && registrations.length === 0 ? (
         <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
           <CircularProgress size={28} />
         </Box>

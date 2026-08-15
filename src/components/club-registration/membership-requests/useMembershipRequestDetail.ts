@@ -9,6 +9,7 @@ import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/no
 import { calculatePaymentSummary } from "@/lib/club-registration/payment/calculate-payment-summary";
 import { normalizePaymentAidList } from "@/lib/club-registration/payment/payment-draft-helpers";
 import type { Representative } from "@/lib/club-registration/schema";
+import type { PpsFollowUpState } from "@/lib/club-registration/pps-follow-up";
 import { buildPricingContext, calculateQuote, resolveDonationPricing } from "@/lib/pricing";
 import type { RegistrationFfttPatch } from "./RegistrationSupplementarySections";
 import { toEditableRegistration } from "./to-editable-registration";
@@ -416,6 +417,26 @@ export function useMembershipRequestDetail(
     }
   };
 
+  const applyPpsFollowUp = useCallback((next: PpsFollowUpState) => {
+    setSelected((current) => {
+      if (!current) {
+        return current;
+      }
+      const patched: RegistrationDetail = {
+        ...current,
+        ppsFollowUpStatus: next.status,
+        ppsFollowUpUpdatedAt: next.updatedAt,
+        ppsFollowUpEvents: next.events,
+      };
+      if (next.updatedBy) {
+        patched.ppsFollowUpUpdatedBy = next.updatedBy;
+      } else {
+        delete patched.ppsFollowUpUpdatedBy;
+      }
+      return patched;
+    });
+  }, []);
+
   return {
     config,
     registrationId,
@@ -436,6 +457,7 @@ export function useMembershipRequestDetail(
     expectedPayableAfterAidsCents,
     amountDiffersFromQuote,
     fetchDetail,
+    applyPpsFollowUp,
     updateField,
     updateReductionTypes,
     patchFfttFields,

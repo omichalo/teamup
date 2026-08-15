@@ -14,6 +14,7 @@ export default function MesInscriptionsPage() {
     <AuthGuard
       allowedRoles={[
         USER_ROLES.PLAYER,
+        USER_ROLES.ASSISTANT_SECRETARY,
         USER_ROLES.SECRETARY,
         USER_ROLES.COACH,
         USER_ROLES.ADMIN,

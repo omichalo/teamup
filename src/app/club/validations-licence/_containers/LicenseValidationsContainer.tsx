@@ -14,6 +14,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
 import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
 import { PageHeader } from "@/components/ui";
+import type { LicenseValidationListItem } from "@/lib/license-validation/map-registration";
 import { LicenseValidationLicenseDetailPanel } from "@/components/license-validation/LicenseValidationLicenseDetailPanel";
 import { LicenseValidationListPanel } from "@/components/license-validation/LicenseValidationListPanel";
 import { LicenseValidationPaymentDetailPanel } from "@/components/license-validation/LicenseValidationPaymentDetailPanel";
@@ -24,22 +25,30 @@ import {
 } from "@/components/license-validation/license-validation-workspace";
 import { useLicenseValidations } from "@/components/license-validation/useLicenseValidations";
 
+/** Hauteur AppBar Layout (Toolbar MUI standard). */
+const APP_BAR_OFFSET_PX = 64;
+
 const workspaceShellSx = {
   display: { xs: "flex", lg: "grid" },
   flexDirection: { xs: "column" },
   gridTemplateColumns: { lg: "minmax(300px, 380px) minmax(0, 1fr)" },
+  gridTemplateRows: { lg: "minmax(0, 1fr)" },
   alignItems: "stretch",
   border: 1,
   borderColor: "divider",
   borderRadius: 2,
   overflow: "hidden",
   bgcolor: "background.paper",
-  minHeight: { xs: 420, lg: "calc(100vh - 220px)" },
-  height: { lg: "calc(100vh - 220px)" },
+  minHeight: { xs: 420, lg: 0 },
+  flex: { lg: 1 },
+  height: { lg: "100%" },
+  minWidth: 0,
 } as const;
 
 const columnSx = {
   minHeight: 0,
+  minWidth: 0,
+  height: { lg: "100%" },
   overflowY: "auto",
   overscrollBehavior: "contain",
   p: 2,
@@ -57,7 +66,19 @@ function WorkspaceTabPanel({
   if (active !== workspace) {
     return null;
   }
-  return <Box sx={{ pt: 2 }}>{children}</Box>;
+  return (
+    <Box
+      sx={{
+        pt: 2,
+        flex: { lg: 1 },
+        minHeight: { lg: 0 },
+        display: { lg: "flex" },
+        flexDirection: { lg: "column" },
+      }}
+    >
+      {children}
+    </Box>
+  );
 }
 
 export function LicenseValidationsContainer() {
@@ -77,63 +98,80 @@ export function LicenseValidationsContainer() {
     loadingMore,
     error,
     reload,
+    applyRegistrationUpdate,
     loadMore,
   } = useLicenseValidations("to_do");
 
-  const handleLicenseSaved = useCallback(async () => {
-    await reload();
-  }, [reload]);
+  const handleLicenseSaved = useCallback(
+    (registration: LicenseValidationListItem) => {
+      applyRegistrationUpdate(registration);
+    },
+    [applyRegistrationUpdate]
+  );
 
   const handlePaymentSaved = useCallback(async () => {
-    await reload();
+    await reload({ silent: true });
   }, [reload]);
 
   return (
-    <Container maxWidth="xl" sx={{ py: { xs: 3, md: 4 } }}>
-      <PageHeader
-        eyebrow="Secrétariat"
-        title="Adhésions — licences et encaissements"
-        actions={
-          workspace === "licenses" ? (
-            <Button
-              startIcon={<RefreshIcon />}
-              onClick={() => void reload()}
-              disabled={loadingList}
-            >
-              Actualiser
-            </Button>
-          ) : null
-        }
-        marginBottom={2}
-      />
+    <Container
+      maxWidth="xl"
+      sx={{
+        py: { xs: 3, md: 4 },
+        display: { lg: "flex" },
+        flexDirection: { lg: "column" },
+        height: { lg: `calc(100dvh - ${APP_BAR_OFFSET_PX}px)` },
+        maxHeight: { lg: `calc(100dvh - ${APP_BAR_OFFSET_PX}px)` },
+        boxSizing: "border-box",
+        overflow: { lg: "hidden" },
+      }}
+    >
+      <Box sx={{ flexShrink: 0 }}>
+        <PageHeader
+          eyebrow="Secrétariat"
+          title="Adhésions — licences et encaissements"
+          actions={
+            workspace === "licenses" ? (
+              <Button
+                startIcon={<RefreshIcon />}
+                onClick={() => void reload()}
+                disabled={loadingList}
+              >
+                Actualiser
+              </Button>
+            ) : null
+          }
+          marginBottom={2}
+        />
 
-      <Paper sx={{ px: { xs: 1, sm: 2 }, pt: 1, pb: 1 }}>
-        <Tabs
-          value={workspace}
-          onChange={(_event, value: LicenseValidationWorkspace) => setWorkspace(value)}
-          variant="fullWidth"
-          aria-label="Espaces licences et encaissements"
-        >
-          <Tab
-            value="licenses"
-            icon={<VerifiedUserOutlinedIcon />}
-            iconPosition="start"
-            label={LICENSE_VALIDATION_WORKSPACE_LABELS.licenses}
-          />
-          <Tab
-            value="payments"
-            icon={<PaymentsOutlinedIcon />}
-            iconPosition="start"
-            label={LICENSE_VALIDATION_WORKSPACE_LABELS.payments}
-          />
-        </Tabs>
-      </Paper>
+        <Paper sx={{ px: { xs: 1, sm: 2 }, pt: 1, pb: 1 }}>
+          <Tabs
+            value={workspace}
+            onChange={(_event, value: LicenseValidationWorkspace) => setWorkspace(value)}
+            variant="fullWidth"
+            aria-label="Espaces licences et encaissements"
+          >
+            <Tab
+              value="licenses"
+              icon={<VerifiedUserOutlinedIcon />}
+              iconPosition="start"
+              label={LICENSE_VALIDATION_WORKSPACE_LABELS.licenses}
+            />
+            <Tab
+              value="payments"
+              icon={<PaymentsOutlinedIcon />}
+              iconPosition="start"
+              label={LICENSE_VALIDATION_WORKSPACE_LABELS.payments}
+            />
+          </Tabs>
+        </Paper>
 
-      {error && workspace === "licenses" ? (
-        <Alert severity="error" sx={{ mt: 2 }}>
-          {error}
-        </Alert>
-      ) : null}
+        {error && workspace === "licenses" ? (
+          <Alert severity="error" sx={{ mt: 2 }}>
+            {error}
+          </Alert>
+        ) : null}
+      </Box>
 
       <WorkspaceTabPanel active={workspace} workspace="licenses">
         <Box sx={workspaceShellSx}>

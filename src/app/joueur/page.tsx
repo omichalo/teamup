@@ -11,16 +11,29 @@ import {
 } from "@mui/material";
 import Grid from "@mui/material/GridLegacy";
 import {
+  Badge as BadgeIcon,
   Description as DescriptionIcon,
   EventAvailable as EventAvailableIcon,
   SportsTennis as SportsTennisIcon,
 } from "@mui/icons-material";
 import Link from "next/link";
 import { AuthGuard } from "@/components/AuthGuard";
+import { useAuth } from "@/hooks/useAuth";
 import { USER_ROLES } from "@/lib/auth/roles";
+import { canAccessLicenseValidation } from "@/lib/license-validation/access";
+
+type QuickAction = {
+  title: string;
+  description: string;
+  href: string;
+  cta: string;
+  icon: React.ReactNode;
+};
 
 export default function PlayerHomePage() {
-  const quickActions = [
+  const { user } = useAuth();
+
+  const quickActions: QuickAction[] = [
     {
       title: "Nouvelle adhésion",
       description:
@@ -37,12 +50,24 @@ export default function PlayerHomePage() {
       cta: "Voir mes dossiers",
       icon: <EventAvailableIcon color="primary" />,
     },
-  ] as const;
+  ];
+
+  if (user && canAccessLicenseValidation(user.role)) {
+    quickActions.push({
+      title: "Licences & encaissements",
+      description:
+        "Saisir les numéros de licence FFTT, suivre les validations et les encaissements.",
+      href: "/club/validations-licence",
+      cta: "Ouvrir l’espace licences",
+      icon: <BadgeIcon color="primary" />,
+    });
+  }
 
   return (
     <AuthGuard
       allowedRoles={[
         USER_ROLES.PLAYER,
+        USER_ROLES.ASSISTANT_SECRETARY,
         USER_ROLES.SECRETARY,
         USER_ROLES.COACH,
         USER_ROLES.ADMIN,

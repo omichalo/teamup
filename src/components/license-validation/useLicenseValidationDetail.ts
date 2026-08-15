@@ -42,5 +42,5 @@ export function useLicenseValidationDetail(registrationId: string | null) {
     void reload();
   }, [reload]);
 
-  return { detail, loading, error, reload };
+  return { detail, loading, error, reload, setDetail };
 }

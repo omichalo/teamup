@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  Alert,
   Button,
+  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
   DialogContentText,
   DialogTitle,
+  FormControlLabel,
   MenuItem,
   Stack,
   TextField,
@@ -25,10 +28,16 @@ import {
   PAYMENT_REFERENCE_MAX_LENGTH,
   paymentReferenceFieldLabel,
 } from "@/lib/club-registration/payment/payment-reference";
+import { formatCentsAsEuros } from "@/lib/pricing";
+import { wouldCreateOverpayment } from "@/lib/club-registration/payment/overpayment";
 
 type Props = {
   open: boolean;
   onClose: () => void;
+  /** Montant prérempli (souvent le reste dû). */
+  suggestedAmountCents?: number;
+  /** Reste dû actuel — sert à détecter un trop-perçu (si fourni). */
+  remainingAmountCents?: number | null;
   onSubmit: (input: {
     method: ReceivedPaymentMethodId;
     label: string;
@@ -36,10 +45,17 @@ type Props = {
     receivedAt: string;
     note?: string;
     reference?: string;
+    confirmOverpayment?: boolean;
   }) => Promise<void>;
 };
 
-export function AddManualPaymentDialog({ open, onClose, onSubmit }: Props) {
+export function AddManualPaymentDialog({
+  open,
+  onClose,
+  suggestedAmountCents = 0,
+  remainingAmountCents = null,
+  onSubmit,
+}: Props) {
   const [method, setMethod] = useState<ReceivedPaymentMethodId>("cheque");
   const [label, setLabel] = useState("");
   const [amountEuros, setAmountEuros] = useState("");
@@ -48,15 +64,44 @@ export function AddManualPaymentDialog({ open, onClose, onSubmit }: Props) {
   );
   const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
+  const [confirmOverpayment, setConfirmOverpayment] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [amountError, setAmountError] = useState<string | null>(null);
 
-  const showReferenceField =
-    method === "cheque" || method === "holiday_vouchers";
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    setMethod("cheque");
+    setLabel("");
+    setAmountEuros(
+      suggestedAmountCents > 0 ? centsToEurosInput(suggestedAmountCents) : ""
+    );
+    setReceivedAt(new Date().toISOString().slice(0, 10));
+    setReference("");
+    setNote("");
+    setConfirmOverpayment(false);
+    setAmountError(null);
+  }, [open, suggestedAmountCents]);
+
+  const amountCents = eurosInputToCents(amountEuros);
+  const isOverpayment =
+    remainingAmountCents != null &&
+    amountCents > 0 &&
+    wouldCreateOverpayment(remainingAmountCents, amountCents);
 
   const handleSubmit = async () => {
-    const amountCents = eurosInputToCents(amountEuros);
-    if (amountCents <= 0) return;
+    if (amountCents <= 0) {
+      setAmountError("Le montant doit être > 0.");
+      return;
+    }
+    if (isOverpayment && !confirmOverpayment) {
+      setAmountError("Cochez la confirmation du trop-perçu pour continuer.");
+      return;
+    }
+
     setSubmitting(true);
+    setAmountError(null);
     try {
       await onSubmit({
         method,
@@ -65,16 +110,16 @@ export function AddManualPaymentDialog({ open, onClose, onSubmit }: Props) {
         receivedAt: new Date(receivedAt).toISOString(),
         ...(reference.trim() ? { reference: reference.trim() } : {}),
         ...(note.trim() ? { note: note.trim() } : {}),
+        ...(isOverpayment ? { confirmOverpayment: true } : {}),
       });
       onClose();
-      setAmountEuros("");
-      setReference("");
-      setNote("");
-      setLabel("");
     } finally {
       setSubmitting(false);
     }
   };
+
+  const showReferenceField =
+    method === "cheque" || method === "holiday_vouchers";
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
@@ -85,6 +130,14 @@ export function AddManualPaymentDialog({ open, onClose, onSubmit }: Props) {
           paiements attendus » (montant libre, autre moyen, correction).
         </DialogContentText>
         <Stack spacing={2} sx={{ pt: 1 }}>
+          {amountError ? <Alert severity="warning">{amountError}</Alert> : null}
+          {isOverpayment ? (
+            <Alert severity="warning">
+              Le reste dû est de {formatCentsAsEuros(remainingAmountCents)}. Ce
+              montant créera un trop-perçu de{" "}
+              {formatCentsAsEuros(amountCents - Math.max(0, remainingAmountCents))}.
+            </Alert>
+          ) : null}
           <TextField
             select
             label="Moyen de paiement"
@@ -108,9 +161,14 @@ export function AddManualPaymentDialog({ open, onClose, onSubmit }: Props) {
           <TextField
             label="Montant (€)"
             value={amountEuros}
-            onChange={(e) => setAmountEuros(e.target.value)}
+            onChange={(e) => {
+              setAmountEuros(e.target.value);
+              setConfirmOverpayment(false);
+              setAmountError(null);
+            }}
             fullWidth
             placeholder={centsToEurosInput(0) || "0,00"}
+            inputProps={{ inputMode: "decimal" }}
           />
           <TextField
             label="Date de réception"
@@ -138,13 +196,28 @@ export function AddManualPaymentDialog({ open, onClose, onSubmit }: Props) {
             multiline
             minRows={2}
           />
+          {isOverpayment ? (
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={confirmOverpayment}
+                  onChange={(e) => setConfirmOverpayment(e.target.checked)}
+                />
+              }
+              label="Je confirme l’enregistrement d’un trop-perçu"
+            />
+          ) : null}
         </Stack>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={submitting}>
           Annuler
         </Button>
-        <Button variant="contained" onClick={() => void handleSubmit()} disabled={submitting}>
+        <Button
+          variant="contained"
+          onClick={() => void handleSubmit()}
+          disabled={submitting || (isOverpayment && !confirmOverpayment)}
+        >
           Enregistrer
         </Button>
       </DialogActions>

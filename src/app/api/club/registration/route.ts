@@ -124,6 +124,7 @@ export async function POST(req: Request) {
     if (
       !hasAnyRole(role, [
         USER_ROLES.PLAYER,
+        USER_ROLES.ASSISTANT_SECRETARY,
         USER_ROLES.SECRETARY,
         USER_ROLES.COACH,
         USER_ROLES.ADMIN,

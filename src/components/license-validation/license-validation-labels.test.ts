@@ -38,6 +38,29 @@ describe("resolveMedicalFollowUpKind", () => {
       )
     ).toBe("certificate_expected");
   });
+
+  it("distingue les états locaux du suivi PPS", () => {
+    expect(
+      resolveMedicalFollowUpKind("adult_pps_declared", "not_required", "ok")
+    ).toBe("ok");
+    expect(
+      resolveMedicalFollowUpKind(
+        "adult_pps_declared",
+        "not_required",
+        "checked_incomplete"
+      )
+    ).toBe("pps_checked_incomplete");
+    expect(
+      formatMedicalFollowUpLabel(
+        "adult_pps_declared",
+        "not_required",
+        "checked_incomplete"
+      )
+    ).toBe("PPS non fait");
+    expect(
+      formatMedicalCertificateLabel("not_required", "adult_pps_declared", "ok")
+    ).toBe("OK");
+  });
 });
 
 describe("formatMedicalFollowUpLabel / formatMedicalCertificateLabel", () => {

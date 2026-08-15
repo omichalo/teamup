@@ -1,6 +1,7 @@
 import {
   formatRegistrationPaymentEmailsForStorage,
   resolveRegistrationContactEmail,
+  resolveRegistrationDisplayContactEmails,
   resolveRegistrationPaymentRecipientEmails,
   resolveRegistrationRepresentativeEmails,
 } from "@/lib/club-registration/resolve-registration-contact-email";
@@ -27,6 +28,67 @@ describe("resolveRegistrationRepresentativeEmails", () => {
         ],
       })
     ).toEqual(["Parent@Example.com"]);
+  });
+});
+
+describe("resolveRegistrationDisplayContactEmails", () => {
+  it("liste l'adhérent puis tous les représentants pour un mineur", () => {
+    expect(
+      resolveRegistrationDisplayContactEmails({
+        adherentRole: "minor_dependent",
+        adherentEmail: "",
+        representatives: [
+          {
+            firstName: "Doris",
+            lastName: "LE BÉHÉREC",
+            email: "dorisgoufak@yahoo.fr",
+            role: "mother",
+          },
+          {
+            firstName: "Ronan",
+            lastName: "LE BÉHÉREC",
+            email: "ronanlebeherec@hotmail.com",
+            role: "father",
+          },
+        ],
+        submitterAccountEmail: "dorisgoufak@yahoo.fr",
+      })
+    ).toEqual([
+      {
+        label: "E-mail (mère, Doris LE BÉHÉREC)",
+        email: "dorisgoufak@yahoo.fr",
+      },
+      {
+        label: "E-mail (père, Ronan LE BÉHÉREC)",
+        email: "ronanlebeherec@hotmail.com",
+      },
+    ]);
+  });
+
+  it("conserve l'e-mail adhérent et ajoute les représentants distincts", () => {
+    expect(
+      resolveRegistrationDisplayContactEmails({
+        adherentEmail: "jean@example.com",
+        representatives: [
+          { firstName: "Alice", email: "parent@example.com", role: "mother" },
+        ],
+      })
+    ).toEqual([
+      { label: "E-mail adhérent", email: "jean@example.com" },
+      { label: "E-mail (mère, Alice)", email: "parent@example.com" },
+    ]);
+  });
+
+  it("retombe sur le compte soumettant si aucun autre contact", () => {
+    expect(
+      resolveRegistrationDisplayContactEmails({
+        adherentEmail: "",
+        representatives: [],
+        submitterAccountEmail: "parent@example.com",
+      })
+    ).toEqual([
+      { label: "E-mail compte soumettant", email: "parent@example.com" },
+    ]);
   });
 });
 

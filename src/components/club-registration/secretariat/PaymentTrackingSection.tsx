@@ -328,6 +328,8 @@ export function PaymentTrackingSection({
 
       <AddManualPaymentDialog
         open={manualOpen}
+        suggestedAmountCents={payment.remainingAmountCents}
+        remainingAmountCents={payment.remainingAmountCents}
         onClose={() => setManualOpen(false)}
         onSubmit={async (input) => {
           await runAction(() =>
