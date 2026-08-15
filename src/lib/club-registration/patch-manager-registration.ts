@@ -8,6 +8,7 @@ import {
   isMedicalCertificateStatus,
   normalizeMedicalCertificateStatus,
 } from "@/lib/club-registration/medical-certificate";
+import { normalizePpsFollowUpStatus } from "@/lib/club-registration/pps-follow-up";
 import { buildManagerRegistrationPricingPatch } from "@/lib/club-registration/build-manager-registration-pricing-patch";
 import { resolveManagerPaymentAidsUpdate } from "@/lib/club-registration/build-manager-registration-aids-patch";
 import {
@@ -167,6 +168,22 @@ export async function patchManagerRegistration(
     if (nextCertificateStatus !== currentCertificateStatus) {
       updates.medicalCertificateStatusUpdatedBy = decoded.uid;
       updates.medicalCertificateStatusUpdatedAt = FieldValue.serverTimestamp();
+    }
+
+    const previousDeclaration =
+      typeof currentData.medicalCertificateDeclaration === "string"
+        ? currentData.medicalCertificateDeclaration
+        : undefined;
+    if (nextDeclaration !== previousDeclaration) {
+      const nextPpsStatus = normalizePpsFollowUpStatus(
+        currentData.ppsFollowUpStatus,
+        nextDeclaration
+      );
+      updates.ppsFollowUpStatus = nextPpsStatus;
+      if (nextPpsStatus !== currentData.ppsFollowUpStatus) {
+        updates.ppsFollowUpUpdatedBy = decoded.uid;
+        updates.ppsFollowUpUpdatedAt = FieldValue.serverTimestamp();
+      }
     }
   }
 

@@ -12,6 +12,7 @@ import {
 } from "@/lib/club-registration/list-registrations";
 import { resolveManagedListStatusFilter } from "@/lib/club-registration/registration-status";
 import { resolveManagedListMedicalCertificateFilter } from "@/lib/club-registration/medical-certificate";
+import { resolveManagedListPpsFollowUpFilter } from "@/lib/club-registration/pps-follow-up";
 
 const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
 
@@ -29,6 +30,7 @@ export async function GET(req: Request) {
     if (
       !hasAnyRole(role, [
         USER_ROLES.PLAYER,
+        USER_ROLES.ASSISTANT_SECRETARY,
         USER_ROLES.SECRETARY,
         USER_ROLES.COACH,
         USER_ROLES.ADMIN,
@@ -50,6 +52,9 @@ export async function GET(req: Request) {
       const medicalCertificateFilter = resolveManagedListMedicalCertificateFilter(
         url.searchParams.get("medicalCertificate")
       );
+      const ppsFollowUpFilter = resolveManagedListPpsFollowUpFilter(
+        url.searchParams.get("ppsFollowUp")
+      );
       const rawLimit = Number.parseInt(url.searchParams.get("limit") ?? "", 10);
       const pageSize = Number.isFinite(rawLimit)
         ? Math.min(Math.max(rawLimit, 1), MANAGED_PAGE_SIZE_MAX)
@@ -60,6 +65,7 @@ export async function GET(req: Request) {
       const page = await listManagedRegistrations(db, {
         statusFilter,
         medicalCertificateFilter,
+        ppsFollowUpFilter,
         pageSize,
         cursor,
         searchQuery,

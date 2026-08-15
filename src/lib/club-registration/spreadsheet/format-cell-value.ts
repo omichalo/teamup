@@ -7,6 +7,13 @@ import {
   type MedicalCertificateStatus,
 } from "@/lib/club-registration/medical-certificate";
 import {
+  PPS_FOLLOW_UP_EVENT_LABELS,
+  PPS_FOLLOW_UP_STATUS_LABELS,
+  isPpsFollowUpStatus,
+  parsePpsFollowUpEvents,
+  type PpsFollowUpStatus,
+} from "@/lib/club-registration/pps-follow-up";
+import {
   PAYMENT_METHOD_LABELS,
   PAYMENT_STATUS_LABELS,
   REMAINING_PAYMENT_METHOD_LABELS,
@@ -201,6 +208,7 @@ export function formatSpreadsheetCellValue(
       return typeof value === "string" ? (SUBMITTER_ROLE_LABELS[value] ?? value) : "";
     case "paymentRequestedBy":
     case "medicalCertificateStatusUpdatedBy":
+    case "ppsFollowUpUpdatedBy":
       return resolveSpreadsheetUserLabel(value, context);
     case "adherentRole":
       return typeof value === "string" ? (ADHERENT_ROLE_LABELS[value] ?? value) : "";
@@ -236,6 +244,24 @@ export function formatSpreadsheetCellValue(
       return typeof value === "string"
         ? (MEDICAL_CERTIFICATE_STATUS_LABELS[value as MedicalCertificateStatus] ?? value)
         : "";
+    case "ppsFollowUpStatus":
+      return typeof value === "string" && isPpsFollowUpStatus(value)
+        ? PPS_FOLLOW_UP_STATUS_LABELS[value as PpsFollowUpStatus]
+        : typeof value === "string"
+          ? value
+          : "";
+    case "ppsFollowUpEvents": {
+      const events = parsePpsFollowUpEvents(value);
+      if (events.length === 0) {
+        return "";
+      }
+      return events
+        .map((event) => {
+          const label = PPS_FOLLOW_UP_EVENT_LABELS[event.type];
+          return event.note ? `${label}: ${event.note}` : label;
+        })
+        .join(" · ");
+    }
     case "familyRegistrationOrder":
       return typeof value === "string" ? (FAMILY_ORDER_LABELS[value] ?? value) : "";
     case "reductionTypes":
@@ -274,6 +300,7 @@ export function formatSpreadsheetCellValue(
     case "submittedAt":
     case "updatedAt":
     case "medicalCertificateStatusUpdatedAt":
+    case "ppsFollowUpUpdatedAt":
     case "paymentRequestedAt":
     case "paidAt":
     case "pricingQuoteComputedAt":

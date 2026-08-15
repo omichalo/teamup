@@ -1,14 +1,35 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { LicenseValidationListFilter } from "@/lib/license-validation/license-validation-status";
+import type {
+  LicenseValidationListFilter,
+} from "@/lib/license-validation/license-validation-status";
+import { matchesLicenseStatusFilter } from "@/lib/license-validation/license-validation-status";
 import type { LicenseValidationPaymentListFilter } from "@/lib/license-validation/payment-status-filter";
+import { matchesPaymentStatusFilter } from "@/lib/license-validation/payment-status-filter";
 import type { LicenseValidationListItem } from "@/lib/license-validation/map-registration";
+import { registrationMatchesLicenseValidationSearch } from "@/lib/license-validation/search-registrations";
 
 type PageInfo = {
   hasNextPage: boolean;
   nextCursor: string | null;
 };
+
+function toListItem(item: LicenseValidationListItem): LicenseValidationListItem {
+  return {
+    id: item.id,
+    firstName: item.firstName,
+    lastName: item.lastName,
+    adherentEmail: item.adherentEmail,
+    birthDate: item.birthDate,
+    ffttLicense: item.ffttLicense,
+    licenseValidationStatus: item.licenseValidationStatus,
+    wantsCompetitorExtras: item.wantsCompetitorExtras,
+    paymentStatus: item.paymentStatus,
+    status: item.status,
+    submittedAt: item.submittedAt,
+  };
+}
 
 export function useLicenseValidations(initialStatus: LicenseValidationListFilter = "all") {
   const [statusFilter, setStatusFilter] =
@@ -61,17 +82,46 @@ export function useLicenseValidations(initialStatus: LicenseValidationListFilter
     [paymentStatusFilter, searchInput, statusFilter]
   );
 
-  const reload = useCallback(async () => {
-    setLoadingList(true);
+  const reload = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = Boolean(options?.silent);
+    if (!silent) {
+      setLoadingList(true);
+    }
     setError(null);
     try {
       await fetchPage();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur inconnue");
     } finally {
-      setLoadingList(false);
+      if (!silent) {
+        setLoadingList(false);
+      }
     }
   }, [fetchPage]);
+
+  const applyRegistrationUpdate = useCallback(
+    (item: LicenseValidationListItem) => {
+      const listItem = toListItem(item);
+      const keep =
+        matchesLicenseStatusFilter(listItem, statusFilter) &&
+        matchesPaymentStatusFilter(listItem.paymentStatus, paymentStatusFilter) &&
+        registrationMatchesLicenseValidationSearch(listItem, searchInput);
+
+      setRegistrations((current) => {
+        const index = current.findIndex((row) => row.id === listItem.id);
+        if (!keep) {
+          return index === -1 ? current : current.filter((row) => row.id !== listItem.id);
+        }
+        if (index === -1) {
+          return current;
+        }
+        const next = [...current];
+        next[index] = listItem;
+        return next;
+      });
+    },
+    [paymentStatusFilter, searchInput, statusFilter]
+  );
 
   const loadMore = useCallback(async () => {
     if (!pageInfo.hasNextPage || !pageInfo.nextCursor) {
@@ -105,6 +155,7 @@ export function useLicenseValidations(initialStatus: LicenseValidationListFilter
     loadingMore,
     error,
     reload,
+    applyRegistrationUpdate,
     loadMore,
   };
 }

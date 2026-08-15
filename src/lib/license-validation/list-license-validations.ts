@@ -6,6 +6,7 @@ import {
 } from "@/lib/license-validation/map-registration";
 import {
   resolveLicenseValidationListFilter,
+  matchesLicenseStatusFilter,
   type LicenseValidationListFilter,
 } from "@/lib/license-validation/license-validation-status";
 import {
@@ -31,12 +32,12 @@ export type LicenseValidationPage = {
  * l’introduction de `licenseValidationStatus` n’ont pas ce champ : ils doivent
  * compter comme `to_do` (voir `normalizeLicenseValidationStatus`).
  * On ne pousse donc le filtre Firestore que pour les statuts explicitement
- * renseignés (`done`, `other_federation`).
+ * renseignés (tout sauf `to_do` / `all`).
  */
 function canFilterLicenseStatusInFirestore(
   statusFilter: LicenseValidationListFilter
 ): boolean {
-  return statusFilter === "done" || statusFilter === "other_federation";
+  return statusFilter !== "all" && statusFilter !== "to_do";
 }
 
 function applyLicenseValidationStatusFilter(
@@ -53,16 +54,7 @@ function matchesSubmittedStatus(status: string | null): boolean {
   return typeof status === "string" && SUBMITTED_STATUSES.includes(status);
 }
 
-export function matchesLicenseStatusFilter(
-  item: LicenseValidationListItem,
-  statusFilter: LicenseValidationListFilter
-): boolean {
-  if (statusFilter === "all") {
-    return true;
-  }
-  return item.licenseValidationStatus === statusFilter;
-}
-
+export { matchesLicenseStatusFilter };
 async function fetchLicenseValidationSummaries(
   db: Firestore,
   statusFilter: LicenseValidationListFilter,

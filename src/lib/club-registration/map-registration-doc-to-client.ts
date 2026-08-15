@@ -1,6 +1,7 @@
 import type { DocumentSnapshot } from "firebase-admin/firestore";
 import { normalizeReductionReferenceCodes } from "@/lib/club-registration/reduction-reference-codes";
 import { normalizeMedicalCertificateStatus } from "@/lib/club-registration/medical-certificate";
+import { readPpsFollowUpState } from "@/lib/club-registration/pps-follow-up";
 import { REGISTRATION_CLIENT_FIELDS } from "@/lib/club-registration/registration-api-fields";
 
 export type RegistrationClientRecord = Record<string, unknown> & { id: string };
@@ -29,6 +30,15 @@ export function mapRegistrationDocToClient(
     data.medicalCertificateStatus,
     data.medicalCertificateDeclaration
   );
+  const declaration =
+    typeof data.medicalCertificateDeclaration === "string"
+      ? data.medicalCertificateDeclaration
+      : null;
+  const pps = readPpsFollowUpState(data as Record<string, unknown>, declaration);
+  registration.ppsFollowUpStatus = pps.status;
+  registration.ppsFollowUpUpdatedAt = pps.updatedAt;
+  registration.ppsFollowUpUpdatedBy = pps.updatedBy;
+  registration.ppsFollowUpEvents = pps.events;
   registration.submittedAt = data.submittedAt?.toDate?.()?.toISOString?.() ?? null;
   registration.updatedAt = data.updatedAt?.toDate?.()?.toISOString?.() ?? null;
   registration.medicalCertificateStatusUpdatedAt =

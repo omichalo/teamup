@@ -3,15 +3,25 @@ import {
   normalizeMedicalCertificateStatus,
 } from "@/lib/club-registration/medical-certificate";
 import {
+  readPpsFollowUpState,
+  type PpsFollowUpState,
+} from "@/lib/club-registration/pps-follow-up";
+import {
   resolveRegistrationPaymentStatus,
 } from "@/lib/club-registration/resolve-registration-payment-status";
 import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
 import type { RegistrationPayment } from "@/lib/club-registration/payment/types";
 import {
+  resolveRegistrationDisplayContactEmails,
+  type RegistrationDisplayContactEmail,
+} from "@/lib/club-registration/resolve-registration-contact-email";
+import {
   normalizeLicenseValidationStatus,
   type LicenseValidationStatus,
 } from "@/lib/license-validation/license-validation-status";
 import type { PaymentStatusId } from "@/lib/club-registration/payment-constants";
+
+export type { RegistrationDisplayContactEmail };
 
 export const LICENSE_VALIDATION_LIST_FIELDS = [
   "firstName",
@@ -41,6 +51,7 @@ export type LicenseValidationListItem = {
 
 export type LicenseValidationDetail = LicenseValidationListItem & {
   birthCity: string | null;
+  sex: string | null;
   addressLine1: string | null;
   addressLine2: string | null;
   postalCode: string | null;
@@ -49,8 +60,10 @@ export type LicenseValidationDetail = LicenseValidationListItem & {
   medicalCertificateDeclaration: string | null;
   medicalCertificateStatus: string | null;
   medicalQuestionnaire: Record<string, unknown> | null;
+  ppsFollowUp: PpsFollowUpState;
   wantsRegistrationCertificate: boolean;
   payment: RegistrationPayment | null;
+  contactEmails: RegistrationDisplayContactEmail[];
 };
 
 function readString(data: Record<string, unknown>, key: string): string | null {
@@ -98,6 +111,7 @@ export function mapRegistrationToLicenseValidationDetail(
   return {
     ...listItem,
     birthCity: readString(data, "birthCity"),
+    sex: readString(data, "sex"),
     addressLine1: readString(data, "addressLine1"),
     addressLine2: readString(data, "addressLine2"),
     postalCode: readString(data, "postalCode"),
@@ -116,8 +130,10 @@ export function mapRegistrationToLicenseValidationDetail(
       data.medicalQuestionnaire !== null
         ? (data.medicalQuestionnaire as Record<string, unknown>)
         : null,
+    ppsFollowUp: readPpsFollowUpState(data, medicalCertificateDeclaration),
     wantsRegistrationCertificate: readBoolean(data, "wantsRegistrationCertificate"),
     payment: normalizeRegistrationPayment(data),
+    contactEmails: resolveRegistrationDisplayContactEmails(data),
   };
 }
 

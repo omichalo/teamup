@@ -11,13 +11,15 @@ import {
 } from "@mui/material";
 import type { ExpectedPayment } from "@/lib/club-registration/payment/types";
 import { MarkExpectedPaymentReceivedDialog } from "@/components/club-registration/secretariat/MarkExpectedPaymentReceivedDialog";
+import { AddManualPaymentDialog } from "@/components/club-registration/secretariat/AddManualPaymentDialog";
 import {
   PAYMENT_METHOD_LABELS,
+  RECEIVED_PAYMENT_METHOD_LABELS,
 } from "@/lib/club-registration/payment-constants";
+import { wouldCreateOverpayment } from "@/lib/club-registration/payment/overpayment";
 import { formatCentsAsEuros } from "@/lib/pricing";
 import { formatPaidLabel } from "@/components/license-validation/license-validation-labels";
 import { useLicenseValidationDetail } from "@/components/license-validation/useLicenseValidationDetail";
-import { AddManualLicenseValidationPaymentDialog } from "@/components/license-validation/AddManualLicenseValidationPaymentDialog";
 
 type Props = {
   registrationId: string | null;
@@ -45,7 +47,6 @@ export function LicenseValidationPaymentDetailPanel({
   const [receiveExpected, setReceiveExpected] = useState<ExpectedPayment | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
-  const [manualSuggestedAmountCents, setManualSuggestedAmountCents] = useState(0);
 
   const pendingChequePayments = useMemo(() => {
     if (!detail?.payment) {
@@ -116,15 +117,6 @@ export function LicenseValidationPaymentDetailPanel({
 
   const displayName = [detail.firstName, detail.lastName].filter(Boolean).join(" ");
   const payment = detail.payment;
-  const allowedManualMethod:
-    | "cheque"
-    | "holiday_vouchers"
-    | null =
-    payment &&
-    (payment.paymentMethod === "cheque" ||
-      payment.paymentMethod === "holiday_vouchers")
-      ? payment.paymentMethod
-      : null;
 
   return (
     <Stack spacing={2.5}>
@@ -165,6 +157,12 @@ export function LicenseValidationPaymentDetailPanel({
             label="Reste dû"
             value={formatCentsAsEuros(payment.remainingAmountCents)}
           />
+          {payment.paidAmountCents > payment.amountToPayCents ? (
+            <Alert severity="info">
+              Trop-perçu enregistré :{" "}
+              {formatCentsAsEuros(payment.paidAmountCents - payment.amountToPayCents)}.
+            </Alert>
+          ) : null}
         </Stack>
       ) : (
         <Alert severity="warning">Aucune information de paiement sur ce dossier.</Alert>
@@ -172,7 +170,7 @@ export function LicenseValidationPaymentDetailPanel({
 
       <Stack spacing={1}>
         <Typography variant="subtitle2" color="text.secondary">
-          Enregistrer un encaissement
+          Échéances en attente
         </Typography>
         {pendingChequePayments.length > 0 ? (
           pendingChequePayments.map((expected) => (
@@ -189,35 +187,42 @@ export function LicenseValidationPaymentDetailPanel({
             Aucune échéance chèque ou chèques vacances en attente pour ce dossier.
           </Typography>
         )}
-        {paymentError ? <Alert severity="error">{paymentError}</Alert> : null}
       </Stack>
 
-      {payment && allowedManualMethod ? (
+      {payment ? (
         <Stack spacing={1}>
           <Typography variant="subtitle2" color="text.secondary">
-            Encaisser le complément (manuel)
+            Enregistrer un encaissement
           </Typography>
-          <Button
-            variant="outlined"
-            disabled={payment.remainingAmountCents <= 0}
-            onClick={() => {
-              setManualSuggestedAmountCents(payment.remainingAmountCents);
-              setManualOpen(true);
-            }}
-          >
-            Encaisser {formatCentsAsEuros(payment.remainingAmountCents)} —{" "}
-            {PAYMENT_METHOD_LABELS[allowedManualMethod]}
+          <Button variant="outlined" onClick={() => setManualOpen(true)}>
+            {payment.remainingAmountCents > 0
+              ? `Ajouter un paiement (reste ${formatCentsAsEuros(payment.remainingAmountCents)})`
+              : "Ajouter un paiement (solde déjà à zéro)"}
           </Button>
         </Stack>
       ) : null}
+
+      {paymentError ? <Alert severity="error">{paymentError}</Alert> : null}
 
       <MarkExpectedPaymentReceivedDialog
         open={Boolean(receiveExpected)}
         expected={receiveExpected}
         onClose={() => setReceiveExpected(null)}
         onSubmit={async (input) => {
-          if (!receiveExpected) {
+          if (!receiveExpected || !payment) {
             return;
+          }
+          const overpayment = wouldCreateOverpayment(
+            payment.remainingAmountCents,
+            input.amountCents
+          );
+          if (
+            overpayment &&
+            !window.confirm(
+              `Ce montant dépasse le reste dû (${formatCentsAsEuros(payment.remainingAmountCents)}). Confirmer le trop-perçu ?`
+            )
+          ) {
+            throw new Error("Trop-perçu non confirmé");
           }
           try {
             await postPaymentReceive({
@@ -225,6 +230,7 @@ export function LicenseValidationPaymentDetailPanel({
               expectedId: receiveExpected.id,
               amountCents: input.amountCents,
               receivedAt: input.receivedAt,
+              ...(overpayment ? { confirmOverpayment: true } : {}),
               ...(input.reference ? { reference: input.reference } : {}),
               ...(input.note ? { note: input.note } : {}),
             });
@@ -235,19 +241,20 @@ export function LicenseValidationPaymentDetailPanel({
         }}
       />
 
-      {payment && allowedManualMethod ? (
-        <AddManualLicenseValidationPaymentDialog
+      {payment ? (
+        <AddManualPaymentDialog
           open={manualOpen}
-          method={allowedManualMethod}
-          suggestedAmountCents={manualSuggestedAmountCents}
+          suggestedAmountCents={payment.remainingAmountCents}
+          remainingAmountCents={payment.remainingAmountCents}
           onClose={() => setManualOpen(false)}
           onSubmit={async (input) => {
             await postPaymentReceive({
               mode: "manual",
-              method: allowedManualMethod,
-              label: PAYMENT_METHOD_LABELS[allowedManualMethod],
+              method: input.method,
+              label: input.label || RECEIVED_PAYMENT_METHOD_LABELS[input.method],
               amountCents: input.amountCents,
               receivedAt: input.receivedAt,
+              ...(input.confirmOverpayment ? { confirmOverpayment: true } : {}),
               ...(input.reference ? { reference: input.reference } : {}),
               ...(input.note ? { note: input.note } : {}),
             });

@@ -1,6 +1,7 @@
 import { FieldValue } from "firebase-admin/firestore";
 import type { UserRole } from "@/lib/auth/roles";
 import type { MedicalCertificateStatus } from "@/lib/club-registration/medical-certificate";
+import { initialPpsFollowUpStatus } from "@/lib/club-registration/pps-follow-up";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import { calculateQuoteWithConfig } from "@/lib/club-registration-config/pricing-resolve";
 import { buildPricingContext } from "@/lib/pricing/build-context";
@@ -92,6 +93,10 @@ export function buildRegistrationSubmitDocument(params: {
     pricingQuoteComputedAt: now,
     isMinor,
     medicalCertificateStatus,
+    ppsFollowUpStatus: initialPpsFollowUpStatus(
+      payload.medicalCertificateDeclaration
+    ),
+    ppsFollowUpEvents: [],
     licenseValidationStatus: "to_do",
     submitterUid,
     submitterAccountEmail,
