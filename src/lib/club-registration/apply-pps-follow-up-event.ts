@@ -41,8 +41,9 @@ export async function applyPpsFollowUpEvent(
     typeof data.medicalCertificateDeclaration === "string"
       ? data.medicalCertificateDeclaration
       : null;
+  const birthDate = typeof data.birthDate === "string" ? data.birthDate : null;
 
-  if (!isPpsFollowUpApplicable(declaration)) {
+  if (!isPpsFollowUpApplicable(declaration, birthDate)) {
     return {
       ok: false,
       status: 400,

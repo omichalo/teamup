@@ -106,4 +106,23 @@ describe("medical-dossier", () => {
       })
     ).toBe(false);
   });
+
+  it("traite comme mineur un joueur déjà majeur au calendrier mais pas à la date de saison", () => {
+    expect(
+      deriveMedicalCertificateDeclaration({
+        birthDate: "2008-01-15",
+        questionnaire: { summary: "all_no", answers: {} },
+        veteranPath: createEmptyMedicalVeteranPath(),
+        hasVerifiedFfttLicense: false,
+      })
+    ).toBe("minor_all_no");
+    expect(
+      deriveMedicalCertificateDeclaration({
+        birthDate: "2008-01-15",
+        questionnaire: { summary: "pps_declared", answers: {} },
+        veteranPath: createEmptyMedicalVeteranPath(),
+        hasVerifiedFfttLicense: false,
+      })
+    ).toBe("");
+  });
 });

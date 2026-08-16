@@ -1,3 +1,5 @@
+import { isMinorForClubSeason } from "@/lib/club-registration/season-age";
+
 export const MEDICAL_CERTIFICATE_STATUS_VALUES = [
   "not_required",
   "required_not_received",
@@ -178,13 +180,19 @@ function resolvePpsFollowUpKind(
 export function resolveMedicalFollowUpKind(
   declaration: string | null | undefined,
   status: string | null | undefined,
-  ppsFollowUpStatus?: string | null
+  ppsFollowUpStatus?: string | null,
+  birthDate?: string | null
 ): MedicalFollowUpKind | null {
   if (!declaration && !status && !ppsFollowUpStatus) {
     return null;
   }
 
+  const seasonMinor = Boolean(birthDate && isMinorForClubSeason(birthDate));
+
   if (declaration && PPS_EQUIVALENT_DECLARATIONS.has(declaration)) {
+    if (seasonMinor) {
+      return "ok";
+    }
     return resolvePpsFollowUpKind(ppsFollowUpStatus);
   }
 
@@ -212,8 +220,14 @@ export function resolveMedicalFollowUpKind(
 export function formatMedicalFollowUpLabel(
   declaration: string | null | undefined,
   status: string | null | undefined,
-  ppsFollowUpStatus?: string | null
+  ppsFollowUpStatus?: string | null,
+  birthDate?: string | null
 ): string {
-  const kind = resolveMedicalFollowUpKind(declaration, status, ppsFollowUpStatus);
+  const kind = resolveMedicalFollowUpKind(
+    declaration,
+    status,
+    ppsFollowUpStatus,
+    birthDate
+  );
   return kind ? MEDICAL_FOLLOW_UP_LABELS[kind] : "—";
 }

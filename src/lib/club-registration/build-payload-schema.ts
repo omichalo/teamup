@@ -10,6 +10,7 @@ import { getToggleAidRules } from "@/lib/club-registration-config/aid-rules";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import { preprocessRegistrationPayloadInput } from "./reduction-reference-codes";
 import { isMinorAt } from "./age";
+import { isMinorForClubSeason } from "./season-age";
 import {
   createEmptyMedicalVeteranPath,
   deriveMedicalCertificateDeclaration,
@@ -248,7 +249,8 @@ export function buildRegistrationPayloadSchema(config: RegistrationConfigV1) {
       }
 
       const senior = isSeniorMedicalVeteranPath(data.birthDate);
-      const minor = isMinorAt(data.birthDate);
+      const seasonMinor = isMinorForClubSeason(data.birthDate);
+      const legalMinor = isMinorAt(data.birthDate);
       const decl = data.medicalCertificateDeclaration;
       const hasVerifiedFfttLicense = Boolean(data.ffttLicenseLookup?.licence);
       const veteranPath: MedicalVeteranPath = data.medicalVeteranPath
@@ -283,7 +285,7 @@ export function buildRegistrationPayloadSchema(config: RegistrationConfigV1) {
         });
       }
 
-      if (minor) {
+      if (seasonMinor) {
         if (!data.medicalQuestionnaire.summary) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
@@ -361,14 +363,14 @@ export function buildRegistrationPayloadSchema(config: RegistrationConfigV1) {
         }
       }
 
-      if (!minor && !data.adherentEmail?.trim()) {
+      if (!legalMinor && !data.adherentEmail?.trim()) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "L'e-mail de contact est obligatoire pour un adhérent majeur.",
           path: ["adherentEmail"],
         });
       }
-      if (minor) {
+      if (legalMinor) {
         if (data.emergencyMedicalAuthorization !== "yes") {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
@@ -404,7 +406,7 @@ export function buildRegistrationPayloadSchema(config: RegistrationConfigV1) {
         }
       }
 
-      if (minor && data.adherentRole === "self") {
+      if (legalMinor && data.adherentRole === "self") {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message:

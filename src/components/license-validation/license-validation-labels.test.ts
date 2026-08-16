@@ -21,6 +21,33 @@ describe("resolveMedicalFollowUpKind", () => {
     expect(resolveMedicalFollowUpKind("minor_all_no", "not_required")).toBe("ok");
   });
 
+  it("ne traite pas l’ancien régime comme PPS pour un mineur de saison", () => {
+    expect(
+      resolveMedicalFollowUpKind(
+        "under_40_all_no",
+        "not_required",
+        undefined,
+        "2012-06-01"
+      )
+    ).toBe("ok");
+    expect(
+      formatMedicalCertificateLabel(
+        "not_required",
+        "adult_pps_declared",
+        "expected",
+        "2008-01-15"
+      )
+    ).toBe("OK");
+    expect(
+      resolveMedicalFollowUpKind(
+        "under_40_all_no",
+        "not_required",
+        undefined,
+        "2000-04-12"
+      )
+    ).toBe("pps_expected");
+  });
+
   it("distingue certificat attendu, reçu et validé", () => {
     expect(
       resolveMedicalFollowUpKind("adult_certificate_required", "required_not_received")

@@ -177,7 +177,12 @@ export async function patchManagerRegistration(
     if (nextDeclaration !== previousDeclaration) {
       const nextPpsStatus = normalizePpsFollowUpStatus(
         currentData.ppsFollowUpStatus,
-        nextDeclaration
+        nextDeclaration,
+        typeof updates.birthDate === "string"
+          ? updates.birthDate
+          : typeof currentData.birthDate === "string"
+            ? currentData.birthDate
+            : undefined
       );
       updates.ppsFollowUpStatus = nextPpsStatus;
       if (nextPpsStatus !== currentData.ppsFollowUpStatus) {
