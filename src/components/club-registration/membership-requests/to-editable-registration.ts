@@ -7,6 +7,7 @@ import { normalizeReductionReferenceCodes } from "@/lib/club-registration/reduct
 import { expandCompetitionIdsForFormFromConfig } from "@/lib/club-registration-config/helpers";
 import { normalizePaymentAidList } from "@/lib/club-registration/payment/payment-draft-helpers";
 import type { PaymentAid, RegistrationPayment } from "@/lib/club-registration/payment/types";
+import { isMinorForClubSeason } from "@/lib/club-registration/season-age";
 import type { EditableRegistration, RegistrationDetail } from "./types";
 
 /** Reprend les aides déclarées à la soumission (objet `payment` après persist). */
@@ -55,7 +56,10 @@ export function toEditableRegistration(
     slotIds: registration.slotIds ?? [],
     schoolPickupSlotIds: registration.schoolPickupSlotIds ?? [],
     medicalCertificateDeclaration:
-      registration.medicalCertificateDeclaration ?? "adult_pps_declared",
+      registration.medicalCertificateDeclaration ??
+      (isMinorForClubSeason(registration.birthDate ?? "")
+        ? "minor_all_no"
+        : "adult_pps_declared"),
     medicalCertificateStatus: normalizeMedicalCertificateStatus(
       registration.medicalCertificateStatus,
       registration.medicalCertificateDeclaration

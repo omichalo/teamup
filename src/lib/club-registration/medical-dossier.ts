@@ -1,4 +1,7 @@
-import { isAtLeast65At, isMinorAt } from "./age";
+import {
+  isAtLeast65ForClubSeason,
+  isMinorForClubSeason,
+} from "./season-age";
 import type { ClubRegistrationPayload } from "./schema";
 
 export const MEDICAL_YES_NO_VALUES = ["yes", "no"] as const;
@@ -69,13 +72,13 @@ export function deriveMedicalCertificateDeclaration(params: {
 }): MedicalCertificateDeclaration | "" {
   const { summary } = params.questionnaire;
 
-  if (isMinorAt(params.birthDate)) {
+  if (isMinorForClubSeason(params.birthDate)) {
     if (summary === "all_no") return "minor_all_no";
     if (summary === "has_yes") return "minor_yes_certificate_required";
     return "";
   }
 
-  if (isAtLeast65At(params.birthDate)) {
+  if (isAtLeast65ForClubSeason(params.birthDate)) {
     const hadLicense = effectiveHadFfttLicense(
       params.veteranPath,
       params.hasVerifiedFfttLicense
@@ -113,7 +116,7 @@ export function inferMedicalDossierFromDeclaration(
     return { questionnaire, veteranPath };
   }
 
-  const senior = isAtLeast65At(birthDate);
+  const senior = isAtLeast65ForClubSeason(birthDate);
 
   switch (declaration) {
     case "minor_all_no":
@@ -122,7 +125,9 @@ export function inferMedicalDossierFromDeclaration(
       break;
     case "minor_yes_certificate_required":
     case "questionnaire_yes_certificate_required":
-      questionnaire.summary = isMinorAt(birthDate) ? "has_yes" : "certificate_choice";
+      questionnaire.summary = isMinorForClubSeason(birthDate)
+        ? "has_yes"
+        : "certificate_choice";
       break;
     case "adult_pps_declared":
       questionnaire.summary = "pps_declared";
@@ -182,7 +187,7 @@ export function syncMedicalCertificateDeclaration<
 
 /** True si le parcours vétéran (licence / catégorie) s’applique à cette date de naissance. */
 export function isSeniorMedicalVeteranPath(birthDate: string): boolean {
-  return isAtLeast65At(birthDate);
+  return isAtLeast65ForClubSeason(birthDate);
 }
 
 /** True si l’adhérent doit choisir PPS ou certificat (adulte sans obligation certificat vétéran). */
@@ -192,8 +197,8 @@ export function needsAdultPpsOrCertificateChoice(params: {
   veteranPath: MedicalVeteranPath;
   hasVerifiedFfttLicense: boolean;
 }): boolean {
-  if (isMinorAt(params.birthDate)) return false;
-  if (!isAtLeast65At(params.birthDate)) return true;
+  if (isMinorForClubSeason(params.birthDate)) return false;
+  if (!isAtLeast65ForClubSeason(params.birthDate)) return true;
 
   const hadLicense = effectiveHadFfttLicense(
     params.veteranPath,

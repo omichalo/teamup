@@ -7,13 +7,9 @@ import {
   formatBlockingLicenseConflictMessage,
 } from "@/lib/club-registration/find-registration-license-conflicts";
 import { COLLECTION } from "@/lib/club-registration/list-registrations";
-import {
-  isLicenseValidationStatus,
-  type LicenseValidationStatus,
-} from "@/lib/license-validation/license-validation-status";
+import { normalizeLicenseValidationStatus } from "@/lib/license-validation/license-validation-status";
 import { mapRegistrationToLicenseValidationDetail } from "@/lib/license-validation/map-registration";
-
-const FFTT_LICENSE_RE = /^[0-9]{5,12}$/;
+import { resolveLicenseValidationPatchFields } from "@/lib/license-validation/resolve-license-validation-patch";
 
 export type LicenseValidationPatchInput = {
   ffttLicense?: unknown;
@@ -24,42 +20,20 @@ export type LicenseValidationPatchResult =
   | { ok: true; data: ReturnType<typeof mapRegistrationToLicenseValidationDetail> }
   | { ok: false; status: number; error: string };
 
+function readOptionalString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
 export async function patchLicenseValidation(
   db: Firestore,
   registrationId: string,
   actorUid: string,
   body: LicenseValidationPatchInput
 ): Promise<LicenseValidationPatchResult> {
-  const updates: Record<string, unknown> = {};
   const hasLicense = body.ffttLicense !== undefined;
   const hasStatus = body.licenseValidationStatus !== undefined;
-
   if (!hasLicense && !hasStatus) {
     return { ok: false, status: 400, error: "Aucun champ modifiable fourni" };
-  }
-
-  if (hasLicense) {
-    if (typeof body.ffttLicense !== "string") {
-      return { ok: false, status: 400, error: "Numéro de licence invalide" };
-    }
-    const normalized = body.ffttLicense.replace(/\D/g, "");
-    if (!FFTT_LICENSE_RE.test(normalized)) {
-      return {
-        ok: false,
-        status: 400,
-        error: "Le numéro de licence doit contenir entre 5 et 12 chiffres",
-      };
-    }
-    updates.ffttLicense = normalized;
-  }
-
-  if (hasStatus) {
-    if (!isLicenseValidationStatus(body.licenseValidationStatus)) {
-      return { ok: false, status: 400, error: "Statut de licence invalide" };
-    }
-    updates.licenseValidationStatus = body.licenseValidationStatus as LicenseValidationStatus;
-    updates.licenseValidationStatusUpdatedAt = FieldValue.serverTimestamp();
-    updates.licenseValidationStatusUpdatedBy = actorUid;
   }
 
   const docRef = db.collection(COLLECTION).doc(registrationId);
@@ -68,10 +42,41 @@ export async function patchLicenseValidation(
     return { ok: false, status: 404, error: "Dossier introuvable" };
   }
 
-  if (hasLicense) {
+  const data = snap.data() ?? {};
+  const lookup =
+    data.ffttLicenseLookup && typeof data.ffttLicenseLookup === "object"
+      ? (data.ffttLicenseLookup as Record<string, unknown>)
+      : null;
+  const resolved = resolveLicenseValidationPatchFields({
+    bodyLicense: body.ffttLicense,
+    hasLicense,
+    bodyStatus: body.licenseValidationStatus,
+    hasStatus,
+    currentLicense: readOptionalString(data.ffttLicense),
+    currentLookupLicense: lookup ? readOptionalString(lookup.licence) : null,
+    currentStatus: normalizeLicenseValidationStatus(data.licenseValidationStatus),
+  });
+  if (!resolved.ok) {
+    return { ok: false, status: 400, error: resolved.error };
+  }
+
+  const updates: Record<string, unknown> = {};
+  if (resolved.fields.ffttLicense !== undefined) {
+    // Chaîne vide = vidage volontaire : au rechargement on ne reprend pas le lookup.
+    updates.ffttLicense = resolved.fields.ffttLicense ?? "";
+  }
+  if (resolved.fields.licenseValidationStatus !== undefined) {
+    updates.licenseValidationStatus = resolved.fields.licenseValidationStatus;
+    updates.licenseValidationStatusUpdatedAt = FieldValue.serverTimestamp();
+    updates.licenseValidationStatusUpdatedBy = actorUid;
+  }
+
+  const licenseToCheck =
+    typeof updates.ffttLicense === "string" ? updates.ffttLicense : null;
+  if (licenseToCheck) {
     const conflicts = await findRegistrationLicenseConflicts(
       db,
-      updates.ffttLicense as string,
+      licenseToCheck,
       registrationId
     );
     if (conflicts.blocking.length > 0) {

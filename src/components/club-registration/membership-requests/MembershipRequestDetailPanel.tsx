@@ -70,6 +70,7 @@ export function MembershipRequestDetailPanel({
         <PpsFollowUpPanel
           registrationId={registrationId}
           medicalCertificateDeclaration={selected.medicalCertificateDeclaration}
+          birthDate={selected.birthDate ?? null}
           ppsFollowUp={readPpsFollowUpState(
             selected as unknown as Record<string, unknown>,
             selected.medicalCertificateDeclaration

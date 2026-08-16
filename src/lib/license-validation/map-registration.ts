@@ -15,6 +15,7 @@ import {
   resolveRegistrationDisplayContactEmails,
   type RegistrationDisplayContactEmail,
 } from "@/lib/club-registration/resolve-registration-contact-email";
+import { readKnownFfttLicenseFromRegistrationData } from "@/lib/license-validation/known-fftt-license";
 import {
   normalizeLicenseValidationStatus,
   type LicenseValidationStatus,
@@ -85,7 +86,7 @@ export function mapRegistrationToLicenseValidationListItem(
     lastName: readString(data, "lastName") ?? "",
     adherentEmail: readString(data, "adherentEmail") ?? "",
     birthDate: readString(data, "birthDate"),
-    ffttLicense: readString(data, "ffttLicense"),
+    ffttLicense: readKnownFfttLicenseFromRegistrationData(data),
     licenseValidationStatus: normalizeLicenseValidationStatus(
       data.licenseValidationStatus
     ),

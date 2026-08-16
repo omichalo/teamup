@@ -23,6 +23,7 @@ import {
 type Props = {
   registrationId: string;
   medicalCertificateDeclaration: string | null | undefined;
+  birthDate?: string | null;
   ppsFollowUp: PpsFollowUpState;
   onUpdated: (next: PpsFollowUpState) => void | Promise<void>;
 };
@@ -56,6 +57,7 @@ function formatEventAt(iso: string): string {
 export function PpsFollowUpPanel({
   registrationId,
   medicalCertificateDeclaration,
+  birthDate,
   ppsFollowUp,
   onUpdated,
 }: Props) {
@@ -72,7 +74,7 @@ export function PpsFollowUpPanel({
 
   const state = localOverride ?? ppsFollowUp;
 
-  if (!isPpsFollowUpApplicable(medicalCertificateDeclaration)) {
+  if (!isPpsFollowUpApplicable(medicalCertificateDeclaration, birthDate)) {
     return null;
   }
 
