@@ -19,6 +19,24 @@ describe("pps-follow-up", () => {
     expect(initialPpsFollowUpStatus("minor_all_no")).toBe("not_applicable");
   });
 
+  it("n’applique pas le suivi PPS aux mineurs de saison", () => {
+    expect(
+      isPpsFollowUpApplicable("adult_pps_declared", "2008-01-15", "2025-2026")
+    ).toBe(false);
+    expect(
+      isPpsFollowUpApplicable("under_40_all_no", "2012-06-01", "2025-2026")
+    ).toBe(false);
+    expect(
+      isPpsFollowUpApplicable("under_40_all_no", "2000-04-12", "2025-2026")
+    ).toBe(true);
+    expect(
+      initialPpsFollowUpStatus("under_40_all_no", "2012-06-01", "2025-2026")
+    ).toBe("not_applicable");
+    expect(
+      normalizePpsFollowUpStatus("expected", "under_40_all_no", "2012-06-01")
+    ).toBe("not_applicable");
+  });
+
   it("normalise le statut selon la déclaration", () => {
     expect(normalizePpsFollowUpStatus("ok", "adult_pps_declared")).toBe("ok");
     expect(

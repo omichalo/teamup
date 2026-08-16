@@ -94,7 +94,8 @@ export function buildRegistrationSubmitDocument(params: {
     isMinor,
     medicalCertificateStatus,
     ppsFollowUpStatus: initialPpsFollowUpStatus(
-      payload.medicalCertificateDeclaration
+      payload.medicalCertificateDeclaration,
+      payload.birthDate
     ),
     ppsFollowUpEvents: [],
     licenseValidationStatus: "to_do",

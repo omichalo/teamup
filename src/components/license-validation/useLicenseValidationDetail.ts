@@ -39,6 +39,7 @@ export function useLicenseValidationDetail(registrationId: string | null) {
   }, [registrationId]);
 
   useEffect(() => {
+    setDetail(null);
     void reload();
   }, [reload]);
 

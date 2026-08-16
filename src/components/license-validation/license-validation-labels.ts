@@ -32,9 +32,15 @@ export function formatSexLabel(sex: string | null | undefined): string {
 export function formatMedicalCertificateLabel(
   status: string | null,
   declaration?: string | null,
-  ppsFollowUpStatus?: string | null
+  ppsFollowUpStatus?: string | null,
+  birthDate?: string | null
 ): string {
-  return formatMedicalFollowUpLabel(declaration, status, ppsFollowUpStatus);
+  return formatMedicalFollowUpLabel(
+    declaration,
+    status,
+    ppsFollowUpStatus,
+    birthDate
+  );
 }
 
 export function formatAttestationLabel(wantsRegistrationCertificate: boolean): string {

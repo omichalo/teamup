@@ -10,7 +10,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { isAtLeast65At } from "@/lib/club-registration/age";
+import { isAtLeast65ForClubSeason } from "@/lib/club-registration/season-age";
 import { MEDICAL_QUESTIONNAIRE_SUMMARY_LABELS } from "@/lib/club-registration/medical-declaration-labels";
 import {
   buildApplyFfttIdentityPatch,
@@ -309,7 +309,7 @@ type MedicalDossierDetailProps = {
 export function RegistrationMedicalDossierDetail({
   registration,
 }: MedicalDossierDetailProps) {
-  const senior = isAtLeast65At(registration.birthDate ?? "");
+  const senior = isAtLeast65ForClubSeason(registration.birthDate ?? "");
   const summary = registration.medicalQuestionnaire?.summary;
   const veteranPath = registration.medicalVeteranPath;
   const hasVerifiedFfttLicense = Boolean(registration.ffttLicenseLookup?.licence);

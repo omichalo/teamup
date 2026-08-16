@@ -1,4 +1,5 @@
 import { isMinorAt } from "@/lib/club-registration/age";
+import { isMinorForClubSeason } from "@/lib/club-registration/season-age";
 import { getDefaultRegistrationConfig } from "@/lib/club-registration-config/default-config";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import type { RegistrationStepId } from "@/lib/club-registration/field-to-step";
@@ -26,7 +27,7 @@ function invalid(
 }
 
 function getMedicalFocusSelector(draft: RegistrationDraft): string {
-  const minor = isMinorAt(draft.birthDate);
+  const minor = isMinorForClubSeason(draft.birthDate);
   const senior = isSeniorMedicalVeteranPath(draft.birthDate);
   const hasVerified = Boolean(draft.ffttLicenseLookup?.licence);
   const hadLicense = effectiveHadFfttLicense(
@@ -246,7 +247,7 @@ export function validateStep(
 
   if (stepId === "admin") {
     const senior = isSeniorMedicalVeteranPath(draft.birthDate);
-    const minor = isMinorAt(draft.birthDate);
+    const minor = isMinorForClubSeason(draft.birthDate);
     const decl = draft.medicalCertificateDeclaration;
     if (
       !decl ||

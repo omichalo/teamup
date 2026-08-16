@@ -70,7 +70,8 @@ export function mapRegistrationDocToSummary(
     data.ppsFollowUpStatus,
     typeof data.medicalCertificateDeclaration === "string"
       ? data.medicalCertificateDeclaration
-      : undefined
+      : undefined,
+    typeof data.birthDate === "string" ? data.birthDate : undefined
   );
   const submittedAtMs: number = data.submittedAt?.toMillis?.() ?? 0;
   summary.submittedAt = data.submittedAt?.toDate?.()?.toISOString?.() ?? null;
@@ -255,7 +256,8 @@ function filterManagedSummaries(
         : undefined;
     const ppsStatus = normalizePpsFollowUpStatus(
       summary.ppsFollowUpStatus,
-      declaration
+      declaration,
+      typeof summary.birthDate === "string" ? summary.birthDate : undefined
     );
     return (
       matchesManagedStatusFilter(summary, params.statusFilter) &&

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Alert,
   Box,
@@ -18,8 +18,10 @@ import {
 import {
   LICENSE_VALIDATION_STATUS_LABELS,
   LICENSE_VALIDATION_STATUS_VALUES,
+  requiresFfttLicenseNumber,
   type LicenseValidationStatus,
 } from "@/lib/license-validation/license-validation-status";
+import { LICENSE_REQUIRED_MESSAGE } from "@/lib/license-validation/resolve-license-validation-patch";
 import {
   formatRegistrationAddress,
   type LicenseValidationDetail,
@@ -61,20 +63,33 @@ export function LicenseValidationLicenseDetailPanel({
   const { detail, loading, error, reload, setDetail } = useLicenseValidationDetail(registrationId);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [ffttLicense, setFfttLicense] = useState("");
-  const [licenseValidationStatus, setLicenseValidationStatus] =
-    useState<LicenseValidationStatus>("to_do");
+  const [licenseDraft, setLicenseDraft] = useState<string | null>(null);
+  const [statusDraft, setStatusDraft] = useState<LicenseValidationStatus | null>(
+    null
+  );
+  const [draftRegistrationId, setDraftRegistrationId] = useState<string | null>(
+    null
+  );
 
-  useEffect(() => {
-    if (!detail) {
-      return;
-    }
-    setFfttLicense(detail.ffttLicense ?? "");
-    setLicenseValidationStatus(detail.licenseValidationStatus);
-  }, [detail]);
+  const isDraftForCurrent =
+    Boolean(registrationId) && draftRegistrationId === registrationId;
+  const knownLicense =
+    detail && detail.id === registrationId ? (detail.ffttLicense ?? "") : "";
+  const ffttLicense =
+    isDraftForCurrent && licenseDraft !== null ? licenseDraft : knownLicense;
+  const licenseValidationStatus: LicenseValidationStatus =
+    isDraftForCurrent && statusDraft !== null
+      ? statusDraft
+      : (detail?.id === registrationId
+          ? detail.licenseValidationStatus
+          : "to_do");
 
   const handleSave = async () => {
     if (!registrationId) {
+      return;
+    }
+    if (requiresFfttLicenseNumber(licenseValidationStatus) && ffttLicense.trim().length < 5) {
+      setSaveError(LICENSE_REQUIRED_MESSAGE);
       return;
     }
     setSaving(true);
@@ -94,6 +109,9 @@ export function LicenseValidationLicenseDetailPanel({
         throw new Error(json.error || "Enregistrement impossible");
       }
       const registration = json.registration as LicenseValidationDetail;
+      setLicenseDraft(null);
+      setStatusDraft(null);
+      setDraftRegistrationId(null);
       await reload();
       await onSaved(registration);
     } catch (err) {
@@ -137,11 +155,6 @@ export function LicenseValidationLicenseDetailPanel({
     return null;
   }
 
-  const lookupLicense =
-    typeof detail.ffttLicenseLookup?.licence === "string"
-      ? detail.ffttLicenseLookup.licence
-      : null;
-
   const infoFields: Array<{ label: string; value: string; fullWidth?: boolean }> = [
     { label: "Date de naissance", value: formatBirthDate(detail.birthDate) },
     { label: "Sexe", value: formatSexLabel(detail.sex) },
@@ -159,39 +172,13 @@ export function LicenseValidationLicenseDetailPanel({
     infoFields.push({
       label: "E-mail",
       value: "—",
-      fullWidth: !lookupLicense,
     });
-    if (lookupLicense) {
-      infoFields.push({
-        label: "Licence enregistrée (dossier)",
-        value: lookupLicense,
-      });
-    }
-  } else if (contactEmails.length === 1) {
-    infoFields.push({
-      label: contactEmails[0]!.label,
-      value: contactEmails[0]!.email,
-      fullWidth: !lookupLicense,
-    });
-    if (lookupLicense) {
-      infoFields.push({
-        label: "Licence enregistrée (dossier)",
-        value: lookupLicense,
-      });
-    }
   } else {
     for (const contact of contactEmails) {
       infoFields.push({
         label: contact.label,
         value: contact.email,
-        fullWidth: true,
-      });
-    }
-    if (lookupLicense) {
-      infoFields.push({
-        label: "Licence enregistrée (dossier)",
-        value: lookupLicense,
-        fullWidth: true,
+        fullWidth: contactEmails.length > 1,
       });
     }
   }
@@ -212,7 +199,8 @@ export function LicenseValidationLicenseDetailPanel({
       value: formatMedicalCertificateLabel(
         detail.medicalCertificateStatus,
         detail.medicalCertificateDeclaration,
-        detail.ppsFollowUp.status
+        detail.ppsFollowUp.status,
+        detail.birthDate
       ),
     },
     {
@@ -244,12 +232,21 @@ export function LicenseValidationLicenseDetailPanel({
         <Grid container spacing={1.5}>
           <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
-              label="Nouveau numéro de licence"
+              label="Numéro de licence"
               value={ffttLicense}
-              onChange={(e) => setFfttLicense(e.target.value.replace(/\D/g, ""))}
+              onChange={(e) => {
+                setDraftRegistrationId(registrationId);
+                setLicenseDraft(e.target.value.replace(/\D/g, ""));
+              }}
               fullWidth
               size="small"
+              required={requiresFfttLicenseNumber(licenseValidationStatus)}
               inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
+              helperText={
+                requiresFfttLicenseNumber(licenseValidationStatus)
+                  ? "Obligatoire pour Traité et Validé sans pratique sportive"
+                  : " "
+              }
             />
           </Grid>
           <Grid size={{ xs: 12, sm: 6 }}>
@@ -259,9 +256,10 @@ export function LicenseValidationLicenseDetailPanel({
                 labelId="license-validation-status-label"
                 label="Statut licence"
                 value={licenseValidationStatus}
-                onChange={(e) =>
-                  setLicenseValidationStatus(e.target.value as LicenseValidationStatus)
-                }
+                onChange={(e) => {
+                  setDraftRegistrationId(registrationId);
+                  setStatusDraft(e.target.value as LicenseValidationStatus);
+                }}
               >
                 {LICENSE_VALIDATION_STATUS_VALUES.map((status) => (
                   <MenuItem key={status} value={status}>
@@ -282,6 +280,7 @@ export function LicenseValidationLicenseDetailPanel({
         <PpsFollowUpPanel
           registrationId={registrationId}
           medicalCertificateDeclaration={detail.medicalCertificateDeclaration}
+          birthDate={detail.birthDate}
           ppsFollowUp={detail.ppsFollowUp}
           onUpdated={(next) => {
             setDetail((current) =>

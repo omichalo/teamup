@@ -10,7 +10,7 @@ import {
   Typography,
 } from "@mui/material";
 import { CLUB_REGISTRATION_EXTERNAL_LINKS } from "@/lib/club-registration/constants";
-import { isMinorAt } from "@/lib/club-registration/age";
+import { isMinorForClubSeason } from "@/lib/club-registration/season-age";
 import { isMedicalCertificateRequired } from "@/lib/club-registration/medical-certificate";
 import {
   createEmptyMedicalQuestionnaire,
@@ -288,7 +288,7 @@ function SeniorVeteranBlock({
 }
 
 export function MedicalDeclarationSection({ draft, patchMedical }: Props) {
-  const minor = isMinorAt(draft.birthDate);
+  const minor = isMinorForClubSeason(draft.birthDate);
   const senior = isSeniorMedicalVeteranPath(draft.birthDate);
   const hasVerifiedFfttLicense = Boolean(draft.ffttLicenseLookup?.licence);
   const skipFirstLicenseQuestion = senior && hasVerifiedFfttLicense;

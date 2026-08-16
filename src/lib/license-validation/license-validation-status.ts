@@ -20,6 +20,13 @@ export const LICENSE_VALIDATION_STATUS_LABELS: Record<
 
 export const DEFAULT_LICENSE_VALIDATION_STATUS: LicenseValidationStatus = "to_do";
 
+/** Le numéro FFTT est obligatoire pour « Traité » et « Validé sans pratique sportive ». */
+export function requiresFfttLicenseNumber(
+  status: LicenseValidationStatus
+): boolean {
+  return status === "done" || status === "validated_without_sport";
+}
+
 export function isLicenseValidationStatus(
   value: unknown
 ): value is LicenseValidationStatus {

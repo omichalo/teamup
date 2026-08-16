@@ -1,3 +1,5 @@
+import { isMinorForClubSeason } from "@/lib/club-registration/season-age";
+
 /**
  * Suivi local historisé du PPS (Parcours Prévention Santé FFTT).
  * L’app n’a pas accès à l’espace licencié : saisie manuelle secrétariat / adjoint.
@@ -73,22 +75,33 @@ export function isPpsFollowUpEventType(
 }
 
 export function isPpsFollowUpApplicable(
-  declaration: string | null | undefined
+  declaration: string | null | undefined,
+  birthDate?: string | null,
+  seasonLabel?: string
 ): boolean {
+  if (birthDate && isMinorForClubSeason(birthDate, seasonLabel)) {
+    return false;
+  }
   return Boolean(declaration && PPS_FOLLOW_UP_DECLARATIONS.has(declaration));
 }
 
 export function initialPpsFollowUpStatus(
-  declaration: string | null | undefined
+  declaration: string | null | undefined,
+  birthDate?: string | null,
+  seasonLabel?: string
 ): PpsFollowUpStatus {
-  return isPpsFollowUpApplicable(declaration) ? "expected" : "not_applicable";
+  return isPpsFollowUpApplicable(declaration, birthDate, seasonLabel)
+    ? "expected"
+    : "not_applicable";
 }
 
 export function normalizePpsFollowUpStatus(
   status: unknown,
-  declaration: string | null | undefined
+  declaration: string | null | undefined,
+  birthDate?: string | null,
+  seasonLabel?: string
 ): PpsFollowUpStatus {
-  if (!isPpsFollowUpApplicable(declaration)) {
+  if (!isPpsFollowUpApplicable(declaration, birthDate, seasonLabel)) {
     return "not_applicable";
   }
   if (isPpsFollowUpStatus(status) && status !== "not_applicable") {
@@ -207,7 +220,15 @@ export function readPpsFollowUpState(
   data: Record<string, unknown>,
   declaration: string | null | undefined
 ): PpsFollowUpState {
-  const status = normalizePpsFollowUpStatus(data.ppsFollowUpStatus, declaration);
+  const birthDate =
+    typeof data.birthDate === "string" && data.birthDate.length > 0
+      ? data.birthDate
+      : undefined;
+  const status = normalizePpsFollowUpStatus(
+    data.ppsFollowUpStatus,
+    declaration,
+    birthDate
+  );
   const updatedAt = readEventAt(data.ppsFollowUpUpdatedAt);
   const updatedBy =
     typeof data.ppsFollowUpUpdatedBy === "string" &&
