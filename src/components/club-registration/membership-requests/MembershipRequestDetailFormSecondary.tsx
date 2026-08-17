@@ -21,7 +21,6 @@ import { RegistrationMultiSelectField } from "../RegistrationMultiSelectField";
 import type { RegistrationDraft } from "../registration-defaults";
 import { PaymentTrackingSection } from "../secretariat/PaymentTrackingSection";
 import { SecretariatAidAmountFields } from "../secretariat/SecretariatAidAmountFields";
-import { SecretariatPaymentNotesSection } from "../secretariat/SecretariatPaymentNotesSection";
 import { RegistrationMedicalDossierDetail } from "./RegistrationSupplementarySections";
 import { DetailSectionTitle } from "./DetailSectionTitle";
 import {
@@ -31,8 +30,7 @@ import {
   MEDICAL_OPTIONS,
 } from "./membership-request-detail-shared";
 import { MembershipRequestDonationSection } from "./MembershipRequestDonationSection";
-import { DeleteRegistrationSection } from "./DeleteRegistrationSection";
-import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
+import { MembershipRequestDetailFooter } from "./MembershipRequestDetailFooter";
 import type { MembershipRequestDetailState } from "./useMembershipRequestDetail";
 import type { EditableRegistration, MembershipListReloadFn } from "./types";
 
@@ -67,8 +65,6 @@ export function MembershipRequestDetailFormSecondary({
     updateMedicalDeclaration,
     applyCalculatedAmount,
     persistQuote,
-    save,
-    requestPayment,
   } = detail;
 
   if (!selected || !form) return null;
@@ -363,37 +359,11 @@ export function MembershipRequestDetailFormSecondary({
         />
       ) : null}
 
-      <SecretariatPaymentNotesSection
-        amountEuros={form.amountEuros}
-        reviewNotes={form.reviewNotes}
-        onAmountEurosChange={(value) => updateField("amountEuros", value)}
-        onReviewNotesChange={(value) => updateField("reviewNotes", value)}
-        registrationStatus={selected.status ?? null}
-        paymentRequestedAt={selected.paymentRequestedAt ?? null}
-        paymentAmountCents={selected.paymentAmountCents ?? null}
-        paymentEmailSentTo={selected.paymentEmailSentTo ?? null}
-        paymentMethod={selectedPayment?.paymentMethod}
-        saving={saving}
-        requestingPayment={requestingPayment}
-        persistingQuote={persistingQuote}
-        onSave={() => void save()}
-        onRequestPayment={requestPayment}
+      <MembershipRequestDetailFooter
+        detail={detail}
+        onListReload={onListReload}
+        onDeleted={onDeleted}
       />
-
-      {registrationId ? (
-        <DeleteRegistrationSection
-          registrationId={registrationId}
-          firstName={form.firstName}
-          lastName={form.lastName}
-          adherentDisplayName={formatPersonDisplayName(form.firstName, form.lastName)}
-          status={selected.status ?? null}
-          disabled={saving || requestingPayment || persistingQuote}
-          onDeleted={async () => {
-            await onListReload?.({ advance: "always" });
-            await onDeleted?.();
-          }}
-        />
-      ) : null}
     </Stack>
   );
 }
