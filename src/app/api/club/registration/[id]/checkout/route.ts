@@ -26,6 +26,7 @@ import {
   canSelfServiceCheckout,
   resolveSelfServicePayableCents,
 } from "@/lib/club-registration/self-service-checkout";
+import { resolveCheckoutChargeAmounts } from "@/lib/club-registration/payment/resolve-remaining-payable";
 import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
 import type { PriceQuote } from "@/lib/pricing/types";
 
@@ -123,10 +124,12 @@ export async function POST(
       invoiceTotalCents
     );
 
-    const amountToPayCents =
-      payment?.amountToPayCents ?? resolveSelfServicePayableCents(data);
+    const charge = resolveCheckoutChargeAmounts(
+      payment,
+      resolveSelfServicePayableCents(data)
+    );
 
-    if (amountToPayCents <= 0) {
+    if (charge.remainingPayableCents <= 0) {
       return jsonNoStore({ error: "Aucun montant à régler pour ce dossier." }, { status: 400 });
     }
 
@@ -136,7 +139,9 @@ export async function POST(
       donationPricing,
       pricingConfig,
       payment,
-      amountToPayCents,
+      amountToPayCents: charge.amountToPayCents,
+      alreadyPaidCents: charge.alreadyPaidCents,
+      remainingPayableCents: charge.remainingPayableCents,
       paymentEmail,
       adherentName,
       successUrl,
@@ -164,7 +169,7 @@ export async function POST(
       resource: "clubRegistration",
       resourceId: id,
       details: {
-        amountCents: amountToPayCents,
+        amountCents: charge.remainingPayableCents,
         stripeCheckoutSessionId: checkoutResult.result.session.id,
         selfService: true,
       },

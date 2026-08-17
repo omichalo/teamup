@@ -23,6 +23,8 @@ import {
   SECRETARIAT_RESEND_PAYMENT_BUTTON,
   SECRETARIAT_RESEND_PAYMENT_TOOLTIP,
   SECRETARIAT_SELF_SERVICE_HINT,
+  SECRETARIAT_SEND_ONLINE_PAYMENT_BUTTON,
+  SECRETARIAT_SEND_ONLINE_PAYMENT_TOOLTIP,
 } from "@/lib/club-registration/payment/bnpl-checkout-copy";
 import {
   PAYMENT_METHOD_LABELS,
@@ -39,11 +41,13 @@ type Props = {
   paymentAmountCents?: number | null;
   paymentEmailSentTo?: string | null | undefined;
   paymentMethod?: PaymentMethodId | null | undefined;
+  remainingAmountCents?: number | null;
   saving: boolean;
   requestingPayment: boolean;
   persistingQuote: boolean;
   onSave: () => void | Promise<void>;
   onRequestPayment: () => void | Promise<void>;
+  onRequestOnlinePayment?: () => void | Promise<void>;
 };
 
 const tooltipEnterProps = { enterDelay: 400, enterNextDelay: 400 } as const;
@@ -79,14 +83,22 @@ export function SecretariatPaymentNotesSection({
   paymentAmountCents,
   paymentEmailSentTo,
   paymentMethod,
+  remainingAmountCents = null,
   saving,
   requestingPayment,
   persistingQuote,
   onSave,
   onRequestPayment,
+  onRequestOnlinePayment,
 }: Props) {
   const canSendStripeEmail = paymentMethod === "card";
   const isPaid = registrationStatus === "paid";
+  const remaining = remainingAmountCents ?? null;
+  const canOfferOnlineLink =
+    !isPaid &&
+    Boolean(onRequestOnlinePayment) &&
+    !canSendStripeEmail &&
+    (remaining == null || remaining > 0);
   const isPaymentResend = registrationStatus === "payment_requested" && !isPaid;
   const paymentButtonLabel = isPaymentResend
     ? canSendStripeEmail
@@ -111,16 +123,17 @@ export function SecretariatPaymentNotesSection({
 
       {paymentMethod === "card" ? (
         <Alert severity="info" variant="outlined">
-          Mode <strong>carte bancaire</strong> : un lien Stripe Checkout sera envoyé par
-          e-mail. {BNPL_SECRETARIAT_ALERT} {CHECKOUT_LINK_VALIDITY_NOTICE}{" "}
+          Mode prévu <strong>carte bancaire</strong> : un lien Stripe Checkout sera
+          envoyé par e-mail. {BNPL_SECRETARIAT_ALERT} {CHECKOUT_LINK_VALIDITY_NOTICE}{" "}
           {SECRETARIAT_SELF_SERVICE_HINT}
         </Alert>
       ) : null}
 
       {paymentMethod && paymentMethod !== "card" ? (
         <Alert severity="info" variant="outlined">
-          Mode <strong>{PAYMENT_METHOD_LABELS[paymentMethod]}</strong> : aucun lien Stripe
-          ne sera envoyé. Utilisez le tableau de suivi pour noter les encaissements reçus.
+          Mode prévu <strong>{PAYMENT_METHOD_LABELS[paymentMethod]}</strong> : les
+          instructions de règlement suivent cette intention. Vous pouvez aussi envoyer
+          un lien de paiement en ligne si l&apos;adhérent règle finalement par carte.
         </Alert>
       ) : null}
 
@@ -138,7 +151,11 @@ export function SecretariatPaymentNotesSection({
                 </InputAdornment>
               ),
             }}
-            helperText="Doit correspondre au reste dû après aides (voir tarification). C’est ce montant qui figurera sur la demande de paiement ou sur vos relances."
+            helperText={
+              remaining != null && remaining !== paymentAmountCents
+                ? `Net après aides. Le solde réellement demandé sera ${formatAmountCents(remaining)}.`
+                : "Doit correspondre au net après aides (voir tarification)."
+            }
           />
         </Grid>
         <Grid size={{ xs: 12 }}>
@@ -190,23 +207,44 @@ export function SecretariatPaymentNotesSection({
           </span>
         </Tooltip>
         {isPaid ? null : (
-          <Tooltip
-            title={paymentTooltip}
-            slotProps={{ popper: { sx: { maxWidth: 340 } } }}
-            {...tooltipEnterProps}
-          >
-            <span>
-              <Button
-                variant="contained"
-                color="secondary"
-                startIcon={<MarkEmailReadIcon />}
-                onClick={() => void onRequestPayment()}
-                disabled={saving || requestingPayment || persistingQuote}
+          <>
+            {canOfferOnlineLink ? (
+              <Tooltip
+                title={SECRETARIAT_SEND_ONLINE_PAYMENT_TOOLTIP}
+                slotProps={{ popper: { sx: { maxWidth: 340 } } }}
+                {...tooltipEnterProps}
               >
-                {requestingPayment ? "Envoi..." : paymentButtonLabel}
-              </Button>
-            </span>
-          </Tooltip>
+                <span>
+                  <Button
+                    variant="outlined"
+                    color="secondary"
+                    startIcon={<MarkEmailReadIcon />}
+                    onClick={() => void onRequestOnlinePayment?.()}
+                    disabled={saving || requestingPayment || persistingQuote}
+                  >
+                    {SECRETARIAT_SEND_ONLINE_PAYMENT_BUTTON}
+                  </Button>
+                </span>
+              </Tooltip>
+            ) : null}
+            <Tooltip
+              title={paymentTooltip}
+              slotProps={{ popper: { sx: { maxWidth: 340 } } }}
+              {...tooltipEnterProps}
+            >
+              <span>
+                <Button
+                  variant="contained"
+                  color="secondary"
+                  startIcon={<MarkEmailReadIcon />}
+                  onClick={() => void onRequestPayment()}
+                  disabled={saving || requestingPayment || persistingQuote}
+                >
+                  {requestingPayment ? "Envoi..." : paymentButtonLabel}
+                </Button>
+              </span>
+            </Tooltip>
+          </>
         )}
       </Stack>
     </>

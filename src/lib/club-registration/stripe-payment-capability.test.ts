@@ -11,26 +11,24 @@ describe("createStripePaymentForRegistration", () => {
     ).resolves.toEqual({ supported: true });
   });
 
-  it("refuse le mode chèque", async () => {
+  it("autorise Stripe même si le mode prévu est chèque", async () => {
     const result = await createStripePaymentForRegistration({
       registrationId: "reg_1",
       amountToPayCents: 12_000,
       paymentMethod: "cheque",
     });
 
-    expect(result.supported).toBe(false);
-    expect(result.reason).toContain("Chèque");
+    expect(result.supported).toBe(true);
   });
 
-  it("refuse les chèques vacances", async () => {
+  it("autorise Stripe pour les chèques vacances", async () => {
     const result = await createStripePaymentForRegistration({
       registrationId: "reg_1",
       amountToPayCents: 12_000,
       paymentMethod: "holiday_vouchers",
     });
 
-    expect(result.supported).toBe(false);
-    expect(result.reason).toContain("Chèques vacances");
+    expect(result.supported).toBe(true);
   });
 
   it("refuse un montant nul", async () => {

@@ -56,7 +56,7 @@ export function canQuickResendPaymentLink(registration: RegistrationSummary): bo
   const payment =
     registration.payment ??
     normalizeRegistrationPayment(registration as unknown as Record<string, unknown>);
-  if (payment?.paymentMethod !== "card") {
+  if (payment && payment.remainingAmountCents <= 0 && payment.paidAmountCents > 0) {
     return false;
   }
   const amountCents = resolveQuickPaymentAmountCents(registration);

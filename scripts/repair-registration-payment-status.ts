@@ -29,6 +29,7 @@ import {
   paymentToFirestoreUpdate,
 } from "../src/lib/club-registration/payment/normalize-payment";
 import { markPaymentFullyPaid } from "../src/lib/club-registration/payment/payment-mutations";
+import { receivedMethodFromPlanned } from "../src/lib/club-registration/payment/received-method-from-planned";
 import { needsRegistrationPaymentStatusRepair } from "../src/lib/club-registration/repair-registration-payment-status";
 import { resolveRegistrationPaymentStatus } from "../src/lib/club-registration/resolve-registration-payment-status";
 import { formatPersonDisplayName } from "../src/lib/shared/person-name-format";
@@ -191,7 +192,11 @@ function formatPaidAt(value: unknown): string {
 function buildRepairPatch(data: DocumentData): Record<string, unknown> {
   const payment = normalizeRegistrationPayment(data);
   const nextPayment = payment
-    ? markPaymentFullyPaid(payment, { recordedBy: "repair-script" })
+    ? markPaymentFullyPaid(payment, {
+        method: receivedMethodFromPlanned(payment.paymentMethod),
+        recordedBy: "repair-script",
+        note: "Réparation de statut — moyen repris du mode prévu",
+      })
     : null;
 
   return {

@@ -16,6 +16,7 @@ import {
   paymentToFirestoreUpdate,
 } from "@/lib/club-registration/payment/normalize-payment";
 import { recalculateRegistrationPayment } from "@/lib/club-registration/payment/payment-mutations";
+import { resolveCheckoutChargeAmounts } from "@/lib/club-registration/payment/resolve-remaining-payable";
 import {
   calculateQuoteForRecord,
   resolveRegistrationConfigForRecord,
@@ -67,6 +68,7 @@ export async function POST(
     const { id } = await context.params;
     const body = ((await req.json().catch(() => ({}))) ?? {}) as {
       amountCents?: number;
+      channel?: "stripe" | "instructions";
     };
 
     const db = getFirestoreAdmin();
@@ -128,10 +130,12 @@ export async function POST(
       invoiceTotalCents
     );
 
-    const amountToPayCents =
-      payment?.amountToPayCents ??
-      quote?.totalCents ??
-      (typeof requestedAmount === "number" ? requestedAmount : 0);
+    const charge = resolveCheckoutChargeAmounts(
+      payment,
+      quote?.totalCents ?? (typeof requestedAmount === "number" ? requestedAmount : 0)
+    );
+    const amountToPayCents = charge.amountToPayCents;
+    const payableCents = charge.remainingPayableCents;
 
     if (amountToPayCents <= 0) {
       const zeroPayment = payment
@@ -154,6 +158,16 @@ export async function POST(
       );
     }
 
+    if (payableCents <= 0) {
+      return jsonNoStore(
+        {
+          error:
+            "Ce dossier est déjà réglé (paiement enregistré). Impossible de renvoyer un lien de paiement.",
+        },
+        { status: 409 }
+      );
+    }
+
     if (requestedAmount !== amountToPayCents) {
       return jsonNoStore(
         {
@@ -166,13 +180,14 @@ export async function POST(
     }
 
     const paymentMethod = payment?.paymentMethod ?? "card";
-    const stripeCapability = await createStripePaymentForRegistration({
-      registrationId: id,
-      amountToPayCents,
-      paymentMethod,
-    });
+    const channel =
+      body.channel === "stripe" || body.channel === "instructions"
+        ? body.channel
+        : paymentMethod === "card"
+          ? "stripe"
+          : "instructions";
 
-    if (!stripeCapability.supported) {
+    if (channel === "instructions") {
       const manualResult = await processManualPaymentFollowUp({
         docRef,
         registrationId: id,
@@ -180,6 +195,7 @@ export async function POST(
         quote,
         donationPricing,
         amountToPayCents,
+        payableCents,
         paymentMethod,
         paymentEmails,
         adherentName,
@@ -202,12 +218,27 @@ export async function POST(
       );
     }
 
+    const stripeCapability = await createStripePaymentForRegistration({
+      registrationId: id,
+      amountToPayCents: payableCents,
+      paymentMethod,
+    });
+
+    if (!stripeCapability.supported) {
+      return jsonNoStore(
+        { error: stripeCapability.reason ?? "Paiement en ligne indisponible." },
+        { status: 400 }
+      );
+    }
+
     const checkoutValidation = validateRegistrationStripeCheckout({
       quote,
       donationPricing,
       pricingConfig,
       payment,
       amountToPayCents,
+      alreadyPaidCents: charge.alreadyPaidCents,
+      remainingPayableCents: payableCents,
     });
     if (!checkoutValidation.ok) {
       return jsonNoStore(checkoutValidation.body, { status: checkoutValidation.status });
@@ -220,6 +251,7 @@ export async function POST(
       quote,
       donationPricing,
       amountToPayCents,
+      payableCents,
       paymentEmails,
       adherentName,
       baseUrl,

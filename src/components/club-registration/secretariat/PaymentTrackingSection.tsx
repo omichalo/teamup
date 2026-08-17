@@ -21,6 +21,7 @@ import {
   PAYMENT_STATUS_LABELS,
   REMAINING_PAYMENT_METHOD_LABELS,
 } from "@/lib/club-registration/payment-constants";
+import { receivedMethodFromPlanned } from "@/lib/club-registration/payment/received-method-from-planned";
 import type { ExpectedPayment, RegistrationPayment } from "@/lib/club-registration/payment/types";
 import { formatCentsAsEuros } from "@/lib/pricing";
 import { AddManualPaymentDialog } from "./AddManualPaymentDialog";
@@ -72,17 +73,17 @@ export function PaymentTrackingSection({
         value: formatCentsAsEuros(payment.assistanceTotalAmountCents),
       },
       {
-        label: "Reste à payer (initial)",
+        label: "Montant à régler",
         value: formatCentsAsEuros(payment.amountToPayCents),
       },
-      { label: "Montant déjà reçu", value: formatCentsAsEuros(payment.paidAmountCents) },
-      { label: "Reste dû", value: formatCentsAsEuros(payment.remainingAmountCents) },
+      { label: "Montant encaissé", value: formatCentsAsEuros(payment.paidAmountCents) },
+      { label: "Solde restant", value: formatCentsAsEuros(payment.remainingAmountCents) },
       {
         label: "Statut",
         value: PAYMENT_STATUS_LABELS[payment.paymentStatus],
       },
       {
-        label: "Mode choisi",
+        label: "Mode prévu",
         value: PAYMENT_METHOD_LABELS[payment.paymentMethod],
       },
       ...(payment.paymentMethod === "cheque"
@@ -189,7 +190,7 @@ export function PaymentTrackingSection({
       {payment.expectedPayments.length > 0 ? (
         <>
           <Typography variant="subtitle2" fontWeight={600}>
-            Paiements attendus
+            Règlement prévu
           </Typography>
           <Table size="small">
             <TableHead>
@@ -253,7 +254,7 @@ export function PaymentTrackingSection({
         <>
           <Divider />
           <Typography variant="subtitle2" fontWeight={600}>
-            Paiements reçus
+            Encaissements reçus
           </Typography>
           <Table size="small">
             <TableHead>
@@ -293,18 +294,16 @@ export function PaymentTrackingSection({
           </Button>
         </Tooltip>
         <Tooltip
-          title="Raccourci quand tout est réglé d’un coup, sans cocher chaque ligne. À utiliser avec prudence (contrôle trésorerie)."
+          title="Ouvre le formulaire d’encaissement, prérempli avec le solde restant. Choisissez le moyen réellement reçu."
           slotProps={{ popper: { sx: { maxWidth: 300 } } }}
           enterDelay={400}
         >
           <Button
             variant="outlined"
             color="success"
-            onClick={() =>
-              void runAction(() => postPaymentAction(registrationId, "/mark-paid", {}))
-            }
+            onClick={() => setManualOpen(true)}
           >
-            Tout est payé (raccourci)
+            Tout est payé
           </Button>
         </Tooltip>
         <Tooltip
@@ -330,6 +329,7 @@ export function PaymentTrackingSection({
         open={manualOpen}
         suggestedAmountCents={payment.remainingAmountCents}
         remainingAmountCents={payment.remainingAmountCents}
+        defaultMethod={receivedMethodFromPlanned(payment.paymentMethod)}
         onClose={() => setManualOpen(false)}
         onSubmit={async (input) => {
           await runAction(() =>

@@ -359,7 +359,7 @@ export function useMembershipRequestDetail(
     }
   };
 
-  const requestPayment = async () => {
+  const requestPayment = async (channel?: "stripe" | "instructions") => {
     if (!registrationId || !form) return;
     const amountCents = parseAmountCents(form.amountEuros);
     if (!amountCents || amountCents <= 0) {
@@ -383,7 +383,10 @@ export function useMembershipRequestDetail(
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amountCents }),
+          body: JSON.stringify({
+            amountCents,
+            ...(channel ? { channel } : {}),
+          }),
         }
       );
       const json = await res.json().catch(() => ({}));

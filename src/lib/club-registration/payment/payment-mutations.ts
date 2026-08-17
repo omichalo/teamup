@@ -89,7 +89,7 @@ export function markExpectedPaymentReceived(
     receivedPayments: [...payment.receivedPayments, received],
   };
 
-  return recalculateRegistrationPayment(next);
+  return finalizeAfterReceipt(next);
 }
 
 export function cancelExpectedPayment(
@@ -133,7 +133,7 @@ export function addManualReceivedPayment(
     ...(input.note ? { note: input.note } : {}),
   };
 
-  return recalculateRegistrationPayment({
+  return finalizeAfterReceipt({
     ...payment,
     receivedPayments: [...payment.receivedPayments, received],
   });
@@ -152,33 +152,62 @@ function RECEIVED_PAYMENT_METHOD_LABELS_FALLBACK(
   return labels[method];
 }
 
+export const CANCELLED_EXPECTED_REPLACED_NOTE =
+  "Remplacé par le règlement effectivement reçu.";
+
+/**
+ * Plan prévisionnel : si le solde est à 0, les lignes encore « expected »
+ * sont annulées. Les lignes déjà « received » restent intactes.
+ */
+export function cancelOutstandingExpectedPayments(
+  payment: RegistrationPayment,
+  note: string = CANCELLED_EXPECTED_REPLACED_NOTE
+): RegistrationPayment {
+  if (payment.remainingAmountCents > 0) {
+    return payment;
+  }
+
+  let changed = false;
+  const expectedPayments = payment.expectedPayments.map((line) => {
+    if (line.status !== "expected") {
+      return line;
+    }
+    changed = true;
+    const cancelled: ExpectedPayment = { ...line, status: "cancelled", note };
+    return cancelled;
+  });
+
+  return changed ? { ...payment, expectedPayments } : payment;
+}
+
+function finalizeAfterReceipt(payment: RegistrationPayment): RegistrationPayment {
+  return cancelOutstandingExpectedPayments(recalculateRegistrationPayment(payment));
+}
+
 export function markPaymentFullyPaid(
   payment: RegistrationPayment,
-  input?: { note?: string; recordedBy?: string }
+  input: {
+    method: ReceivedPaymentMethodId;
+    note?: string;
+    recordedBy?: string;
+  }
 ): RegistrationPayment {
   const remaining = payment.remainingAmountCents;
   if (remaining <= 0) {
-    return recalculateRegistrationPayment({
+    return finalizeAfterReceipt({
       ...payment,
-      paymentStatus: "paid",
+      paymentStatus: "paid" satisfies PaymentStatusId,
     });
   }
 
-  const withReceipt = addManualReceivedPayment(payment, {
-    method: payment.paymentMethod === "cheque" ? "cheque" : "card",
+  return addManualReceivedPayment(payment, {
+    method: input.method,
     label: "Solde — marqué payé par le secrétariat",
     amountCents: remaining,
     receivedAt: new Date().toISOString(),
-    ...(input?.note ? { note: input.note } : {}),
-    ...(input?.recordedBy ? { recordedBy: input.recordedBy } : {}),
+    ...(input.note ? { note: input.note } : {}),
+    ...(input.recordedBy ? { recordedBy: input.recordedBy } : {}),
   });
-
-  return {
-    ...withReceipt,
-    paymentStatus: "paid" satisfies PaymentStatusId,
-    remainingAmountCents: 0,
-    paidAmountCents: withReceipt.amountToPayCents,
-  };
 }
 
 export function setManualFollowUp(

@@ -70,7 +70,7 @@ export const SPREADSHEET_COLUMN_LABELS: Record<SpreadsheetColumnId, string> = {
   handisportPracticeLevel: "Niveau handisport",
   paymentStripeLineItems: "Lignes Stripe",
   payment: "Suivi paiement",
-  paymentMethod: "Mode de paiement",
+  paymentMethod: "Mode prévu",
   paymentInstallments: "Échéances",
   paymentAids: "Aides",
   holidayVoucherAmountCents: "Chèques vacances (centimes)",

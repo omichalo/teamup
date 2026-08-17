@@ -27,7 +27,29 @@ describe("self-service-checkout", () => {
     ).toBe(true);
   });
 
-  it("refuse si déjà payé ou hors carte", () => {
+  it("CAS F — autorise le self-service même si le mode prévu n'est pas carte", () => {
+    expect(
+      canSelfServiceCheckout({
+        status: "payment_requested",
+        paymentAmountCents: 22_400,
+        payment: {
+          paymentMethod: "cheque",
+          amountToPayCents: 22_400,
+          totalAmountCents: 22_400,
+          assistanceTotalAmountCents: 0,
+          aids: [],
+          paymentInstallments: 1,
+          expectedPayments: [],
+          receivedPayments: [],
+          paidAmountCents: 0,
+          remainingAmountCents: 22_400,
+          paymentStatus: "waiting_payment",
+        },
+      })
+    ).toBe(true);
+  });
+
+  it("CAS G — refuse si déjà payé ou dossier pas encore prêt", () => {
     expect(
       canSelfServiceCheckout({
         status: "paid",
@@ -44,26 +66,6 @@ describe("self-service-checkout", () => {
         paymentAmountCents: 22_400,
         payment: {
           paymentMethod: "card",
-          amountToPayCents: 22_400,
-          totalAmountCents: 22_400,
-          assistanceTotalAmountCents: 0,
-          aids: [],
-          paymentInstallments: 1,
-          expectedPayments: [],
-          receivedPayments: [],
-          paidAmountCents: 0,
-          remainingAmountCents: 22_400,
-          paymentStatus: "waiting_payment",
-        },
-      })
-    ).toBe(false);
-
-    expect(
-      canSelfServiceCheckout({
-        status: "payment_requested",
-        paymentAmountCents: 22_400,
-        payment: {
-          paymentMethod: "cheque",
           amountToPayCents: 22_400,
           totalAmountCents: 22_400,
           assistanceTotalAmountCents: 0,
@@ -106,10 +108,28 @@ describe("self-service-checkout", () => {
         },
       })
     ).toBe(22_400);
+    expect(
+      resolveSelfServicePayableCents({
+        paymentAmountCents: 30_000,
+        payment: {
+          paymentMethod: "cheque",
+          amountToPayCents: 30_000,
+          totalAmountCents: 30_000,
+          assistanceTotalAmountCents: 0,
+          aids: [],
+          paymentInstallments: 1,
+          expectedPayments: [],
+          receivedPayments: [],
+          paidAmountCents: 10_000,
+          remainingAmountCents: 20_000,
+          paymentStatus: "partially_paid",
+        },
+      })
+    ).toBe(20_000);
     expect(resolveSelfServicePayableCents({ paymentAmountCents: 15_000 })).toBe(15_000);
   });
 
-  it("détecte l'attente hors carte", () => {
+  it("n'affiche plus l'attente hors carte si le self-service Stripe est ouvert", () => {
     expect(
       isAwaitingNonCardPayment({
         status: "payment_requested",
@@ -128,7 +148,7 @@ describe("self-service-checkout", () => {
           paymentStatus: "waiting_payment",
         },
       })
-    ).toBe(true);
+    ).toBe(false);
     expect(
       isAwaitingNonCardPayment({
         status: "payment_requested",

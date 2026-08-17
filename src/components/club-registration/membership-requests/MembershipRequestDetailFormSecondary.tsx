@@ -371,13 +371,13 @@ export function MembershipRequestDetailFormSecondary({
         paymentAmountCents={selected.paymentAmountCents ?? null}
         paymentEmailSentTo={selected.paymentEmailSentTo ?? null}
         paymentMethod={selectedPayment?.paymentMethod}
+        remainingAmountCents={selectedPayment?.remainingAmountCents ?? null}
         saving={saving}
         requestingPayment={requestingPayment}
         persistingQuote={persistingQuote}
-        onSave={async () => {
-          await save();
-        }}
+        onSave={() => void save()}
         onRequestPayment={requestPayment}
+        onRequestOnlinePayment={() => requestPayment("stripe")}
       />
 
       {registrationId ? (

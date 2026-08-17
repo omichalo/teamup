@@ -16,7 +16,6 @@ import {
 } from "@/lib/club-registration/payment/normalize-payment";
 import {
   recalculateRegistrationPayment,
-  regenerateExpectedPayments,
   setManualFollowUp,
 } from "@/lib/club-registration/payment/payment-mutations";
 import { renderInvoiceHeader } from "@/lib/club-registration-config/helpers";
@@ -57,6 +56,7 @@ export async function processManualPaymentFollowUp(params: {
   adherentName: string;
   baseUrl: string;
   requestedByUid: string;
+  payableCents?: number;
 }): Promise<{ success: true } | { success: false; error: string }> {
   const paymentInstallments = params.payment?.paymentInstallments ?? 1;
   const baseManualPayment: RegistrationPayment =
@@ -94,7 +94,7 @@ export async function processManualPaymentFollowUp(params: {
 
   const instructionsMail = buildPaymentInstructionsEmail({
     adherentName: params.adherentName,
-    amountCents: params.amountToPayCents,
+    amountCents: params.payableCents ?? params.amountToPayCents,
     registrationId: params.registrationId,
     appOrigin: params.baseUrl,
     paymentMethod: manualPayment.paymentMethod,
@@ -135,7 +135,7 @@ export async function processManualPaymentFollowUp(params: {
     resource: "clubRegistration",
     resourceId: params.registrationId,
     details: {
-      amountCents: params.amountToPayCents,
+      amountCents: params.payableCents ?? params.amountToPayCents,
       manualFollowUp: true,
       paymentMethod: manualPayment.paymentMethod,
       donationCents: params.donationPricing?.voluntaryDonationCents ?? 0,
@@ -155,14 +155,10 @@ export function recalculatePaymentForRequest(
   if (!payment || !quote) {
     return payment;
   }
-  let updated = recalculateRegistrationPayment({
+  return recalculateRegistrationPayment({
     ...payment,
     totalAmountCents: invoiceTotalCents,
   });
-  if (updated.paymentMethod === "card" || updated.paymentMethod === "cheque") {
-    updated = regenerateExpectedPayments(updated);
-  }
-  return updated;
 }
 
 export async function createStripeCheckoutForRegistration(params: {
@@ -172,6 +168,8 @@ export async function createStripeCheckoutForRegistration(params: {
   pricingConfig: RegistrationConfigV1;
   payment: RegistrationPayment | null;
   amountToPayCents: number;
+  alreadyPaidCents?: number;
+  remainingPayableCents?: number;
   paymentEmail: string;
   adherentName: string;
   successUrl: string;
@@ -185,6 +183,9 @@ export async function createStripeCheckoutForRegistration(params: {
     params.donationPricing != null &&
     params.donationPricing.invoiceTotalCents > 0;
 
+  const remainingPayableCents = params.remainingPayableCents ?? params.amountToPayCents;
+  const alreadyPaidCents = Math.max(0, params.alreadyPaidCents ?? 0);
+
   if (useQuoteLineItems && params.quote && params.donationPricing) {
     const validation = validateRegistrationStripeCheckout({
       quote: params.quote,
@@ -192,6 +193,8 @@ export async function createStripeCheckoutForRegistration(params: {
       pricingConfig: params.pricingConfig,
       payment: params.payment,
       amountToPayCents: params.amountToPayCents,
+      alreadyPaidCents,
+      remainingPayableCents,
     });
     if (!validation.ok) {
       return validation;
@@ -226,6 +229,7 @@ export async function createStripeCheckoutForRegistration(params: {
       donationDiscountCents: donationPricing.donationDiscountCents,
       donationDiscountCouponName: stripePresentation.donationDiscountCouponName,
       aids: paymentAids,
+      alreadyPaidCents,
     });
 
     const session = await createMembershipCheckoutSession({
@@ -261,7 +265,7 @@ export async function createStripeCheckoutForRegistration(params: {
 
   const session = await createLegacySingleLineCheckoutSession({
     registrationId: params.registrationId,
-    amountCents: params.amountToPayCents,
+    amountCents: remainingPayableCents,
     customerEmail: params.paymentEmail,
     adherentName: params.adherentName,
     successUrl: params.successUrl,
