@@ -1,5 +1,11 @@
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import { z } from "zod";
+import {
+  applyManagerAidReceiptMetadata,
+  getRegistrationPaymentAids,
+  isAidReceiptOnlyChange,
+  resolveApprovedStatusAfterAidReceipt,
+} from "@/lib/club-registration/payment/aid-receipt";
 import { mergePaymentAidsFromDraft } from "@/lib/club-registration/payment/build-payment-from-draft";
 import {
   normalizeRegistrationPayment,
@@ -11,7 +17,7 @@ import {
   regenerateExpectedPayments,
 } from "@/lib/club-registration/payment/payment-mutations";
 import type { PaymentAid, RegistrationPayment } from "@/lib/club-registration/payment/types";
-import { paymentAidPayloadSchema } from "@/lib/club-registration/payment-payload-schema";
+import { managerPaymentAidPayloadSchema } from "@/lib/club-registration/payment-payload-schema";
 import { validateAdminAids } from "@/lib/club-registration/validate-admin-aids";
 import { PRICING_CATALOG_VERSION, type FamilyRegistrationOrder, type PriceQuote } from "@/lib/pricing/types";
 
@@ -28,7 +34,7 @@ const EMPTY_QUOTE: PriceQuote = {
 export function parseManagerPaymentAidsInput(
   raw: unknown
 ): { ok: true; data: PaymentAid[] } | { ok: false; error: string } {
-  const parsed = z.array(paymentAidPayloadSchema).safeParse(raw);
+  const parsed = z.array(managerPaymentAidPayloadSchema).safeParse(raw);
   if (!parsed.success) {
     return { ok: false, error: "Montants d'aides invalides" };
   }
@@ -75,16 +81,22 @@ export function resolveManagerPaymentAidsUpdate(
   mergedData: Record<string, unknown>,
   currentData: Record<string, unknown>,
   rawPaymentAids: unknown,
-  config: RegistrationConfigV1
+  config: RegistrationConfigV1,
+  actor: { uid: string; at: string }
 ): { ok: true; patch: Record<string, unknown> } | { ok: false; error: string } {
   const parsedAids = parseManagerPaymentAidsInput(rawPaymentAids);
   if (!parsedAids.ok) {
     return parsedAids;
   }
 
-  const aidIssue = validateAdminAids(buildAidValidationDraft(mergedData, parsedAids.data), config);
-  if (aidIssue) {
-    return { ok: false, error: aidIssue.message };
+  const previousAids = getRegistrationPaymentAids(currentData);
+  const stampedAids = applyManagerAidReceiptMetadata(parsedAids.data, previousAids, actor);
+
+  if (!isAidReceiptOnlyChange(parsedAids.data, previousAids)) {
+    const aidIssue = validateAdminAids(buildAidValidationDraft(mergedData, stampedAids), config);
+    if (aidIssue) {
+      return { ok: false, error: aidIssue.message };
+    }
   }
 
   return {
@@ -93,7 +105,7 @@ export function resolveManagerPaymentAidsUpdate(
       mergedData,
       currentData,
       config,
-      parsedAids.data
+      stampedAids
     ),
   };
 }
@@ -143,9 +155,18 @@ export function buildManagerRegistrationAidsPatch(
   };
 
   const payment = normalizeRegistrationPayment(currentData);
-  if (payment) {
-    const nextPayment = syncPaymentAfterAidsChange(payment, mergedAids);
+  const nextPayment = payment ? syncPaymentAfterAidsChange(payment, mergedAids) : null;
+  if (nextPayment) {
     Object.assign(patch, paymentToFirestoreUpdate(nextPayment));
+  }
+
+  const approvedStatus = resolveApprovedStatusAfterAidReceipt({
+    currentStatus: currentData.status,
+    aids: mergedAids,
+    amountToPayCents: nextPayment?.amountToPayCents ?? 0,
+  });
+  if (approvedStatus) {
+    patch.status = approvedStatus;
   }
 
   return patch;

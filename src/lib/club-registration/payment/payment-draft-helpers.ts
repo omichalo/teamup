@@ -1,6 +1,27 @@
 import { EXCEPTIONAL_DISCOUNT_AID_TYPE } from "./exceptional-discount";
 import type { PaymentAid } from "./types";
 
+function assignAidReceiptFields(
+  target: PaymentAid,
+  source: {
+    received?: boolean | undefined;
+    receivedAt?: string | undefined;
+    receivedBy?: string | undefined;
+  }
+): void {
+  if (source.received === true) {
+    target.received = true;
+    if (typeof source.receivedAt === "string" && source.receivedAt.length > 0) {
+      target.receivedAt = source.receivedAt;
+    }
+    if (typeof source.receivedBy === "string" && source.receivedBy.length > 0) {
+      target.receivedBy = source.receivedBy;
+    }
+  } else if (source.received === false) {
+    target.received = false;
+  }
+}
+
 export function normalizePaymentAidList(
   aids: Array<{
     type: string;
@@ -8,6 +29,9 @@ export function normalizePaymentAidList(
     amountCents: number;
     reference?: string | undefined;
     note?: string | undefined;
+    received?: boolean | undefined;
+    receivedAt?: string | undefined;
+    receivedBy?: string | undefined;
   }>
 ): PaymentAid[] {
   return aids.map((aid) => {
@@ -18,6 +42,7 @@ export function normalizePaymentAidList(
     };
     if (aid.reference) normalized.reference = aid.reference;
     if (aid.note) normalized.note = aid.note;
+    assignAidReceiptFields(normalized, aid);
     return normalized;
   });
 }
@@ -93,6 +118,7 @@ export function upsertPaymentAid(
     if (patch.note != null && patch.note.length > 0) {
       next.note = patch.note;
     }
+    assignAidReceiptFields(next, patch);
     return [...without, next];
   }
   return without;

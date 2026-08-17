@@ -4,12 +4,13 @@ import { Chip, Stack, Typography } from "@mui/material";
 import type { SpreadsheetSummaryStats } from "@/lib/club-registration/spreadsheet/quick-filters";
 import type { SpreadsheetSavedViewId } from "@/lib/club-registration/spreadsheet/quick-filters";
 
-type SummaryChipKey = "displayed" | "actionable" | "certificate" | "payment";
+type SummaryChipKey = "displayed" | "actionable" | "certificate" | "payment" | "aids";
 
 const VIEW_BY_CHIP: Partial<Record<SummaryChipKey, SpreadsheetSavedViewId>> = {
   actionable: "to_review",
   certificate: "missing_certificate",
   payment: "payment_pending",
+  aids: "pending_aid_receipt",
 };
 
 type Props = {
@@ -54,6 +55,15 @@ export function SpreadsheetSummaryBar({ stats, onApplySavedView, attached = fals
       label: `${stats.paymentPendingCount} paiement en cours`,
       color: "info",
       show: stats.paymentPendingCount > 0,
+      clickable: true,
+    },
+    {
+      key: "aids",
+      label: `${stats.pendingAidReceiptCount} aide${
+        stats.pendingAidReceiptCount > 1 ? "s" : ""
+      } en attente`,
+      color: "warning",
+      show: stats.pendingAidReceiptCount > 0,
       clickable: true,
     },
   ].filter((part) => part.show) as {

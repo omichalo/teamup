@@ -13,6 +13,7 @@ import {
 import { resolveManagedListStatusFilter } from "@/lib/club-registration/registration-status";
 import { resolveManagedListMedicalCertificateFilter } from "@/lib/club-registration/medical-certificate";
 import { resolveManagedListPpsFollowUpFilter } from "@/lib/club-registration/pps-follow-up";
+import { resolveManagedListAidReceiptFilter } from "@/lib/club-registration/payment/aid-receipt";
 
 const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
 
@@ -55,6 +56,9 @@ export async function GET(req: Request) {
       const ppsFollowUpFilter = resolveManagedListPpsFollowUpFilter(
         url.searchParams.get("ppsFollowUp")
       );
+      const aidReceiptFilter = resolveManagedListAidReceiptFilter(
+        url.searchParams.get("aidReceipt")
+      );
       const rawLimit = Number.parseInt(url.searchParams.get("limit") ?? "", 10);
       const pageSize = Number.isFinite(rawLimit)
         ? Math.min(Math.max(rawLimit, 1), MANAGED_PAGE_SIZE_MAX)
@@ -66,6 +70,7 @@ export async function GET(req: Request) {
         statusFilter,
         medicalCertificateFilter,
         ppsFollowUpFilter,
+        aidReceiptFilter,
         pageSize,
         cursor,
         searchQuery,

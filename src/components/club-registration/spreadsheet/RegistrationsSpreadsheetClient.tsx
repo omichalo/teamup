@@ -86,6 +86,7 @@ export function RegistrationsSpreadsheetClient() {
     applySavedView,
     toggleRegistrationStatusFilter,
     togglePaymentStatusFilter,
+    toggleAidReceiptFilter,
     clearAllFilters,
   } = useSpreadsheetFilterState(preferences, savePreferences, urlBootstrap);
 
@@ -153,10 +154,13 @@ export function RegistrationsSpreadsheetClient() {
     quickFilters,
   ]);
 
-  const summaryStats = useMemo(
-    () => computeSpreadsheetSummaryStats(displayedRows),
-    [displayedRows]
-  );
+  const summaryStats = useMemo(() => {
+    const corpusStats = computeSpreadsheetSummaryStats(registrations);
+    return {
+      ...corpusStats,
+      displayedCount: displayedRows.length,
+    };
+  }, [displayedRows.length, registrations]);
 
   const treatQueueHref = buildManagedTreatQueueHref();
   const treatQueueLabel =
@@ -286,6 +290,7 @@ export function RegistrationsSpreadsheetClient() {
             onSelectSavedView={(viewId) => void applySavedView(viewId)}
             onToggleRegistrationStatus={toggleRegistrationStatusFilter}
             onTogglePaymentStatus={togglePaymentStatusFilter}
+            onToggleAidReceiptStatus={toggleAidReceiptFilter}
             loading={loading}
             tableDensity={tableDensity}
             onTableDensityChange={(density) => void handleTableDensityChange(density)}

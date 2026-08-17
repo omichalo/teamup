@@ -49,3 +49,16 @@ export {
   isExpectedPaymentStatusId,
   isReceivedMethodIdSafe,
 } from "./normalize-payment";
+
+export {
+  isCollectableAid,
+  isAidReceiptPending,
+  hasPendingAidReceipt,
+  markAidReceived,
+  markAidUnreceived,
+  getRegistrationPaymentAids,
+  resolveManagedListAidReceiptFilter,
+  matchesManagedAidReceiptFilter,
+  resolveZeroDueDossierStatus,
+  resolveApprovedStatusAfterAidReceipt,
+} from "./aid-receipt";

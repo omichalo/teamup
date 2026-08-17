@@ -1,4 +1,5 @@
 import {
+  normalizePaymentAidList,
   sanitizeEurosMonetaryInput,
   upsertPaymentAid,
 } from "./payment-draft-helpers";
@@ -51,5 +52,37 @@ describe("upsertPaymentAid retainZero", () => {
       { retainZero: true }
     );
     expect(next[0]?.note).toBe("Geste ");
+  });
+
+  it("conserve received* au normalize et à l'upsert de montant", () => {
+    const normalized = normalizePaymentAidList([
+      {
+        type: "pass_sport",
+        label: "Pass Sport",
+        amountCents: 5_000,
+        received: true,
+        receivedAt: "2026-08-01T00:00:00.000Z",
+        receivedBy: "uid-sec",
+      },
+    ]);
+    expect(normalized[0]).toMatchObject({
+      received: true,
+      receivedAt: "2026-08-01T00:00:00.000Z",
+      receivedBy: "uid-sec",
+    });
+
+    const updated = upsertPaymentAid(normalized, {
+      type: "pass_sport",
+      label: "Pass Sport",
+      amountCents: 7_000,
+      received: true,
+      receivedAt: "2026-08-01T00:00:00.000Z",
+      receivedBy: "uid-sec",
+    });
+    expect(updated[0]).toMatchObject({
+      amountCents: 7_000,
+      received: true,
+      receivedBy: "uid-sec",
+    });
   });
 });

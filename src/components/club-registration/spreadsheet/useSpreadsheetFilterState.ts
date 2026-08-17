@@ -7,7 +7,9 @@ import type { RegistrationsSpreadsheetPreferences } from "@/lib/club-registratio
 import {
   EMPTY_SPREADSHEET_QUICK_FILTERS,
   getSpreadsheetSavedView,
+  normalizeSpreadsheetQuickFilters,
   resolveActiveSavedViewId,
+  type AidReceiptFilterStatus,
   type SpreadsheetQuickFilters,
   type SpreadsheetSavedViewId,
 } from "@/lib/club-registration/spreadsheet/quick-filters";
@@ -16,11 +18,7 @@ import type { SpreadsheetColumnFilters } from "@/lib/club-registration/spreadshe
 type SavePreferences = (next: RegistrationsSpreadsheetPreferences) => Promise<void>;
 
 function cloneQuickFilters(filters: SpreadsheetQuickFilters): SpreadsheetQuickFilters {
-  return {
-    registrationStatuses: [...filters.registrationStatuses],
-    paymentStatuses: [...filters.paymentStatuses],
-    medicalCertificateStatuses: [...filters.medicalCertificateStatuses],
-  };
+  return normalizeSpreadsheetQuickFilters(filters);
 }
 
 export function useSpreadsheetFilterState(
@@ -83,7 +81,9 @@ export function useSpreadsheetFilterState(
   const updateQuickFilters = useCallback(
     (updater: (current: SpreadsheetQuickFilters) => SpreadsheetQuickFilters) => {
       setQuickFilters((current) => {
-        const next = updater(current);
+        const next = normalizeSpreadsheetQuickFilters(
+          updater(normalizeSpreadsheetQuickFilters(current))
+        );
         const resolvedViewId = resolveActiveSavedViewId(next);
         setActiveViewId(resolvedViewId);
         void persistActiveView(resolvedViewId);
@@ -117,6 +117,21 @@ export function useSpreadsheetFilterState(
           paymentStatuses: selected
             ? current.paymentStatuses.filter((value) => value !== status)
             : [...current.paymentStatuses, status],
+        };
+      });
+    },
+    [updateQuickFilters]
+  );
+
+  const toggleAidReceiptFilter = useCallback(
+    (status: AidReceiptFilterStatus) => {
+      updateQuickFilters((current) => {
+        const selected = current.aidReceiptStatuses.includes(status);
+        return {
+          ...current,
+          aidReceiptStatuses: selected
+            ? current.aidReceiptStatuses.filter((value) => value !== status)
+            : [...current.aidReceiptStatuses, status],
         };
       });
     },
@@ -168,6 +183,7 @@ export function useSpreadsheetFilterState(
     applySavedView,
     toggleRegistrationStatusFilter,
     togglePaymentStatusFilter,
+    toggleAidReceiptFilter,
     clearAllFilters,
   };
 }
