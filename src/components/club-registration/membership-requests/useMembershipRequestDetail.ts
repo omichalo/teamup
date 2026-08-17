@@ -391,11 +391,13 @@ export function useMembershipRequestDetail(
       if (!res.ok || json.error) {
         throw new Error(json.error || "Impossible d'envoyer la demande de paiement.");
       }
-      if (json.zeroDue === true) {
+      if (json.zeroDue === true || json.alreadySettled === true) {
         setSuccess(
           typeof json.message === "string"
             ? json.message
-            : "Aucun paiement n'est dû pour ce dossier."
+            : json.alreadySettled === true
+              ? "Dossier validé. Le paiement était déjà enregistré."
+              : "Aucun paiement n'est dû pour ce dossier."
         );
       } else if (json.manualFollowUp === true) {
         setSuccess(

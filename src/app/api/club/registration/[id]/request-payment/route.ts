@@ -6,7 +6,7 @@ import { jsonNoStore } from "@/lib/http/cache-headers";
 import { adminAuth, getFirestoreAdmin } from "@/lib/firebase-admin";
 import { hasAnyRole, resolveRole, USER_ROLES } from "@/lib/auth/roles";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
-import { isRegistrationPaidRecord } from "@/lib/club-registration/payment-proof";
+import { AUDIT_ACTIONS, logAuditAction } from "@/lib/auth/audit-logger";
 import {
   createStripePaymentForRegistration,
   getAppBaseUrl,
@@ -31,6 +31,12 @@ import {
   recalculatePaymentForRequest,
   validateRegistrationStripeCheckout,
 } from "@/lib/club-registration/request-payment-checkout";
+import {
+  buildPaidDossierValidationPatch,
+  isRegistrationPaymentSettled,
+  resolveSettledRequestPaymentAction,
+} from "@/lib/club-registration/resolve-settled-request-payment";
+import { dispatchPaymentConfirmedEmail } from "@/lib/email/dispatch-payment-confirmed-email";
 import { buildMesInscriptionsUrl } from "@/lib/club-registration/mes-inscriptions-url";
 import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
 import type { PriceQuote } from "@/lib/pricing/types";
@@ -78,27 +84,8 @@ export async function POST(
     }
 
     const data = snap.data() ?? {};
-    if (isRegistrationPaidRecord(data)) {
-      return jsonNoStore(
-        {
-          error:
-            "Ce dossier est déjà réglé (paiement enregistré). Impossible de renvoyer un lien de paiement.",
-        },
-        { status: 409 }
-      );
-    }
-
     const isResend = data.status === "payment_requested";
     const requestedAmount = body.amountCents ?? data.paymentAmountCents;
-
-    const paymentEmails = resolveRegistrationPaymentRecipientEmails(data);
-    const paymentEmail = paymentEmails[0] ?? null;
-    if (!paymentEmail) {
-      return jsonNoStore(
-        { error: "Aucune adresse e-mail exploitable pour envoyer la demande de paiement." },
-        { status: 400 }
-      );
-    }
 
     const adherentName =
       formatPersonDisplayName(
@@ -128,6 +115,8 @@ export async function POST(
       quote?.totalCents ??
       (typeof requestedAmount === "number" ? requestedAmount : 0);
 
+    // Une remise à 0 € met paymentStatus à "paid" : traiter le zéro dû avant
+    // le garde-fou « déjà réglé », sinon la validation est bloquée.
     if (amountToPayCents <= 0) {
       const zeroDue = resolveZeroDueDossierStatus(
         payment?.aids ?? getRegistrationPaymentAids(data)
@@ -150,6 +139,72 @@ export async function POST(
           message: zeroDue.message,
         },
         { status: 200 }
+      );
+    }
+
+    if (isRegistrationPaymentSettled(data as Record<string, unknown>, payment)) {
+      const settledAction = resolveSettledRequestPaymentAction(data.status);
+      if (settledAction.kind === "reject") {
+        return jsonNoStore({ error: settledAction.error }, { status: 409 });
+      }
+      if (settledAction.kind === "already_finalized") {
+        return jsonNoStore(
+          {
+            success: true,
+            alreadySettled: true,
+            message: settledAction.message,
+          },
+          { status: 200 }
+        );
+      }
+
+      await docRef.set(
+        {
+          ...buildPaidDossierValidationPatch(payment),
+          ...(data.paidAt == null ? { paidAt: FieldValue.serverTimestamp() } : {}),
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_UPDATED, decoded.uid, {
+        resource: "clubRegistration",
+        resourceId: id,
+        details: { action: "validate_already_paid" },
+        success: true,
+      });
+
+      const paidAmountCents = payment?.paidAmountCents ?? 0;
+      if (paidAmountCents > 0) {
+        try {
+          await dispatchPaymentConfirmedEmail({
+            registrationId: id,
+            data,
+            amountCents: paidAmountCents,
+            source: "secretariat",
+            req,
+          });
+        } catch (emailError) {
+          console.error("[api/club/registration/request-payment] confirmation email", emailError);
+        }
+      }
+
+      return jsonNoStore(
+        {
+          success: true,
+          alreadySettled: true,
+          message: settledAction.message,
+        },
+        { status: 200 }
+      );
+    }
+
+    const paymentEmails = resolveRegistrationPaymentRecipientEmails(data);
+    const paymentEmail = paymentEmails[0] ?? null;
+    if (!paymentEmail) {
+      return jsonNoStore(
+        { error: "Aucune adresse e-mail exploitable pour envoyer la demande de paiement." },
+        { status: 400 }
       );
     }
 
