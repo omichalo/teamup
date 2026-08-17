@@ -12,6 +12,7 @@ describe("managed-list-url-state", () => {
       statusFilter: "actionable",
       medicalCertificateFilter: "all",
       ppsFollowUpFilter: "all",
+      aidReceiptFilter: "all",
       selectedId: "reg-1",
     });
   });
@@ -22,6 +23,17 @@ describe("managed-list-url-state", () => {
       statusFilter: "all",
       medicalCertificateFilter: "all",
       ppsFollowUpFilter: "expected",
+      aidReceiptFilter: "all",
+      selectedId: null,
+    });
+  });
+
+  it("parses pending aid receipt saved view", () => {
+    expect(parseManagedListUrlState(new URLSearchParams("vue=pending_aid_receipt"))).toEqual({
+      statusFilter: "all",
+      medicalCertificateFilter: "all",
+      ppsFollowUpFilter: "all",
+      aidReceiptFilter: "pending",
       selectedId: null,
     });
   });
@@ -32,9 +44,22 @@ describe("managed-list-url-state", () => {
         statusFilter: "actionable",
         medicalCertificateFilter: "all",
         ppsFollowUpFilter: "all",
+        aidReceiptFilter: "all",
         selectedId: "reg-1",
       })
     ).toBe("vue=to_review&id=reg-1");
+  });
+
+  it("builds pending aid receipt view param", () => {
+    expect(
+      buildManagedListQueryString({
+        statusFilter: "all",
+        medicalCertificateFilter: "all",
+        ppsFollowUpFilter: "all",
+        aidReceiptFilter: "pending",
+        selectedId: null,
+      })
+    ).toBe("vue=pending_aid_receipt");
   });
 
   it("keeps pps filter alongside saved view", () => {
@@ -43,6 +68,7 @@ describe("managed-list-url-state", () => {
         statusFilter: "actionable",
         medicalCertificateFilter: "all",
         ppsFollowUpFilter: "ok",
+        aidReceiptFilter: "all",
         selectedId: null,
       })
     ).toBe("vue=to_review&pps=ok");
@@ -61,6 +87,7 @@ describe("managed-list-url-state", () => {
           statusFilter: "actionable",
           medicalCertificateFilter: "all",
           ppsFollowUpFilter: "all",
+          aidReceiptFilter: "all",
           selectedId: "reg-1",
         },
         parseManagedListUrlState(new URLSearchParams("status=actionable&id=reg-1"))

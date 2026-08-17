@@ -25,11 +25,13 @@ import type { ExpectedPayment, RegistrationPayment } from "@/lib/club-registrati
 import { formatCentsAsEuros } from "@/lib/pricing";
 import { AddManualPaymentDialog } from "./AddManualPaymentDialog";
 import { MarkExpectedPaymentReceivedDialog } from "./MarkExpectedPaymentReceivedDialog";
+import { PaymentDeclaredAidsTable } from "./PaymentDeclaredAidsTable";
 
 type Props = {
   registrationId: string;
   payment: RegistrationPayment;
   onRefresh: () => Promise<void>;
+  onAidsChange: (aids: RegistrationPayment["aids"]) => void;
 };
 
 async function postPaymentAction(
@@ -59,6 +61,7 @@ export function PaymentTrackingSection({
   registrationId,
   payment,
   onRefresh,
+  onAidsChange,
 }: Props) {
   const [manualOpen, setManualOpen] = useState(false);
   const [receiveExpected, setReceiveExpected] = useState<ExpectedPayment | null>(null);
@@ -157,33 +160,11 @@ export function PaymentTrackingSection({
       ) : null}
 
       {payment.aids.length > 0 ? (
-        <>
-          <Typography variant="subtitle2" fontWeight={600}>
-            Aides déclarées
-          </Typography>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Aide</TableCell>
-                <TableCell align="right">Montant</TableCell>
-                <TableCell>Référence / note</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {payment.aids.map((aid) => (
-                <TableRow key={aid.type}>
-                  <TableCell>{aid.label}</TableCell>
-                  <TableCell align="right">
-                    {formatCentsAsEuros(aid.amountCents)}
-                  </TableCell>
-                  <TableCell>
-                    {[aid.reference, aid.note].filter(Boolean).join(" — ") || "—"}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </>
+        <PaymentDeclaredAidsTable
+          registrationId={registrationId}
+          aids={payment.aids}
+          onAidsChange={onAidsChange}
+        />
       ) : null}
 
       {payment.expectedPayments.length > 0 ? (

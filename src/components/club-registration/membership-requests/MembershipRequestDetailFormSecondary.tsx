@@ -61,6 +61,7 @@ export function MembershipRequestDetailFormSecondary({
     expectedPayableAfterAidsCents,
     amountDiffersFromQuote,
     fetchDetail,
+    applyPaymentAids,
     updateField,
     updateReductionTypes,
     updateMedicalDeclaration,
@@ -358,6 +359,7 @@ export function MembershipRequestDetailFormSecondary({
               await fetchDetail(registrationId);
             }
           }}
+          onAidsChange={applyPaymentAids}
         />
       ) : null}
 
@@ -374,9 +376,7 @@ export function MembershipRequestDetailFormSecondary({
         saving={saving}
         requestingPayment={requestingPayment}
         persistingQuote={persistingQuote}
-        onSave={async () => {
-          await save();
-        }}
+        onSave={() => void save()}
         onRequestPayment={requestPayment}
       />
 

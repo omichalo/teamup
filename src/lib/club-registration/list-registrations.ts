@@ -12,6 +12,10 @@ import {
 } from "@/lib/club-registration/pps-follow-up";
 import { hasPaymentProofAvailable } from "@/lib/club-registration/payment-proof";
 import {
+  matchesManagedAidReceiptFilter,
+  type ManagedListAidReceiptFilter,
+} from "@/lib/club-registration/payment/aid-receipt";
+import {
   ACTIONABLE_REGISTRATION_STATUSES,
   type ManagedListStatusFilter,
 } from "@/lib/club-registration/registration-status";
@@ -38,6 +42,7 @@ export const LIST_FIELDS = [
   "paymentRequestedAt",
   "paidAt",
   "payment",
+  "paymentAids",
   "pricingQuote",
 ] as const;
 
@@ -231,6 +236,7 @@ export type ListManagedRegistrationsParams = {
   statusFilter: ManagedListStatusFilter;
   medicalCertificateFilter?: ManagedListMedicalCertificateFilter;
   ppsFollowUpFilter?: ManagedListPpsFollowUpFilter;
+  aidReceiptFilter?: ManagedListAidReceiptFilter;
   pageSize: number;
   cursor?: string | null;
   searchQuery?: string | null;
@@ -240,7 +246,13 @@ function needsClientSideFiltering(params: ListManagedRegistrationsParams): boole
   const searchQuery = params.searchQuery?.trim() ?? "";
   const medicalFilter = params.medicalCertificateFilter ?? "all";
   const ppsFilter = params.ppsFollowUpFilter ?? "all";
-  return searchQuery.length >= 2 || medicalFilter !== "all" || ppsFilter !== "all";
+  const aidReceiptFilter = params.aidReceiptFilter ?? "all";
+  return (
+    searchQuery.length >= 2 ||
+    medicalFilter !== "all" ||
+    ppsFilter !== "all" ||
+    aidReceiptFilter !== "all"
+  );
 }
 
 function filterManagedSummaries(
@@ -249,6 +261,7 @@ function filterManagedSummaries(
 ): RegistrationListSummary[] {
   const medicalFilter = params.medicalCertificateFilter ?? "all";
   const ppsFilter = params.ppsFollowUpFilter ?? "all";
+  const aidReceiptFilter = params.aidReceiptFilter ?? "all";
   return summaries.filter((summary) => {
     const declaration =
       typeof summary.medicalCertificateDeclaration === "string"
@@ -263,6 +276,7 @@ function filterManagedSummaries(
       matchesManagedStatusFilter(summary, params.statusFilter) &&
       matchesMedicalCertificateFilter(summary, medicalFilter) &&
       matchesPpsFollowUpFilter(ppsStatus, ppsFilter) &&
+      matchesManagedAidReceiptFilter(summary, aidReceiptFilter) &&
       registrationMatchesSearch(summary, params.searchQuery)
     );
   });

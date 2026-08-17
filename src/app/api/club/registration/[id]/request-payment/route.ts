@@ -24,6 +24,7 @@ import { resolveRegistrationDonationPricing } from "@/lib/club-registration/reso
 import {
   resolveRegistrationPaymentRecipientEmails,
 } from "@/lib/club-registration/resolve-registration-contact-email";
+import { getRegistrationPaymentAids, resolveZeroDueDossierStatus } from "@/lib/club-registration/payment/aid-receipt";
 import {
   persistPaymentRequestedAndNotify,
   processManualPaymentFollowUp,
@@ -89,12 +90,6 @@ export async function POST(
 
     const isResend = data.status === "payment_requested";
     const requestedAmount = body.amountCents ?? data.paymentAmountCents;
-    if (!Number.isInteger(requestedAmount) || requestedAmount <= 0) {
-      return jsonNoStore(
-        { error: "Indiquez un montant strictement positif avant de demander le paiement." },
-        { status: 400 }
-      );
-    }
 
     const paymentEmails = resolveRegistrationPaymentRecipientEmails(data);
     const paymentEmail = paymentEmails[0] ?? null;
@@ -134,13 +129,16 @@ export async function POST(
       (typeof requestedAmount === "number" ? requestedAmount : 0);
 
     if (amountToPayCents <= 0) {
+      const zeroDue = resolveZeroDueDossierStatus(
+        payment?.aids ?? getRegistrationPaymentAids(data)
+      );
       const zeroPayment = payment
         ? recalculateRegistrationPayment({ ...payment, paymentStatus: "paid" })
         : null;
       await docRef.set(
         {
           ...(zeroPayment ? paymentToFirestoreUpdate(zeroPayment) : {}),
-          status: "approved",
+          status: zeroDue.status,
           updatedAt: FieldValue.serverTimestamp(),
         },
         { merge: true }
@@ -148,9 +146,17 @@ export async function POST(
       return jsonNoStore(
         {
           success: true,
-          message: "Aucun paiement n'est dû pour ce dossier.",
+          zeroDue: true,
+          message: zeroDue.message,
         },
         { status: 200 }
+      );
+    }
+
+    if (!Number.isInteger(requestedAmount) || requestedAmount <= 0) {
+      return jsonNoStore(
+        { error: "Indiquez un montant strictement positif avant de demander le paiement." },
+        { status: 400 }
       );
     }
 

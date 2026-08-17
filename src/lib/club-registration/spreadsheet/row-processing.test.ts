@@ -3,6 +3,7 @@ import type { RegistrationClientRecord } from "@/lib/club-registration/map-regis
 import {
   applySpreadsheetFilters,
   filterSpreadsheetRowsByGlobalSearch,
+  hasActiveQuickFilters,
 } from "./row-processing";
 
 function row(partial: Partial<RegistrationClientRecord> & { id: string }): RegistrationClientRecord {
@@ -42,5 +43,24 @@ describe("spreadsheet row filters", () => {
       config: null,
     });
     expect(filtered).toEqual([rows[1]]);
+  });
+
+  it("tolère un filtre rapide sans aidReceiptStatuses (état antérieur)", () => {
+    const legacyFilters = {
+      registrationStatuses: [],
+      paymentStatuses: [],
+      medicalCertificateStatuses: [],
+    } as Parameters<typeof hasActiveQuickFilters>[0];
+
+    expect(hasActiveQuickFilters(legacyFilters)).toBe(false);
+    expect(
+      applySpreadsheetFilters(rows, {
+        globalSearchQuery: "",
+        columnFilters: {},
+        visibleColumnIds: ["firstName"],
+        config: null,
+        quickFilters: legacyFilters,
+      })
+    ).toEqual(rows);
   });
 });

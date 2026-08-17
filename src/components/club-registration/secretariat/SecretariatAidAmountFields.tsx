@@ -1,6 +1,6 @@
 "use client";
 
-import { Alert, Box, Button, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, Stack, Typography } from "@mui/material";
 import {
   findAidRuleById,
   getAidRuleFixedAmountCents,
@@ -14,6 +14,7 @@ import {
   normalizePaymentAidList,
   upsertPaymentAid,
 } from "@/lib/club-registration/payment/payment-draft-helpers";
+import { isCollectableAid, pickAidReceiptFields } from "@/lib/club-registration/payment/aid-receipt";
 import type { PaymentAid } from "@/lib/club-registration/payment/types";
 import { getReductionReferenceCode } from "@/lib/club-registration/reduction-reference-codes";
 import { SecretariatExceptionalDiscountFields } from "./SecretariatExceptionalDiscountFields";
@@ -34,6 +35,21 @@ const AID_AMOUNT_FIELD_SX = {
 function aidMaxAmountHelperText(ruleMaxCents: number | undefined): string | undefined {
   if (ruleMaxCents === undefined) return undefined;
   return `Montant maximum : ${formatCentsAsEuros(ruleMaxCents)}`;
+}
+
+function AidReceiptStatusChip({ aid }: { aid: PaymentAid | undefined }) {
+  if (!aid || !isCollectableAid(aid)) {
+    return null;
+  }
+  const received = aid.received === true;
+  return (
+    <Chip
+      size="small"
+      variant="outlined"
+      color={received ? "success" : "warning"}
+      label={received ? "Reçue" : "En attente de réception"}
+    />
+  );
 }
 
 function FixedAidAmountRow({
@@ -102,6 +118,7 @@ export function SecretariatAidAmountFields({
           amountCents,
           ...(reference ? { reference } : {}),
           ...(existing?.note ? { note: existing.note } : {}),
+          ...(existing ? pickAidReceiptFields(existing) : {}),
         },
         { retainZero: true }
       )
@@ -118,7 +135,8 @@ export function SecretariatAidAmountFields({
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Ajustez le montant déclaré pour chaque aide cochée. Ces montants sont déduits du
-              reste à payer estimé.
+              reste à payer estimé. Pour cocher qu&apos;une aide a bien été reçue, utilisez le
+              suivi du paiement plus bas (enregistrement immédiat).
             </Typography>
             <Stack spacing={2}>
               {selectedRules.map((rule) => {
@@ -128,29 +146,33 @@ export function SecretariatAidAmountFields({
 
                 if (fixedAmountCents !== undefined) {
                   return (
-                    <FixedAidAmountRow
-                      key={rule.id}
-                      ruleId={rule.id}
-                      ruleLabel={rule.label}
-                      fixedAmountCents={fixedAmountCents}
-                      dossierAmountCents={aid?.amountCents ?? 0}
-                      onApplyFixedAmount={() => updateAidAmount(rule.id, fixedAmountCents)}
-                    />
+                    <Stack key={rule.id} spacing={0.75}>
+                      <FixedAidAmountRow
+                        ruleId={rule.id}
+                        ruleLabel={rule.label}
+                        fixedAmountCents={fixedAmountCents}
+                        dossierAmountCents={aid?.amountCents ?? 0}
+                        onApplyFixedAmount={() => updateAidAmount(rule.id, fixedAmountCents)}
+                      />
+                      <AidReceiptStatusChip aid={aid} />
+                    </Stack>
                   );
                 }
 
                 const maxHelperText = aidMaxAmountHelperText(maxAmountCents);
                 return (
-                  <AidEuroAmountField
-                    key={rule.id}
-                    label={`Montant (${rule.label})`}
-                    amountCents={aid?.amountCents ?? 0}
-                    onCommitCents={(cents) => updateAidAmount(rule.id, cents)}
-                    required
-                    sx={AID_AMOUNT_FIELD_SX}
-                    dataField={`paymentAid.${rule.id}`}
-                    {...(maxHelperText ? { helperText: maxHelperText } : {})}
-                  />
+                  <Stack key={rule.id} spacing={0.75}>
+                    <AidEuroAmountField
+                      label={`Montant (${rule.label})`}
+                      amountCents={aid?.amountCents ?? 0}
+                      onCommitCents={(cents) => updateAidAmount(rule.id, cents)}
+                      required
+                      sx={AID_AMOUNT_FIELD_SX}
+                      dataField={`paymentAid.${rule.id}`}
+                      {...(maxHelperText ? { helperText: maxHelperText } : {})}
+                    />
+                    <AidReceiptStatusChip aid={aid} />
+                  </Stack>
                 );
               })}
             </Stack>
