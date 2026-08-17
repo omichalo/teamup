@@ -20,7 +20,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import ViewColumnIcon from "@mui/icons-material/ViewColumn";
 import type { PaymentStatusId } from "@/lib/club-registration/payment-constants";
 import type { RegistrationStatus } from "@/lib/club-registration/registration-status";
-import type { SpreadsheetQuickFilters, SpreadsheetSavedViewId } from "@/lib/club-registration/spreadsheet/quick-filters";
+import type { SpreadsheetQuickFilters, SpreadsheetSavedViewId, AidReceiptFilterStatus } from "@/lib/club-registration/spreadsheet/quick-filters";
 import type { SpreadsheetTableDensity } from "@/lib/club-registration/spreadsheet/preferences";
 import { FilterCard } from "@/components/ui";
 import { SpreadsheetQuickFilterChips } from "./SpreadsheetQuickFilterChips";
@@ -48,6 +48,7 @@ type Props = {
   onSelectSavedView: (viewId: SpreadsheetSavedViewId) => void;
   onToggleRegistrationStatus: (status: RegistrationStatus) => void;
   onTogglePaymentStatus: (status: PaymentStatusId) => void;
+  onToggleAidReceiptStatus: (status: AidReceiptFilterStatus) => void;
   loading: boolean;
   tableDensity?: SpreadsheetTableDensity;
   onTableDensityChange?: (density: SpreadsheetTableDensity) => void;
@@ -75,6 +76,7 @@ export function SpreadsheetToolbar({
   onSelectSavedView,
   onToggleRegistrationStatus,
   onTogglePaymentStatus,
+  onToggleAidReceiptStatus,
   loading,
   tableDensity = "comfortable",
   onTableDensityChange,
@@ -201,6 +203,7 @@ export function SpreadsheetToolbar({
             quickFilters={quickFilters}
             onToggleRegistrationStatus={onToggleRegistrationStatus}
             onTogglePaymentStatus={onTogglePaymentStatus}
+            onToggleAidReceiptStatus={onToggleAidReceiptStatus}
           />
           {hasActiveFilters ? (
             <Button

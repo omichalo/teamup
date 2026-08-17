@@ -25,6 +25,7 @@ import {
   REGISTRATION_STATUS_LABELS,
   type RegistrationStatus,
 } from "@/lib/club-registration/registration-status";
+import { getRegistrationPaymentAids } from "@/lib/club-registration/payment/aid-receipt";
 import type { SpreadsheetColumnId } from "./column-ids";
 import type { RegistrationClientRecord } from "@/lib/club-registration/map-registration-doc-to-client";
 import {
@@ -318,7 +319,7 @@ export function formatSpreadsheetCellValue(
     case "paymentInstallments":
       return formatPaymentInstallmentsForSpreadsheet(value);
     case "paymentAids":
-      return formatPaymentAidsForSpreadsheet(value);
+      return formatPaymentAidsForSpreadsheet(getRegistrationPaymentAids(row));
     case "pricingQuoteStatus":
       return typeof value === "string"
         ? (PRICING_QUOTE_STATUS_LABELS[value] ?? value)

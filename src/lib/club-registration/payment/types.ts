@@ -12,6 +12,10 @@ export type PaymentAid = {
   amountCents: number;
   reference?: string;
   note?: string;
+  /** Aide collectable effectivement reçue par le club (Pass Sport, Labaz, etc.). */
+  received?: boolean;
+  receivedAt?: string;
+  receivedBy?: string;
 };
 
 export type ExpectedPayment = {

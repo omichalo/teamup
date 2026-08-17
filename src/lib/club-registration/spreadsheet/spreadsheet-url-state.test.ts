@@ -29,4 +29,14 @@ describe("spreadsheet url state", () => {
       "/club/adhesions-tableau?vue=missing_certificate&q=Martin&tri=submittedAt&ordre=desc&dossier=id-1"
     );
   });
+
+  it("conserve la vue aides en attente dans l’URL du tableau", () => {
+    const params = new URLSearchParams("vue=pending_aid_receipt");
+    expect(parseSpreadsheetUrlState(params)).toEqual({
+      viewId: "pending_aid_receipt",
+    });
+    expect(
+      buildSpreadsheetPathWithParams({ viewId: "pending_aid_receipt" })
+    ).toBe("/club/adhesions-tableau?vue=pending_aid_receipt");
+  });
 });

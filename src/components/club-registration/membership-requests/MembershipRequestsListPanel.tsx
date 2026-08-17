@@ -34,6 +34,7 @@ import {
   type ManagedListPpsFollowUpFilter,
   type PpsFollowUpStatus,
 } from "@/lib/club-registration/pps-follow-up";
+import type { ManagedListAidReceiptFilter } from "@/lib/club-registration/payment/aid-receipt";
 import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
 import { PaymentSummaryCard } from "../secretariat/PaymentSummaryCard";
 import { ManagedListMedicalCertificateChips } from "./ManagedListMedicalCertificateChips";
@@ -84,6 +85,7 @@ type MembershipRequestsListPanelProps = {
   onMedicalCertificateFilterChange: (value: ManagedListMedicalCertificateFilter) => void;
   ppsFollowUpFilter: ManagedListPpsFollowUpFilter;
   onPpsFollowUpFilterChange: (value: ManagedListPpsFollowUpFilter) => void;
+  aidReceiptFilter: ManagedListAidReceiptFilter;
   searchInput: string;
   onSearchInputChange: (value: string) => void;
   pageInfo: ManagedRegistrationsPageInfo;
@@ -108,6 +110,7 @@ export function MembershipRequestsListPanel({
   onMedicalCertificateFilterChange,
   ppsFollowUpFilter,
   onPpsFollowUpFilterChange,
+  aidReceiptFilter,
   searchInput,
   onSearchInputChange,
   pageInfo,
@@ -124,9 +127,11 @@ export function MembershipRequestsListPanel({
   const searchActive = searchInput.trim().length >= 2;
   const medicalFilterActive = medicalCertificateFilter !== "all";
   const ppsFilterActive = ppsFollowUpFilter !== "all";
+  const aidFilterActive = aidReceiptFilter !== "all";
   const showResultCount =
     searchActive ||
-    ((medicalFilterActive || ppsFilterActive) && pageInfo.totalMatched != null);
+    ((medicalFilterActive || ppsFilterActive || aidFilterActive) &&
+      pageInfo.totalMatched != null);
   const hasActiveSelection = selectedId != null;
   const activeTabIndex = MANAGED_LIST_STATUS_FILTER_OPTIONS.findIndex(
     (option) => option.value === statusFilter

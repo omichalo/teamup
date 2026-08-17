@@ -43,6 +43,8 @@ export function MembershipRequestsClient() {
     setMedicalCertificateFilter,
     ppsFollowUpFilter,
     setPpsFollowUpFilter,
+    aidReceiptFilter,
+    setAidReceiptFilter,
     searchInput,
     setSearchInput,
     registrations,
@@ -57,6 +59,7 @@ export function MembershipRequestsClient() {
     statusFilter: initialUrlState.statusFilter,
     medicalCertificateFilter: initialUrlState.medicalCertificateFilter,
     ppsFollowUpFilter: initialUrlState.ppsFollowUpFilter,
+    aidReceiptFilter: initialUrlState.aidReceiptFilter,
   });
   const [selectedId, setSelectedId] = useState<string | null>(initialUrlState.selectedId);
   const [mobileListVisible, setMobileListVisible] = useState(true);
@@ -64,8 +67,13 @@ export function MembershipRequestsClient() {
     useManagedQueueSummary();
 
   const activeViewId = useMemo(
-    () => resolveManagedListSavedViewFromFilters(statusFilter, medicalCertificateFilter),
-    [medicalCertificateFilter, statusFilter]
+    () =>
+      resolveManagedListSavedViewFromFilters(
+        statusFilter,
+        medicalCertificateFilter,
+        aidReceiptFilter
+      ),
+    [aidReceiptFilter, medicalCertificateFilter, statusFilter]
   );
 
   const {
@@ -98,8 +106,9 @@ export function MembershipRequestsClient() {
       const filters = getManagedListFiltersForSavedView(viewId);
       setStatusFilter(filters.statusFilter);
       setMedicalCertificateFilter(filters.medicalCertificateFilter);
+      setAidReceiptFilter(filters.aidReceiptFilter);
     },
-    [setMedicalCertificateFilter, setStatusFilter]
+    [setAidReceiptFilter, setMedicalCertificateFilter, setStatusFilter]
   );
 
   useEffect(() => {
@@ -107,9 +116,17 @@ export function MembershipRequestsClient() {
       statusFilter,
       medicalCertificateFilter,
       ppsFollowUpFilter,
+      aidReceiptFilter,
       selectedId,
     });
-  }, [medicalCertificateFilter, ppsFollowUpFilter, selectedId, statusFilter, syncToUrl]);
+  }, [
+    aidReceiptFilter,
+    medicalCertificateFilter,
+    ppsFollowUpFilter,
+    selectedId,
+    statusFilter,
+    syncToUrl,
+  ]);
 
   useEffect(() => {
     if (registrations.length === 0) {
@@ -182,6 +199,7 @@ export function MembershipRequestsClient() {
       onMedicalCertificateFilterChange={setMedicalCertificateFilter}
       ppsFollowUpFilter={ppsFollowUpFilter}
       onPpsFollowUpFilterChange={setPpsFollowUpFilter}
+      aidReceiptFilter={aidReceiptFilter}
       searchInput={searchInput}
       onSearchInputChange={setSearchInput}
       pageInfo={pageInfo}

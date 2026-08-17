@@ -6,6 +6,7 @@ import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types"
 import { calculateQuoteWithConfig } from "@/lib/club-registration-config/pricing-resolve";
 import { buildPricingContext } from "@/lib/pricing/build-context";
 import type { ClubRegistrationPayload } from "./build-payload-schema";
+import { sanitizePaymentAidsForFamilySubmit } from "./payment/aid-receipt";
 import { buildPaymentFromDraft } from "./payment/build-payment-from-draft";
 import { paymentToFirestoreUpdate } from "./payment/normalize-payment";
 
@@ -51,13 +52,7 @@ export function buildRegistrationSubmitDocument(params: {
     reductionReferenceCodes: payload.reductionReferenceCodes,
     paymentMethod: payload.paymentMethod,
     paymentInstallments: payload.paymentInstallments,
-    paymentAids: payload.paymentAids.map((aid) => ({
-      type: aid.type,
-      label: aid.label,
-      amountCents: aid.amountCents,
-      ...(aid.reference ? { reference: aid.reference } : {}),
-      ...(aid.note ? { note: aid.note } : {}),
-    })),
+    paymentAids: sanitizePaymentAidsForFamilySubmit(payload.paymentAids),
     holidayVoucherAmountCents: payload.holidayVoucherAmountCents ?? null,
     remainingPaymentMethod: payload.remainingPaymentMethod ?? "",
     paymentNote: payload.paymentNote ?? "",

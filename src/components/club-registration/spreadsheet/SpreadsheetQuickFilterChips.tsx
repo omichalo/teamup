@@ -4,8 +4,10 @@ import { Box } from "@mui/material";
 import type { PaymentStatusId } from "@/lib/club-registration/payment-constants";
 import type { RegistrationStatus } from "@/lib/club-registration/registration-status";
 import {
+  SPREADSHEET_AID_RECEIPT_CHIP_OPTIONS,
   SPREADSHEET_PAYMENT_STATUS_CHIP_OPTIONS,
   SPREADSHEET_REGISTRATION_STATUS_CHIP_OPTIONS,
+  type AidReceiptFilterStatus,
   type SpreadsheetQuickFilters,
 } from "@/lib/club-registration/spreadsheet/quick-filters";
 import { FilterChipGroup } from "./SpreadsheetFilterChipGroup";
@@ -14,18 +16,20 @@ type Props = {
   quickFilters: SpreadsheetQuickFilters;
   onToggleRegistrationStatus: (status: RegistrationStatus) => void;
   onTogglePaymentStatus: (status: PaymentStatusId) => void;
+  onToggleAidReceiptStatus: (status: AidReceiptFilterStatus) => void;
 };
 
 export function SpreadsheetQuickFilterChips({
   quickFilters,
   onToggleRegistrationStatus,
   onTogglePaymentStatus,
+  onToggleAidReceiptStatus,
 }: Props) {
   return (
     <Box
       sx={{
         display: "grid",
-        gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+        gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", lg: "1fr 1fr 1fr" },
         columnGap: { xs: 0, sm: 2.5, xl: 3 },
         rowGap: 1.25,
       }}
@@ -41,6 +45,12 @@ export function SpreadsheetQuickFilterChips({
         options={SPREADSHEET_PAYMENT_STATUS_CHIP_OPTIONS}
         activeValues={quickFilters.paymentStatuses}
         onToggle={onTogglePaymentStatus}
+      />
+      <FilterChipGroup
+        title="Aides"
+        options={SPREADSHEET_AID_RECEIPT_CHIP_OPTIONS}
+        activeValues={quickFilters.aidReceiptStatuses ?? []}
+        onToggle={onToggleAidReceiptStatus}
       />
     </Box>
   );

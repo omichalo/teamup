@@ -16,6 +16,11 @@ export const paymentAidPayloadSchema = z.object({
   note: z.string().trim().max(PAYMENT_AID_NOTE_MAX_LENGTH).optional(),
 });
 
+/** Schéma secrétariat : accepte `received`, jamais `receivedAt` / `receivedBy` (posés côté serveur). */
+export const managerPaymentAidPayloadSchema = paymentAidPayloadSchema.extend({
+  received: z.boolean().optional(),
+});
+
 export const paymentPayloadFieldsSchema = {
   paymentMethod: z.enum(PAYMENT_METHOD_IDS),
   paymentInstallments: z

@@ -1,4 +1,5 @@
 import type { PriceQuote } from "@/lib/pricing/types";
+import { isCollectableAid } from "@/lib/club-registration/payment/aid-receipt";
 import type { PaymentAid } from "@/lib/club-registration/payment/types";
 import type { StripeCheckoutLineItem } from "@/lib/pricing/stripe-checkout-lines";
 import { formatLastNameForDisplay } from "@/lib/shared/person-name-format";
@@ -174,7 +175,12 @@ export function formatPaymentAidsForSpreadsheet(value: unknown): string {
           : "";
       const note =
         typeof aid.note === "string" && aid.note.trim().length > 0 ? ` — ${aid.note.trim()}` : "";
-      return [label, amount, reference, note].filter(Boolean).join("") || label;
+      const receipt = isCollectableAid(aid)
+        ? aid.received === true
+          ? " — reçue"
+          : " — en attente"
+        : "";
+      return [label, amount, reference, note, receipt].filter(Boolean).join("") || label;
     })
     .filter(Boolean)
     .join(" ; ");

@@ -8,6 +8,10 @@ import {
   type ManagedListMedicalCertificateFilter,
 } from "@/lib/club-registration/medical-certificate";
 import {
+  resolveManagedListAidReceiptFilter,
+  type ManagedListAidReceiptFilter,
+} from "@/lib/club-registration/payment/aid-receipt";
+import {
   resolveManagedListPpsFollowUpFilter,
   type ManagedListPpsFollowUpFilter,
 } from "@/lib/club-registration/pps-follow-up";
@@ -20,8 +24,17 @@ export type ManagedListUrlState = {
   statusFilter: ManagedListStatusFilter;
   medicalCertificateFilter: ManagedListMedicalCertificateFilter;
   ppsFollowUpFilter: ManagedListPpsFollowUpFilter;
+  aidReceiptFilter: ManagedListAidReceiptFilter;
   selectedId: string | null;
 };
+
+function resolveSavedViewIdFromState(input: ManagedListUrlState) {
+  return resolveManagedListSavedViewFromFilters(
+    input.statusFilter,
+    input.medicalCertificateFilter,
+    input.aidReceiptFilter
+  );
+}
 
 export function parseManagedListUrlState(
   searchParams: Pick<URLSearchParams, "get">
@@ -36,6 +49,7 @@ export function parseManagedListUrlState(
       statusFilter: filters.statusFilter,
       medicalCertificateFilter: filters.medicalCertificateFilter,
       ppsFollowUpFilter,
+      aidReceiptFilter: filters.aidReceiptFilter,
       selectedId: searchParams.get("id"),
     };
   }
@@ -49,15 +63,13 @@ export function parseManagedListUrlState(
     statusFilter,
     medicalCertificateFilter,
     ppsFollowUpFilter,
+    aidReceiptFilter: resolveManagedListAidReceiptFilter(searchParams.get("aides")),
     selectedId: searchParams.get("id"),
   };
 }
 
 export function normalizeManagedListUrlState(input: ManagedListUrlState): ManagedListUrlState {
-  const matchedViewId = resolveManagedListSavedViewFromFilters(
-    input.statusFilter,
-    input.medicalCertificateFilter
-  );
+  const matchedViewId = resolveSavedViewIdFromState(input);
 
   if (matchedViewId) {
     const filters = getManagedListFiltersForSavedView(matchedViewId);
@@ -65,6 +77,7 @@ export function normalizeManagedListUrlState(input: ManagedListUrlState): Manage
       statusFilter: filters.statusFilter,
       medicalCertificateFilter: filters.medicalCertificateFilter,
       ppsFollowUpFilter: input.ppsFollowUpFilter,
+      aidReceiptFilter: filters.aidReceiptFilter,
       selectedId: input.selectedId,
     };
   }
@@ -73,6 +86,7 @@ export function normalizeManagedListUrlState(input: ManagedListUrlState): Manage
     statusFilter: input.statusFilter,
     medicalCertificateFilter: input.medicalCertificateFilter,
     ppsFollowUpFilter: input.ppsFollowUpFilter,
+    aidReceiptFilter: input.aidReceiptFilter,
     selectedId: input.selectedId,
   };
 }
@@ -89,16 +103,14 @@ export function managedListUrlStatesEqual(
     normalizedLeft.medicalCertificateFilter ===
       normalizedRight.medicalCertificateFilter &&
     normalizedLeft.ppsFollowUpFilter === normalizedRight.ppsFollowUpFilter &&
+    normalizedLeft.aidReceiptFilter === normalizedRight.aidReceiptFilter &&
     (normalizedLeft.selectedId ?? null) === (normalizedRight.selectedId ?? null)
   );
 }
 
 export function buildManagedListQueryString(input: ManagedListUrlState): string {
   const params = new URLSearchParams();
-  const matchedViewId = resolveManagedListSavedViewFromFilters(
-    input.statusFilter,
-    input.medicalCertificateFilter
-  );
+  const matchedViewId = resolveSavedViewIdFromState(input);
 
   if (matchedViewId) {
     params.set("vue", matchedViewId);
@@ -106,6 +118,9 @@ export function buildManagedListQueryString(input: ManagedListUrlState): string 
     params.set("status", input.statusFilter);
     if (input.medicalCertificateFilter !== "all") {
       params.set("certificat", input.medicalCertificateFilter);
+    }
+    if (input.aidReceiptFilter !== "all") {
+      params.set("aides", input.aidReceiptFilter);
     }
   }
 

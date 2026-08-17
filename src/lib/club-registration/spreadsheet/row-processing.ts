@@ -4,6 +4,7 @@ import type { SpreadsheetColumnId } from "@/lib/club-registration/spreadsheet/co
 import {
   EMPTY_SPREADSHEET_QUICK_FILTERS,
   filterSpreadsheetRowsByQuickFilters,
+  isQuickFiltersEmpty,
   type SpreadsheetQuickFilters,
 } from "@/lib/club-registration/spreadsheet/quick-filters";
 import {
@@ -76,11 +77,7 @@ export function filterSpreadsheetRowsByColumnFilters(
 }
 
 export function hasActiveQuickFilters(quickFilters: SpreadsheetQuickFilters): boolean {
-  return (
-    quickFilters.registrationStatuses.length > 0 ||
-    quickFilters.paymentStatuses.length > 0 ||
-    quickFilters.medicalCertificateStatuses.length > 0
-  );
+  return !isQuickFiltersEmpty(quickFilters);
 }
 
 export function applySpreadsheetFilters(

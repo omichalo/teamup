@@ -4,6 +4,10 @@ import {
   type MedicalCertificateStatus,
 } from "@/lib/club-registration/medical-certificate";
 import {
+  getRegistrationPaymentAids,
+  hasPendingAidReceipt,
+} from "@/lib/club-registration/payment/aid-receipt";
+import {
   ACTIONABLE_REGISTRATION_STATUSES,
   isRegistrationStatus,
   REGISTRATION_STATUS_LABELS,
@@ -16,23 +20,40 @@ import {
 } from "@/lib/club-registration/payment-constants";
 import { resolveRegistrationPaymentStatus } from "@/lib/club-registration/resolve-registration-payment-status";
 
+export type AidReceiptFilterStatus = "pending";
+
 export type SpreadsheetQuickFilters = {
   registrationStatuses: RegistrationStatus[];
   paymentStatuses: PaymentStatusId[];
   medicalCertificateStatuses: MedicalCertificateStatus[];
+  aidReceiptStatuses: AidReceiptFilterStatus[];
 };
 
 export const EMPTY_SPREADSHEET_QUICK_FILTERS: SpreadsheetQuickFilters = {
   registrationStatuses: [],
   paymentStatuses: [],
   medicalCertificateStatuses: [],
+  aidReceiptStatuses: [],
 };
+
+/** Complète les tableaux manquants (état React / vues antérieures au champ aides). */
+export function normalizeSpreadsheetQuickFilters(
+  filters: Partial<SpreadsheetQuickFilters> | null | undefined
+): SpreadsheetQuickFilters {
+  return {
+    registrationStatuses: [...(filters?.registrationStatuses ?? [])],
+    paymentStatuses: [...(filters?.paymentStatuses ?? [])],
+    medicalCertificateStatuses: [...(filters?.medicalCertificateStatuses ?? [])],
+    aidReceiptStatuses: [...(filters?.aidReceiptStatuses ?? [])],
+  };
+}
 
 export type SpreadsheetSavedViewId =
   | "all"
   | "to_review"
   | "missing_certificate"
-  | "payment_pending";
+  | "payment_pending"
+  | "pending_aid_receipt";
 
 export type SpreadsheetSavedView = {
   id: SpreadsheetSavedViewId;
@@ -57,17 +78,15 @@ export const SPREADSHEET_SAVED_VIEWS: SpreadsheetSavedView[] = [
     id: "to_review",
     label: "À valider",
     quickFilters: {
+      ...EMPTY_SPREADSHEET_QUICK_FILTERS,
       registrationStatuses: [...ACTIONABLE_REGISTRATION_STATUSES],
-      paymentStatuses: [],
-      medicalCertificateStatuses: [],
     },
   },
   {
     id: "missing_certificate",
     label: "Certificat manquant",
     quickFilters: {
-      registrationStatuses: [],
-      paymentStatuses: [],
+      ...EMPTY_SPREADSHEET_QUICK_FILTERS,
       medicalCertificateStatuses: ["required_not_received"],
     },
   },
@@ -75,9 +94,16 @@ export const SPREADSHEET_SAVED_VIEWS: SpreadsheetSavedView[] = [
     id: "payment_pending",
     label: "Paiement en attente",
     quickFilters: {
-      registrationStatuses: [],
+      ...EMPTY_SPREADSHEET_QUICK_FILTERS,
       paymentStatuses: [...PAYMENT_PENDING_STATUSES],
-      medicalCertificateStatuses: [],
+    },
+  },
+  {
+    id: "pending_aid_receipt",
+    label: "Aides en attente",
+    quickFilters: {
+      ...EMPTY_SPREADSHEET_QUICK_FILTERS,
+      aidReceiptStatuses: ["pending"],
     },
   },
 ];
@@ -122,11 +148,17 @@ export function getRowMedicalCertificateStatus(
   return summaryMedicalCertificateStatus(row);
 }
 
+export function rowHasPendingAidReceipt(row: RegistrationClientRecord): boolean {
+  return hasPendingAidReceipt(getRegistrationPaymentAids(row));
+}
+
 export function isQuickFiltersEmpty(quickFilters: SpreadsheetQuickFilters): boolean {
+  const normalized = normalizeSpreadsheetQuickFilters(quickFilters);
   return (
-    quickFilters.registrationStatuses.length === 0 &&
-    quickFilters.paymentStatuses.length === 0 &&
-    quickFilters.medicalCertificateStatuses.length === 0
+    normalized.registrationStatuses.length === 0 &&
+    normalized.paymentStatuses.length === 0 &&
+    normalized.medicalCertificateStatuses.length === 0 &&
+    normalized.aidReceiptStatuses.length === 0
   );
 }
 
@@ -135,13 +167,15 @@ export function quickFiltersMatchSavedView(
   viewId: SpreadsheetSavedViewId
 ): boolean {
   const view = getSpreadsheetSavedView(viewId);
+  const normalized = normalizeSpreadsheetQuickFilters(quickFilters);
   return (
-    arraysEqual(quickFilters.registrationStatuses, view.quickFilters.registrationStatuses) &&
-    arraysEqual(quickFilters.paymentStatuses, view.quickFilters.paymentStatuses) &&
+    arraysEqual(normalized.registrationStatuses, view.quickFilters.registrationStatuses) &&
+    arraysEqual(normalized.paymentStatuses, view.quickFilters.paymentStatuses) &&
     arraysEqual(
-      quickFilters.medicalCertificateStatuses,
+      normalized.medicalCertificateStatuses,
       view.quickFilters.medicalCertificateStatuses
-    )
+    ) &&
+    arraysEqual(normalized.aidReceiptStatuses, view.quickFilters.aidReceiptStatuses)
   );
 }
 
@@ -164,30 +198,35 @@ export function filterSpreadsheetRowsByQuickFilters(
   rows: RegistrationClientRecord[],
   quickFilters: SpreadsheetQuickFilters
 ): RegistrationClientRecord[] {
-  if (isQuickFiltersEmpty(quickFilters)) {
+  const normalized = normalizeSpreadsheetQuickFilters(quickFilters);
+  if (isQuickFiltersEmpty(normalized)) {
     return rows;
   }
 
   return rows.filter((row) => {
-    if (quickFilters.registrationStatuses.length > 0) {
+    if (normalized.registrationStatuses.length > 0) {
       const status = getRowRegistrationStatus(row);
-      if (!status || !quickFilters.registrationStatuses.includes(status)) {
+      if (!status || !normalized.registrationStatuses.includes(status)) {
         return false;
       }
     }
 
-    if (quickFilters.paymentStatuses.length > 0) {
+    if (normalized.paymentStatuses.length > 0) {
       const paymentStatus = getRowPaymentStatus(row);
-      if (!paymentStatus || !quickFilters.paymentStatuses.includes(paymentStatus)) {
+      if (!paymentStatus || !normalized.paymentStatuses.includes(paymentStatus)) {
         return false;
       }
     }
 
-    if (quickFilters.medicalCertificateStatuses.length > 0) {
+    if (normalized.medicalCertificateStatuses.length > 0) {
       const medicalStatus = getRowMedicalCertificateStatus(row);
-      if (!quickFilters.medicalCertificateStatuses.includes(medicalStatus)) {
+      if (!normalized.medicalCertificateStatuses.includes(medicalStatus)) {
         return false;
       }
+    }
+
+    if (normalized.aidReceiptStatuses.includes("pending") && !rowHasPendingAidReceipt(row)) {
+      return false;
     }
 
     return true;
@@ -199,6 +238,7 @@ export type SpreadsheetSummaryStats = {
   actionableCount: number;
   missingCertificateCount: number;
   paymentPendingCount: number;
+  pendingAidReceiptCount: number;
 };
 
 export function computeSpreadsheetSummaryStats(
@@ -207,6 +247,7 @@ export function computeSpreadsheetSummaryStats(
   let actionableCount = 0;
   let missingCertificateCount = 0;
   let paymentPendingCount = 0;
+  let pendingAidReceiptCount = 0;
 
   for (const row of rows) {
     const registrationStatus = getRowRegistrationStatus(row);
@@ -222,6 +263,10 @@ export function computeSpreadsheetSummaryStats(
     if (paymentStatus && PAYMENT_PENDING_STATUSES.includes(paymentStatus)) {
       paymentPendingCount += 1;
     }
+
+    if (rowHasPendingAidReceipt(row)) {
+      pendingAidReceiptCount += 1;
+    }
   }
 
   return {
@@ -229,6 +274,7 @@ export function computeSpreadsheetSummaryStats(
     actionableCount,
     missingCertificateCount,
     paymentPendingCount,
+    pendingAidReceiptCount,
   };
 }
 
@@ -243,6 +289,11 @@ export const SPREADSHEET_PAYMENT_STATUS_CHIP_OPTIONS = PAYMENT_PENDING_STATUSES.
   value,
   label: PAYMENT_STATUS_LABELS[value],
 }));
+
+export const SPREADSHEET_AID_RECEIPT_CHIP_OPTIONS: {
+  value: AidReceiptFilterStatus;
+  label: string;
+}[] = [{ value: "pending", label: "En attente de réception" }];
 
 function arraysEqual<T>(left: readonly T[], right: readonly T[]): boolean {
   if (left.length !== right.length) return false;

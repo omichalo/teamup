@@ -148,7 +148,8 @@ export async function patchManagerRegistration(
 
   const currentData = snap.data() ?? {};
   const currentStatus = currentData.status;
-  const statusPatch = currentStatus === "submitted" ? { status: "in_review" } : {};
+  const statusPatch =
+    currentStatus === "submitted" ? { status: "in_review" as const } : {};
 
   if (
     updates.medicalCertificateDeclaration !== undefined ||
@@ -205,7 +206,8 @@ export async function patchManagerRegistration(
       mergedForPricing,
       currentData,
       updates.paymentAids,
-      config
+      config,
+      { uid: decoded.uid, at: new Date().toISOString() }
     );
     if (!aidsUpdate.ok) {
       return jsonNoStore({ error: aidsUpdate.error }, { status: 400 });
@@ -217,7 +219,7 @@ export async function patchManagerRegistration(
     {
       ...updates,
       ...pricingPatch,
-      ...statusPatch,
+      ...(updates.status !== undefined ? {} : statusPatch),
       reviewedBy: decoded.uid,
       reviewedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
