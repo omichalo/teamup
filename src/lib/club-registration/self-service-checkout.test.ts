@@ -1,5 +1,7 @@
 import {
   canSelfServiceCheckout,
+  canSelfServiceOnlineCheckout,
+  canSelfServiceRemainingOverride,
   isAwaitingNonCardPayment,
   resolveSelfServicePayableCents,
 } from "./self-service-checkout";
@@ -127,6 +129,55 @@ describe("self-service-checkout", () => {
       })
     ).toBe(20_000);
     expect(resolveSelfServicePayableCents({ paymentAmountCents: 15_000 })).toBe(15_000);
+  });
+
+  it("pour des chèques vacances, le self-service propose le complément et tout le solde", () => {
+    const mixed = {
+      status: "payment_requested",
+      paymentAmountCents: 30_000,
+      payment: {
+        paymentMethod: "holiday_vouchers",
+        amountToPayCents: 30_000,
+        totalAmountCents: 30_000,
+        assistanceTotalAmountCents: 0,
+        aids: [],
+        paymentInstallments: 1,
+        expectedPayments: [],
+        receivedPayments: [],
+        paidAmountCents: 0,
+        remainingAmountCents: 30_000,
+        holidayVoucherAmountCents: 25_000,
+        remainingPaymentMethod: "card",
+        paymentStatus: "waiting_payment",
+      },
+    };
+    expect(resolveSelfServicePayableCents(mixed)).toBe(5_000);
+    expect(canSelfServiceOnlineCheckout(mixed)).toBe(true);
+    expect(canSelfServiceRemainingOverride(mixed)).toBe(true);
+    expect(canSelfServiceCheckout(mixed)).toBe(true);
+
+    const afterCard = {
+      status: "payment_requested",
+      paymentAmountCents: 30_000,
+      payment: {
+        paymentMethod: "holiday_vouchers",
+        amountToPayCents: 30_000,
+        totalAmountCents: 30_000,
+        assistanceTotalAmountCents: 0,
+        aids: [],
+        paymentInstallments: 1,
+        expectedPayments: [],
+        receivedPayments: [],
+        paidAmountCents: 5_000,
+        remainingAmountCents: 25_000,
+        holidayVoucherAmountCents: 25_000,
+        remainingPaymentMethod: "card",
+        paymentStatus: "partially_paid",
+      },
+    };
+    expect(canSelfServiceOnlineCheckout(afterCard)).toBe(false);
+    expect(canSelfServiceRemainingOverride(afterCard)).toBe(true);
+    expect(canSelfServiceCheckout(afterCard)).toBe(true);
   });
 
   it("n'affiche plus l'attente hors carte si le self-service Stripe est ouvert", () => {

@@ -1,4 +1,5 @@
 import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
+import { resolveOnlinePayableCents } from "@/lib/club-registration/payment/resolve-remaining-payable";
 import { isRegistrationPaidRecord } from "@/lib/club-registration/payment-proof";
 import type { RegistrationSummary } from "@/components/club-registration/membership-requests/types";
 
@@ -56,7 +57,7 @@ export function canQuickResendPaymentLink(registration: RegistrationSummary): bo
   const payment =
     registration.payment ??
     normalizeRegistrationPayment(registration as unknown as Record<string, unknown>);
-  if (payment && payment.remainingAmountCents <= 0 && payment.paidAmountCents > 0) {
+  if (payment && resolveOnlinePayableCents(payment) <= 0) {
     return false;
   }
   const amountCents = resolveQuickPaymentAmountCents(registration);

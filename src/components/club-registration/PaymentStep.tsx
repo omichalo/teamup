@@ -204,8 +204,10 @@ export function PaymentStep({ draft, onChange }: Props) {
       {draft.paymentMethod === "holiday_vouchers" ? (
         <Stack spacing={2}>
           <Alert severity="info" variant="outlined">
-            Les chèques vacances peuvent couvrir tout ou partie du règlement. En cas
-            de complément, le secrétariat vous indiquera la marche à suivre.
+            Les chèques vacances peuvent couvrir tout ou partie du règlement. Un
+            complément éventuel pourra être réglé en ligne après validation du
+            dossier. Si vous changez d&apos;avis, vous pourrez aussi régler tout le
+            solde par carte.
           </Alert>
           <EuroMonetaryInputField
             label="Montant prévu en chèques vacances"

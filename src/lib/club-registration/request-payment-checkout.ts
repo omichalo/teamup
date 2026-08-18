@@ -170,6 +170,7 @@ export async function createStripeCheckoutForRegistration(params: {
   amountToPayCents: number;
   alreadyPaidCents?: number;
   remainingPayableCents?: number;
+  reservedHolidayVoucherCents?: number;
   paymentEmail: string;
   adherentName: string;
   successUrl: string;
@@ -195,6 +196,9 @@ export async function createStripeCheckoutForRegistration(params: {
       amountToPayCents: params.amountToPayCents,
       alreadyPaidCents,
       remainingPayableCents,
+      ...(params.reservedHolidayVoucherCents != null
+        ? { reservedHolidayVoucherCents: params.reservedHolidayVoucherCents }
+        : {}),
     });
     if (!validation.ok) {
       return validation;
@@ -230,6 +234,9 @@ export async function createStripeCheckoutForRegistration(params: {
       donationDiscountCouponName: stripePresentation.donationDiscountCouponName,
       aids: paymentAids,
       alreadyPaidCents,
+      ...(params.reservedHolidayVoucherCents != null
+        ? { reservedHolidayVoucherCents: params.reservedHolidayVoucherCents }
+        : {}),
     });
 
     const session = await createMembershipCheckoutSession({

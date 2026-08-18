@@ -52,6 +52,8 @@ export {
 
 export {
   resolveRemainingPayableCents,
+  resolveOnlinePayableCents,
+  resolveUnpaidHolidayVoucherCents,
   resolveCheckoutChargeAmounts,
   type CheckoutChargeAmounts,
 } from "./resolve-remaining-payable";

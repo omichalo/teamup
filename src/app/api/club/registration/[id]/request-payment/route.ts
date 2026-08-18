@@ -16,7 +16,11 @@ import {
   paymentToFirestoreUpdate,
 } from "@/lib/club-registration/payment/normalize-payment";
 import { recalculateRegistrationPayment } from "@/lib/club-registration/payment/payment-mutations";
-import { resolveCheckoutChargeAmounts } from "@/lib/club-registration/payment/resolve-remaining-payable";
+import {
+  parseStripeChargeMode,
+  resolveCheckoutChargeAmounts,
+  resolveStripeChargeForMode,
+} from "@/lib/club-registration/payment/resolve-remaining-payable";
 import {
   calculateQuoteForRecord,
   resolveRegistrationConfigForRecord,
@@ -76,6 +80,7 @@ export async function POST(
     const body = ((await req.json().catch(() => ({}))) ?? {}) as {
       amountCents?: number;
       channel?: "stripe" | "instructions";
+      charge?: unknown;
     };
 
     const db = getFirestoreAdmin();
@@ -269,9 +274,24 @@ export async function POST(
       );
     }
 
+    const stripeCharge = resolveStripeChargeForMode(
+      charge,
+      parseStripeChargeMode(body.charge)
+    );
+
+    if (stripeCharge.stripeCents <= 0) {
+      return jsonNoStore(
+        {
+          error:
+            "Aucun montant à demander en ligne : le solde restant est prévu hors carte (chèques vacances).",
+        },
+        { status: 400 }
+      );
+    }
+
     const stripeCapability = await createStripePaymentForRegistration({
       registrationId: id,
-      amountToPayCents: payableCents,
+      amountToPayCents: stripeCharge.stripeCents,
       paymentMethod,
     });
 
@@ -289,7 +309,8 @@ export async function POST(
       payment,
       amountToPayCents,
       alreadyPaidCents: charge.alreadyPaidCents,
-      remainingPayableCents: payableCents,
+      remainingPayableCents: stripeCharge.stripeCents,
+      reservedHolidayVoucherCents: stripeCharge.reservedHolidayVoucherCents,
     });
     if (!checkoutValidation.ok) {
       return jsonNoStore(checkoutValidation.body, { status: checkoutValidation.status });
@@ -302,7 +323,7 @@ export async function POST(
       quote,
       donationPricing,
       amountToPayCents,
-      payableCents,
+      payableCents: stripeCharge.stripeCents,
       paymentEmails,
       adherentName,
       baseUrl,
