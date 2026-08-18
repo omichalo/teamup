@@ -21,6 +21,8 @@ import {
   SECRETARIAT_SELF_SERVICE_HINT,
   SECRETARIAT_SEND_ONLINE_PAYMENT_BUTTON,
   SECRETARIAT_SEND_ONLINE_PAYMENT_TOOLTIP,
+  SECRETARIAT_SEND_FULL_REMAINING_ONLINE_BUTTON,
+  SECRETARIAT_SEND_FULL_REMAINING_ONLINE_TOOLTIP,
 } from "@/lib/club-registration/payment/bnpl-checkout-copy";
 import { resolveSecretariatPaymentCta } from "@/lib/club-registration/payment/secretariat-payment-action";
 import { centsToEurosInput } from "@/lib/club-registration/payment/payment-draft-helpers";
@@ -40,6 +42,7 @@ type Props = {
   paymentEmailSentTo?: string | null | undefined;
   paymentMethod?: PaymentMethodId | null | undefined;
   remainingAmountCents?: number | null;
+  onlinePayableCents?: number | null;
   paymentSettled?: boolean;
   saving: boolean;
   requestingPayment: boolean;
@@ -47,6 +50,7 @@ type Props = {
   onSave: () => void | Promise<void>;
   onRequestPayment: () => void | Promise<void>;
   onRequestOnlinePayment?: () => void | Promise<void>;
+  onRequestFullRemainingOnline?: () => void | Promise<void>;
 };
 
 const tooltipEnterProps = { enterDelay: 400, enterNextDelay: 400 } as const;
@@ -88,6 +92,7 @@ export function SecretariatPaymentNotesSection({
   paymentEmailSentTo,
   paymentMethod,
   remainingAmountCents = null,
+  onlinePayableCents = null,
   paymentSettled = false,
   saving,
   requestingPayment,
@@ -95,8 +100,10 @@ export function SecretariatPaymentNotesSection({
   onSave,
   onRequestPayment,
   onRequestOnlinePayment,
+  onRequestFullRemainingOnline,
 }: Props) {
   const remaining = remainingAmountCents ?? null;
+  const onlinePayable = onlinePayableCents ?? remaining;
   const paymentCta = resolveSecretariatPaymentCta({
     registrationStatus,
     paymentSettled,
@@ -108,17 +115,30 @@ export function SecretariatPaymentNotesSection({
     paymentCta.kind !== "validate_settled" &&
     Boolean(onRequestOnlinePayment) &&
     paymentMethod !== "card" &&
-    (remaining == null || remaining > 0);
+    (onlinePayable == null || onlinePayable > 0);
+  const canOfferFullRemainingLink =
+    paymentCta.visible &&
+    paymentCta.kind !== "validate_settled" &&
+    Boolean(onRequestFullRemainingOnline) &&
+    remaining != null &&
+    remaining > 0 &&
+    onlinePayable != null &&
+    remaining > onlinePayable;
   const requestedAtLabel = formatPaymentRequestedAt(paymentRequestedAt);
   const remainingLabel = formatAmountCents(remaining);
+  const onlineLabel = formatAmountCents(onlinePayable);
   const netLabel = formatAmountCents(paymentAmountCents);
   const alreadyPaidCents =
     remaining != null && paymentAmountCents != null && remaining < paymentAmountCents
       ? paymentAmountCents - remaining
       : null;
   const hasPartialReceipt = alreadyPaidCents != null && alreadyPaidCents > 0;
+  const hasOfflineRemainder =
+    remaining != null && onlinePayable != null && onlinePayable > 0 && onlinePayable < remaining;
   const chargeButtonLabel =
     remaining != null && remaining > 0 ? remaining : null;
+  const onlineChargeLabel =
+    onlinePayable != null && onlinePayable > 0 ? onlinePayable : null;
 
   return (
     <>
@@ -163,7 +183,7 @@ export function SecretariatPaymentNotesSection({
         {remaining != null ? (
           <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
-              label="Solde qui sera demandé maintenant"
+              label="Solde encore dû"
               value={centsToEurosInput(remaining)}
               fullWidth
               InputProps={{
@@ -175,9 +195,13 @@ export function SecretariatPaymentNotesSection({
                 ),
               }}
               helperText={
-                hasPartialReceipt
-                  ? `${formatAmountCents(alreadyPaidCents)} déjà encaissé. C’est ce solde que le lien Stripe demandera.`
-                  : "Montant du lien de paiement et des instructions."
+                hasOfflineRemainder
+                  ? `Dont ${onlineLabel} en ligne ; le reste est prévu hors carte (chèques vacances).`
+                  : hasPartialReceipt && onlinePayable === remaining
+                    ? `${formatAmountCents(alreadyPaidCents)} déjà encaissé. C’est ce solde que le lien Stripe demandera.`
+                    : hasPartialReceipt
+                      ? `${formatAmountCents(alreadyPaidCents)} déjà encaissé. Le reste est prévu hors carte.`
+                      : "Montant du lien de paiement et des instructions."
               }
             />
           </Grid>
@@ -218,10 +242,24 @@ export function SecretariatPaymentNotesSection({
         </Alert>
       ) : null}
 
-      {hasPartialReceipt && remainingLabel && netLabel && paymentCta.visible ? (
+      {hasOfflineRemainder && onlineLabel ? (
         <Alert severity="warning" variant="outlined">
-          Un encaissement est déjà enregistré. Le lien de paiement demandera{" "}
-          <strong>{remainingLabel}</strong>, pas {netLabel}.
+          Le lien de paiement en ligne demandera <strong>{onlineLabel}</strong> par
+          défaut, pas {remainingLabel}. Si l&apos;adhérent ne remet pas les chèques
+          vacances, vous pouvez demander tout le solde en ligne.
+        </Alert>
+      ) : remaining != null && remaining > 0 && onlinePayable === 0 && remainingLabel ? (
+        <Alert severity="warning" variant="outlined">
+          Le complément carte est déjà encaissé. Le solde {remainingLabel} est prévu
+          en chèques vacances ; vous pouvez quand même demander tout ce solde en
+          ligne si l&apos;adhérent change d&apos;avis.
+        </Alert>
+      ) : hasPartialReceipt && remainingLabel && netLabel && paymentCta.visible ? (
+        <Alert severity="warning" variant="outlined">
+          Un encaissement est déjà enregistré.{" "}
+          {onlineChargeLabel && onlineLabel
+            ? `Le lien de paiement demandera ${onlineLabel}, pas ${netLabel}.`
+            : `Solde restant ${remainingLabel} (hors carte).`}
         </Alert>
       ) : null}
 
@@ -245,8 +283,8 @@ export function SecretariatPaymentNotesSection({
         {canOfferOnlineLink ? (
           <Tooltip
             title={
-              remainingLabel
-                ? `Envoie un e-mail invitant l'adhérent à régler ${remainingLabel} par carte (Stripe), pas le montant net initial.`
+              onlineLabel
+                ? `Envoie un e-mail invitant l'adhérent à régler ${onlineLabel} par carte (Stripe).`
                 : SECRETARIAT_SEND_ONLINE_PAYMENT_TOOLTIP
             }
             slotProps={{ popper: { sx: { maxWidth: 340 } } }}
@@ -262,7 +300,29 @@ export function SecretariatPaymentNotesSection({
               >
                 {withRemainingAmount(
                   SECRETARIAT_SEND_ONLINE_PAYMENT_BUTTON,
-                  chargeButtonLabel
+                  onlineChargeLabel
+                )}
+              </Button>
+            </span>
+          </Tooltip>
+        ) : null}
+        {canOfferFullRemainingLink ? (
+          <Tooltip
+            title={SECRETARIAT_SEND_FULL_REMAINING_ONLINE_TOOLTIP}
+            slotProps={{ popper: { sx: { maxWidth: 340 } } }}
+            {...tooltipEnterProps}
+          >
+            <span>
+              <Button
+                variant="outlined"
+                color="secondary"
+                startIcon={<MarkEmailReadIcon />}
+                onClick={() => void onRequestFullRemainingOnline?.()}
+                disabled={saving || requestingPayment || persistingQuote}
+              >
+                {withRemainingAmount(
+                  SECRETARIAT_SEND_FULL_REMAINING_ONLINE_BUTTON,
+                  remaining
                 )}
               </Button>
             </span>

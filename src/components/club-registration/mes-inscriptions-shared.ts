@@ -1,4 +1,6 @@
 import type { MedicalCertificateStatus } from "@/lib/club-registration/medical-certificate";
+import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
+import { resolveOnlinePayableCents } from "@/lib/club-registration/payment/resolve-remaining-payable";
 import { getEnabledSections } from "@/lib/club-registration-config/helpers";
 import { getDefaultRegistrationConfig } from "@/lib/club-registration-config/default-config";
 
@@ -72,6 +74,18 @@ export function formatMesInscriptionAmount(cents: number | undefined): string | 
 export function formatMesInscriptionPayableAmount(
   registration: MesInscriptionSummary
 ): string | null {
+  const payment = normalizeRegistrationPayment(
+    registration as unknown as Record<string, unknown>
+  );
+  if (payment) {
+    const online = resolveOnlinePayableCents(payment);
+    if (online > 0) {
+      return formatMesInscriptionAmount(online);
+    }
+    if (payment.remainingAmountCents > 0) {
+      return formatMesInscriptionAmount(payment.remainingAmountCents);
+    }
+  }
   const remaining = registration.payment?.remainingAmountCents;
   if (typeof remaining === "number") {
     return formatMesInscriptionAmount(remaining);

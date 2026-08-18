@@ -360,7 +360,10 @@ export function useMembershipRequestDetail(
     }
   };
 
-  const requestPayment = async (channel?: "stripe" | "instructions") => {
+  const requestPayment = async (
+    channel?: "stripe" | "instructions",
+    options?: { charge?: "online" | "remaining" }
+  ) => {
     if (!registrationId || !form) return;
     const amountCents = parseAmountCents(form.amountEuros);
     if (amountCents === null || amountCents < 0) {
@@ -387,6 +390,7 @@ export function useMembershipRequestDetail(
           body: JSON.stringify({
             amountCents,
             ...(channel ? { channel } : {}),
+            ...(options?.charge ? { charge: options.charge } : {}),
           }),
         }
       );
