@@ -9,9 +9,9 @@ import { requireRegistrationManager } from "@/lib/club-registration/payment/api-
 import {
   isReceivedMethodIdSafe,
   normalizeRegistrationPayment,
-  paymentToFirestoreUpdate,
 } from "@/lib/club-registration/payment/normalize-payment";
 import { addManualReceivedPayment } from "@/lib/club-registration/payment/payment-mutations";
+import { paymentWriteWithSettlement } from "@/lib/club-registration/payment/settlement-firestore";
 import { normalizePaymentReference } from "@/lib/club-registration/payment/payment-reference";
 
 const COLLECTION = "clubRegistrations";
@@ -79,7 +79,7 @@ export async function POST(
 
     await docRef.set(
       {
-        ...paymentToFirestoreUpdate(next),
+        ...paymentWriteWithSettlement(next),
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true }

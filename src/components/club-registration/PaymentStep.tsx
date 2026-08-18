@@ -76,9 +76,9 @@ export function PaymentStep({ draft, onChange }: Props) {
   return (
     <Stack spacing={3}>
       <Typography variant="body2" color="text.secondary">
-        Indiquez comment vous souhaitez régler votre inscription. Les montants
-        d&apos;aides ont été saisis à l&apos;étape dossier administratif ; le
-        secrétariat vérifiera votre dossier avant validation définitive.
+        Les montants d&apos;aides ont été saisis à l&apos;étape dossier
+        administratif ; le secrétariat vérifiera votre dossier avant validation
+        définitive.
       </Typography>
 
       {!quote ? (
@@ -139,10 +139,11 @@ export function PaymentStep({ draft, onChange }: Props) {
 
       <Stack spacing={1.5}>
         <Typography variant="subtitle1" component="h3" sx={{ fontWeight: 700 }}>
-          Mode de paiement
+          Mode de règlement prévu
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Comment souhaitez-vous régler le reste à payer ?
+          Indiquez comment vous prévoyez de régler votre adhésion. Ce choix
+          pourra évoluer par la suite.
         </Typography>
         <FormControl component="fieldset" data-field="paymentMethod">
           <RadioGroup

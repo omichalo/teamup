@@ -4,10 +4,7 @@ import type {
   StripeCheckoutLineItem,
   StripeInvoiceCustomField,
 } from "@/lib/pricing/stripe-checkout-lines";
-import {
-  PAYMENT_METHOD_LABELS,
-  type PaymentMethodId,
-} from "@/lib/club-registration/payment-constants";
+import type { PaymentMethodId } from "@/lib/club-registration/payment-constants";
 
 export interface StripeCheckoutSession {
   id: string;
@@ -375,22 +372,16 @@ export function pickInvoiceDownloadUrl(links: StripeInvoiceLinks): string | null
 
 /**
  * Point d'extension pour le paiement CB en ligne via Checkout (carte ou BNPL sur Stripe).
- * Les autres modes passent en suivi secrétariat.
+ * Le mode prévu à l'inscription n'interdit plus un règlement en ligne du solde.
  */
 export async function createStripePaymentForRegistration(params: {
   registrationId: string;
   amountToPayCents: number;
-  paymentMethod: PaymentMethodId;
+  paymentMethod?: PaymentMethodId;
 }): Promise<{ supported: boolean; reason?: string }> {
+  void params.paymentMethod;
   if (params.amountToPayCents <= 0) {
     return { supported: false, reason: "Aucun montant à régler" };
-  }
-
-  if (params.paymentMethod !== "card") {
-    return {
-      supported: false,
-      reason: `Mode « ${PAYMENT_METHOD_LABELS[params.paymentMethod]} » : pas de lien de paiement en ligne. Suivez les encaissements dans le tableau ci-dessous.`,
-    };
   }
 
   return { supported: true };

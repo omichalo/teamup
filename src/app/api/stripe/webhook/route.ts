@@ -6,14 +6,9 @@ import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { AUDIT_ACTIONS, logAuditAction } from "@/lib/auth/audit-logger";
 import { dispatchPaymentConfirmedEmail } from "@/lib/email/dispatch-payment-confirmed-email";
 import { verifyStripeWebhookSignature } from "@/lib/club-registration/stripe";
-import {
-  normalizeRegistrationPayment,
-  paymentToFirestoreUpdate,
-} from "@/lib/club-registration/payment/normalize-payment";
-import {
-  addManualReceivedPayment,
-  markPaymentFullyPaid,
-} from "@/lib/club-registration/payment/payment-mutations";
+import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
+import { applyStripeCheckoutPaid } from "@/lib/club-registration/payment/apply-stripe-checkout-paid";
+import { paymentWriteWithSettlement } from "@/lib/club-registration/payment/settlement-firestore";
 
 type StripeWebhookEvent = {
   id: string;
@@ -31,20 +26,6 @@ type StripeWebhookEvent = {
 };
 
 const STRIPE_PAID_CHECKOUT_STATUSES = new Set(["paid", "no_payment_required"]);
-
-function resolveStripeCheckoutPaidAmountCents(
-  session: NonNullable<StripeWebhookEvent["data"]>["object"],
-  existing: Record<string, unknown>,
-  basePaymentAmountToPayCents: number | null
-): number {
-  if (typeof session?.amount_total === "number" && session.amount_total > 0) {
-    return session.amount_total;
-  }
-  if (typeof existing.paymentAmountCents === "number" && existing.paymentAmountCents > 0) {
-    return existing.paymentAmountCents;
-  }
-  return basePaymentAmountToPayCents ?? 0;
-}
 
 export async function POST(req: Request) {
   try {
@@ -77,49 +58,62 @@ export async function POST(req: Request) {
 
     const db = getFirestoreAdmin();
     const docRef = db.collection("clubRegistrations").doc(registrationId);
-    const snap = await docRef.get();
-    const existing = snap.data() ?? {};
-    if (existing.status === "paid") {
+
+    const applied = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(docRef);
+      const existing = snap.data() ?? {};
+      const amountTotal =
+        typeof session?.amount_total === "number" ? session.amount_total : undefined;
+      const existingStatus = typeof existing.status === "string" ? existing.status : undefined;
+      const result = applyStripeCheckoutPaid({
+        payment: normalizeRegistrationPayment(existing),
+        ...(existingStatus ? { existingStatus } : {}),
+        ...(session?.id ? { sessionId: session.id } : {}),
+        ...(amountTotal != null ? { amountTotal } : {}),
+      });
+
+      if (result.duplicate) {
+        return { ...result, existing, amountCents: amountTotal ?? 0 };
+      }
+
+      if (result.ignored) {
+        return { ...result, existing, amountCents: 0 };
+      }
+
+      const paymentUpdate = result.payment
+        ? paymentWriteWithSettlement(result.payment)
+        : result.markRegistrationPaid
+          ? { paymentStatus: "paid", status: "paid", paidAt: FieldValue.serverTimestamp() }
+          : {};
+
+      tx.set(
+        docRef,
+        {
+          ...paymentUpdate,
+          ...(result.markRegistrationPaid
+            ? { status: "paid", paidAt: FieldValue.serverTimestamp() }
+            : {}),
+          stripeCheckoutSessionId: session?.id ?? null,
+          stripeInvoiceId: session?.invoice ?? null,
+          stripePaymentUrl: null,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      return {
+        ...result,
+        existing,
+        amountCents: amountTotal && amountTotal > 0 ? amountTotal : 0,
+      };
+    });
+
+    if (applied.duplicate) {
       return jsonNoStore({ received: true, duplicate: true }, { status: 200 });
     }
-
-    const basePayment = normalizeRegistrationPayment(existing);
-    const amountCents = resolveStripeCheckoutPaidAmountCents(
-      session,
-      existing,
-      basePayment?.amountToPayCents ?? null
-    );
-
-    let payment = basePayment;
-    if (payment) {
-      if (amountCents > 0) {
-        payment = addManualReceivedPayment(payment, {
-          method: "card",
-          label: "Paiement Stripe",
-          amountCents,
-          receivedAt: new Date().toISOString(),
-          recordedBy: "stripe",
-          ...(session?.id ? { note: `Checkout ${session.id}` } : {}),
-        });
-      }
-      payment = markPaymentFullyPaid(payment, {
-        recordedBy: "stripe",
-        ...(session?.id ? { note: `Checkout ${session.id}` } : {}),
-      });
+    if (applied.ignored) {
+      return jsonNoStore({ received: true, ignored: applied.ignored }, { status: 200 });
     }
-
-    await docRef.set(
-      {
-        status: "paid",
-        stripeCheckoutSessionId: session?.id ?? null,
-        stripeInvoiceId: session?.invoice ?? null,
-        stripePaymentUrl: null,
-        paidAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-        ...(payment ? paymentToFirestoreUpdate(payment) : { paymentStatus: "paid" }),
-      },
-      { merge: true }
-    );
 
     logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_PAYMENT_CONFIRMED, "stripe", {
       resource: "clubRegistration",
@@ -127,21 +121,23 @@ export async function POST(req: Request) {
       details: {
         eventId: event.id,
         checkoutSessionId: session?.id,
+        amountCents: applied.amountCents,
+        settled: applied.markRegistrationPaid,
         donationCents: session?.metadata?.donationCents,
         donationDiscountCents: session?.metadata?.donationDiscountCents,
       },
       success: true,
     });
 
-    if (amountCents > 0) {
+    if (applied.amountCents > 0 && applied.markRegistrationPaid) {
       try {
         await dispatchPaymentConfirmedEmail({
           registrationId,
           data: {
-            ...existing,
-            stripeInvoiceId: session?.invoice ?? existing.stripeInvoiceId,
+            ...applied.existing,
+            stripeInvoiceId: session?.invoice ?? applied.existing.stripeInvoiceId,
           },
-          amountCents,
+          amountCents: applied.amountCents,
           source: "stripe",
         });
       } catch (emailError) {

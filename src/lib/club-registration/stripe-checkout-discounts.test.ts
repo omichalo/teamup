@@ -3,6 +3,7 @@ import {
   assertStripePayableAfterDiscounts,
   buildMergedCheckoutDiscountCouponName,
   computeSecretariatAidDiscountCents,
+  sumCheckoutDiscountCents,
   sumPaymentAidDiscountCents,
 } from "./stripe-checkout-discounts";
 
@@ -53,6 +54,50 @@ describe("stripe-checkout-discounts", () => {
         aids: [{ type: "pass_sport", label: "Pass Sport", amountCents: 2_000 }],
       })
     ).toBe("Remise don libre + Pass Sport");
+  });
+
+  it("valide le solde après un encaissement déjà reçu", () => {
+    expect(() =>
+      assertStripePayableAfterDiscounts({
+        invoiceTotalCents: 30_000,
+        donationDiscountCents: 0,
+        aidDiscountCents: 0,
+        amountToPayCents: 30_000,
+        alreadyPaidCents: 10_000,
+        remainingPayableCents: 20_000,
+      })
+    ).not.toThrow();
+  });
+
+  it("rejette un Checkout au montant initial après paiement partiel", () => {
+    expect(() =>
+      assertStripePayableAfterDiscounts({
+        invoiceTotalCents: 30_000,
+        donationDiscountCents: 0,
+        aidDiscountCents: 0,
+        amountToPayCents: 30_000,
+        alreadyPaidCents: 10_000,
+        remainingPayableCents: 30_000,
+      })
+    ).toThrow("Incohérence solde Stripe");
+  });
+
+  it("inclut le déjà encaissé dans le coupon Checkout", () => {
+    expect(
+      sumCheckoutDiscountCents({
+        donationDiscountCents: 0,
+        aids: [],
+        alreadyPaidCents: 10_000,
+      })
+    ).toBe(10_000);
+    expect(
+      buildMergedCheckoutDiscountCouponName({
+        donationDiscountCents: 0,
+        donationDiscountCouponName: "Remise don libre",
+        aids: [],
+        alreadyPaidCents: 10_000,
+      })
+    ).toBe("Déjà encaissé");
   });
 
   it("somme les aides", () => {

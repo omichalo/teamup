@@ -56,7 +56,7 @@ export function resolveSecretariatPaymentCta(params: {
     label: SECRETARIAT_INITIAL_PAYMENT_BUTTON,
     tooltip: canSendStripeEmail
       ? BNPL_SECRETARIAT_PAYMENT_TOOLTIP
-      : "Enregistre le dossier puis bascule en suivi adapté : pas de lien de paiement automatique pour ce mode de règlement.",
+      : "Enregistre le dossier puis envoie les instructions de règlement prévues. Un lien de paiement en ligne peut être envoyé séparément.",
     kind: "request",
   };
 }

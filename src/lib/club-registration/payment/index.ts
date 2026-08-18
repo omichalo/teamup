@@ -51,6 +51,12 @@ export {
 } from "./normalize-payment";
 
 export {
+  resolveRemainingPayableCents,
+  resolveCheckoutChargeAmounts,
+  type CheckoutChargeAmounts,
+} from "./resolve-remaining-payable";
+
+export {
   isCollectableAid,
   isAidReceiptPending,
   hasPendingAidReceipt,

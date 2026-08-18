@@ -38,6 +38,8 @@ type Props = {
   suggestedAmountCents?: number;
   /** Reste dû actuel — sert à détecter un trop-perçu (si fourni). */
   remainingAmountCents?: number | null;
+  /** Moyen proposé, sans contrainte — l'utilisateur peut le changer. */
+  defaultMethod?: ReceivedPaymentMethodId;
   onSubmit: (input: {
     method: ReceivedPaymentMethodId;
     label: string;
@@ -54,6 +56,7 @@ export function AddManualPaymentDialog({
   onClose,
   suggestedAmountCents = 0,
   remainingAmountCents = null,
+  defaultMethod = "cheque",
   onSubmit,
 }: Props) {
   const [method, setMethod] = useState<ReceivedPaymentMethodId>("cheque");
@@ -72,7 +75,7 @@ export function AddManualPaymentDialog({
     if (!open) {
       return;
     }
-    setMethod("cheque");
+    setMethod(defaultMethod);
     setLabel("");
     setAmountEuros(
       suggestedAmountCents > 0 ? centsToEurosInput(suggestedAmountCents) : ""
@@ -82,7 +85,7 @@ export function AddManualPaymentDialog({
     setNote("");
     setConfirmOverpayment(false);
     setAmountError(null);
-  }, [open, suggestedAmountCents]);
+  }, [open, suggestedAmountCents, defaultMethod]);
 
   const amountCents = eurosInputToCents(amountEuros);
   const isOverpayment =
