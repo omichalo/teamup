@@ -55,3 +55,16 @@ export {
   resolveCheckoutChargeAmounts,
   type CheckoutChargeAmounts,
 } from "./resolve-remaining-payable";
+
+export {
+  isCollectableAid,
+  isAidReceiptPending,
+  hasPendingAidReceipt,
+  markAidReceived,
+  markAidUnreceived,
+  getRegistrationPaymentAids,
+  resolveManagedListAidReceiptFilter,
+  matchesManagedAidReceiptFilter,
+  resolveZeroDueDossierStatus,
+  resolveApprovedStatusAfterAidReceipt,
+} from "./aid-receipt";

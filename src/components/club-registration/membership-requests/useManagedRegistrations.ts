@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ManagedListMedicalCertificateFilter } from "@/lib/club-registration/medical-certificate";
+import type { ManagedListAidReceiptFilter } from "@/lib/club-registration/payment/aid-receipt";
 import type { ManagedListPpsFollowUpFilter } from "@/lib/club-registration/pps-follow-up";
 import type { ManagedListUrlState } from "@/lib/club-registration/managed-list-url-state";
 import type { ManagedListStatusFilter } from "@/lib/club-registration/registration-status";
@@ -24,6 +25,7 @@ function buildManagedRegistrationsUrl(params: {
   statusFilter: ManagedListStatusFilter;
   medicalCertificateFilter: ManagedListMedicalCertificateFilter;
   ppsFollowUpFilter: ManagedListPpsFollowUpFilter;
+  aidReceiptFilter: ManagedListAidReceiptFilter;
   searchQuery: string;
   cursor?: string | null | undefined;
 }): string {
@@ -36,6 +38,9 @@ function buildManagedRegistrationsUrl(params: {
   if (params.ppsFollowUpFilter !== "all") {
     url.searchParams.set("ppsFollowUp", params.ppsFollowUpFilter);
   }
+  if (params.aidReceiptFilter !== "all") {
+    url.searchParams.set("aidReceipt", params.aidReceiptFilter);
+  }
   if (params.searchQuery.trim().length >= 2) {
     url.searchParams.set("q", params.searchQuery.trim());
   }
@@ -47,7 +52,7 @@ function buildManagedRegistrationsUrl(params: {
 
 type InitialState = Pick<
   ManagedListUrlState,
-  "statusFilter" | "medicalCertificateFilter" | "ppsFollowUpFilter"
+  "statusFilter" | "medicalCertificateFilter" | "ppsFollowUpFilter" | "aidReceiptFilter"
 >;
 
 export function useManagedRegistrations(initial?: InitialState) {
@@ -60,6 +65,9 @@ export function useManagedRegistrations(initial?: InitialState) {
     );
   const [ppsFollowUpFilter, setPpsFollowUpFilter] =
     useState<ManagedListPpsFollowUpFilter>(initial?.ppsFollowUpFilter ?? "all");
+  const [aidReceiptFilter, setAidReceiptFilter] = useState<ManagedListAidReceiptFilter>(
+    initial?.aidReceiptFilter ?? "all"
+  );
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [registrations, setRegistrations] = useState<RegistrationSummary[]>([]);
@@ -89,6 +97,7 @@ export function useManagedRegistrations(initial?: InitialState) {
       status: ManagedListStatusFilter;
       medical: ManagedListMedicalCertificateFilter;
       pps: ManagedListPpsFollowUpFilter;
+      aidReceipt: ManagedListAidReceiptFilter;
       query: string;
     }) => {
       const requestId = ++requestIdRef.current;
@@ -105,6 +114,7 @@ export function useManagedRegistrations(initial?: InitialState) {
             statusFilter: options.status,
             medicalCertificateFilter: options.medical,
             ppsFollowUpFilter: options.pps,
+            aidReceiptFilter: options.aidReceipt,
             searchQuery: options.query,
             cursor: options.cursor,
           }),
@@ -156,9 +166,10 @@ export function useManagedRegistrations(initial?: InitialState) {
       status: statusFilter,
       medical: medicalCertificateFilter,
       pps: ppsFollowUpFilter,
+      aidReceipt: aidReceiptFilter,
       query: searchQuery,
     });
-  }, [fetchPage, medicalCertificateFilter, ppsFollowUpFilter, searchQuery, statusFilter]);
+  }, [aidReceiptFilter, fetchPage, medicalCertificateFilter, ppsFollowUpFilter, searchQuery, statusFilter]);
 
   useEffect(() => {
     void fetchPage({
@@ -166,9 +177,10 @@ export function useManagedRegistrations(initial?: InitialState) {
       status: statusFilter,
       medical: medicalCertificateFilter,
       pps: ppsFollowUpFilter,
+      aidReceipt: aidReceiptFilter,
       query: searchQuery,
     });
-  }, [fetchPage, medicalCertificateFilter, ppsFollowUpFilter, searchQuery, statusFilter]);
+  }, [aidReceiptFilter, fetchPage, medicalCertificateFilter, ppsFollowUpFilter, searchQuery, statusFilter]);
 
   const loadMore = useCallback(async () => {
     if (!pageInfo.hasNextPage || !pageInfo.nextCursor || loadingMore || loadingList) {
@@ -180,9 +192,11 @@ export function useManagedRegistrations(initial?: InitialState) {
       status: statusFilter,
       medical: medicalCertificateFilter,
       pps: ppsFollowUpFilter,
+      aidReceipt: aidReceiptFilter,
       query: searchQuery,
     });
   }, [
+    aidReceiptFilter,
     fetchPage,
     loadingList,
     loadingMore,
@@ -212,6 +226,8 @@ export function useManagedRegistrations(initial?: InitialState) {
     setMedicalCertificateFilter,
     ppsFollowUpFilter,
     setPpsFollowUpFilter,
+    aidReceiptFilter,
+    setAidReceiptFilter,
     searchInput,
     setSearchInput,
     searchQuery,

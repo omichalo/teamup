@@ -131,6 +131,21 @@ describe("format complex field helpers", () => {
       formatPaymentAidsForSpreadsheet([
         { type: "pass_sport", label: "Pass Sport", amountCents: 5000, reference: "REF1" },
       ])
-    ).toContain("REF1");
+    ).toContain("en attente");
+    expect(
+      formatPaymentAidsForSpreadsheet([
+        {
+          type: "pass_sport",
+          label: "Pass Sport",
+          amountCents: 5000,
+          received: true,
+        },
+      ])
+    ).toContain("reçue");
+    expect(
+      formatPaymentAidsForSpreadsheet([
+        { type: "other", label: "Remise exceptionnelle", amountCents: 1000, note: "Geste" },
+      ])
+    ).not.toContain("en attente");
   });
 });

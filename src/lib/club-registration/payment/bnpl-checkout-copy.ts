@@ -88,6 +88,13 @@ export const ADHERENT_PAYMENT_PENDING_ALERT =
 /** Bouton secrétariat — premier envoi. */
 export const SECRETARIAT_INITIAL_PAYMENT_BUTTON = "Valider et demander le paiement";
 
+/** Bouton secrétariat — validation après paiement déjà enregistré. */
+export const SECRETARIAT_VALIDATE_SETTLED_BUTTON = "Valider le dossier";
+
+/** Tooltip secrétariat — validation après paiement déjà enregistré. */
+export const SECRETARIAT_VALIDATE_SETTLED_TOOLTIP =
+  "Valide le dossier sans envoyer de lien de paiement, car le règlement est déjà enregistré.";
+
 /** Bouton secrétariat — renvoi lien. */
 export const SECRETARIAT_RESEND_PAYMENT_BUTTON = "Renvoyer le lien de paiement";
 

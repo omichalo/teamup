@@ -8,6 +8,7 @@ import {
 import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
 import { calculatePaymentSummary } from "@/lib/club-registration/payment/calculate-payment-summary";
 import { normalizePaymentAidList } from "@/lib/club-registration/payment/payment-draft-helpers";
+import type { PaymentAid } from "@/lib/club-registration/payment/types";
 import type { Representative } from "@/lib/club-registration/schema";
 import type { PpsFollowUpState } from "@/lib/club-registration/pps-follow-up";
 import { buildPricingContext, calculateQuote, resolveDonationPricing } from "@/lib/pricing";
@@ -362,8 +363,8 @@ export function useMembershipRequestDetail(
   const requestPayment = async (channel?: "stripe" | "instructions") => {
     if (!registrationId || !form) return;
     const amountCents = parseAmountCents(form.amountEuros);
-    if (!amountCents || amountCents <= 0) {
-      setError("Indiquez un montant strictement positif avant de demander le paiement.");
+    if (amountCents === null || amountCents < 0) {
+      setError("Indiquez un montant avant de demander le paiement.");
       return;
     }
 
@@ -393,7 +394,15 @@ export function useMembershipRequestDetail(
       if (!res.ok || json.error) {
         throw new Error(json.error || "Impossible d'envoyer la demande de paiement.");
       }
-      if (json.manualFollowUp === true) {
+      if (json.zeroDue === true || json.alreadySettled === true) {
+        setSuccess(
+          typeof json.message === "string"
+            ? json.message
+            : json.alreadySettled === true
+              ? "Dossier validé. Le paiement était déjà enregistré."
+              : "Aucun paiement n'est dû pour ce dossier."
+        );
+      } else if (json.manualFollowUp === true) {
         setSuccess(
           typeof json.message === "string"
             ? json.message
@@ -440,6 +449,13 @@ export function useMembershipRequestDetail(
     });
   }, []);
 
+  const applyPaymentAids = useCallback((aids: PaymentAid[]) => {
+    setForm((current) => (current ? { ...current, paymentAids: aids } : current));
+    setSelected((current) =>
+      current?.payment ? { ...current, payment: { ...current.payment, aids } } : current
+    );
+  }, []);
+
   return {
     config,
     registrationId,
@@ -461,6 +477,7 @@ export function useMembershipRequestDetail(
     amountDiffersFromQuote,
     fetchDetail,
     applyPpsFollowUp,
+    applyPaymentAids,
     updateField,
     updateReductionTypes,
     patchFfttFields,
