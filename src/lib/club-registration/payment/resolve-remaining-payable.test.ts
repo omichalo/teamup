@@ -1,6 +1,9 @@
 import {
+  parseStripeChargeMode,
   resolveCheckoutChargeAmounts,
+  resolveOnlinePayableCents,
   resolveRemainingPayableCents,
+  resolveStripeChargeForMode,
 } from "./resolve-remaining-payable";
 import type { ReceivedPayment, RegistrationPayment } from "./types";
 
@@ -78,6 +81,8 @@ describe("resolveCheckoutChargeAmounts", () => {
     expect(amounts.amountToPayCents).toBe(30_000);
     expect(amounts.alreadyPaidCents).toBe(10_000);
     expect(amounts.remainingPayableCents).toBe(20_000);
+    expect(amounts.onlinePayableCents).toBe(20_000);
+    expect(amounts.reservedHolidayVoucherCents).toBe(0);
   });
 
   it("sans payment, retombe sur le montant fourni", () => {
@@ -85,6 +90,83 @@ describe("resolveCheckoutChargeAmounts", () => {
       amountToPayCents: 15_000,
       alreadyPaidCents: 0,
       remainingPayableCents: 15_000,
+      onlinePayableCents: 15_000,
+      reservedHolidayVoucherCents: 0,
     });
+  });
+
+  it("lien CB = complément si des chèques vacances sont encore dus", () => {
+    const mixed = payment({
+      paymentMethod: "holiday_vouchers",
+      holidayVoucherAmountCents: 25_000,
+      remainingPaymentMethod: "card",
+    });
+    expect(resolveOnlinePayableCents(mixed)).toBe(5_000);
+    expect(resolveCheckoutChargeAmounts(mixed, 30_000).onlinePayableCents).toBe(5_000);
+    expect(resolveCheckoutChargeAmounts(mixed, 30_000).reservedHolidayVoucherCents).toBe(
+      25_000
+    );
+  });
+
+  it("après complément CB, plus rien à demander en ligne tant que les CV manquent", () => {
+    const afterCard = payment({
+      paymentMethod: "holiday_vouchers",
+      holidayVoucherAmountCents: 25_000,
+      remainingPaymentMethod: "card",
+      receivedPayments: [
+        {
+          id: "rp_card",
+          method: "card",
+          label: "Paiement Stripe",
+          amountCents: 5_000,
+          receivedAt: "2026-08-19T10:00:00.000Z",
+        },
+      ],
+      paidAmountCents: 5_000,
+      remainingAmountCents: 25_000,
+      paymentStatus: "partially_paid",
+    });
+    expect(resolveRemainingPayableCents(afterCard)).toBe(25_000);
+    expect(resolveOnlinePayableCents(afterCard)).toBe(0);
+  });
+
+  it("le mode remaining encaisse tout le solde, y compris la part CV prévue", () => {
+    const mixed = payment({
+      paymentMethod: "holiday_vouchers",
+      holidayVoucherAmountCents: 25_000,
+      remainingPaymentMethod: "card",
+    });
+    const amounts = resolveCheckoutChargeAmounts(mixed, 30_000);
+    expect(parseStripeChargeMode(undefined)).toBe("online");
+    expect(parseStripeChargeMode("remaining")).toBe("remaining");
+    expect(resolveStripeChargeForMode(amounts, "online")).toEqual({
+      stripeCents: 5_000,
+      reservedHolidayVoucherCents: 25_000,
+    });
+    expect(resolveStripeChargeForMode(amounts, "remaining")).toEqual({
+      stripeCents: 30_000,
+      reservedHolidayVoucherCents: 0,
+    });
+  });
+
+  it("après encaissement des CV, le lien CB demande le solde restant", () => {
+    const afterVouchers = payment({
+      paymentMethod: "holiday_vouchers",
+      holidayVoucherAmountCents: 25_000,
+      remainingPaymentMethod: "card",
+      receivedPayments: [
+        {
+          id: "rp_cv",
+          method: "holiday_vouchers",
+          label: "Chèques vacances",
+          amountCents: 25_000,
+          receivedAt: "2026-08-19T10:00:00.000Z",
+        },
+      ],
+      paidAmountCents: 25_000,
+      remainingAmountCents: 5_000,
+      paymentStatus: "partially_paid",
+    });
+    expect(resolveOnlinePayableCents(afterVouchers)).toBe(5_000);
   });
 });

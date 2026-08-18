@@ -31,6 +31,7 @@ export function validateRegistrationStripeCheckout(params: {
   amountToPayCents: number;
   alreadyPaidCents?: number;
   remainingPayableCents?: number;
+  reservedHolidayVoucherCents?: number;
 }):
   | { ok: true }
   | { ok: false; status: number; body: Record<string, unknown> } {
@@ -89,6 +90,9 @@ export function validateRegistrationStripeCheckout(params: {
         : {}),
       ...(params.remainingPayableCents != null
         ? { remainingPayableCents: params.remainingPayableCents }
+        : {}),
+      ...(params.reservedHolidayVoucherCents != null
+        ? { reservedHolidayVoucherCents: params.reservedHolidayVoucherCents }
         : {}),
     });
   } catch (validationError) {

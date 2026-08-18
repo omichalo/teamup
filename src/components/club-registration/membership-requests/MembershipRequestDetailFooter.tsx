@@ -2,6 +2,7 @@
 
 import { SecretariatPaymentNotesSection } from "../secretariat/SecretariatPaymentNotesSection";
 import { isRegistrationPaymentSettled } from "@/lib/club-registration/resolve-settled-request-payment";
+import { resolveOnlinePayableCents } from "@/lib/club-registration/payment/resolve-remaining-payable";
 import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
 import { DeleteRegistrationSection } from "./DeleteRegistrationSection";
 import type { MembershipRequestDetailState } from "./useMembershipRequestDetail";
@@ -48,6 +49,9 @@ export function MembershipRequestDetailFooter({
         paymentEmailSentTo={selected.paymentEmailSentTo ?? null}
         paymentMethod={selectedPayment?.paymentMethod}
         remainingAmountCents={selectedPayment?.remainingAmountCents ?? null}
+        onlinePayableCents={
+          selectedPayment ? resolveOnlinePayableCents(selectedPayment) : null
+        }
         paymentSettled={isRegistrationPaymentSettled(
           {
             status: selected.status,
@@ -62,6 +66,9 @@ export function MembershipRequestDetailFooter({
         onSave={() => void save()}
         onRequestPayment={requestPayment}
         onRequestOnlinePayment={() => requestPayment("stripe")}
+        onRequestFullRemainingOnline={() =>
+          requestPayment("stripe", { charge: "remaining" })
+        }
       />
 
       {registrationId ? (

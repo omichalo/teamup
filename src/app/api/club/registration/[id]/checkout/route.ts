@@ -26,7 +26,11 @@ import {
   canSelfServiceCheckout,
   resolveSelfServicePayableCents,
 } from "@/lib/club-registration/self-service-checkout";
-import { resolveCheckoutChargeAmounts } from "@/lib/club-registration/payment/resolve-remaining-payable";
+import {
+  parseStripeChargeMode,
+  resolveCheckoutChargeAmounts,
+  resolveStripeChargeForMode,
+} from "@/lib/club-registration/payment/resolve-remaining-payable";
 import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
 import type { PriceQuote } from "@/lib/pricing/types";
 
@@ -128,9 +132,11 @@ export async function POST(
       payment,
       resolveSelfServicePayableCents(data)
     );
+    const body = ((await req.json().catch(() => ({}))) ?? {}) as { charge?: unknown };
+    const stripeCharge = resolveStripeChargeForMode(charge, parseStripeChargeMode(body.charge));
 
-    if (charge.remainingPayableCents <= 0) {
-      return jsonNoStore({ error: "Aucun montant à régler pour ce dossier." }, { status: 400 });
+    if (stripeCharge.stripeCents <= 0) {
+      return jsonNoStore({ error: "Aucun montant à régler en ligne pour ce dossier." }, { status: 400 });
     }
 
     const checkoutResult = await createStripeCheckoutForRegistration({
@@ -141,7 +147,8 @@ export async function POST(
       payment,
       amountToPayCents: charge.amountToPayCents,
       alreadyPaidCents: charge.alreadyPaidCents,
-      remainingPayableCents: charge.remainingPayableCents,
+      remainingPayableCents: stripeCharge.stripeCents,
+      reservedHolidayVoucherCents: stripeCharge.reservedHolidayVoucherCents,
       paymentEmail,
       adherentName,
       successUrl,
@@ -169,7 +176,7 @@ export async function POST(
       resource: "clubRegistration",
       resourceId: id,
       details: {
-        amountCents: charge.remainingPayableCents,
+        amountCents: stripeCharge.stripeCents,
         stripeCheckoutSessionId: checkoutResult.result.session.id,
         selfService: true,
       },

@@ -77,6 +77,12 @@ export const ADHERENT_PAY_ONLINE_BUTTON_LABEL = "Payer en ligne";
 export const ADHERENT_PAY_ONLINE_HELPER =
   "Paiement sécurisé Stripe. Carte ou paiement en plusieurs fois (BNPL) selon éligibilité.";
 
+/** Bouton adhérent — régler tout le solde malgré des CV prévus. */
+export const ADHERENT_PAY_REMAINING_BUTTON_LABEL = "Payer tout le solde par carte";
+
+export const ADHERENT_PAY_REMAINING_HELPER =
+  "Si vous ne remettez pas les chèques vacances, vous pouvez régler tout le reste dû par carte.";
+
 /** Dossier en attente hors carte bancaire. */
 export const ADHERENT_NON_CARD_PAYMENT_HINT =
   "Les instructions de règlement vous ont été envoyées par e-mail.";
@@ -107,7 +113,13 @@ export const SECRETARIAT_SEND_ONLINE_PAYMENT_BUTTON =
   "Envoyer un lien de paiement en ligne";
 
 export const SECRETARIAT_SEND_ONLINE_PAYMENT_TOOLTIP =
-  "Envoie un e-mail invitant l'adhérent à régler le solde restant par carte (Stripe), quel que soit le mode prévu à l'inscription.";
+  "Envoie un e-mail invitant l'adhérent à régler le complément par carte (Stripe), sans encaisser la part prévue en chèques vacances.";
+
+export const SECRETARIAT_SEND_FULL_REMAINING_ONLINE_BUTTON =
+  "Demander tout le solde en ligne";
+
+export const SECRETARIAT_SEND_FULL_REMAINING_ONLINE_TOOLTIP =
+  "Si l'adhérent change d'avis et ne remet pas les chèques vacances, encaisse tout le reste dû par carte.";
 
 /** Liste secrétariat — action rapide renvoi. */
 export const SECRETARIAT_QUICK_RESEND_PAYMENT_LABEL = "Renvoyer le lien";

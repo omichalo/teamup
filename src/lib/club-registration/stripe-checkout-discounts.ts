@@ -17,12 +17,18 @@ export function buildMergedCheckoutDiscountCouponName(params: {
   donationDiscountCouponName: string;
   aids: PaymentAid[];
   alreadyPaidCents?: number;
+  reservedHolidayVoucherCents?: number;
 }): string {
   const activeAids = params.aids.filter((aid) => aid.amountCents > 0);
   const hasDonation = params.donationDiscountCents > 0;
   const hasAlreadyPaid = (params.alreadyPaidCents ?? 0) > 0;
+  const hasReservedVouchers = (params.reservedHolidayVoucherCents ?? 0) > 0;
 
-  if (hasAlreadyPaid && !hasDonation && activeAids.length === 0) {
+  if (hasReservedVouchers && !hasAlreadyPaid && !hasDonation && activeAids.length === 0) {
+    return "Chèques vacances prévus";
+  }
+
+  if (hasAlreadyPaid && !hasDonation && activeAids.length === 0 && !hasReservedVouchers) {
     return "Déjà encaissé";
   }
 
@@ -45,11 +51,13 @@ export function sumCheckoutDiscountCents(params: {
   donationDiscountCents: number;
   aids: PaymentAid[];
   alreadyPaidCents?: number;
+  reservedHolidayVoucherCents?: number;
 }): number {
   return (
     Math.max(0, params.donationDiscountCents) +
     sumPaymentAidDiscountCents(params.aids) +
-    Math.max(0, params.alreadyPaidCents ?? 0)
+    Math.max(0, params.alreadyPaidCents ?? 0) +
+    Math.max(0, params.reservedHolidayVoucherCents ?? 0)
   );
 }
 
@@ -79,6 +87,7 @@ export function assertStripePayableAfterDiscounts(params: {
   amountToPayCents: number;
   alreadyPaidCents?: number;
   remainingPayableCents?: number;
+  reservedHolidayVoucherCents?: number;
 }): void {
   void params.donationDiscountCents;
   const expectedPayable = params.invoiceTotalCents - params.aidDiscountCents;
@@ -90,10 +99,14 @@ export function assertStripePayableAfterDiscounts(params: {
 
   if (params.remainingPayableCents != null) {
     const alreadyPaid = Math.max(0, params.alreadyPaidCents ?? 0);
-    const expectedRemaining = Math.max(0, params.amountToPayCents - alreadyPaid);
+    const reservedVouchers = Math.max(0, params.reservedHolidayVoucherCents ?? 0);
+    const expectedRemaining = Math.max(
+      0,
+      params.amountToPayCents - alreadyPaid - reservedVouchers
+    );
     if (expectedRemaining !== params.remainingPayableCents) {
       throw new Error(
-        `Incohérence solde Stripe : net ${params.amountToPayCents} cts, déjà encaissé ${alreadyPaid} cts, attendu ${params.remainingPayableCents} cts, calculé ${expectedRemaining} cts`
+        `Incohérence solde Stripe : net ${params.amountToPayCents} cts, déjà encaissé ${alreadyPaid} cts, CV prévus ${reservedVouchers} cts, attendu ${params.remainingPayableCents} cts, calculé ${expectedRemaining} cts`
       );
     }
   }
@@ -110,13 +123,16 @@ export async function createCheckoutDiscountCouponIds(params: {
   donationDiscountCouponName: string;
   aids: PaymentAid[];
   alreadyPaidCents?: number;
+  reservedHolidayVoucherCents?: number;
 }): Promise<string[]> {
   const donationDiscount = Math.max(0, params.donationDiscountCents);
   const alreadyPaidCents = Math.max(0, params.alreadyPaidCents ?? 0);
+  const reservedHolidayVoucherCents = Math.max(0, params.reservedHolidayVoucherCents ?? 0);
   const totalOff = sumCheckoutDiscountCents({
     donationDiscountCents: donationDiscount,
     aids: params.aids,
     alreadyPaidCents,
+    reservedHolidayVoucherCents,
   });
 
   if (totalOff <= 0) {
@@ -132,6 +148,7 @@ export async function createCheckoutDiscountCouponIds(params: {
         donationDiscountCouponName: params.donationDiscountCouponName,
         aids: params.aids,
         alreadyPaidCents,
+        reservedHolidayVoucherCents,
       })
     ),
     kind: "merged_checkout_discount",

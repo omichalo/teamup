@@ -7,12 +7,17 @@ import {
   ADHERENT_NON_CARD_PAYMENT_HINT,
   ADHERENT_PAY_ONLINE_BUTTON_LABEL,
   ADHERENT_PAY_ONLINE_HELPER,
+  ADHERENT_PAY_REMAINING_BUTTON_LABEL,
+  ADHERENT_PAY_REMAINING_HELPER,
 } from "@/lib/club-registration/payment/bnpl-checkout-copy";
 import {
-  canSelfServiceCheckout,
+  canSelfServiceOnlineCheckout,
+  canSelfServiceRemainingOverride,
   isAwaitingNonCardPayment,
   type SelfServiceCheckoutRecord,
 } from "@/lib/club-registration/self-service-checkout";
+
+type ChargeMode = "online" | "remaining";
 
 type Props = {
   registration: SelfServiceCheckoutRecord & { id: string };
@@ -20,64 +25,95 @@ type Props = {
 };
 
 export function MesInscriptionPayOnlineButton({ registration, onError }: Props) {
-  const [loading, setLoading] = useState(false);
+  const [loadingCharge, setLoadingCharge] = useState<ChargeMode | null>(null);
+  const canPayOnline = canSelfServiceOnlineCheckout(registration);
+  const canPayRemaining = canSelfServiceRemainingOverride(registration);
 
-  if (canSelfServiceCheckout(registration)) {
-    const handlePay = async () => {
-      setLoading(true);
-      onError(null);
-      try {
-        const res = await fetch(
-          `/api/club/registration/${encodeURIComponent(registration.id)}/checkout`,
-          {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-          }
-        );
-        const json = (await res.json().catch(() => ({}))) as {
-          checkoutUrl?: string;
-          error?: string;
-        };
-        if (!res.ok || !json.checkoutUrl) {
-          throw new Error(json.error || "Impossible d'ouvrir la page de paiement.");
+  if (!canPayOnline && !canPayRemaining) {
+    if (isAwaitingNonCardPayment(registration)) {
+      return (
+        <Typography variant="caption" color="text.secondary" sx={{ width: "100%" }}>
+          {ADHERENT_NON_CARD_PAYMENT_HINT}
+        </Typography>
+      );
+    }
+    return null;
+  }
+
+  const handlePay = async (charge: ChargeMode) => {
+    setLoadingCharge(charge);
+    onError(null);
+    try {
+      const res = await fetch(
+        `/api/club/registration/${encodeURIComponent(registration.id)}/checkout`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(charge === "remaining" ? { charge: "remaining" } : {}),
         }
-        window.location.assign(json.checkoutUrl);
-      } catch (err) {
-        onError(err instanceof Error ? err.message : "Impossible d'ouvrir la page de paiement.");
-        setLoading(false);
+      );
+      const json = (await res.json().catch(() => ({}))) as {
+        checkoutUrl?: string;
+        error?: string;
+      };
+      if (!res.ok || !json.checkoutUrl) {
+        throw new Error(json.error || "Impossible d'ouvrir la page de paiement.");
       }
-    };
+      window.location.assign(json.checkoutUrl);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Impossible d'ouvrir la page de paiement.");
+      setLoadingCharge(null);
+    }
+  };
 
-    return (
-      <>
+  const loading = loadingCharge != null;
+
+  return (
+    <>
+      {canPayOnline ? (
         <Button
           size="small"
           variant="contained"
           color="secondary"
           startIcon={
-            loading ? <CircularProgress size={16} color="inherit" /> : <PaymentIcon fontSize="small" />
+            loadingCharge === "online" ? (
+              <CircularProgress size={16} color="inherit" />
+            ) : (
+              <PaymentIcon fontSize="small" />
+            )
           }
           disabled={loading}
-          onClick={() => void handlePay()}
+          onClick={() => void handlePay("online")}
           sx={{ alignSelf: { xs: "stretch", sm: "auto" }, flexShrink: 0 }}
         >
-          {loading ? "Redirection…" : ADHERENT_PAY_ONLINE_BUTTON_LABEL}
+          {loadingCharge === "online" ? "Redirection…" : ADHERENT_PAY_ONLINE_BUTTON_LABEL}
         </Button>
-        <Typography variant="caption" color="text.secondary" sx={{ width: "100%" }}>
-          {ADHERENT_PAY_ONLINE_HELPER}
-        </Typography>
-      </>
-    );
-  }
-
-  if (isAwaitingNonCardPayment(registration)) {
-    return (
+      ) : null}
+      {canPayRemaining ? (
+        <Button
+          size="small"
+          variant={canPayOnline ? "outlined" : "contained"}
+          color="secondary"
+          startIcon={
+            loadingCharge === "remaining" ? (
+              <CircularProgress size={16} color="inherit" />
+            ) : (
+              <PaymentIcon fontSize="small" />
+            )
+          }
+          disabled={loading}
+          onClick={() => void handlePay("remaining")}
+          sx={{ alignSelf: { xs: "stretch", sm: "auto" }, flexShrink: 0 }}
+        >
+          {loadingCharge === "remaining"
+            ? "Redirection…"
+            : ADHERENT_PAY_REMAINING_BUTTON_LABEL}
+        </Button>
+      ) : null}
       <Typography variant="caption" color="text.secondary" sx={{ width: "100%" }}>
-        {ADHERENT_NON_CARD_PAYMENT_HINT}
+        {canPayRemaining ? ADHERENT_PAY_REMAINING_HELPER : ADHERENT_PAY_ONLINE_HELPER}
       </Typography>
-    );
-  }
-
-  return null;
+    </>
+  );
 }

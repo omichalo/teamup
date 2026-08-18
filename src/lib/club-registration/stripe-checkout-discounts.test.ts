@@ -82,6 +82,34 @@ describe("stripe-checkout-discounts", () => {
     ).toThrow("Incohérence solde Stripe");
   });
 
+  it("valide un Checkout du seul complément CB, CV encore dus", () => {
+    expect(() =>
+      assertStripePayableAfterDiscounts({
+        invoiceTotalCents: 30_000,
+        donationDiscountCents: 0,
+        aidDiscountCents: 0,
+        amountToPayCents: 30_000,
+        alreadyPaidCents: 0,
+        reservedHolidayVoucherCents: 25_000,
+        remainingPayableCents: 5_000,
+      })
+    ).not.toThrow();
+  });
+
+  it("valide un Checkout de tout le solde si l'adhérent ne remet pas les CV", () => {
+    expect(() =>
+      assertStripePayableAfterDiscounts({
+        invoiceTotalCents: 30_000,
+        donationDiscountCents: 0,
+        aidDiscountCents: 0,
+        amountToPayCents: 30_000,
+        alreadyPaidCents: 0,
+        reservedHolidayVoucherCents: 0,
+        remainingPayableCents: 30_000,
+      })
+    ).not.toThrow();
+  });
+
   it("inclut le déjà encaissé dans le coupon Checkout", () => {
     expect(
       sumCheckoutDiscountCents({
@@ -98,6 +126,24 @@ describe("stripe-checkout-discounts", () => {
         alreadyPaidCents: 10_000,
       })
     ).toBe("Déjà encaissé");
+  });
+
+  it("inclut les chèques vacances prévus dans le coupon Checkout", () => {
+    expect(
+      buildMergedCheckoutDiscountCouponName({
+        donationDiscountCents: 0,
+        donationDiscountCouponName: "Remise don libre",
+        aids: [],
+        reservedHolidayVoucherCents: 25_000,
+      })
+    ).toBe("Chèques vacances prévus");
+    expect(
+      sumCheckoutDiscountCents({
+        donationDiscountCents: 0,
+        aids: [],
+        reservedHolidayVoucherCents: 25_000,
+      })
+    ).toBe(25_000);
   });
 
   it("somme les aides", () => {
