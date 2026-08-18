@@ -55,7 +55,7 @@ export function buildRecapPaymentFields(
         : "—",
     },
     {
-      label: "Mode de paiement",
+      label: "Mode de règlement prévu",
       value:
         draft.paymentMethod !== ""
           ? PAYMENT_METHOD_LABELS[draft.paymentMethod]

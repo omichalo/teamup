@@ -75,7 +75,10 @@ export function MembershipRequestCardQuickActions({
     }
   };
 
-  const requestPayment = async (busy: BusyAction) => {
+  const requestPayment = async (
+    busy: BusyAction,
+    channel?: "stripe" | "instructions"
+  ) => {
     const amountCents = resolveQuickPaymentAmountCents(registration);
     if (!amountCents || amountCents <= 0) {
       return;
@@ -90,7 +93,10 @@ export function MembershipRequestCardQuickActions({
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amountCents }),
+          body: JSON.stringify({
+            amountCents,
+            ...(channel ? { channel } : {}),
+          }),
         }
       );
       const json = await res.json().catch(() => ({}));
@@ -174,7 +180,7 @@ export function MembershipRequestCardQuickActions({
               )
             }
             disabled={busyAction !== null}
-            onClick={() => void requestPayment("resend")}
+            onClick={() => void requestPayment("resend", "stripe")}
           >
             {SECRETARIAT_QUICK_RESEND_PAYMENT_LABEL}
           </Button>

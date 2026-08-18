@@ -73,9 +73,25 @@ describe("registration-card-quick-actions", () => {
     ).toBe(true);
     expect(
       canQuickResendPaymentLink(
-        baseSummary({ status: "in_review", paymentAmountCents: 22_400 })
+        baseSummary({
+          status: "payment_requested",
+          paymentAmountCents: 22_400,
+          payment: {
+            paymentMethod: "cheque",
+            amountToPayCents: 22_400,
+            totalAmountCents: 22_400,
+            assistanceTotalAmountCents: 0,
+            aids: [],
+            paymentInstallments: 1,
+            expectedPayments: [],
+            receivedPayments: [],
+            paidAmountCents: 0,
+            remainingAmountCents: 22_400,
+            paymentStatus: "waiting_payment",
+          },
+        })
       )
-    ).toBe(false);
+    ).toBe(true);
     expect(
       canQuickResendPaymentLink(
         baseSummary({

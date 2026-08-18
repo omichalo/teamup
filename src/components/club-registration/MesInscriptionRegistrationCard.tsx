@@ -18,8 +18,8 @@ import { MEDICAL_CERTIFICATE_STATUS_LABELS } from "@/lib/club-registration/medic
 import { MesInscriptionPayOnlineButton } from "@/components/club-registration/MesInscriptionPayOnlineButton";
 import {
   findMesInscriptionSectionLabel,
-  formatMesInscriptionAmount,
   formatMesInscriptionDate,
+  formatMesInscriptionPayableAmount,
   isMesInscriptionPaid,
   MES_INSCRIPTION_MEDICAL_COLOR,
   MES_INSCRIPTION_ROLE_LABEL,
@@ -100,8 +100,8 @@ export const MesInscriptionRegistrationCard = forwardRef<HTMLDivElement, Props>(
               {r.status === "payment_requested" ? (
                 <Typography variant="caption" color="secondary.main" fontWeight={700}>
                   Paiement attendu
-                  {formatMesInscriptionAmount(r.paymentAmountCents)
-                    ? ` : ${formatMesInscriptionAmount(r.paymentAmountCents)}`
+                  {formatMesInscriptionPayableAmount(r)
+                    ? ` : ${formatMesInscriptionPayableAmount(r)}`
                     : ""}
                 </Typography>
               ) : null}

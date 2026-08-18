@@ -21,6 +21,8 @@ import {
   PAYMENT_STATUS_LABELS,
   REMAINING_PAYMENT_METHOD_LABELS,
 } from "@/lib/club-registration/payment-constants";
+import { receivedMethodFromPlanned } from "@/lib/club-registration/payment/received-method-from-planned";
+import { resolveExpectedLineReceivedCents } from "@/lib/club-registration/payment/expected-line-received";
 import type { ExpectedPayment, RegistrationPayment } from "@/lib/club-registration/payment/types";
 import { formatCentsAsEuros } from "@/lib/pricing";
 import { AddManualPaymentDialog } from "./AddManualPaymentDialog";
@@ -75,17 +77,17 @@ export function PaymentTrackingSection({
         value: formatCentsAsEuros(payment.assistanceTotalAmountCents),
       },
       {
-        label: "Reste à payer (initial)",
+        label: "Montant à régler",
         value: formatCentsAsEuros(payment.amountToPayCents),
       },
-      { label: "Montant déjà reçu", value: formatCentsAsEuros(payment.paidAmountCents) },
-      { label: "Reste dû", value: formatCentsAsEuros(payment.remainingAmountCents) },
+      { label: "Montant encaissé", value: formatCentsAsEuros(payment.paidAmountCents) },
+      { label: "Solde restant", value: formatCentsAsEuros(payment.remainingAmountCents) },
       {
         label: "Statut",
         value: PAYMENT_STATUS_LABELS[payment.paymentStatus],
       },
       {
-        label: "Mode choisi",
+        label: "Mode prévu",
         value: PAYMENT_METHOD_LABELS[payment.paymentMethod],
       },
       ...(payment.paymentMethod === "cheque"
@@ -170,63 +172,77 @@ export function PaymentTrackingSection({
       {payment.expectedPayments.length > 0 ? (
         <>
           <Typography variant="subtitle2" fontWeight={600}>
-            Paiements attendus
+            Règlement prévu
           </Typography>
           <Table size="small">
             <TableHead>
               <TableRow>
                 <TableCell>Libellé</TableCell>
-                <TableCell align="right">Montant</TableCell>
+                <TableCell align="right">Prévu</TableCell>
+                <TableCell align="right">Reçu</TableCell>
                 <TableCell>Statut</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {payment.expectedPayments.map((line) => (
-                <TableRow key={line.id}>
-                  <TableCell>{line.label}</TableCell>
-                  <TableCell align="right">
-                    {formatCentsAsEuros(line.expectedAmountCents)}
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      size="small"
-                      label={
-                        line.status === "received"
-                          ? "Reçu"
-                          : line.status === "cancelled"
-                            ? "Annulé"
-                            : "Attendu"
-                      }
-                      color={
-                        line.status === "received"
-                          ? "success"
-                          : line.status === "cancelled"
-                            ? "default"
-                            : "warning"
-                      }
-                    />
-                  </TableCell>
-                  <TableCell align="right">
-                    {line.status === "expected" ? (
-                      <Tooltip
-                        title="À utiliser dès que cette échéance est bien arrivée sur le compte du club (hors lien de paiement envoyé par l’application, si vous n’en utilisez pas)."
-                        slotProps={{ popper: { sx: { maxWidth: 320 } } }}
-                        enterDelay={400}
-                      >
-                        <Button
-                          size="small"
-                          onClick={() => setReceiveExpected(line)}
+              {payment.expectedPayments.map((line) => {
+                const receivedCents = resolveExpectedLineReceivedCents(
+                  line,
+                  payment.receivedPayments
+                );
+                return (
+                  <TableRow key={line.id}>
+                    <TableCell>{line.label}</TableCell>
+                    <TableCell align="right">
+                      {formatCentsAsEuros(line.expectedAmountCents)}
+                    </TableCell>
+                    <TableCell align="right">
+                      {receivedCents != null ? formatCentsAsEuros(receivedCents) : "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        size="small"
+                        label={
+                          line.status === "received"
+                            ? "Reçu"
+                            : line.status === "cancelled"
+                              ? "Annulé"
+                              : "Attendu"
+                        }
+                        color={
+                          line.status === "received"
+                            ? "success"
+                            : line.status === "cancelled"
+                              ? "default"
+                              : "warning"
+                        }
+                      />
+                    </TableCell>
+                    <TableCell align="right">
+                      {line.status === "expected" ? (
+                        <Tooltip
+                          title="À utiliser dès que cette échéance est bien arrivée sur le compte du club (hors lien de paiement envoyé par l’application, si vous n’en utilisez pas)."
+                          slotProps={{ popper: { sx: { maxWidth: 320 } } }}
+                          enterDelay={400}
                         >
-                          Marquer reçu
-                        </Button>
-                      </Tooltip>
-                    ) : null}
-                  </TableCell>
-                </TableRow>
-              ))}
+                          <Button
+                            size="small"
+                            onClick={() => setReceiveExpected(line)}
+                          >
+                            Marquer reçu
+                          </Button>
+                        </Tooltip>
+                      ) : null}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
+          <Typography variant="caption" color="text.secondary">
+            « Prévu » est le plan d&apos;origine ; « Reçu » reprend l&apos;encaissement
+            réellement enregistré. Le solde restant ci-dessus fait foi.
+          </Typography>
         </>
       ) : null}
 
@@ -234,7 +250,7 @@ export function PaymentTrackingSection({
         <>
           <Divider />
           <Typography variant="subtitle2" fontWeight={600}>
-            Paiements reçus
+            Encaissements reçus
           </Typography>
           <Table size="small">
             <TableHead>
@@ -274,18 +290,16 @@ export function PaymentTrackingSection({
           </Button>
         </Tooltip>
         <Tooltip
-          title="Raccourci quand tout est réglé d’un coup, sans cocher chaque ligne. À utiliser avec prudence (contrôle trésorerie)."
+          title="Ouvre le formulaire d’encaissement, prérempli avec le solde restant. Choisissez le moyen réellement reçu."
           slotProps={{ popper: { sx: { maxWidth: 300 } } }}
           enterDelay={400}
         >
           <Button
             variant="outlined"
             color="success"
-            onClick={() =>
-              void runAction(() => postPaymentAction(registrationId, "/mark-paid", {}))
-            }
+            onClick={() => setManualOpen(true)}
           >
-            Tout est payé (raccourci)
+            Tout est payé
           </Button>
         </Tooltip>
         <Tooltip
@@ -311,6 +325,7 @@ export function PaymentTrackingSection({
         open={manualOpen}
         suggestedAmountCents={payment.remainingAmountCents}
         remainingAmountCents={payment.remainingAmountCents}
+        defaultMethod={receivedMethodFromPlanned(payment.paymentMethod)}
         onClose={() => setManualOpen(false)}
         onSubmit={async (input) => {
           await runAction(() =>

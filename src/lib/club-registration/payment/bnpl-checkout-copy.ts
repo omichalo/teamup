@@ -34,7 +34,7 @@ export const BNPL_SECRETARIAT_PAYMENT_TOOLTIP =
 
 /** Sous-titre page secrétariat — demandes d'adhésion. */
 export const BNPL_SECRETARIAT_PAGE_SUBTITLE =
-  "Relisez le dossier, vérifiez le montant, puis demandez le paiement : un e-mail avec lien Stripe part pour la carte bancaire (une fois ou BNPL sur la page Stripe, selon éligibilité). Les autres modes sont suivis manuellement dans le tableau ci-dessous.";
+  "Relisez le dossier, vérifiez le montant, puis demandez le paiement. Le mode déclaré à l'inscription reste une intention : vous pouvez envoyer un lien Stripe même si l'adhérent avait prévu un autre règlement.";
 
 /** Chaîne attendue dans les tests e-mail (repère stable). */
 export const BNPL_COPY_TEST_MARKER = "BNPL";
@@ -101,6 +101,13 @@ export const SECRETARIAT_RESEND_PAYMENT_BUTTON = "Renvoyer le lien de paiement";
 /** Tooltip secrétariat — renvoi. */
 export const SECRETARIAT_RESEND_PAYMENT_TOOLTIP =
   "Génère un nouveau lien Stripe (valable 24 h) et renvoie l'e-mail de paiement au contact du dossier.";
+
+/** Bouton secrétariat — proposer un paiement CB même si le mode prévu n'est pas carte. */
+export const SECRETARIAT_SEND_ONLINE_PAYMENT_BUTTON =
+  "Envoyer un lien de paiement en ligne";
+
+export const SECRETARIAT_SEND_ONLINE_PAYMENT_TOOLTIP =
+  "Envoie un e-mail invitant l'adhérent à régler le solde restant par carte (Stripe), quel que soit le mode prévu à l'inscription.";
 
 /** Liste secrétariat — action rapide renvoi. */
 export const SECRETARIAT_QUICK_RESEND_PAYMENT_LABEL = "Renvoyer le lien";

@@ -6,11 +6,9 @@ import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
 import { AUDIT_ACTIONS, logAuditAction } from "@/lib/auth/audit-logger";
 import { requireRegistrationManager } from "@/lib/club-registration/payment/api-auth";
-import {
-  normalizeRegistrationPayment,
-  paymentToFirestoreUpdate,
-} from "@/lib/club-registration/payment/normalize-payment";
+import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
 import { markExpectedPaymentReceived } from "@/lib/club-registration/payment/payment-mutations";
+import { paymentWriteWithSettlement } from "@/lib/club-registration/payment/settlement-firestore";
 import { normalizePaymentReference } from "@/lib/club-registration/payment/payment-reference";
 
 const COLLECTION = "clubRegistrations";
@@ -81,7 +79,7 @@ export async function POST(
 
     await docRef.set(
       {
-        ...paymentToFirestoreUpdate(next),
+        ...paymentWriteWithSettlement(next),
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true }

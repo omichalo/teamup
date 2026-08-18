@@ -16,23 +16,41 @@ export function buildMergedCheckoutDiscountCouponName(params: {
   donationDiscountCents: number;
   donationDiscountCouponName: string;
   aids: PaymentAid[];
+  alreadyPaidCents?: number;
 }): string {
   const activeAids = params.aids.filter((aid) => aid.amountCents > 0);
   const hasDonation = params.donationDiscountCents > 0;
+  const hasAlreadyPaid = (params.alreadyPaidCents ?? 0) > 0;
 
-  if (hasDonation && activeAids.length === 0) {
+  if (hasAlreadyPaid && !hasDonation && activeAids.length === 0) {
+    return "Déjà encaissé";
+  }
+
+  if (hasDonation && activeAids.length === 0 && !hasAlreadyPaid) {
     return params.donationDiscountCouponName;
   }
-  if (!hasDonation && activeAids.length === 1) {
+  if (!hasDonation && activeAids.length === 1 && !hasAlreadyPaid) {
     return activeAids[0]!.label;
   }
-  if (!hasDonation && activeAids.length > 1) {
+  if (!hasDonation && activeAids.length > 1 && !hasAlreadyPaid) {
     return "Remises aides secrétariat";
   }
-  if (hasDonation && activeAids.length === 1) {
+  if (hasDonation && activeAids.length === 1 && !hasAlreadyPaid) {
     return `${params.donationDiscountCouponName} + ${activeAids[0]!.label}`;
   }
   return "Remises adhésion";
+}
+
+export function sumCheckoutDiscountCents(params: {
+  donationDiscountCents: number;
+  aids: PaymentAid[];
+  alreadyPaidCents?: number;
+}): number {
+  return (
+    Math.max(0, params.donationDiscountCents) +
+    sumPaymentAidDiscountCents(params.aids) +
+    Math.max(0, params.alreadyPaidCents ?? 0)
+  );
 }
 
 /** Montant total des coupons « aides secrétariat » à appliquer sur la facture. */
@@ -59,6 +77,8 @@ export function assertStripePayableAfterDiscounts(params: {
   donationDiscountCents: number;
   aidDiscountCents: number;
   amountToPayCents: number;
+  alreadyPaidCents?: number;
+  remainingPayableCents?: number;
 }): void {
   void params.donationDiscountCents;
   const expectedPayable = params.invoiceTotalCents - params.aidDiscountCents;
@@ -66,6 +86,16 @@ export function assertStripePayableAfterDiscounts(params: {
     throw new Error(
       `Incohérence montant Stripe : facture ${params.invoiceTotalCents} cts, aides ${params.aidDiscountCents} cts, attendu ${params.amountToPayCents} cts, calculé ${expectedPayable} cts`
     );
+  }
+
+  if (params.remainingPayableCents != null) {
+    const alreadyPaid = Math.max(0, params.alreadyPaidCents ?? 0);
+    const expectedRemaining = Math.max(0, params.amountToPayCents - alreadyPaid);
+    if (expectedRemaining !== params.remainingPayableCents) {
+      throw new Error(
+        `Incohérence solde Stripe : net ${params.amountToPayCents} cts, déjà encaissé ${alreadyPaid} cts, attendu ${params.remainingPayableCents} cts, calculé ${expectedRemaining} cts`
+      );
+    }
   }
 }
 
@@ -79,10 +109,15 @@ export async function createCheckoutDiscountCouponIds(params: {
   donationDiscountCents: number;
   donationDiscountCouponName: string;
   aids: PaymentAid[];
+  alreadyPaidCents?: number;
 }): Promise<string[]> {
-  const aidTotal = sumPaymentAidDiscountCents(params.aids);
   const donationDiscount = Math.max(0, params.donationDiscountCents);
-  const totalOff = donationDiscount + aidTotal;
+  const alreadyPaidCents = Math.max(0, params.alreadyPaidCents ?? 0);
+  const totalOff = sumCheckoutDiscountCents({
+    donationDiscountCents: donationDiscount,
+    aids: params.aids,
+    alreadyPaidCents,
+  });
 
   if (totalOff <= 0) {
     return [];
@@ -96,6 +131,7 @@ export async function createCheckoutDiscountCouponIds(params: {
         donationDiscountCents: donationDiscount,
         donationDiscountCouponName: params.donationDiscountCouponName,
         aids: params.aids,
+        alreadyPaidCents,
       })
     ),
     kind: "merged_checkout_discount",

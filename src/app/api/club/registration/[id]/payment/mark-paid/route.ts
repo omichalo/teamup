@@ -7,6 +7,7 @@ import { validateOrigin } from "@/lib/auth/csrf-utils";
 import { AUDIT_ACTIONS, logAuditAction } from "@/lib/auth/audit-logger";
 import { requireRegistrationManager } from "@/lib/club-registration/payment/api-auth";
 import {
+  isReceivedMethodIdSafe,
   normalizeRegistrationPayment,
   paymentToFirestoreUpdate,
 } from "@/lib/club-registration/payment/normalize-payment";
@@ -30,7 +31,10 @@ export async function POST(
     }
 
     const { id } = await context.params;
-    const body = ((await req.json().catch(() => ({}))) ?? {}) as { note?: string };
+    const body = ((await req.json().catch(() => ({}))) ?? {}) as {
+      note?: string;
+      method?: string;
+    };
 
     const db = getFirestoreAdmin();
     const docRef = db.collection(COLLECTION).doc(id);
@@ -45,9 +49,17 @@ export async function POST(
       return jsonNoStore({ error: "Aucune donnée de paiement sur ce dossier" }, { status: 400 });
     }
 
+    if (!isReceivedMethodIdSafe(body.method)) {
+      return jsonNoStore(
+        { error: "Indiquez le moyen d'encaissement réellement reçu." },
+        { status: 400 }
+      );
+    }
+
     const alreadyPaid = data.status === "paid" || payment.paymentStatus === "paid";
 
     const next = markPaymentFullyPaid(payment, {
+      method: body.method,
       recordedBy: auth.uid,
       ...(typeof body.note === "string" && body.note.trim()
         ? { note: body.note.trim() }

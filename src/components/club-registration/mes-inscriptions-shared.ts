@@ -69,6 +69,16 @@ export function formatMesInscriptionAmount(cents: number | undefined): string | 
   }).format(cents / 100);
 }
 
+export function formatMesInscriptionPayableAmount(
+  registration: MesInscriptionSummary
+): string | null {
+  const remaining = registration.payment?.remainingAmountCents;
+  if (typeof remaining === "number") {
+    return formatMesInscriptionAmount(remaining);
+  }
+  return formatMesInscriptionAmount(registration.paymentAmountCents);
+}
+
 export function formatMesInscriptionDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   try {

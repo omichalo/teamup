@@ -29,6 +29,8 @@ export function validateRegistrationStripeCheckout(params: {
   pricingConfig: RegistrationConfigV1;
   payment: RegistrationPayment | null;
   amountToPayCents: number;
+  alreadyPaidCents?: number;
+  remainingPayableCents?: number;
 }):
   | { ok: true }
   | { ok: false; status: number; body: Record<string, unknown> } {
@@ -82,6 +84,12 @@ export function validateRegistrationStripeCheckout(params: {
       donationDiscountCents: donationPricing.donationDiscountCents,
       aidDiscountCents,
       amountToPayCents: params.amountToPayCents,
+      ...(params.alreadyPaidCents != null
+        ? { alreadyPaidCents: params.alreadyPaidCents }
+        : {}),
+      ...(params.remainingPayableCents != null
+        ? { remainingPayableCents: params.remainingPayableCents }
+        : {}),
     });
   } catch (validationError) {
     return {
@@ -149,6 +157,8 @@ export async function persistPaymentRequestedAndNotify(params: {
   quote: PriceQuote | null;
   donationPricing: DonationPricingBreakdown | null;
   amountToPayCents: number;
+  /** Solde réellement demandé dans l'e-mail (après encaissements déjà reçus). */
+  payableCents?: number;
   paymentEmails: string[];
   adherentName: string;
   baseUrl: string;
@@ -172,10 +182,11 @@ export async function persistPaymentRequestedAndNotify(params: {
     params.donationPricing != null &&
     params.donationPricing.invoiceTotalCents > 0;
   const emailVariant = params.isResend ? "resend" : "initial";
+  const emailAmountCents = params.payableCents ?? params.amountToPayCents;
   const paymentMail = buildPaymentRequestEmail({
     registrationId: params.registrationId,
     adherentName: params.adherentName,
-    amountCents: params.amountToPayCents,
+    amountCents: emailAmountCents,
     appOrigin: params.baseUrl,
     quote: hasValidatedQuote ? params.quote : null,
     donationPricing: hasValidatedQuote ? params.donationPricing : null,
@@ -195,7 +206,7 @@ export async function persistPaymentRequestedAndNotify(params: {
     resource: "clubRegistration",
     resourceId: params.registrationId,
     details: {
-      amountCents: params.amountToPayCents,
+      amountCents: emailAmountCents,
       resend: Boolean(params.isResend),
       paymentHub: "mes_inscriptions",
       ...(hasValidatedQuote

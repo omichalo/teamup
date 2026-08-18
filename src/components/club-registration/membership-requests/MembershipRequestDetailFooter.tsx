@@ -42,9 +42,12 @@ export function MembershipRequestDetailFooter({
         onReviewNotesChange={(value) => updateField("reviewNotes", value)}
         registrationStatus={selected.status ?? null}
         paymentRequestedAt={selected.paymentRequestedAt ?? null}
-        paymentAmountCents={selected.paymentAmountCents ?? null}
+        paymentAmountCents={
+          selectedPayment?.amountToPayCents ?? selected.paymentAmountCents ?? null
+        }
         paymentEmailSentTo={selected.paymentEmailSentTo ?? null}
         paymentMethod={selectedPayment?.paymentMethod}
+        remainingAmountCents={selectedPayment?.remainingAmountCents ?? null}
         paymentSettled={isRegistrationPaymentSettled(
           {
             status: selected.status,
@@ -58,6 +61,7 @@ export function MembershipRequestDetailFooter({
         persistingQuote={persistingQuote}
         onSave={() => void save()}
         onRequestPayment={requestPayment}
+        onRequestOnlinePayment={() => requestPayment("stripe")}
       />
 
       {registrationId ? (
