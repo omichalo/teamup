@@ -23,6 +23,7 @@ import {
   SECRETARIAT_SEND_ONLINE_PAYMENT_TOOLTIP,
 } from "@/lib/club-registration/payment/bnpl-checkout-copy";
 import { resolveSecretariatPaymentCta } from "@/lib/club-registration/payment/secretariat-payment-action";
+import { centsToEurosInput } from "@/lib/club-registration/payment/payment-draft-helpers";
 import {
   PAYMENT_METHOD_LABELS,
   type PaymentMethodId,
@@ -71,6 +72,11 @@ function formatAmountCents(cents: number | null | undefined): string | null {
   }).format(cents / 100);
 }
 
+function withRemainingAmount(label: string, remainingCents: number | null): string {
+  const formatted = formatAmountCents(remainingCents);
+  return formatted ? `${label} (${formatted})` : label;
+}
+
 export function SecretariatPaymentNotesSection({
   amountEuros,
   reviewNotes,
@@ -104,7 +110,15 @@ export function SecretariatPaymentNotesSection({
     paymentMethod !== "card" &&
     (remaining == null || remaining > 0);
   const requestedAtLabel = formatPaymentRequestedAt(paymentRequestedAt);
-  const formattedAmount = formatAmountCents(paymentAmountCents);
+  const remainingLabel = formatAmountCents(remaining);
+  const netLabel = formatAmountCents(paymentAmountCents);
+  const alreadyPaidCents =
+    remaining != null && paymentAmountCents != null && remaining < paymentAmountCents
+      ? paymentAmountCents - remaining
+      : null;
+  const hasPartialReceipt = alreadyPaidCents != null && alreadyPaidCents > 0;
+  const chargeButtonLabel =
+    remaining != null && remaining > 0 ? remaining : null;
 
   return (
     <>
@@ -132,7 +146,7 @@ export function SecretariatPaymentNotesSection({
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, sm: 6 }}>
           <TextField
-            label="Montant total à demander à l’adhérent"
+            label="Montant net après aides"
             value={amountEuros}
             onChange={(e) => onAmountEurosChange(e.target.value)}
             fullWidth
@@ -143,13 +157,31 @@ export function SecretariatPaymentNotesSection({
                 </InputAdornment>
               ),
             }}
-            helperText={
-              remaining != null && remaining !== paymentAmountCents
-                ? `Net après aides. Le solde réellement demandé sera ${formatAmountCents(remaining)}.`
-                : "Doit correspondre au net après aides (voir tarification)."
-            }
+            helperText="Total de l’adhésion (hors déjà encaissé). Doit correspondre au devis."
           />
         </Grid>
+        {remaining != null ? (
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <TextField
+              label="Solde qui sera demandé maintenant"
+              value={centsToEurosInput(remaining)}
+              fullWidth
+              InputProps={{
+                readOnly: true,
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <EuroIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              }}
+              helperText={
+                hasPartialReceipt
+                  ? `${formatAmountCents(alreadyPaidCents)} déjà encaissé. C’est ce solde que le lien Stripe demandera.`
+                  : "Montant du lien de paiement et des instructions."
+              }
+            />
+          </Grid>
+        ) : null}
         <Grid size={{ xs: 12 }}>
           <TextField
             label="Notes internes (non visibles par l’adhérent)"
@@ -172,7 +204,7 @@ export function SecretariatPaymentNotesSection({
         <Alert severity="warning" variant="outlined">
           Paiement en attente
           {requestedAtLabel ? ` depuis le ${requestedAtLabel}` : ""}
-          {formattedAmount ? ` — montant : ${formattedAmount}` : ""}.
+          {remainingLabel ? ` — solde demandé : ${remainingLabel}` : ""}.
           {paymentEmailSentTo ? (
             <>
               {" "}
@@ -183,6 +215,13 @@ export function SecretariatPaymentNotesSection({
       ) : paymentEmailSentTo ? (
         <Alert severity="info">
           Dernière demande de paiement par e-mail envoyée à {paymentEmailSentTo}.
+        </Alert>
+      ) : null}
+
+      {hasPartialReceipt && remainingLabel && netLabel && paymentCta.visible ? (
+        <Alert severity="warning" variant="outlined">
+          Un encaissement est déjà enregistré. Le lien de paiement demandera{" "}
+          <strong>{remainingLabel}</strong>, pas {netLabel}.
         </Alert>
       ) : null}
 
@@ -205,7 +244,11 @@ export function SecretariatPaymentNotesSection({
         </Tooltip>
         {canOfferOnlineLink ? (
           <Tooltip
-            title={SECRETARIAT_SEND_ONLINE_PAYMENT_TOOLTIP}
+            title={
+              remainingLabel
+                ? `Envoie un e-mail invitant l'adhérent à régler ${remainingLabel} par carte (Stripe), pas le montant net initial.`
+                : SECRETARIAT_SEND_ONLINE_PAYMENT_TOOLTIP
+            }
             slotProps={{ popper: { sx: { maxWidth: 340 } } }}
             {...tooltipEnterProps}
           >
@@ -217,7 +260,10 @@ export function SecretariatPaymentNotesSection({
                 onClick={() => void onRequestOnlinePayment?.()}
                 disabled={saving || requestingPayment || persistingQuote}
               >
-                {SECRETARIAT_SEND_ONLINE_PAYMENT_BUTTON}
+                {withRemainingAmount(
+                  SECRETARIAT_SEND_ONLINE_PAYMENT_BUTTON,
+                  chargeButtonLabel
+                )}
               </Button>
             </span>
           </Tooltip>
@@ -240,7 +286,9 @@ export function SecretariatPaymentNotesSection({
                   ? paymentCta.kind === "validate_settled"
                     ? "Validation..."
                     : "Envoi..."
-                  : paymentCta.label}
+                  : paymentCta.kind === "validate_settled"
+                    ? paymentCta.label
+                    : withRemainingAmount(paymentCta.label, chargeButtonLabel)}
               </Button>
             </span>
           </Tooltip>

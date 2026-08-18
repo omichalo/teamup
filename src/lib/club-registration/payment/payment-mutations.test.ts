@@ -2,6 +2,7 @@ import {
   CANCELLED_EXPECTED_REPLACED_NOTE,
   addManualReceivedPayment,
   cancelOutstandingExpectedPayments,
+  markExpectedPaymentReceived,
   markPaymentFullyPaid,
 } from "./payment-mutations";
 import type { ExpectedPayment, ReceivedPayment, RegistrationPayment } from "./types";
@@ -49,6 +50,9 @@ describe("addManualReceivedPayment", () => {
     expect(next.receivedPayments).toHaveLength(1);
     expect(next.receivedPayments[0].method).toBe("cash");
     expect(next.expectedPayments.every((line) => line.status === "expected")).toBe(true);
+    expect(
+      next.expectedPayments.reduce((sum, line) => sum + line.expectedAmountCents, 0)
+    ).toBe(20_000);
   });
 
   it("CAS E — solde couvert par CB : échéances encore expected passent en cancelled", () => {
@@ -114,6 +118,37 @@ describe("addManualReceivedPayment", () => {
 
     expect(next.expectedPayments[0].status).toBe("received");
     expect(next.expectedPayments[1].status).toBe("cancelled");
+  });
+});
+
+describe("markExpectedPaymentReceived", () => {
+  it("conserve le montant prévu et réajuste les échéances encore attendues au solde", () => {
+    const next = markExpectedPaymentReceived(
+      basePayment({
+        totalAmountCents: 29_000,
+        amountToPayCents: 29_000,
+        remainingAmountCents: 29_000,
+        expectedPayments: chequePlan([9666, 9666, 9668]),
+      }),
+      "ep_1",
+      {
+        amountCents: 10_000,
+        receivedAt: "2026-08-18T10:00:00.000Z",
+      }
+    );
+
+    expect(next).not.toBeNull();
+    expect(next?.expectedPayments[0]?.status).toBe("received");
+    expect(next?.expectedPayments[0]?.expectedAmountCents).toBe(9666);
+    expect(next?.receivedPayments[0]?.amountCents).toBe(10_000);
+    expect(next?.paidAmountCents).toBe(10_000);
+    expect(next?.remainingAmountCents).toBe(19_000);
+    expect(next?.expectedPayments[1]?.status).toBe("expected");
+    expect(next?.expectedPayments[2]?.status).toBe("expected");
+    expect(
+      (next?.expectedPayments[1]?.expectedAmountCents ?? 0) +
+        (next?.expectedPayments[2]?.expectedAmountCents ?? 0)
+    ).toBe(19_000);
   });
 });
 

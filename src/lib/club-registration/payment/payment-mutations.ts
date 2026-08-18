@@ -1,5 +1,8 @@
 import { calculatePaymentSummary } from "./calculate-payment-summary";
-import { generateExpectedPayments } from "./generate-expected-payments";
+import {
+  generateExpectedPayments,
+  splitAmountAcrossInstallments,
+} from "./generate-expected-payments";
 import type {
   ExpectedPayment,
   ReceivedPayment,
@@ -180,8 +183,49 @@ export function cancelOutstandingExpectedPayments(
   return changed ? { ...payment, expectedPayments } : payment;
 }
 
+/**
+ * Recale les échéances encore « expected » pour qu'elles somment au solde restant.
+ * Les lignes déjà reçues ou annulées ne sont pas touchées (le plan d'origine y reste).
+ */
+export function rebalanceOutstandingExpectedPayments(
+  payment: RegistrationPayment
+): RegistrationPayment {
+  const outstandingIndexes: number[] = [];
+  payment.expectedPayments.forEach((line, index) => {
+    if (line.status === "expected") {
+      outstandingIndexes.push(index);
+    }
+  });
+
+  if (outstandingIndexes.length === 0) {
+    return payment;
+  }
+
+  const amounts = splitAmountAcrossInstallments(
+    Math.max(0, payment.remainingAmountCents),
+    outstandingIndexes.length
+  );
+  const amountByIndex = new Map(
+    outstandingIndexes.map((index, slot) => [index, amounts[slot] ?? 0])
+  );
+
+  let changed = false;
+  const expectedPayments = payment.expectedPayments.map((line, index) => {
+    const nextAmount = amountByIndex.get(index);
+    if (nextAmount === undefined || nextAmount === line.expectedAmountCents) {
+      return line;
+    }
+    changed = true;
+    return { ...line, expectedAmountCents: nextAmount };
+  });
+
+  return changed ? { ...payment, expectedPayments } : payment;
+}
+
 function finalizeAfterReceipt(payment: RegistrationPayment): RegistrationPayment {
-  return cancelOutstandingExpectedPayments(recalculateRegistrationPayment(payment));
+  return rebalanceOutstandingExpectedPayments(
+    cancelOutstandingExpectedPayments(recalculateRegistrationPayment(payment))
+  );
 }
 
 export function markPaymentFullyPaid(
