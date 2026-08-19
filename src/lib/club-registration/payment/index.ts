@@ -59,6 +59,11 @@ export {
 } from "./resolve-remaining-payable";
 
 export {
+  syncPaymentAfterQuoteChange,
+  buildPaymentSyncPatchForQuote,
+} from "./sync-payment-after-quote-change";
+
+export {
   isCollectableAid,
   isAidReceiptPending,
   hasPendingAidReceipt,

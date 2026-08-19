@@ -193,17 +193,11 @@ export async function patchManagerRegistration(
     }
   }
 
-  const mergedForPricing = { ...currentData, ...updates };
-  const pricingPatch = await buildManagerRegistrationPricingPatch(
-    mergedForPricing,
-    currentData
-  );
-
   if (updates.paymentAids !== undefined) {
     await ensureRegistrationConfigSeeded();
     const config = await getActiveRegistrationConfig();
     const aidsUpdate = resolveManagerPaymentAidsUpdate(
-      mergedForPricing,
+      { ...currentData, ...updates },
       currentData,
       updates.paymentAids,
       config,
@@ -214,6 +208,13 @@ export async function patchManagerRegistration(
     }
     Object.assign(updates, aidsUpdate.patch);
   }
+
+  const mergedForPricing = { ...currentData, ...updates };
+  const pricingPatch = await buildManagerRegistrationPricingPatch(
+    mergedForPricing,
+    currentData,
+    mergedForPricing
+  );
 
   await docRef.set(
     {

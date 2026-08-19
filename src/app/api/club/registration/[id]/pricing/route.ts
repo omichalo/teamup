@@ -12,6 +12,7 @@ import {
   readVoluntaryDonationCents,
   resolveRegistrationDonationPricing,
 } from "@/lib/club-registration/resolve-registration-donation";
+import { buildPaymentSyncPatchForQuote } from "@/lib/club-registration/payment/sync-payment-after-quote-change";
 import type { PriceQuote } from "@/lib/pricing/types";
 
 const COLLECTION = "clubRegistrations";
@@ -159,6 +160,13 @@ export async function POST(
         const donation = resolveRegistrationDonationPricing(quote, merged);
         patch.paymentAmountCents = donation.invoiceTotalCents;
         patch.donationDiscountCents = donation.donationDiscountCents;
+        Object.assign(
+          patch,
+          buildPaymentSyncPatchForQuote({
+            currentData: snap.data() ?? {},
+            invoiceTotalCents: donation.invoiceTotalCents,
+          })
+        );
       }
       if (body.handisportPracticeLevel !== undefined) {
         patch.handisportPracticeLevel = body.handisportPracticeLevel;
