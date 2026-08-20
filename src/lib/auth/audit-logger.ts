@@ -103,4 +103,9 @@ export const AUDIT_ACTIONS = {
   APP_SUGGESTION_CREATED: "app.suggestion.created",
   APP_SUGGESTION_UPDATED: "app.suggestion.updated",
   APP_SUGGESTION_COMMENT_ADDED: "app.suggestion.comment_added",
+  ATTENDANCE_MARKED: "attendance.marked",
+  ATTENDANCE_UNMARKED: "attendance.unmarked",
+  ATTENDANCE_LEAD_CREATED: "attendance.lead.created",
+  ATTENDANCE_LEAD_UPDATED: "attendance.lead.updated",
+  ATTENDANCE_SLOT_ADDED: "attendance.slot.added",
 } as const;

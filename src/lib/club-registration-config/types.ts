@@ -41,6 +41,12 @@ export type RegistrationSiteSlot = {
   sortOrder: number;
   schoolPickupSchool?: string | undefined;
   enabled: boolean;
+  /** Jour ISO (1 = lundi … 7 = dimanche). */
+  weekday?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | undefined;
+  /** Minutes depuis minuit (début). */
+  startMinutes?: number | undefined;
+  /** Minutes depuis minuit (fin, exclusive du lendemain). */
+  endMinutes?: number | undefined;
 };
 
 export type RegistrationSite = {
