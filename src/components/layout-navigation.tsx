@@ -5,6 +5,7 @@ import {
   AdminPanelSettings,
   Assignment,
   Event,
+  EventAvailable,
   FactCheck,
   Groups,
   Home,
@@ -103,6 +104,16 @@ const NAV = {
     href: "/club/validations-licence",
     icon: <VerifiedUser />,
   },
+  presences: {
+    label: "Présences",
+    href: "/club/presences",
+    icon: <EventAvailable />,
+  },
+  presencesEssais: {
+    label: "Essais présence",
+    href: "/club/presences/essais",
+    icon: <HowToReg />,
+  },
 } as const satisfies Record<string, LayoutNavigationItem>;
 
 export const LAYOUT_NAV = NAV;
@@ -113,18 +124,18 @@ type LayoutNavOptions = {
   isPlayerLike: boolean;
   isAssistantSecretary: boolean;
   isSecretary: boolean;
+  isBoardMember: boolean;
   canAccessSpreadsheet: boolean;
 };
 
 export function hasLayoutNavigation(nav: LayoutNavigationStructure): boolean {
   return (
-    nav.primary.length > 0 ||
-    nav.groups.some((group) => group.items.length > 0)
+    nav.primary.length > 0 || nav.groups.some((group) => group.items.length > 0)
   );
 }
 
 export function buildLayoutAccountMenuItems(
-  options: LayoutNavOptions
+  options: LayoutNavOptions,
 ): LayoutNavigationItem[] {
   const { hasUser, isAdmin, isPlayerLike, isSecretary } = options;
   if (!hasUser || isPlayerLike) {
@@ -143,7 +154,7 @@ export function buildLayoutAccountMenuItems(
 }
 
 export function buildLayoutNavigation(
-  options: LayoutNavOptions
+  options: LayoutNavOptions,
 ): LayoutNavigationStructure {
   const {
     hasUser,
@@ -151,6 +162,7 @@ export function buildLayoutNavigation(
     isPlayerLike,
     isAssistantSecretary,
     isSecretary,
+    isBoardMember,
     canAccessSpreadsheet,
   } = options;
   if (!hasUser) {
@@ -166,6 +178,9 @@ export function buildLayoutNavigation(
     if (canAccessSpreadsheet) {
       primary.push(NAV.tableauAdhesions);
     }
+    if (isBoardMember) {
+      primary.push(NAV.presences, NAV.presencesEssais);
+    }
     if (isAssistantSecretary) {
       primary.push(NAV.validationsLicence);
     }
@@ -174,13 +189,19 @@ export function buildLayoutNavigation(
 
   if (isSecretary) {
     return {
-      primary: [NAV.accueilStaff, NAV.dossiersAValider, NAV.boiteIdees],
+      primary: [
+        NAV.accueilStaff,
+        NAV.dossiersAValider,
+        NAV.presences,
+        NAV.boiteIdees,
+      ],
       groups: [
         {
           id: "adhesions",
           label: "Adhésions",
           items: [
             NAV.tableauAdhesions,
+            NAV.presencesEssais,
             NAV.campagnesTarifs,
             NAV.apercuFormulaire,
             NAV.validationsLicence,
@@ -215,6 +236,8 @@ export function buildLayoutNavigation(
           label: "Adhésions",
           items: [
             NAV.tableauAdhesions,
+            NAV.presences,
+            NAV.presencesEssais,
             NAV.campagnesTarifs,
             NAV.apercuFormulaire,
             NAV.validationsLicence,
@@ -227,6 +250,7 @@ export function buildLayoutNavigation(
   return {
     primary: [
       NAV.accueilStaff,
+      NAV.presences,
       NAV.compositions,
       NAV.disponibilites,
       NAV.tableauAdhesions,

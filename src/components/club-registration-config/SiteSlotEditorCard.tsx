@@ -2,11 +2,23 @@
 
 import type { ConfigEditorDragHandleProps } from "./ConfigEditorLayout";
 import {
+  FormControl,
   FormControlLabel,
+  InputLabel,
+  MenuItem,
+  Select,
+  Stack,
   Switch,
   TextField,
 } from "@mui/material";
 import type { RegistrationSiteSlot } from "@/lib/club-registration-config/types";
+import {
+  ISO_WEEKDAY_LABELS,
+  formatMinutesAsInput,
+  isIsoWeekday,
+  parseTimeInput,
+  type IsoWeekday,
+} from "@/lib/club-registration-config/slot-schedule";
 import { ConfigEditorCollapsibleItem, ConfigEditorOptionPanel } from "./ConfigEditorLayout";
 import { ConfigEditorRemoveAction } from "./ConfigEditorRemoveAction";
 import { slotItemDecor } from "./config-editor-item-decor";
@@ -24,6 +36,8 @@ type Props = {
   isDragging?: boolean;
 };
 
+const WEEKDAY_OPTIONS: IsoWeekday[] = [1, 2, 3, 4, 5, 6, 7];
+
 export function SiteSlotEditorCard({
   slot,
   expanded,
@@ -35,6 +49,9 @@ export function SiteSlotEditorCard({
   isDragging = false,
 }: Props) {
   const schoolPickupEnabled = Boolean(slot.schoolPickupSchool);
+  const weekday = isIsoWeekday(slot.weekday) ? slot.weekday : 1;
+  const startInput = formatMinutesAsInput(slot.startMinutes ?? 17 * 60);
+  const endInput = formatMinutesAsInput(slot.endMinutes ?? 18 * 60 + 30);
 
   return (
     <ConfigEditorCollapsibleItem
@@ -59,6 +76,46 @@ export function SiteSlotEditorCard({
         helperText="Ex. Lundi / 17h00 – 18h30 / Jeunes Loisirs"
         fullWidth
       />
+
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+        <FormControl size="small" sx={{ minWidth: 160 }}>
+          <InputLabel id={`slot-weekday-${slot.id}`}>Jour</InputLabel>
+          <Select
+            labelId={`slot-weekday-${slot.id}`}
+            label="Jour"
+            value={weekday}
+            onChange={(e) => onChange({ weekday: Number(e.target.value) as IsoWeekday })}
+          >
+            {WEEKDAY_OPTIONS.map((value) => (
+              <MenuItem key={value} value={value}>
+                {ISO_WEEKDAY_LABELS[value]}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <TextField
+          label="Début"
+          type="time"
+          size="small"
+          value={startInput}
+          onChange={(e) => {
+            const minutes = parseTimeInput(e.target.value);
+            if (minutes != null) onChange({ startMinutes: minutes });
+          }}
+          slotProps={{ inputLabel: { shrink: true } }}
+        />
+        <TextField
+          label="Fin"
+          type="time"
+          size="small"
+          value={endInput}
+          onChange={(e) => {
+            const minutes = parseTimeInput(e.target.value);
+            if (minutes != null) onChange({ endMinutes: minutes });
+          }}
+          slotProps={{ inputLabel: { shrink: true } }}
+        />
+      </Stack>
 
       <ConfigEditorOptionPanel title="Récupération scolaire">
         <FormControlLabel

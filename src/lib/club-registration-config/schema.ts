@@ -7,6 +7,7 @@ import { repairPricingProfiles } from "./pricing-profiles";
 import { repairJerseyConfig } from "./repair-jersey";
 import { repairPricingDevices } from "./pricing-devices";
 import { repairChampYonCatalog } from "./repair-champ-yon-catalog";
+import { repairSlotSchedules } from "./repair-slot-schedules";
 
 const pricingProfileBehaviorSchema = z.enum(["classic_like", "handisport", "sport_adapte"]);
 
@@ -37,6 +38,9 @@ const registrationSiteSlotSchema = z.object({
   sortOrder: z.number().int().min(0).default(0),
   schoolPickupSchool: z.string().trim().min(1).max(200).optional(),
   enabled: z.boolean(),
+  weekday: z.number().int().min(1).max(7).optional(),
+  startMinutes: z.number().int().min(0).max(23 * 60 + 59).optional(),
+  endMinutes: z.number().int().min(1).max(23 * 60 + 59).optional(),
 });
 
 /** Chaîne optionnelle : vide ou espaces → `undefined` (champ masqué côté formulaire). */
@@ -265,7 +269,8 @@ export const registrationConfigV1Schema = z
   .transform((config) => repairPricingProfiles(config as RegistrationConfigV1))
   .transform((config) => repairJerseyConfig(config as RegistrationConfigV1))
   .transform((config) => repairChampYonCatalog(config as RegistrationConfigV1))
-  .transform((config) => repairPricingDevices(config as RegistrationConfigV1));
+  .transform((config) => repairPricingDevices(config as RegistrationConfigV1))
+  .transform((config) => repairSlotSchedules(config as RegistrationConfigV1));
 
 export const registrationConfigExportSchema = z.object({
   schemaVersion: z.literal(REGISTRATION_CONFIG_SCHEMA_VERSION),

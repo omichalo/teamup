@@ -222,6 +222,9 @@ export function createEmptySlot(existingSlots: RegistrationSiteSlot[]) {
     label: "Nouveau créneau",
     enabled: true,
     sortOrder: nextSortOrder(existingSlots),
+    weekday: 1 as const,
+    startMinutes: 17 * 60,
+    endMinutes: 18 * 60 + 30,
   };
 }
 

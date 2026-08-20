@@ -407,6 +407,66 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "attendanceMarks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "slotId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "attendanceMarks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "registrationId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "attendanceMarks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "seasonLabel",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "slotId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "attendanceLeads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []
