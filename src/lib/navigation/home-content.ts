@@ -7,11 +7,7 @@ export const HOME_HERO_IMAGE_ALT =
   "Joueuses et joueurs de SQY Ping — visuel du site sqyping.fr";
 
 export type HomeLinkColor =
-  | "primary"
-  | "secondary"
-  | "success"
-  | "info"
-  | "warning";
+  "primary" | "secondary" | "success" | "info" | "warning";
 
 export type HomeLinkCard = LayoutNavigationItem & {
   description: string;
@@ -50,7 +46,8 @@ const HOME_LINK_META: Record<
     color: "secondary",
   },
   "/disponibilites": {
-    description: "Saisir les disponibilités par journée et suivre les réponses.",
+    description:
+      "Saisir les disponibilités par journée et suivre les réponses.",
     cta: "Gérer les disponibilités",
     color: "info",
   },
@@ -70,7 +67,8 @@ const HOME_LINK_META: Record<
     color: "secondary",
   },
   "/club/adhesions-tableau": {
-    description: "Vue d'ensemble de tous les dossiers, avec tri, filtres et export.",
+    description:
+      "Vue d'ensemble de tous les dossiers, avec tri, filtres et export.",
     cta: "Ouvrir le tableau",
     color: "info",
   },
@@ -85,7 +83,8 @@ const HOME_LINK_META: Record<
     color: "info",
   },
   "/club/inscription": {
-    description: "Créer un dossier d'adhésion pour vous, un proche ou un membre du club.",
+    description:
+      "Créer un dossier d'adhésion pour vous, un proche ou un membre du club.",
     cta: "Ouvrir le formulaire",
     color: "primary",
   },
@@ -95,7 +94,8 @@ const HOME_LINK_META: Record<
     color: "primary",
   },
   "/club/idees": {
-    description: "Proposer une évolution ou signaler un problème sur l'application.",
+    description:
+      "Proposer une évolution ou signaler un problème sur l'application.",
     cta: "Ouvrir idées & remontées",
     color: "warning",
   },
@@ -103,6 +103,16 @@ const HOME_LINK_META: Record<
     description: "Saisir les licences FFTT et suivre les encaissements.",
     cta: "Ouvrir l'espace licences",
     color: "success",
+  },
+  "/club/presences": {
+    description: "Pointer les présences d'entraînement et consulter les taux.",
+    cta: "Ouvrir le pointage",
+    color: "info",
+  },
+  "/club/presences/essais": {
+    description: "Relancer les personnes venues essayer un entraînement.",
+    cta: "Ouvrir les essais",
+    color: "warning",
   },
 };
 
@@ -137,7 +147,7 @@ const TITLE = "Bienvenue sur TeamUp";
 function intro(
   eyebrow: string,
   subtitle: string,
-  sections: HomeDashboardSection[]
+  sections: HomeDashboardSection[],
 ): RoleHomeContent {
   return { eyebrow, title: TITLE, subtitle, sections };
 }
@@ -153,26 +163,29 @@ function playerHome(): RoleHomeContent {
         description: "Créer un dossier et suivre ceux déjà transmis au club.",
         items: cards([LAYOUT_NAV.nouvelleAdhesion, LAYOUT_NAV.mesDossiers]),
       },
-    ]
+    ],
   );
 }
 
 function boardMemberHome(): RoleHomeContent {
   return intro(
     "Espace membre du bureau",
-    "Même parcours qu'un adhérent, avec la vue d'ensemble des dossiers du club.",
+    "Même parcours qu'un adhérent, avec le tableau des dossiers et le pointage des entraînements.",
     [
       {
         id: "adhesions",
         title: "Adhésions",
-        description: "Vos dossiers personnels et le tableau de tous les adhérents.",
+        description:
+          "Vos dossiers, le tableau du club et les présences aux entraînements.",
         items: cards([
           LAYOUT_NAV.tableauAdhesions,
+          LAYOUT_NAV.presences,
+          LAYOUT_NAV.presencesEssais,
           LAYOUT_NAV.nouvelleAdhesion,
           LAYOUT_NAV.mesDossiers,
         ]),
       },
-    ]
+    ],
   );
 }
 
@@ -184,7 +197,8 @@ function assistantSecretaryHome(): RoleHomeContent {
       {
         id: "adhesions",
         title: "Adhésions",
-        description: "Consultation des dossiers du club et suivi de vos propres inscriptions.",
+        description:
+          "Consultation des dossiers du club et suivi de vos propres inscriptions.",
         items: cards([
           LAYOUT_NAV.tableauAdhesions,
           LAYOUT_NAV.validationsLicence,
@@ -192,7 +206,7 @@ function assistantSecretaryHome(): RoleHomeContent {
           LAYOUT_NAV.mesDossiers,
         ]),
       },
-    ]
+    ],
   );
 }
 
@@ -226,10 +240,11 @@ function coachHome(): RoleHomeContent {
       {
         id: "club",
         title: "Vie du club",
-        description: "Remontées sur l'application.",
-        items: cards([LAYOUT_NAV.boiteIdees]),
+        description:
+          "Présences aux entraînements et remontées sur l'application.",
+        items: cards([LAYOUT_NAV.presences, LAYOUT_NAV.boiteIdees]),
       },
-    ]
+    ],
   );
 }
 
@@ -250,16 +265,21 @@ function secretaryHome(): RoleHomeContent {
             LAYOUT_NAV.apercuFormulaire,
             LAYOUT_NAV.validationsLicence,
             LAYOUT_NAV.mesDossiers,
-          ])
+          ]),
         ),
       },
       {
         id: "club",
         title: "Vie du club",
-        description: "Remontées sur l'application.",
-        items: cards([LAYOUT_NAV.boiteIdees]),
+        description:
+          "Présences aux entraînements et remontées sur l'application.",
+        items: cards([
+          LAYOUT_NAV.presences,
+          LAYOUT_NAV.presencesEssais,
+          LAYOUT_NAV.boiteIdees,
+        ]),
       },
-    ]
+    ],
   );
 }
 
@@ -292,16 +312,21 @@ function adminHome(): RoleHomeContent {
             LAYOUT_NAV.apercuFormulaire,
             LAYOUT_NAV.validationsLicence,
             LAYOUT_NAV.mesDossiers,
-          ])
+          ]),
         ),
       },
       {
         id: "club",
         title: "Vie du club",
-        description: "Administration de la plateforme et remontées.",
-        items: cards([LAYOUT_NAV.administration, LAYOUT_NAV.boiteIdees]),
+        description: "Présences, administration de la plateforme et remontées.",
+        items: cards([
+          LAYOUT_NAV.presences,
+          LAYOUT_NAV.presencesEssais,
+          LAYOUT_NAV.administration,
+          LAYOUT_NAV.boiteIdees,
+        ]),
       },
-    ]
+    ],
   );
 }
 
@@ -324,6 +349,6 @@ export function buildRoleHomeContent(role: UserRole): RoleHomeContent {
 
 export function listHomeCardHrefs(content: RoleHomeContent): string[] {
   return content.sections.flatMap((section) =>
-    section.items.map((item) => item.href)
+    section.items.map((item) => item.href),
   );
 }

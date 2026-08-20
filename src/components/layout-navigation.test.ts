@@ -11,6 +11,7 @@ describe("buildLayoutNavigation", () => {
     isPlayerLike: false,
     isAssistantSecretary: false,
     isSecretary: false,
+    isBoardMember: false,
     canAccessSpreadsheet: false,
   };
 
@@ -43,6 +44,23 @@ describe("buildLayoutNavigation", () => {
     ]);
   });
 
+  it("adds attendance pages for board members", () => {
+    const nav = buildLayoutNavigation({
+      ...base,
+      isPlayerLike: true,
+      isBoardMember: true,
+      canAccessSpreadsheet: true,
+    });
+    expect(nav.primary.map((item) => item.href)).toEqual([
+      "/joueur",
+      "/club/inscription",
+      "/club/mes-inscriptions",
+      "/club/adhesions-tableau",
+      "/club/presences",
+      "/club/presences/essais",
+    ]);
+  });
+
   it("adds license validation page for assistant secretary", () => {
     const nav = buildLayoutNavigation({
       ...base,
@@ -64,6 +82,7 @@ describe("buildLayoutNavigation", () => {
     expect(nav.primary.map((item) => item.href)).toEqual([
       "/",
       "/club/demandes-adhesion",
+      "/club/presences",
       "/club/idees",
     ]);
     expect(nav.groups).toHaveLength(1);
@@ -71,6 +90,7 @@ describe("buildLayoutNavigation", () => {
     expect(nav.groups[0]?.label).toBe("Adhésions");
     expect(nav.groups[0]?.items.map((item) => item.href)).toEqual([
       "/club/adhesions-tableau",
+      "/club/presences/essais",
       "/club/parametrage-inscription",
       "/club/inscription",
       "/club/validations-licence",
@@ -81,6 +101,7 @@ describe("buildLayoutNavigation", () => {
     const nav = buildLayoutNavigation(base);
     expect(nav.primary.map((item) => item.href)).toEqual([
       "/",
+      "/club/presences",
       "/compositions",
       "/disponibilites",
       "/club/adhesions-tableau",
@@ -115,6 +136,8 @@ describe("buildLayoutNavigation", () => {
     ]);
     expect(nav.groups[1]?.items.map((item) => item.href)).toEqual([
       "/club/adhesions-tableau",
+      "/club/presences",
+      "/club/presences/essais",
       "/club/parametrage-inscription",
       "/club/inscription",
       "/club/validations-licence",
@@ -129,14 +152,15 @@ describe("buildLayoutAccountMenuItems", () => {
     isPlayerLike: false,
     isAssistantSecretary: false,
     isSecretary: false,
+    isBoardMember: false,
     canAccessSpreadsheet: false,
   };
 
   it("returns no account menu for player-like roles", () => {
     expect(
       buildLayoutAccountMenuItems({ ...base, isPlayerLike: true }).map(
-        (item) => item.href
-      )
+        (item) => item.href,
+      ),
     ).toEqual([]);
   });
 
@@ -150,8 +174,8 @@ describe("buildLayoutAccountMenuItems", () => {
   it("omits new adhesion for admin account menu", () => {
     expect(
       buildLayoutAccountMenuItems({ ...base, isAdmin: true }).map(
-        (item) => item.href
-      )
+        (item) => item.href,
+      ),
     ).toEqual(["/club/mes-inscriptions"]);
   });
 });

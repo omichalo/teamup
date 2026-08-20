@@ -39,6 +39,10 @@ describe("export / import round-trip", () => {
     if (result.ok) {
       expect(result.config.meta.catalogVersion).toBe(config.meta.catalogVersion);
       expect(buildConfigExport(result.config).schemaVersion).toBe("1.0.0");
+      const firstSlot = result.config.sites[0]?.slots[0];
+      expect(firstSlot?.weekday).toBeDefined();
+      expect(firstSlot?.startMinutes).toBeDefined();
+      expect(firstSlot?.endMinutes).toBeDefined();
     }
   });
 });

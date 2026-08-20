@@ -20,6 +20,7 @@ import {
 } from "@/lib/pricing/catalog/sqyping-2025";
 import { PRICING_CATALOG_VERSION } from "@/lib/pricing/types";
 import { inferLinkedSectionIdsFromSite } from "./site-section-links";
+import { withResolvedSlotSchedule } from "./repair-slot-schedules";
 import {
   buildDefaultPricingProfilesRecord,
 } from "./pricing-profiles";
@@ -251,15 +252,17 @@ export function buildDefaultRegistrationConfig(): RegistrationConfigV1 {
         : {}),
       linkedSectionIds: inferLinkedSectionIdsFromSite(site),
       sortOrder: index,
-      slots: site.slots.map((slot, slotIndex) => ({
-        id: slot.id,
-        label: slot.label,
-        sortOrder: slotIndex,
-        enabled: true,
-        ...(slot.schoolPickupSchool
-          ? { schoolPickupSchool: slot.schoolPickupSchool }
-          : {}),
-      })),
+      slots: site.slots.map((slot, slotIndex) =>
+        withResolvedSlotSchedule({
+          id: slot.id,
+          label: slot.label,
+          sortOrder: slotIndex,
+          enabled: true,
+          ...(slot.schoolPickupSchool
+            ? { schoolPickupSchool: slot.schoolPickupSchool }
+            : {}),
+        })
+      ),
     })),
     competitions: COMPETITION_OPTIONS.map((comp) => ({
       id: comp.id,

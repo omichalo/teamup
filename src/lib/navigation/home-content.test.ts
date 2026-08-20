@@ -18,6 +18,7 @@ function navOptionsForRole(role: UserRole) {
       role === USER_ROLES.BOARD_MEMBER,
     isAssistantSecretary: role === USER_ROLES.ASSISTANT_SECRETARY,
     isSecretary: role === USER_ROLES.SECRETARY,
+    isBoardMember: role === USER_ROLES.BOARD_MEMBER,
     canAccessSpreadsheet:
       role === USER_ROLES.ADMIN ||
       role === USER_ROLES.SECRETARY ||
@@ -47,16 +48,16 @@ describe("buildRoleHomeContent", () => {
       expect(content.eyebrow.length).toBeGreaterThan(0);
       expect(content.subtitle.length).toBeGreaterThan(0);
       expect(content.sections.length).toBeGreaterThan(0);
-      expect(content.sections.every((section) => section.items.length > 0)).toBe(
-        true
-      );
+      expect(
+        content.sections.every((section) => section.items.length > 0),
+      ).toBe(true);
     }
   });
 
   it("surfaces every navigation destination as a home card", () => {
     for (const role of Object.values(USER_ROLES)) {
       const missing = expectedNavHrefs(role).filter(
-        (href) => !listHomeCardHrefs(buildRoleHomeContent(role)).includes(href)
+        (href) => !listHomeCardHrefs(buildRoleHomeContent(role)).includes(href),
       );
       expect({ role, missing }).toEqual({ role, missing: [] });
     }
@@ -71,17 +72,21 @@ describe("buildRoleHomeContent", () => {
         "/joueurs",
         "/club/adhesions-tableau",
         "/club/inscription",
-      ])
+      ]),
     );
     expect(hrefs).not.toContain("/club/demandes-adhesion");
     expect(hrefs).not.toContain("/admin");
   });
 
-  it("keeps board members on the player journey plus the spreadsheet", () => {
+  it("keeps board members on the player journey plus spreadsheet and attendance", () => {
     const content = buildRoleHomeContent(USER_ROLES.BOARD_MEMBER);
-    expect(content.sections.map((section) => section.id)).toEqual(["adhesions"]);
+    expect(content.sections.map((section) => section.id)).toEqual([
+      "adhesions",
+    ]);
     expect(listHomeCardHrefs(content)).toEqual([
       "/club/adhesions-tableau",
+      "/club/presences",
+      "/club/presences/essais",
       "/club/inscription",
       "/club/mes-inscriptions",
     ]);
