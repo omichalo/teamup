@@ -37,7 +37,9 @@ Application **Next.js** pour la gestion du club de tennis de table SQY Ping : ch
 | Rôle | Accès principal |
 |------|-----------------|
 | **Joueur** | Accueil joueur, nouvelle adhésion, suivi de ses dossiers |
-| **Coach** | Compositions, disponibilités, championnat |
+| **Membre du bureau** | Accès joueur + tableau des adhésions (lecture) |
+| **Secrétaire adjoint** | Accès joueur + tableau des adhésions + licences & encaissements |
+| **Coach** | Compositions, disponibilités, championnat, tableau des adhésions |
 | **Secrétaire** | Validation des dossiers, tableau des adhésions, campagnes & tarifs |
 | **Admin** | Tout le secrétariat + administration, sync FFTT, paramétrage global |
 

@@ -32,6 +32,7 @@ import {
   resolveLayoutHomeHref,
 } from "@/components/layout-nav-utils";
 import { useAuth } from "@/hooks/useAuth";
+import { canAccessRegistrationsSpreadsheet } from "@/lib/club-registration/registration-access";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -57,6 +58,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       isPlayerLike,
       isAssistantSecretary,
       isSecretary,
+      canAccessSpreadsheet: Boolean(
+        user && canAccessRegistrationsSpreadsheet(user.role)
+      ),
     }),
     [isAdmin, isAssistantSecretary, isPlayerLike, isSecretary, user]
   );
@@ -74,9 +78,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const homeHref = useMemo(
     () =>
       user
-        ? resolveLayoutHomeHref({ isPlayerLike, isSecretary })
+        ? resolveLayoutHomeHref({ isPlayerLike })
         : "/",
-    [isPlayerLike, isSecretary, user]
+    [isPlayerLike, user]
   );
 
   const handleMenu = (event: React.MouseEvent<HTMLElement>) => {

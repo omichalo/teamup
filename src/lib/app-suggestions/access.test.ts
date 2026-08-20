@@ -12,6 +12,8 @@ describe("app-suggestions access", () => {
     expect(canAccessAppSuggestions(USER_ROLES.SECRETARY)).toBe(true);
     expect(canAccessAppSuggestions(USER_ROLES.ADMIN)).toBe(true);
     expect(canAccessAppSuggestions(USER_ROLES.PLAYER)).toBe(false);
+    expect(canAccessAppSuggestions(USER_ROLES.BOARD_MEMBER)).toBe(false);
+    expect(canAccessAppSuggestions(USER_ROLES.ASSISTANT_SECRETARY)).toBe(false);
   });
 
   it("allows comments for staff only", () => {

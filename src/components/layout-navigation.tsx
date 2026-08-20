@@ -40,6 +40,7 @@ export interface LayoutNavigationStructure {
 
 const NAV = {
   accueil: { label: "Accueil", href: "/joueur", icon: <Home /> },
+  accueilStaff: { label: "Accueil", href: "/", icon: <Home /> },
   nouvelleAdhesion: {
     label: "Nouvelle adhésion",
     href: "/club/inscription",
@@ -112,6 +113,7 @@ type LayoutNavOptions = {
   isPlayerLike: boolean;
   isAssistantSecretary: boolean;
   isSecretary: boolean;
+  canAccessSpreadsheet: boolean;
 };
 
 export function hasLayoutNavigation(nav: LayoutNavigationStructure): boolean {
@@ -143,8 +145,14 @@ export function buildLayoutAccountMenuItems(
 export function buildLayoutNavigation(
   options: LayoutNavOptions
 ): LayoutNavigationStructure {
-  const { hasUser, isAdmin, isPlayerLike, isAssistantSecretary, isSecretary } =
-    options;
+  const {
+    hasUser,
+    isAdmin,
+    isPlayerLike,
+    isAssistantSecretary,
+    isSecretary,
+    canAccessSpreadsheet,
+  } = options;
   if (!hasUser) {
     return { primary: [], groups: [] };
   }
@@ -155,15 +163,18 @@ export function buildLayoutNavigation(
       NAV.nouvelleAdhesion,
       NAV.mesDossiers,
     ];
+    if (canAccessSpreadsheet) {
+      primary.push(NAV.tableauAdhesions);
+    }
     if (isAssistantSecretary) {
-      primary.push(NAV.tableauAdhesions, NAV.validationsLicence);
+      primary.push(NAV.validationsLicence);
     }
     return { primary, groups: [] };
   }
 
   if (isSecretary) {
     return {
-      primary: [NAV.dossiersAValider, NAV.boiteIdees],
+      primary: [NAV.accueilStaff, NAV.dossiersAValider, NAV.boiteIdees],
       groups: [
         {
           id: "adhesions",
@@ -182,6 +193,7 @@ export function buildLayoutNavigation(
   if (isAdmin) {
     return {
       primary: [
+        NAV.accueilStaff,
         NAV.dossiersAValider,
         NAV.compositions,
         NAV.boiteIdees,
@@ -213,7 +225,13 @@ export function buildLayoutNavigation(
   }
 
   return {
-    primary: [NAV.compositions, NAV.disponibilites, NAV.boiteIdees],
+    primary: [
+      NAV.accueilStaff,
+      NAV.compositions,
+      NAV.disponibilites,
+      NAV.tableauAdhesions,
+      NAV.boiteIdees,
+    ],
     groups: [
       {
         id: "championnat",

@@ -38,13 +38,9 @@ export function layoutNavButtonStateSx(active: boolean) {
 
 export function resolveLayoutHomeHref(options: {
   isPlayerLike: boolean;
-  isSecretary: boolean;
 }): string {
   if (options.isPlayerLike) {
     return "/joueur";
-  }
-  if (options.isSecretary) {
-    return "/club/demandes-adhesion";
   }
   return "/";
 }

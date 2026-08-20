@@ -10,6 +10,7 @@ import {
   getFirestoreAdmin,
 } from "@/lib/firebase-admin";
 import {
+  ALL_USER_ROLES,
   COACH_REQUEST_STATUS,
   hasAnyRole,
   resolveCoachRequestStatus,
@@ -29,13 +30,7 @@ interface SetRolePayload {
 }
 
 const ADMIN_ONLY_ROLES: readonly UserRole[] = [USER_ROLES.ADMIN];
-const MANAGED_ROLES: readonly UserRole[] = [
-  USER_ROLES.ADMIN,
-  USER_ROLES.SECRETARY,
-  USER_ROLES.ASSISTANT_SECRETARY,
-  USER_ROLES.COACH,
-  USER_ROLES.PLAYER,
-];
+const MANAGED_ROLES: readonly UserRole[] = ALL_USER_ROLES;
 
 const resolveCoachStatusForRole = (
   requestedStatus: string | undefined,

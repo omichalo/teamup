@@ -1,8 +1,5 @@
 import type { Firestore, Query, QueryDocumentSnapshot } from "firebase-admin/firestore";
-import {
-  normalizeMedicalCertificateStatus,
-  summaryMedicalCertificateStatus,
-} from "@/lib/club-registration/medical-certificate";
+import { normalizeMedicalCertificateStatus } from "@/lib/club-registration/medical-certificate";
 import { normalizePpsFollowUpStatus } from "@/lib/club-registration/pps-follow-up";
 import { normalizeCriteriumFederalRegistrationStatus } from "@/lib/club-registration/criterium-federal-follow-up";
 import { normalizeJerseyFollowUpStatus } from "@/lib/club-registration/jersey-follow-up";
@@ -18,6 +15,10 @@ import {
   needsClientSideFiltering,
   type ListManagedRegistrationsParams,
 } from "@/lib/club-registration/filter-managed-summaries";
+import {
+  summarizeManagedQueue,
+  type ManagedQueueSummary,
+} from "@/lib/club-registration/managed-queue-summary";
 
 export const COLLECTION = "clubRegistrations";
 
@@ -316,53 +317,13 @@ export function parseSearchCursorOffset(cursor: string | null | undefined): numb
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 }
 
-export async function getManagedQueueSummary(db: Firestore): Promise<{
-  actionable: number;
-  missingCertificate: number;
-  paymentPending: number;
-  paymentRequested: number;
-  truncated: boolean;
-}> {
+export async function getManagedQueueSummary(db: Firestore): Promise<ManagedQueueSummary> {
   const summaries = await fetchManagedSummariesInMemory(
     db,
-    "actionable",
+    "all",
     MANAGED_IN_MEMORY_SCAN_LIMIT
   );
-  const paymentRequestedSummaries = await fetchManagedSummariesInMemory(
-    db,
-    "payment_requested",
-    MANAGED_IN_MEMORY_SCAN_LIMIT
-  );
-
-  const paymentPendingStatuses = new Set<string>([
-    "pending_validation",
-    "waiting_payment",
-    "partially_paid",
-    "manual_follow_up",
-  ]);
-
-  let missingCertificate = 0;
-  let paymentPending = 0;
-
-  for (const summary of summaries) {
-    if (summaryMedicalCertificateStatus(summary) === "required_not_received") {
-      missingCertificate += 1;
-    }
-    const paymentStatus = summary.paymentStatus;
-    if (typeof paymentStatus === "string" && paymentPendingStatuses.has(paymentStatus)) {
-      paymentPending += 1;
-    }
-  }
-
-  return {
-    actionable: summaries.length,
-    missingCertificate,
-    paymentPending,
-    paymentRequested: paymentRequestedSummaries.length,
-    truncated:
-      summaries.length >= MANAGED_IN_MEMORY_SCAN_LIMIT ||
-      paymentRequestedSummaries.length >= MANAGED_IN_MEMORY_SCAN_LIMIT,
-  };
+  return summarizeManagedQueue(summaries, MANAGED_IN_MEMORY_SCAN_LIMIT);
 }
 
 export type PersonalRegistrationsResult = {

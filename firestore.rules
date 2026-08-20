@@ -40,8 +40,15 @@ service cloud.firestore {
       return authRole() == "assistant_secretary";
     }
 
+    function isBoardMember() {
+      return authRole() == "board_member";
+    }
+
     function isClubRegistrationViewer() {
-      return isClubRegistrationManager() || isAssistantSecretary();
+      return isClubRegistrationManager()
+             || isAssistantSecretary()
+             || isBoardMember()
+             || authRole() == "coach";
     }
 
     // Liste client : uniquement ses propres dossiers (requête filtrée + plafond).
@@ -222,7 +229,8 @@ service cloud.firestore {
     // peut créer plusieurs dossiers (ex. inscription de 2 enfants). Le couplage 1 dossier ↔ 1 uid
     // est volontairement abandonné.
     //
-    // - get    : owner (submitterUid == uid), admin, secrétariat ou secrétaire adjoint
+    // - get    : owner (submitterUid == uid), admin, secrétariat, secrétaire adjoint,
+    //            membre du bureau ou coach (même lecture que le tableau)
     // - list   : owner uniquement, requête where submitterUid == uid, limit <= 50
     //            (listes secrétariat via API / Admin SDK)
     // - create : owner se déclare comme submitterUid, schemaVersion strict ;

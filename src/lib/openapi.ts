@@ -31,7 +31,7 @@ export const openApiSpec = {
           photoURL: { type: ["string", "null"], format: "uri" },
           role: {
             type: "string",
-            enum: ["admin", "coach", "player"],
+            enum: ["admin", "secretary", "assistant_secretary", "board_member", "coach", "player"],
           },
           playerId: { type: ["string", "null"] },
           emailVerified: { type: "boolean" },
@@ -304,7 +304,7 @@ export const openApiSpec = {
         tags: ["Admin"],
         summary: "Modification du rôle d'un utilisateur",
         description:
-          "Permet à un administrateur de modifier le rôle d'un utilisateur (player/coach/admin) et met à jour les custom claims Firebase + Firestore.",
+          "Permet à un administrateur de modifier le rôle d'un utilisateur et met à jour les custom claims Firebase + Firestore.",
         security: [{ SessionCookie: [] }],
         requestBody: {
           required: true,
@@ -316,7 +316,7 @@ export const openApiSpec = {
                   userId: { type: "string" },
                   role: {
                     type: "string",
-                    enum: ["admin", "coach", "player"],
+                    enum: ["admin", "secretary", "assistant_secretary", "board_member", "coach", "player"],
                   },
                   coachRequestStatus: {
                     type: "string",

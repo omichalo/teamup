@@ -1,7 +1,9 @@
 import {
   getManagedListFiltersForSavedView,
-  resolveManagedListSavedViewFromFilters,
+  inferManagedListQueueViewId,
+  isManagedListQueueViewId,
   resolveManagedListSavedViewId,
+  type ManagedListQueueViewId,
 } from "@/lib/club-registration/managed-list-saved-views";
 import {
   resolveManagedListMedicalCertificateFilter,
@@ -33,6 +35,7 @@ import {
 } from "@/lib/club-registration/registration-status";
 
 export type ManagedListUrlState = {
+  queueViewId: ManagedListQueueViewId;
   statusFilter: ManagedListStatusFilter;
   medicalCertificateFilter: ManagedListMedicalCertificateFilter;
   ppsFollowUpFilter: ManagedListPpsFollowUpFilter;
@@ -43,80 +46,57 @@ export type ManagedListUrlState = {
   selectedId: string | null;
 };
 
-function resolveSavedViewIdFromState(input: ManagedListUrlState) {
-  return resolveManagedListSavedViewFromFilters(
-    input.statusFilter,
-    input.medicalCertificateFilter,
-    input.aidReceiptFilter
-  );
-}
-
 export function parseManagedListUrlState(
   searchParams: Pick<URLSearchParams, "get">
 ): ManagedListUrlState {
-  const ppsFollowUpFilter = resolveManagedListPpsFollowUpFilter(
-    searchParams.get("pps")
-  );
-  const criteriumFederalFilter = resolveManagedListCriteriumFederalFilter(
-    searchParams.get("criterium")
-  );
-  const jerseyFollowUpFilter = resolveManagedListJerseyFollowUpFilter(
-    searchParams.get("maillot")
-  );
-  const registrationCertificateFollowUpFilter =
-    resolveManagedListRegistrationCertificateFollowUpFilter(
-      searchParams.get("attestation")
-    );
-  const savedViewId = resolveManagedListSavedViewId(searchParams.get("vue"));
-  if (savedViewId) {
-    const filters = getManagedListFiltersForSavedView(savedViewId);
-    return {
-      statusFilter: filters.statusFilter,
-      medicalCertificateFilter: filters.medicalCertificateFilter,
-      ppsFollowUpFilter,
-      criteriumFederalFilter,
-      jerseyFollowUpFilter,
-      registrationCertificateFollowUpFilter,
-      aidReceiptFilter: filters.aidReceiptFilter,
-      selectedId: searchParams.get("id"),
-    };
-  }
+  const vue = searchParams.get("vue");
+  const savedViewId = resolveManagedListSavedViewId(vue);
+  const viewFilters = savedViewId ? getManagedListFiltersForSavedView(savedViewId) : null;
+  const statusParam = searchParams.get("status");
+  const certificatParam = searchParams.get("certificat");
+  const aidesParam = searchParams.get("aides");
 
-  const statusFilter = resolveManagedListStatusFilter(searchParams.get("status"));
-  const medicalCertificateFilter = resolveManagedListMedicalCertificateFilter(
-    searchParams.get("certificat")
-  );
+  const statusFilter = statusParam
+    ? resolveManagedListStatusFilter(statusParam)
+    : (viewFilters?.statusFilter ?? resolveManagedListStatusFilter(null));
+  const medicalCertificateFilter = certificatParam
+    ? resolveManagedListMedicalCertificateFilter(certificatParam)
+    : (viewFilters?.medicalCertificateFilter ?? "all");
+  const aidReceiptFilter = aidesParam
+    ? resolveManagedListAidReceiptFilter(aidesParam)
+    : (viewFilters?.aidReceiptFilter ?? "all");
 
   return {
+    queueViewId: inferManagedListQueueViewId({
+      vue,
+      statusFilter,
+      aidReceiptFilter,
+    }),
     statusFilter,
     medicalCertificateFilter,
-    ppsFollowUpFilter,
-    criteriumFederalFilter,
-    jerseyFollowUpFilter,
-    registrationCertificateFollowUpFilter,
-    aidReceiptFilter: resolveManagedListAidReceiptFilter(searchParams.get("aides")),
+    ppsFollowUpFilter: resolveManagedListPpsFollowUpFilter(searchParams.get("pps")),
+    criteriumFederalFilter: resolveManagedListCriteriumFederalFilter(
+      searchParams.get("criterium")
+    ),
+    jerseyFollowUpFilter: resolveManagedListJerseyFollowUpFilter(
+      searchParams.get("maillot")
+    ),
+    registrationCertificateFollowUpFilter:
+      resolveManagedListRegistrationCertificateFollowUpFilter(
+        searchParams.get("attestation")
+      ),
+    aidReceiptFilter,
     selectedId: searchParams.get("id"),
   };
 }
 
 export function normalizeManagedListUrlState(input: ManagedListUrlState): ManagedListUrlState {
-  const matchedViewId = resolveSavedViewIdFromState(input);
-
-  if (matchedViewId) {
-    const filters = getManagedListFiltersForSavedView(matchedViewId);
-    return {
-      statusFilter: filters.statusFilter,
-      medicalCertificateFilter: filters.medicalCertificateFilter,
-      ppsFollowUpFilter: input.ppsFollowUpFilter,
-      criteriumFederalFilter: input.criteriumFederalFilter,
-      jerseyFollowUpFilter: input.jerseyFollowUpFilter,
-      registrationCertificateFollowUpFilter: input.registrationCertificateFollowUpFilter,
-      aidReceiptFilter: filters.aidReceiptFilter,
-      selectedId: input.selectedId,
-    };
-  }
+  const queueViewId = isManagedListQueueViewId(input.queueViewId)
+    ? input.queueViewId
+    : inferManagedListQueueViewId(input);
 
   return {
+    queueViewId,
     statusFilter: input.statusFilter,
     medicalCertificateFilter: input.medicalCertificateFilter,
     ppsFollowUpFilter: input.ppsFollowUpFilter,
@@ -136,6 +116,7 @@ export function managedListUrlStatesEqual(
   const normalizedRight = normalizeManagedListUrlState(right);
 
   return (
+    normalizedLeft.queueViewId === normalizedRight.queueViewId &&
     normalizedLeft.statusFilter === normalizedRight.statusFilter &&
     normalizedLeft.medicalCertificateFilter ===
       normalizedRight.medicalCertificateFilter &&
@@ -151,39 +132,40 @@ export function managedListUrlStatesEqual(
 }
 
 export function buildManagedListQueryString(input: ManagedListUrlState): string {
+  const state = normalizeManagedListUrlState(input);
   const params = new URLSearchParams();
-  const matchedViewId = resolveSavedViewIdFromState(input);
+  const queueDefaults = getManagedListFiltersForSavedView(state.queueViewId);
 
-  if (matchedViewId) {
-    params.set("vue", matchedViewId);
-  } else {
-    params.set("status", input.statusFilter);
-    if (input.medicalCertificateFilter !== "all") {
-      params.set("certificat", input.medicalCertificateFilter);
-    }
-    if (input.aidReceiptFilter !== "all") {
-      params.set("aides", input.aidReceiptFilter);
-    }
+  params.set("vue", state.queueViewId);
+
+  if (state.statusFilter !== queueDefaults.statusFilter) {
+    params.set("status", state.statusFilter);
+  }
+  if (state.medicalCertificateFilter !== "all") {
+    params.set("certificat", state.medicalCertificateFilter);
+  }
+  if (state.aidReceiptFilter !== queueDefaults.aidReceiptFilter) {
+    params.set("aides", state.aidReceiptFilter);
   }
 
-  if (input.ppsFollowUpFilter !== "all") {
-    params.set("pps", input.ppsFollowUpFilter);
+  if (state.ppsFollowUpFilter !== "all") {
+    params.set("pps", state.ppsFollowUpFilter);
   }
 
-  if (input.criteriumFederalFilter !== "all") {
-    params.set("criterium", input.criteriumFederalFilter);
+  if (state.criteriumFederalFilter !== "all") {
+    params.set("criterium", state.criteriumFederalFilter);
   }
 
-  if (input.jerseyFollowUpFilter !== "all") {
-    params.set("maillot", input.jerseyFollowUpFilter);
+  if (state.jerseyFollowUpFilter !== "all") {
+    params.set("maillot", state.jerseyFollowUpFilter);
   }
 
-  if (input.registrationCertificateFollowUpFilter !== "all") {
-    params.set("attestation", input.registrationCertificateFollowUpFilter);
+  if (state.registrationCertificateFollowUpFilter !== "all") {
+    params.set("attestation", state.registrationCertificateFollowUpFilter);
   }
 
-  if (input.selectedId) {
-    params.set("id", input.selectedId);
+  if (state.selectedId) {
+    params.set("id", state.selectedId);
   }
 
   return params.toString();

@@ -125,9 +125,13 @@ describe("buildRegistrationCreatedSecretaryEmail", () => {
     expect(html).toContain("Loisir");
     expect(html).toContain("1234567");
     expect(html).toContain("Disponible le mercredi");
-    expect(html).toContain(`${APP_ORIGIN}/club/demandes-adhesion?id=reg_secretary`);
+    expect(html).toContain(
+      `${APP_ORIGIN}/club/demandes-adhesion?status=actionable&amp;id=reg_secretary`
+    );
     expect(text).toContain("parent@example.com");
-    expect(text).toContain(`${APP_ORIGIN}/club/demandes-adhesion?id=reg_secretary`);
+    expect(text).toContain(
+      `${APP_ORIGIN}/club/demandes-adhesion?status=actionable&id=reg_secretary`
+    );
   });
 });
 

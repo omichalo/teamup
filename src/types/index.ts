@@ -163,6 +163,7 @@ export type UserRole =
   | "admin"
   | "secretary"
   | "assistant_secretary"
+  | "board_member"
   | "coach"
   | "player";
 

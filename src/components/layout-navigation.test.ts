@@ -11,6 +11,7 @@ describe("buildLayoutNavigation", () => {
     isPlayerLike: false,
     isAssistantSecretary: false,
     isSecretary: false,
+    canAccessSpreadsheet: false,
   };
 
   it("returns player primary links with updated labels", () => {
@@ -28,11 +29,26 @@ describe("buildLayoutNavigation", () => {
     expect(nav.groups).toHaveLength(0);
   });
 
+  it("adds spreadsheet only for board-like player access", () => {
+    const nav = buildLayoutNavigation({
+      ...base,
+      isPlayerLike: true,
+      canAccessSpreadsheet: true,
+    });
+    expect(nav.primary.map((item) => item.href)).toEqual([
+      "/joueur",
+      "/club/inscription",
+      "/club/mes-inscriptions",
+      "/club/adhesions-tableau",
+    ]);
+  });
+
   it("adds license validation page for assistant secretary", () => {
     const nav = buildLayoutNavigation({
       ...base,
       isPlayerLike: true,
       isAssistantSecretary: true,
+      canAccessSpreadsheet: true,
     });
     expect(nav.primary.map((item) => item.href)).toEqual([
       "/joueur",
@@ -46,6 +62,7 @@ describe("buildLayoutNavigation", () => {
   it("keeps secretary work in primary and adhesions in group", () => {
     const nav = buildLayoutNavigation({ ...base, isSecretary: true });
     expect(nav.primary.map((item) => item.href)).toEqual([
+      "/",
       "/club/demandes-adhesion",
       "/club/idees",
     ]);
@@ -63,8 +80,10 @@ describe("buildLayoutNavigation", () => {
   it("prioritizes compositions and disponibilites for coach", () => {
     const nav = buildLayoutNavigation(base);
     expect(nav.primary.map((item) => item.href)).toEqual([
+      "/",
       "/compositions",
       "/disponibilites",
+      "/club/adhesions-tableau",
       "/club/idees",
     ]);
     expect(nav.groups.map((group) => group.id)).toEqual(["championnat"]);
@@ -78,6 +97,7 @@ describe("buildLayoutNavigation", () => {
   it("splits admin navigation across primary and two groups", () => {
     const nav = buildLayoutNavigation({ ...base, isAdmin: true });
     expect(nav.primary.map((item) => item.href)).toEqual([
+      "/",
       "/club/demandes-adhesion",
       "/compositions",
       "/club/idees",
@@ -109,6 +129,7 @@ describe("buildLayoutAccountMenuItems", () => {
     isPlayerLike: false,
     isAssistantSecretary: false,
     isSecretary: false,
+    canAccessSpreadsheet: false,
   };
 
   it("returns no account menu for player-like roles", () => {
@@ -137,14 +158,7 @@ describe("buildLayoutAccountMenuItems", () => {
 
 describe("resolveLayoutHomeHref", () => {
   it("routes each role to its home", () => {
-    expect(resolveLayoutHomeHref({ isPlayerLike: true, isSecretary: false })).toBe(
-      "/joueur"
-    );
-    expect(resolveLayoutHomeHref({ isPlayerLike: false, isSecretary: true })).toBe(
-      "/club/demandes-adhesion"
-    );
-    expect(resolveLayoutHomeHref({ isPlayerLike: false, isSecretary: false })).toBe(
-      "/"
-    );
+    expect(resolveLayoutHomeHref({ isPlayerLike: true })).toBe("/joueur");
+    expect(resolveLayoutHomeHref({ isPlayerLike: false })).toBe("/");
   });
 });

@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { Box, CircularProgress } from "@mui/material";
 import { useAuth } from "@/hooks/useAuth";
 import { validateInternalRedirect } from "@/lib/auth/redirect-utils";
-import { USER_ROLES } from "@/lib/auth/roles";
+import { hasPlayerLikeAccess, USER_ROLES } from "@/lib/auth/roles";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -48,12 +48,13 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
 
     // Vérifier les rôles si spécifiés
     if (allowedRoles && user && !allowedRoles.includes(user.role)) {
-      // Redirection intelligente vers une page autorisée selon le rôle
       const role = user.role;
+      if (hasPlayerLikeAccess(role)) {
+        router.push("/joueur");
+        return;
+      }
       const fallbackByRole: Record<string, string> = {
-        [USER_ROLES.PLAYER]: "/joueur",
-        [USER_ROLES.ASSISTANT_SECRETARY]: "/joueur",
-        [USER_ROLES.SECRETARY]: "/club/demandes-adhesion",
+        [USER_ROLES.SECRETARY]: "/",
         [USER_ROLES.COACH]: "/",
         [USER_ROLES.ADMIN]: "/",
       };

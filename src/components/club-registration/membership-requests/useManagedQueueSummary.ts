@@ -1,15 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { ManagedQueueSummary } from "@/lib/club-registration/managed-queue-summary";
+import {
+  emptyManagedQueueStatusCounts,
+  type ManagedQueueSummary,
+} from "@/lib/club-registration/managed-queue-summary";
 
 type ApiResponse = { summary: ManagedQueueSummary } | { error: string };
 
 const EMPTY_SUMMARY: ManagedQueueSummary = {
+  total: 0,
   actionable: 0,
   missingCertificate: 0,
   paymentPending: 0,
   paymentRequested: 0,
+  pendingAidReceipt: 0,
+  byStatus: emptyManagedQueueStatusCounts(),
+  byStatusPendingAid: emptyManagedQueueStatusCounts(),
   truncated: false,
 };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Button,
@@ -16,13 +16,15 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui";
 import {
   getManagedListFiltersForSavedView,
-  resolveManagedListSavedViewFromFilters,
+  type ManagedListQueueViewId,
 } from "@/lib/club-registration/managed-list-saved-views";
 import {
   buildSpreadsheetHref,
   formatManagedRequestsPageSubtitle,
+  getManagedListPipelineTabCounts,
+  getManagedListQueueViewCounts,
 } from "@/lib/club-registration/managed-queue-summary";
-import type { SpreadsheetSavedViewId } from "@/lib/club-registration/spreadsheet/quick-filters";
+import { resolveManagedListSelection } from "@/lib/club-registration/resolve-managed-list-selection";
 import { MembershipRequestDetailPanel } from "./membership-requests/MembershipRequestDetailPanel";
 import { MembershipRequestsListPanel } from "./membership-requests/MembershipRequestsListPanel";
 import { MembershipRequestsQueueComplete } from "./membership-requests/MembershipRequestsQueueComplete";
@@ -71,18 +73,21 @@ export function MembershipRequestsClient() {
     aidReceiptFilter: initialUrlState.aidReceiptFilter,
   });
   const [selectedId, setSelectedId] = useState<string | null>(initialUrlState.selectedId);
+  const [queueViewId, setQueueViewId] = useState<ManagedListQueueViewId>(
+    initialUrlState.queueViewId
+  );
+  const urlPinnedIdRef = useRef<string | null>(initialUrlState.selectedId);
   const [mobileListVisible, setMobileListVisible] = useState(true);
   const { summary: queueSummary, loading: queueSummaryLoading, reload: reloadQueueSummary } =
     useManagedQueueSummary();
 
-  const activeViewId = useMemo(
-    () =>
-      resolveManagedListSavedViewFromFilters(
-        statusFilter,
-        medicalCertificateFilter,
-        aidReceiptFilter
-      ),
-    [aidReceiptFilter, medicalCertificateFilter, statusFilter]
+  const queueViewCounts = useMemo(
+    () => getManagedListQueueViewCounts(queueSummary),
+    [queueSummary]
+  );
+  const pipelineTabCounts = useMemo(
+    () => getManagedListPipelineTabCounts(queueSummary, queueViewId),
+    [queueSummary, queueViewId]
   );
 
   const {
@@ -99,7 +104,14 @@ export function MembershipRequestsClient() {
     goToPrevious,
     goToNext,
     handleListReload,
-  } = useMembershipRequestQueue(registrations, selectedId, setSelectedId, reload, statusFilter);
+  } = useMembershipRequestQueue(
+    registrations,
+    selectedId,
+    setSelectedId,
+    reload,
+    statusFilter,
+    queueViewId
+  );
 
   const handleListReloadWithSummary: MembershipListReloadFn = useCallback(
     async (options) => {
@@ -111,17 +123,32 @@ export function MembershipRequestsClient() {
   );
 
   const applySavedView = useCallback(
-    (viewId: SpreadsheetSavedViewId) => {
+    (viewId: ManagedListQueueViewId) => {
+      urlPinnedIdRef.current = null;
       const filters = getManagedListFiltersForSavedView(viewId);
+      setQueueViewId(viewId);
       setStatusFilter(filters.statusFilter);
       setMedicalCertificateFilter(filters.medicalCertificateFilter);
       setAidReceiptFilter(filters.aidReceiptFilter);
+      setPpsFollowUpFilter("all");
+      setCriteriumFederalFilter("all");
+      setJerseyFollowUpFilter("all");
+      setRegistrationCertificateFollowUpFilter("all");
     },
-    [setAidReceiptFilter, setMedicalCertificateFilter, setStatusFilter]
+    [
+      setAidReceiptFilter,
+      setCriteriumFederalFilter,
+      setJerseyFollowUpFilter,
+      setMedicalCertificateFilter,
+      setPpsFollowUpFilter,
+      setRegistrationCertificateFollowUpFilter,
+      setStatusFilter,
+    ]
   );
 
   useEffect(() => {
     syncToUrl({
+      queueViewId,
       statusFilter,
       medicalCertificateFilter,
       ppsFollowUpFilter,
@@ -135,6 +162,7 @@ export function MembershipRequestsClient() {
     aidReceiptFilter,
     criteriumFederalFilter,
     jerseyFollowUpFilter,
+    queueViewId,
     registrationCertificateFollowUpFilter,
     medicalCertificateFilter,
     ppsFollowUpFilter,
@@ -144,18 +172,16 @@ export function MembershipRequestsClient() {
   ]);
 
   useEffect(() => {
-    if (registrations.length === 0) {
-      setSelectedId((current) => (current === null ? current : null));
-      return;
-    }
-
     setSelectedId((current) => {
-      if (current && registrations.some((registration) => registration.id === current)) {
-        return current;
-      }
-      return registrations[0]?.id ?? null;
+      const next = resolveManagedListSelection({
+        selectedId: current,
+        registrationIds: registrations.map((registration) => registration.id),
+        listReady: !loadingList,
+        preserveSelectedId: current !== null && current === urlPinnedIdRef.current,
+      });
+      return next === undefined ? current : next;
     });
-  }, [registrations]);
+  }, [loadingList, registrations]);
 
   useEffect(() => {
     if (isMobileLayout && selectedId) {
@@ -165,6 +191,7 @@ export function MembershipRequestsClient() {
 
   const handleSelectRegistration = useCallback(
     (id: string) => {
+      urlPinnedIdRef.current = null;
       setSelectedId(id);
       if (isMobileLayout) {
         setMobileListVisible(false);
@@ -194,6 +221,7 @@ export function MembershipRequestsClient() {
   const showQueueComplete =
     !loadingList &&
     registrations.length === 0 &&
+    selectedId === null &&
     (queueJustCompleted || sessionProcessedCount > 0);
 
   const pageSubtitle = queueSummaryLoading
@@ -209,7 +237,10 @@ export function MembershipRequestsClient() {
       selectedId={selectedId}
       onSelect={handleSelectRegistration}
       statusFilter={statusFilter}
-      onStatusFilterChange={setStatusFilter}
+      onStatusFilterChange={(value) => {
+        urlPinnedIdRef.current = null;
+        setStatusFilter(value);
+      }}
       medicalCertificateFilter={medicalCertificateFilter}
       onMedicalCertificateFilterChange={setMedicalCertificateFilter}
       ppsFollowUpFilter={ppsFollowUpFilter}
@@ -229,10 +260,11 @@ export function MembershipRequestsClient() {
       onLoadMore={() => void loadMore()}
       searchInputRef={searchInputRef}
       sessionViewedIds={sessionViewedIds}
-      actionableCount={queueSummary.actionable}
       onListReload={handleListReloadWithSummary}
-      activeViewId={activeViewId}
+      activeViewId={queueViewId}
       onSelectSavedView={applySavedView}
+      queueViewCounts={queueViewCounts}
+      pipelineTabCounts={pipelineTabCounts}
     />
   );
 

@@ -17,25 +17,29 @@ describe("club registration access", () => {
       expect(isClubRegistrationManager(USER_ROLES.ASSISTANT_SECRETARY)).toBe(
         false
       );
+      expect(isClubRegistrationManager(USER_ROLES.BOARD_MEMBER)).toBe(false);
       expect(isClubRegistrationManager(USER_ROLES.COACH)).toBe(false);
       expect(isClubRegistrationManager(USER_ROLES.PLAYER)).toBe(false);
     });
   });
 
   describe("canAccessRegistrationsSpreadsheet", () => {
-    it("autorise admin, secrétariat et secrétaire adjoint", () => {
+    it("autorise admin, secrétariat, secrétaire adjoint, membre du bureau et coach", () => {
       expect(canAccessRegistrationsSpreadsheet(USER_ROLES.ADMIN)).toBe(true);
       expect(canAccessRegistrationsSpreadsheet(USER_ROLES.SECRETARY)).toBe(true);
-      expect(
-        canAccessRegistrationsSpreadsheet(USER_ROLES.ASSISTANT_SECRETARY)
-      ).toBe(true);
-      expect(canAccessRegistrationsSpreadsheet(USER_ROLES.COACH)).toBe(false);
+      expect(canAccessRegistrationsSpreadsheet(USER_ROLES.ASSISTANT_SECRETARY)).toBe(
+        true
+      );
+      expect(canAccessRegistrationsSpreadsheet(USER_ROLES.BOARD_MEMBER)).toBe(
+        true
+      );
+      expect(canAccessRegistrationsSpreadsheet(USER_ROLES.COACH)).toBe(true);
       expect(canAccessRegistrationsSpreadsheet(USER_ROLES.PLAYER)).toBe(false);
     });
   });
 
   describe("canViewClubRegistration", () => {
-    it("autorise le secrétaire adjoint sur un dossier tiers", () => {
+    it("autorise le secrétaire adjoint, le membre du bureau et le coach sur un dossier tiers", () => {
       expect(
         canViewClubRegistration(
           USER_ROLES.ASSISTANT_SECRETARY,
@@ -43,12 +47,15 @@ describe("club registration access", () => {
           otherUid
         )
       ).toBe(true);
-    });
-
-    it("refuse coach et joueur sur le dossier d'un autre", () => {
+      expect(
+        canViewClubRegistration(USER_ROLES.BOARD_MEMBER, ownerUid, otherUid)
+      ).toBe(true);
       expect(
         canViewClubRegistration(USER_ROLES.COACH, ownerUid, otherUid)
-      ).toBe(false);
+      ).toBe(true);
+    });
+
+    it("refuse le joueur sur le dossier d'un autre", () => {
       expect(
         canViewClubRegistration(USER_ROLES.PLAYER, ownerUid, otherUid)
       ).toBe(false);
@@ -65,13 +72,19 @@ describe("club registration access", () => {
       ).toBe(true);
     });
 
-    it("refuse le secrétaire adjoint sur un dossier tiers", () => {
+    it("refuse le secrétaire adjoint, le membre du bureau et le coach sur un dossier tiers", () => {
       expect(
         canAccessClubRegistration(
           USER_ROLES.ASSISTANT_SECRETARY,
           ownerUid,
           otherUid
         )
+      ).toBe(false);
+      expect(
+        canAccessClubRegistration(USER_ROLES.BOARD_MEMBER, ownerUid, otherUid)
+      ).toBe(false);
+      expect(
+        canAccessClubRegistration(USER_ROLES.COACH, ownerUid, otherUid)
       ).toBe(false);
     });
 
@@ -86,12 +99,12 @@ describe("club registration access", () => {
           ownerUid
         )
       ).toBe(true);
+      expect(
+        canAccessClubRegistration(USER_ROLES.BOARD_MEMBER, ownerUid, ownerUid)
+      ).toBe(true);
     });
 
-    it("refuse coach et joueur sur le dossier d'un autre", () => {
-      expect(
-        canAccessClubRegistration(USER_ROLES.COACH, ownerUid, otherUid)
-      ).toBe(false);
+    it("refuse le joueur sur le dossier d'un autre", () => {
       expect(
         canAccessClubRegistration(USER_ROLES.PLAYER, ownerUid, otherUid)
       ).toBe(false);
