@@ -16,6 +16,18 @@ import {
   type ManagedListPpsFollowUpFilter,
 } from "@/lib/club-registration/pps-follow-up";
 import {
+  resolveManagedListCriteriumFederalFilter,
+  type ManagedListCriteriumFederalFilter,
+} from "@/lib/club-registration/criterium-federal-follow-up";
+import {
+  resolveManagedListJerseyFollowUpFilter,
+  type ManagedListJerseyFollowUpFilter,
+} from "@/lib/club-registration/jersey-follow-up";
+import {
+  resolveManagedListRegistrationCertificateFollowUpFilter,
+  type ManagedListRegistrationCertificateFollowUpFilter,
+} from "@/lib/club-registration/registration-certificate-follow-up";
+import {
   resolveManagedListStatusFilter,
   type ManagedListStatusFilter,
 } from "@/lib/club-registration/registration-status";
@@ -24,6 +36,9 @@ export type ManagedListUrlState = {
   statusFilter: ManagedListStatusFilter;
   medicalCertificateFilter: ManagedListMedicalCertificateFilter;
   ppsFollowUpFilter: ManagedListPpsFollowUpFilter;
+  criteriumFederalFilter: ManagedListCriteriumFederalFilter;
+  jerseyFollowUpFilter: ManagedListJerseyFollowUpFilter;
+  registrationCertificateFollowUpFilter: ManagedListRegistrationCertificateFollowUpFilter;
   aidReceiptFilter: ManagedListAidReceiptFilter;
   selectedId: string | null;
 };
@@ -42,6 +57,16 @@ export function parseManagedListUrlState(
   const ppsFollowUpFilter = resolveManagedListPpsFollowUpFilter(
     searchParams.get("pps")
   );
+  const criteriumFederalFilter = resolveManagedListCriteriumFederalFilter(
+    searchParams.get("criterium")
+  );
+  const jerseyFollowUpFilter = resolveManagedListJerseyFollowUpFilter(
+    searchParams.get("maillot")
+  );
+  const registrationCertificateFollowUpFilter =
+    resolveManagedListRegistrationCertificateFollowUpFilter(
+      searchParams.get("attestation")
+    );
   const savedViewId = resolveManagedListSavedViewId(searchParams.get("vue"));
   if (savedViewId) {
     const filters = getManagedListFiltersForSavedView(savedViewId);
@@ -49,6 +74,9 @@ export function parseManagedListUrlState(
       statusFilter: filters.statusFilter,
       medicalCertificateFilter: filters.medicalCertificateFilter,
       ppsFollowUpFilter,
+      criteriumFederalFilter,
+      jerseyFollowUpFilter,
+      registrationCertificateFollowUpFilter,
       aidReceiptFilter: filters.aidReceiptFilter,
       selectedId: searchParams.get("id"),
     };
@@ -63,6 +91,9 @@ export function parseManagedListUrlState(
     statusFilter,
     medicalCertificateFilter,
     ppsFollowUpFilter,
+    criteriumFederalFilter,
+    jerseyFollowUpFilter,
+    registrationCertificateFollowUpFilter,
     aidReceiptFilter: resolveManagedListAidReceiptFilter(searchParams.get("aides")),
     selectedId: searchParams.get("id"),
   };
@@ -77,6 +108,9 @@ export function normalizeManagedListUrlState(input: ManagedListUrlState): Manage
       statusFilter: filters.statusFilter,
       medicalCertificateFilter: filters.medicalCertificateFilter,
       ppsFollowUpFilter: input.ppsFollowUpFilter,
+      criteriumFederalFilter: input.criteriumFederalFilter,
+      jerseyFollowUpFilter: input.jerseyFollowUpFilter,
+      registrationCertificateFollowUpFilter: input.registrationCertificateFollowUpFilter,
       aidReceiptFilter: filters.aidReceiptFilter,
       selectedId: input.selectedId,
     };
@@ -86,6 +120,9 @@ export function normalizeManagedListUrlState(input: ManagedListUrlState): Manage
     statusFilter: input.statusFilter,
     medicalCertificateFilter: input.medicalCertificateFilter,
     ppsFollowUpFilter: input.ppsFollowUpFilter,
+    criteriumFederalFilter: input.criteriumFederalFilter,
+    jerseyFollowUpFilter: input.jerseyFollowUpFilter,
+    registrationCertificateFollowUpFilter: input.registrationCertificateFollowUpFilter,
     aidReceiptFilter: input.aidReceiptFilter,
     selectedId: input.selectedId,
   };
@@ -103,6 +140,11 @@ export function managedListUrlStatesEqual(
     normalizedLeft.medicalCertificateFilter ===
       normalizedRight.medicalCertificateFilter &&
     normalizedLeft.ppsFollowUpFilter === normalizedRight.ppsFollowUpFilter &&
+    normalizedLeft.criteriumFederalFilter ===
+      normalizedRight.criteriumFederalFilter &&
+    normalizedLeft.jerseyFollowUpFilter === normalizedRight.jerseyFollowUpFilter &&
+    normalizedLeft.registrationCertificateFollowUpFilter ===
+      normalizedRight.registrationCertificateFollowUpFilter &&
     normalizedLeft.aidReceiptFilter === normalizedRight.aidReceiptFilter &&
     (normalizedLeft.selectedId ?? null) === (normalizedRight.selectedId ?? null)
   );
@@ -126,6 +168,18 @@ export function buildManagedListQueryString(input: ManagedListUrlState): string 
 
   if (input.ppsFollowUpFilter !== "all") {
     params.set("pps", input.ppsFollowUpFilter);
+  }
+
+  if (input.criteriumFederalFilter !== "all") {
+    params.set("criterium", input.criteriumFederalFilter);
+  }
+
+  if (input.jerseyFollowUpFilter !== "all") {
+    params.set("maillot", input.jerseyFollowUpFilter);
+  }
+
+  if (input.registrationCertificateFollowUpFilter !== "all") {
+    params.set("attestation", input.registrationCertificateFollowUpFilter);
   }
 
   if (input.selectedId) {

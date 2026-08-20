@@ -24,37 +24,22 @@ import {
   type ManagedListStatusFilter,
   type RegistrationStatus,
 } from "@/lib/club-registration/registration-status";
-import {
-  MEDICAL_CERTIFICATE_STATUS_LABELS,
-  type ManagedListMedicalCertificateFilter,
-  type MedicalCertificateStatus,
-} from "@/lib/club-registration/medical-certificate";
-import {
-  PPS_FOLLOW_UP_STATUS_LABELS,
-  type ManagedListPpsFollowUpFilter,
-  type PpsFollowUpStatus,
-} from "@/lib/club-registration/pps-follow-up";
+import type { ManagedListMedicalCertificateFilter } from "@/lib/club-registration/medical-certificate";
+import type { ManagedListPpsFollowUpFilter } from "@/lib/club-registration/pps-follow-up";
 import type { ManagedListAidReceiptFilter } from "@/lib/club-registration/payment/aid-receipt";
+import type { ManagedListCriteriumFederalFilter } from "@/lib/club-registration/criterium-federal-follow-up";
+import type { ManagedListJerseyFollowUpFilter } from "@/lib/club-registration/jersey-follow-up";
+import type { ManagedListRegistrationCertificateFollowUpFilter } from "@/lib/club-registration/registration-certificate-follow-up";
 import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
 import { PaymentSummaryCard } from "../secretariat/PaymentSummaryCard";
-import { ManagedListMedicalCertificateChips } from "./ManagedListMedicalCertificateChips";
-import { ManagedListPpsFollowUpChips } from "./ManagedListPpsFollowUpChips";
+import { ManagedListFollowUpFilters } from "./ManagedListFollowUpFilters";
 import { ManagedListSavedViewsBar } from "./ManagedListSavedViewsBar";
+import { MembershipRequestCardFollowUpChips } from "./MembershipRequestCardFollowUpChips";
 import { MembershipRequestCardQuickActions } from "./MembershipRequestCardQuickActions";
 import type { ManagedRegistrationsPageInfo } from "./useManagedRegistrations";
 import type { MembershipListReloadFn, RegistrationSummary } from "./types";
 import type { SpreadsheetSavedViewId } from "@/lib/club-registration/spreadsheet/quick-filters";
 import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
-
-const MEDICAL_CERTIFICATE_STATUS_COLOR: Record<
-  MedicalCertificateStatus,
-  "default" | "info" | "warning" | "success"
-> = {
-  not_required: "default",
-  required_not_received: "warning",
-  received: "info",
-  validated: "success",
-};
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return "-";
@@ -85,6 +70,14 @@ type MembershipRequestsListPanelProps = {
   onMedicalCertificateFilterChange: (value: ManagedListMedicalCertificateFilter) => void;
   ppsFollowUpFilter: ManagedListPpsFollowUpFilter;
   onPpsFollowUpFilterChange: (value: ManagedListPpsFollowUpFilter) => void;
+  criteriumFederalFilter: ManagedListCriteriumFederalFilter;
+  onCriteriumFederalFilterChange: (value: ManagedListCriteriumFederalFilter) => void;
+  jerseyFollowUpFilter: ManagedListJerseyFollowUpFilter;
+  onJerseyFollowUpFilterChange: (value: ManagedListJerseyFollowUpFilter) => void;
+  registrationCertificateFollowUpFilter: ManagedListRegistrationCertificateFollowUpFilter;
+  onRegistrationCertificateFollowUpFilterChange: (
+    value: ManagedListRegistrationCertificateFollowUpFilter
+  ) => void;
   aidReceiptFilter: ManagedListAidReceiptFilter;
   searchInput: string;
   onSearchInputChange: (value: string) => void;
@@ -110,6 +103,12 @@ export function MembershipRequestsListPanel({
   onMedicalCertificateFilterChange,
   ppsFollowUpFilter,
   onPpsFollowUpFilterChange,
+  criteriumFederalFilter,
+  onCriteriumFederalFilterChange,
+  jerseyFollowUpFilter,
+  onJerseyFollowUpFilterChange,
+  registrationCertificateFollowUpFilter,
+  onRegistrationCertificateFollowUpFilterChange,
   aidReceiptFilter,
   searchInput,
   onSearchInputChange,
@@ -127,10 +126,18 @@ export function MembershipRequestsListPanel({
   const searchActive = searchInput.trim().length >= 2;
   const medicalFilterActive = medicalCertificateFilter !== "all";
   const ppsFilterActive = ppsFollowUpFilter !== "all";
+  const criteriumFilterActive = criteriumFederalFilter !== "all";
+  const jerseyFilterActive = jerseyFollowUpFilter !== "all";
+  const attestationFilterActive = registrationCertificateFollowUpFilter !== "all";
   const aidFilterActive = aidReceiptFilter !== "all";
   const showResultCount =
     searchActive ||
-    ((medicalFilterActive || ppsFilterActive || aidFilterActive) &&
+    ((medicalFilterActive ||
+      ppsFilterActive ||
+      criteriumFilterActive ||
+      jerseyFilterActive ||
+      attestationFilterActive ||
+      aidFilterActive) &&
       pageInfo.totalMatched != null);
   const hasActiveSelection = selectedId != null;
   const activeTabIndex = MANAGED_LIST_STATUS_FILTER_OPTIONS.findIndex(
@@ -147,7 +154,7 @@ export function MembershipRequestsListPanel({
         minHeight: { md: 480 },
       }}
     >
-      <Stack spacing={2} sx={{ flexShrink: 0 }}>
+      <Stack spacing={1.25} sx={{ flexShrink: 0 }}>
       <TextField
         size="small"
         fullWidth
@@ -187,13 +194,19 @@ export function MembershipRequestsListPanel({
           onSelectView={onSelectSavedView}
         />
       ) : null}
-      <ManagedListMedicalCertificateChips
-        value={medicalCertificateFilter}
-        onChange={onMedicalCertificateFilterChange}
-      />
-      <ManagedListPpsFollowUpChips
-        value={ppsFollowUpFilter}
-        onChange={onPpsFollowUpFilterChange}
+      <ManagedListFollowUpFilters
+        medicalCertificateFilter={medicalCertificateFilter}
+        onMedicalCertificateFilterChange={onMedicalCertificateFilterChange}
+        ppsFollowUpFilter={ppsFollowUpFilter}
+        onPpsFollowUpFilterChange={onPpsFollowUpFilterChange}
+        criteriumFederalFilter={criteriumFederalFilter}
+        onCriteriumFederalFilterChange={onCriteriumFederalFilterChange}
+        jerseyFollowUpFilter={jerseyFollowUpFilter}
+        onJerseyFollowUpFilterChange={onJerseyFollowUpFilterChange}
+        registrationCertificateFollowUpFilter={registrationCertificateFollowUpFilter}
+        onRegistrationCertificateFollowUpFilterChange={
+          onRegistrationCertificateFollowUpFilterChange
+        }
       />
 
       <Tabs
@@ -231,7 +244,12 @@ export function MembershipRequestsListPanel({
         </Box>
       ) : registrations.length === 0 ? (
         <Alert severity="info">
-          {searchActive || medicalFilterActive || ppsFilterActive
+          {searchActive ||
+          medicalFilterActive ||
+          ppsFilterActive ||
+          criteriumFilterActive ||
+          jerseyFilterActive ||
+          attestationFilterActive
             ? "Aucun dossier ne correspond à vos critères."
             : "Aucune demande dans cette catégorie pour le moment."}
         </Alert>
@@ -297,38 +315,7 @@ export function MembershipRequestsListPanel({
                     </Typography>
                     <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
                       <Chip size="small" label={chip.label} color={chip.color} />
-                      {registration.medicalCertificateStatus &&
-                      registration.medicalCertificateStatus !== "not_required" ? (
-                        <Chip
-                          size="small"
-                          variant="outlined"
-                          label={
-                            MEDICAL_CERTIFICATE_STATUS_LABELS[registration.medicalCertificateStatus]
-                          }
-                          color={
-                            MEDICAL_CERTIFICATE_STATUS_COLOR[registration.medicalCertificateStatus]
-                          }
-                        />
-                      ) : null}
-                      {registration.ppsFollowUpStatus &&
-                      registration.ppsFollowUpStatus !== "not_applicable" ? (
-                        <Chip
-                          size="small"
-                          variant="outlined"
-                          label={
-                            PPS_FOLLOW_UP_STATUS_LABELS[
-                              registration.ppsFollowUpStatus as PpsFollowUpStatus
-                            ]
-                          }
-                          color={
-                            registration.ppsFollowUpStatus === "ok"
-                              ? "success"
-                              : registration.ppsFollowUpStatus === "checked_incomplete"
-                                ? "warning"
-                                : "default"
-                          }
-                        />
-                      ) : null}
+                      <MembershipRequestCardFollowUpChips registration={registration} />
                     </Stack>
                     <Typography variant="body2" color="text.secondary" sx={{ wordBreak: "break-all" }}>
                       {registration.submitterAccountEmail ?? "E-mail compte inconnu"}

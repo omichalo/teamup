@@ -43,6 +43,12 @@ export function MembershipRequestsClient() {
     setMedicalCertificateFilter,
     ppsFollowUpFilter,
     setPpsFollowUpFilter,
+    criteriumFederalFilter,
+    setCriteriumFederalFilter,
+    jerseyFollowUpFilter,
+    setJerseyFollowUpFilter,
+    registrationCertificateFollowUpFilter,
+    setRegistrationCertificateFollowUpFilter,
     aidReceiptFilter,
     setAidReceiptFilter,
     searchInput,
@@ -59,6 +65,9 @@ export function MembershipRequestsClient() {
     statusFilter: initialUrlState.statusFilter,
     medicalCertificateFilter: initialUrlState.medicalCertificateFilter,
     ppsFollowUpFilter: initialUrlState.ppsFollowUpFilter,
+    criteriumFederalFilter: initialUrlState.criteriumFederalFilter,
+    jerseyFollowUpFilter: initialUrlState.jerseyFollowUpFilter,
+    registrationCertificateFollowUpFilter: initialUrlState.registrationCertificateFollowUpFilter,
     aidReceiptFilter: initialUrlState.aidReceiptFilter,
   });
   const [selectedId, setSelectedId] = useState<string | null>(initialUrlState.selectedId);
@@ -116,11 +125,17 @@ export function MembershipRequestsClient() {
       statusFilter,
       medicalCertificateFilter,
       ppsFollowUpFilter,
+      criteriumFederalFilter,
+      jerseyFollowUpFilter,
+      registrationCertificateFollowUpFilter,
       aidReceiptFilter,
       selectedId,
     });
   }, [
     aidReceiptFilter,
+    criteriumFederalFilter,
+    jerseyFollowUpFilter,
+    registrationCertificateFollowUpFilter,
     medicalCertificateFilter,
     ppsFollowUpFilter,
     selectedId,
@@ -199,6 +214,12 @@ export function MembershipRequestsClient() {
       onMedicalCertificateFilterChange={setMedicalCertificateFilter}
       ppsFollowUpFilter={ppsFollowUpFilter}
       onPpsFollowUpFilterChange={setPpsFollowUpFilter}
+      criteriumFederalFilter={criteriumFederalFilter}
+      onCriteriumFederalFilterChange={setCriteriumFederalFilter}
+      jerseyFollowUpFilter={jerseyFollowUpFilter}
+      onJerseyFollowUpFilterChange={setJerseyFollowUpFilter}
+      registrationCertificateFollowUpFilter={registrationCertificateFollowUpFilter}
+      onRegistrationCertificateFollowUpFilterChange={setRegistrationCertificateFollowUpFilter}
       aidReceiptFilter={aidReceiptFilter}
       searchInput={searchInput}
       onSearchInputChange={setSearchInput}

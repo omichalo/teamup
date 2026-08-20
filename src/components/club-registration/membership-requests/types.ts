@@ -1,4 +1,7 @@
 import type { MedicalCertificateStatus } from "@/lib/club-registration/medical-certificate";
+import type { CriteriumFederalRegistrationStatus } from "@/lib/club-registration/criterium-federal-follow-up";
+import type { JerseyFollowUpStatus } from "@/lib/club-registration/jersey-follow-up";
+import type { RegistrationCertificateFollowUpStatus } from "@/lib/club-registration/registration-certificate-follow-up";
 import type {
   PpsFollowUpEvent,
   PpsFollowUpStatus,
@@ -34,6 +37,12 @@ export type RegistrationSummary = {
   medicalCertificateDeclaration?: string;
   medicalCertificateStatus?: MedicalCertificateStatus;
   ppsFollowUpStatus?: PpsFollowUpStatus;
+  criteriumFederalRegistrationStatus?: CriteriumFederalRegistrationStatus;
+  jerseyFollowUpStatus?: JerseyFollowUpStatus;
+  registrationCertificateFollowUpStatus?: RegistrationCertificateFollowUpStatus;
+  competitionIds?: string[];
+  wantsCompetitorExtras?: boolean;
+  wantsOptionalJersey?: boolean;
   status?: string;
   paymentAmountCents?: number;
   voluntaryDonationCents?: number;
@@ -93,6 +102,9 @@ export type RegistrationDetail = RegistrationSummary & {
   wantsOptionalJersey?: boolean;
   optionalJerseySize?: string;
   competitionIds?: string[];
+  criteriumFederalRegistrationStatus?: CriteriumFederalRegistrationStatus;
+  jerseyFollowUpStatus?: JerseyFollowUpStatus;
+  registrationCertificateFollowUpStatus?: RegistrationCertificateFollowUpStatus;
   applicantNotes?: string;
   reviewNotes?: string;
   paymentEmailSentTo?: string;
@@ -140,6 +152,9 @@ export type EditableRegistration = {
   wantsOptionalJersey: boolean;
   optionalJerseySize: string;
   competitionIds: string[];
+  criteriumFederalRegistrationStatus: CriteriumFederalRegistrationStatus;
+  jerseyFollowUpStatus: JerseyFollowUpStatus;
+  registrationCertificateFollowUpStatus: RegistrationCertificateFollowUpStatus;
   applicantNotes: string;
   reviewNotes: string;
   amountEuros: string;

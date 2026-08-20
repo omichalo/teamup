@@ -14,6 +14,18 @@ import {
   type PpsFollowUpStatus,
 } from "@/lib/club-registration/pps-follow-up";
 import {
+  CRITERIUM_FEDERAL_REGISTRATION_STATUS_LABELS,
+  isCriteriumFederalRegistrationStatus,
+} from "@/lib/club-registration/criterium-federal-follow-up";
+import {
+  JERSEY_FOLLOW_UP_STATUS_LABELS,
+  isJerseyFollowUpStatus,
+} from "@/lib/club-registration/jersey-follow-up";
+import {
+  REGISTRATION_CERTIFICATE_FOLLOW_UP_STATUS_LABELS,
+  isRegistrationCertificateFollowUpStatus,
+} from "@/lib/club-registration/registration-certificate-follow-up";
+import {
   PAYMENT_METHOD_LABELS,
   PAYMENT_STATUS_LABELS,
   REMAINING_PAYMENT_METHOD_LABELS,
@@ -277,6 +289,24 @@ export function formatSpreadsheetCellValue(
       return formatMinorConsent(value, "supervision");
     case "competitionIds":
       return formatStringArray(value, (id) => findCompetitionLabel(config, id));
+    case "criteriumFederalRegistrationStatus":
+      return typeof value === "string" && isCriteriumFederalRegistrationStatus(value)
+        ? CRITERIUM_FEDERAL_REGISTRATION_STATUS_LABELS[value]
+        : typeof value === "string"
+          ? value
+          : "";
+    case "jerseyFollowUpStatus":
+      return typeof value === "string" && isJerseyFollowUpStatus(value)
+        ? JERSEY_FOLLOW_UP_STATUS_LABELS[value]
+        : typeof value === "string"
+          ? value
+          : "";
+    case "registrationCertificateFollowUpStatus":
+      return typeof value === "string" && isRegistrationCertificateFollowUpStatus(value)
+        ? REGISTRATION_CERTIFICATE_FOLLOW_UP_STATUS_LABELS[value]
+        : typeof value === "string"
+          ? value
+          : "";
     case "status":
       return typeof value === "string"
         ? (REGISTRATION_STATUS_LABELS[value as RegistrationStatus] ?? value)

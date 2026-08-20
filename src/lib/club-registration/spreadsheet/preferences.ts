@@ -87,6 +87,9 @@ const DEFAULT_COLUMN_ORDER: SpreadsheetColumnId[] = [
   "wantsOptionalJersey",
   "optionalJerseySize",
   "competitionIds",
+  "criteriumFederalRegistrationStatus",
+  "jerseyFollowUpStatus",
+  "registrationCertificateFollowUpStatus",
   "applicantNotes",
   "isMinor",
   "submitterAccountEmail",
@@ -123,8 +126,12 @@ function buildDefaultColumnList(): SpreadsheetColumnPreference[] {
   ];
   return ordered.map((id) => ({
     id,
-    visible: !DEFAULT_HIDDEN_COLUMN_IDS.has(id),
+    visible: defaultColumnVisible(id),
   }));
+}
+
+function defaultColumnVisible(id: SpreadsheetColumnId): boolean {
+  return !DEFAULT_HIDDEN_COLUMN_IDS.has(id);
 }
 
 export function getDefaultSpreadsheetPreferences(): RegistrationsSpreadsheetPreferences {
@@ -161,7 +168,7 @@ export function normalizeSpreadsheetPreferences(
 
   for (const columnId of SPREADSHEET_COLUMN_IDS) {
     if (!seen.has(columnId)) {
-      columns.push({ id: columnId, visible: false });
+      columns.push({ id: columnId, visible: defaultColumnVisible(columnId) });
     }
   }
 
