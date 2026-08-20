@@ -13,6 +13,9 @@ import {
 import { resolveManagedListStatusFilter } from "@/lib/club-registration/registration-status";
 import { resolveManagedListMedicalCertificateFilter } from "@/lib/club-registration/medical-certificate";
 import { resolveManagedListPpsFollowUpFilter } from "@/lib/club-registration/pps-follow-up";
+import { resolveManagedListCriteriumFederalFilter } from "@/lib/club-registration/criterium-federal-follow-up";
+import { resolveManagedListJerseyFollowUpFilter } from "@/lib/club-registration/jersey-follow-up";
+import { resolveManagedListRegistrationCertificateFollowUpFilter } from "@/lib/club-registration/registration-certificate-follow-up";
 import { resolveManagedListAidReceiptFilter } from "@/lib/club-registration/payment/aid-receipt";
 
 const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
@@ -56,6 +59,16 @@ export async function GET(req: Request) {
       const ppsFollowUpFilter = resolveManagedListPpsFollowUpFilter(
         url.searchParams.get("ppsFollowUp")
       );
+      const criteriumFederalFilter = resolveManagedListCriteriumFederalFilter(
+        url.searchParams.get("criteriumFederal")
+      );
+      const jerseyFollowUpFilter = resolveManagedListJerseyFollowUpFilter(
+        url.searchParams.get("jerseyFollowUp")
+      );
+      const registrationCertificateFollowUpFilter =
+        resolveManagedListRegistrationCertificateFollowUpFilter(
+          url.searchParams.get("registrationCertificateFollowUp")
+        );
       const aidReceiptFilter = resolveManagedListAidReceiptFilter(
         url.searchParams.get("aidReceipt")
       );
@@ -70,6 +83,9 @@ export async function GET(req: Request) {
         statusFilter,
         medicalCertificateFilter,
         ppsFollowUpFilter,
+        criteriumFederalFilter,
+        jerseyFollowUpFilter,
+        registrationCertificateFollowUpFilter,
         aidReceiptFilter,
         pageSize,
         cursor,

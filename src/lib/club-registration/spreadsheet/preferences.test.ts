@@ -14,15 +14,36 @@ describe("spreadsheet preferences", () => {
     expect(visible).toContain("firstName");
     expect(visible).toContain("submitterAccountEmail");
     expect(visible).not.toContain("submitterUid");
+    expect(visible).toContain("criteriumFederalRegistrationStatus");
+    expect(visible).toContain("jerseyFollowUpStatus");
+    expect(visible).toContain("registrationCertificateFollowUpStatus");
     expect(prefs.columns.find((column) => column.id === "submitterUid")?.visible).toBe(false);
   });
 
-  it("normalise une liste partielle en complétant les colonnes manquantes", () => {
+  it("complète une liste partielle sans masquer les colonnes non citées", () => {
     const normalized = normalizeSpreadsheetPreferences({
       columns: [{ id: "lastName", visible: true }],
     });
-    expect(getVisibleColumnsInOrder(normalized)).toEqual(["lastName"]);
+    const visible = getVisibleColumnsInOrder(normalized);
+    expect(visible[0]).toBe("lastName");
+    expect(visible).toContain("firstName");
+    expect(visible).toContain("registrationCertificateFollowUpStatus");
+    expect(normalized.columns.find((column) => column.id === "submitterUid")?.visible).toBe(
+      false
+    );
     expect(normalized.columns.length).toBeGreaterThan(1);
+  });
+
+  it("conserve le masquage explicite d’une colonne", () => {
+    const normalized = normalizeSpreadsheetPreferences({
+      columns: [
+        { id: "lastName", visible: true },
+        { id: "registrationCertificateFollowUpStatus", visible: false },
+      ],
+    });
+    expect(getVisibleColumnsInOrder(normalized)).not.toContain(
+      "registrationCertificateFollowUpStatus"
+    );
   });
 
   it("rejette un payload sans colonne visible", () => {
