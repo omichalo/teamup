@@ -14,11 +14,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import {
-  AccountCircle,
-  Logout,
-  Menu as MenuIcon,
-} from "@mui/icons-material";
+import { AccountCircle, Logout, Menu as MenuIcon } from "@mui/icons-material";
 import { LayoutAccountMenuItems } from "@/components/LayoutAccountMenuItems";
 import {
   buildLayoutAccountMenuItems,
@@ -43,8 +39,15 @@ interface LayoutProps {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { user, signOut, isAdmin, isPlayerLike, isAssistantSecretary, isSecretary } =
-    useAuth();
+  const {
+    user,
+    signOut,
+    isAdmin,
+    isPlayerLike,
+    isAssistantSecretary,
+    isSecretary,
+    isBoardMember,
+  } = useAuth();
 
   const router = useRouter();
   const pathname = usePathname();
@@ -58,29 +61,34 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
       isPlayerLike,
       isAssistantSecretary,
       isSecretary,
+      isBoardMember,
       canAccessSpreadsheet: Boolean(
-        user && canAccessRegistrationsSpreadsheet(user.role)
+        user && canAccessRegistrationsSpreadsheet(user.role),
       ),
     }),
-    [isAdmin, isAssistantSecretary, isPlayerLike, isSecretary, user]
+    [
+      isAdmin,
+      isAssistantSecretary,
+      isBoardMember,
+      isPlayerLike,
+      isSecretary,
+      user,
+    ],
   );
 
   const navigation = useMemo(
     () => buildLayoutNavigation(navOptions),
-    [navOptions]
+    [navOptions],
   );
 
   const accountMenuItems = useMemo(
     () => buildLayoutAccountMenuItems(navOptions),
-    [navOptions]
+    [navOptions],
   );
 
   const homeHref = useMemo(
-    () =>
-      user
-        ? resolveLayoutHomeHref({ isPlayerLike })
-        : "/",
-    [isPlayerLike, user]
+    () => (user ? resolveLayoutHomeHref({ isPlayerLike }) : "/"),
+    [isPlayerLike, user],
   );
 
   const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
@@ -101,8 +109,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     }
   };
 
-  const hasNav =
-    hasLayoutNavigation(navigation) || accountMenuItems.length > 0;
+  const hasNav = hasLayoutNavigation(navigation) || accountMenuItems.length > 0;
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
@@ -119,7 +126,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
               color="inherit"
               aria-label="Ouvrir le menu de navigation"
               onClick={() => setDrawerOpen(true)}
-              sx={{ display: { xs: "inline-flex", [NAV_DESKTOP_BREAKPOINT]: "none" } }}
+              sx={{
+                display: {
+                  xs: "inline-flex",
+                  [NAV_DESKTOP_BREAKPOINT]: "none",
+                },
+              }}
             >
               <MenuIcon />
             </IconButton>

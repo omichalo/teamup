@@ -294,6 +294,17 @@ service cloud.firestore {
     }
 
     // ============================================
+    // Collections: attendanceMarks / attendanceLeads
+    // ============================================
+    // Pointage entraînement — Admin SDK uniquement (routes /api/club/attendance/*).
+    match /attendanceMarks/{markId} {
+      allow read, write: if false;
+    }
+    match /attendanceLeads/{leadId} {
+      allow read, write: if false;
+    }
+
+    // ============================================
     // Règle par défaut : refuser tout accès non explicitement autorisé
     // ============================================
     match /{document=**} {

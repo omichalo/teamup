@@ -1,5 +1,9 @@
 import type { RegistrationConfigV1, RegistrationSection } from "@/lib/club-registration-config/types";
 import { pricingProfileLabel } from "@/lib/club-registration-config/pricing-profiles";
+import {
+  formatSlotScheduleSummary,
+  resolveSlotSchedule,
+} from "@/lib/club-registration-config/slot-schedule";
 import { centsToEuroInput } from "./config-editor-utils";
 
 export function sectionSummaryMeta(
@@ -17,9 +21,27 @@ export function sectionSummaryMeta(
 }
 
 export function slotSummaryMeta(
-  slot: { enabled: boolean; schoolPickupSchool?: string | undefined }
+  slot: {
+    enabled: boolean;
+    schoolPickupSchool?: string | undefined;
+    weekday?: number | undefined;
+    startMinutes?: number | undefined;
+    endMinutes?: number | undefined;
+    id?: string;
+    label?: string;
+  }
 ): string | undefined {
   const parts: string[] = [];
+  const schedule = resolveSlotSchedule({
+    id: slot.id ?? "",
+    label: slot.label ?? "",
+    weekday: slot.weekday,
+    startMinutes: slot.startMinutes,
+    endMinutes: slot.endMinutes,
+  });
+  if (schedule) {
+    parts.push(formatSlotScheduleSummary(schedule));
+  }
   if (!slot.enabled) parts.push("Inactif");
   if (slot.schoolPickupSchool) parts.push("Récup. scolaire");
   return parts.length > 0 ? parts.join(" · ") : undefined;

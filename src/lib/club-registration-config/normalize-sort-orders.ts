@@ -4,6 +4,7 @@ import { repairPricingProfiles } from "./pricing-profiles";
 import { repairSiteLinkedSectionIds } from "./site-section-links";
 import { repairPricingDevices } from "./pricing-devices";
 import { repairChampYonCatalog } from "./repair-champ-yon-catalog";
+import { repairSlotSchedules } from "./repair-slot-schedules";
 import { sortBySortOrder } from "./sort-order";
 
 /** Normalise sortOrder pour les configs importées ou legacy (créneaux sans ordre). */
@@ -36,9 +37,11 @@ export function normalizeRegistrationConfigSortOrders(
     }),
   };
 
-  return repairPricingProfiles(
-    repairPricingDevices(
-      repairChampYonCatalog(repairAidRulesForm(repairSiteLinkedSectionIds(withSortOrders)))
+  return repairSlotSchedules(
+    repairPricingProfiles(
+      repairPricingDevices(
+        repairChampYonCatalog(repairAidRulesForm(repairSiteLinkedSectionIds(withSortOrders)))
+      )
     )
   );
 }

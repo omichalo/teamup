@@ -58,10 +58,10 @@ export const useAuth = () => {
     signUp: async () => ({ success: false, error: "Use /signup page" }),
     isAdmin: role === USER_ROLES.ADMIN,
     isSecretary: role === USER_ROLES.SECRETARY,
+    isBoardMember: role === USER_ROLES.BOARD_MEMBER,
     isAssistantSecretary: isAssistantSecretary(role),
     isPlayerLike: hasPlayerLikeAccess(role),
-    isCoach:
-      role === USER_ROLES.COACH || role === USER_ROLES.ADMIN,
+    isCoach: role === USER_ROLES.COACH || role === USER_ROLES.ADMIN,
     isPlayer: role === USER_ROLES.PLAYER,
     refreshUser,
     sendEmailVerification: async () => {},
