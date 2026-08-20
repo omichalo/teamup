@@ -3,7 +3,7 @@ export const runtime = "nodejs";
 import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
-import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
+import { ALL_USER_ROLES, hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
 import {
   listManagedRegistrations,
   listPersonalRegistrations,
@@ -31,15 +31,7 @@ export async function GET(req: Request) {
 
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     const role = resolveRole(decoded.role as string | undefined);
-    if (
-      !hasAnyRole(role, [
-        USER_ROLES.PLAYER,
-        USER_ROLES.ASSISTANT_SECRETARY,
-        USER_ROLES.SECRETARY,
-        USER_ROLES.COACH,
-        USER_ROLES.ADMIN,
-      ])
-    ) {
+    if (!hasAnyRole(role, ALL_USER_ROLES)) {
       return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
     }
 

@@ -11,6 +11,8 @@ export const CLUB_REGISTRATION_SPREADSHEET_ROLES = [
   USER_ROLES.ADMIN,
   USER_ROLES.SECRETARY,
   USER_ROLES.ASSISTANT_SECRETARY,
+  USER_ROLES.BOARD_MEMBER,
+  USER_ROLES.COACH,
 ] as const;
 
 export function isClubRegistrationManager(role: UserRole): boolean {
@@ -33,8 +35,8 @@ function isRegistrationOwner(
 }
 
 /**
- * Accès lecture d'un dossier : tableau (admin, secrétariat, secrétaire adjoint)
- * ou soumettant du dossier (propriétaire).
+ * Accès lecture d'un dossier : tableau (admin, secrétariat, secrétaire adjoint,
+ * membre du bureau, coach) ou soumettant du dossier (propriétaire).
  */
 export function canViewClubRegistration(
   role: UserRole,
@@ -50,7 +52,8 @@ export function canViewClubRegistration(
 /**
  * Accès lecture / facture / paiement self-service : admin ou secrétariat,
  * ou soumettant du dossier (propriétaire).
- * Les coachs, secrétaires adjoints et autres rôles n'ont pas accès aux dossiers d'autrui.
+ * Les coachs, secrétaires adjoints, membres du bureau et autres rôles n'ont pas
+ * accès en écriture aux dossiers d'autrui.
  */
 export function canAccessClubRegistration(
   role: UserRole,

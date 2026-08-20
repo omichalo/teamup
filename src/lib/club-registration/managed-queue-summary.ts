@@ -1,10 +1,119 @@
+import { summaryMedicalCertificateStatus } from "@/lib/club-registration/medical-certificate";
+import {
+  getRegistrationPaymentAids,
+  hasPendingAidReceipt,
+} from "@/lib/club-registration/payment/aid-receipt";
+import { matchesManagedStatusFilter } from "@/lib/club-registration/filter-managed-summaries";
+import type { ManagedListQueueViewCounts, ManagedListQueueViewId } from "@/lib/club-registration/managed-list-saved-views";
+import {
+  isRegistrationStatus,
+  type RegistrationStatus,
+} from "@/lib/club-registration/registration-status";
+
+export type ManagedQueueStatusCounts = Record<RegistrationStatus, number>;
+
 export type ManagedQueueSummary = {
+  total: number;
   actionable: number;
   missingCertificate: number;
   paymentPending: number;
   paymentRequested: number;
+  pendingAidReceipt: number;
+  byStatus: ManagedQueueStatusCounts;
+  byStatusPendingAid: ManagedQueueStatusCounts;
   truncated: boolean;
 };
+
+const PAYMENT_PENDING_STATUSES = new Set<string>([
+  "pending_validation",
+  "waiting_payment",
+  "partially_paid",
+  "manual_follow_up",
+]);
+
+export function emptyManagedQueueStatusCounts(): ManagedQueueStatusCounts {
+  return {
+    submitted: 0,
+    in_review: 0,
+    payment_requested: 0,
+    paid: 0,
+    approved: 0,
+    rejected: 0,
+  };
+}
+
+export function summarizeManagedQueue(
+  summaries: Array<Record<string, unknown> & { id: string }>,
+  scanLimit: number
+): ManagedQueueSummary {
+  let actionable = 0;
+  let missingCertificate = 0;
+  let paymentPending = 0;
+  let paymentRequested = 0;
+  let pendingAidReceipt = 0;
+  const byStatus = emptyManagedQueueStatusCounts();
+  const byStatusPendingAid = emptyManagedQueueStatusCounts();
+
+  for (const summary of summaries) {
+    const status = summary.status;
+    const pendingAid = hasPendingAidReceipt(getRegistrationPaymentAids(summary));
+    if (typeof status === "string" && isRegistrationStatus(status)) {
+      byStatus[status] += 1;
+      if (pendingAid) {
+        byStatusPendingAid[status] += 1;
+      }
+    }
+    if (matchesManagedStatusFilter(summary, "actionable")) {
+      actionable += 1;
+    }
+    if (matchesManagedStatusFilter(summary, "payment_requested")) {
+      paymentRequested += 1;
+    }
+    if (summaryMedicalCertificateStatus(summary) === "required_not_received") {
+      missingCertificate += 1;
+    }
+    const paymentStatus = summary.paymentStatus;
+    if (typeof paymentStatus === "string" && PAYMENT_PENDING_STATUSES.has(paymentStatus)) {
+      paymentPending += 1;
+    }
+    if (pendingAid) {
+      pendingAidReceipt += 1;
+    }
+  }
+
+  return {
+    total: summaries.length,
+    actionable,
+    missingCertificate,
+    paymentPending,
+    paymentRequested,
+    pendingAidReceipt,
+    byStatus,
+    byStatusPendingAid,
+    truncated: summaries.length >= scanLimit,
+  };
+}
+
+export function getManagedListQueueViewCounts(
+  summary: ManagedQueueSummary
+): ManagedListQueueViewCounts {
+  return {
+    to_review: summary.actionable,
+    payment_pending: summary.paymentRequested,
+    pending_aid_receipt: summary.pendingAidReceipt,
+    all: summary.total,
+  };
+}
+
+export function getManagedListPipelineTabCounts(
+  summary: ManagedQueueSummary,
+  queueViewId: ManagedListQueueViewId
+): Partial<Record<RegistrationStatus, number>> {
+  if (queueViewId === "pending_aid_receipt") {
+    return summary.byStatusPendingAid;
+  }
+  return summary.byStatus;
+}
 
 export function buildManagedTreatQueueHref(registrationId?: string | null): string {
   const url = new URL("/club/demandes-adhesion", "http://local");
@@ -35,14 +144,14 @@ export function buildSpreadsheetHref(options?: {
 
 export function formatManagedQueueSummarySubtitle(summary: ManagedQueueSummary): string {
   const parts = [`${summary.actionable} dossier${summary.actionable > 1 ? "s" : ""} à traiter`];
-  if (summary.missingCertificate > 0) {
+  if (summary.pendingAidReceipt > 0) {
     parts.push(
-      `${summary.missingCertificate} certificat${summary.missingCertificate > 1 ? "s" : ""} attendu${summary.missingCertificate > 1 ? "s" : ""}`
+      `${summary.pendingAidReceipt} aide${summary.pendingAidReceipt > 1 ? "s" : ""} en attente`
     );
   }
-  if (summary.paymentPending > 0) {
+  if (summary.paymentRequested > 0) {
     parts.push(
-      `${summary.paymentPending} paiement${summary.paymentPending > 1 ? "s" : ""} en cours`
+      `${summary.paymentRequested} paiement${summary.paymentRequested > 1 ? "s" : ""} demandé${summary.paymentRequested > 1 ? "s" : ""}`
     );
   }
   if (summary.truncated) {
@@ -51,19 +160,10 @@ export function formatManagedQueueSummarySubtitle(summary: ManagedQueueSummary):
   return parts.join(" · ");
 }
 
-/** Synthèse courte pour l'en-tête de la page « Dossiers à valider ». */
+/** Sous-titre de la page « Dossiers à valider » — les compteurs sont sur les files. */
 export function formatManagedRequestsPageSubtitle(summary: ManagedQueueSummary): string {
-  const parts = [`${summary.actionable} à traiter`];
-  if (summary.missingCertificate > 0) {
-    parts.push(
-      `${summary.missingCertificate} certificat${summary.missingCertificate > 1 ? "s" : ""}`
-    );
-  }
-  if (summary.paymentPending > 0) {
-    parts.push(`${summary.paymentPending} paiement${summary.paymentPending > 1 ? "s" : ""}`);
-  }
   if (summary.truncated) {
-    parts.push("…");
+    return "Relisez les dossiers, puis suivez les paiements et les aides. Comptage partiel.";
   }
-  return parts.join(" · ");
+  return "Relisez les dossiers, puis suivez les paiements et les aides.";
 }

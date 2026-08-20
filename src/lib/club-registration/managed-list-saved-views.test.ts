@@ -1,5 +1,8 @@
 import {
+  getManagedListPipelineTabs,
   getManagedListFiltersForSavedView,
+  inferManagedListQueueViewId,
+  resolveManagedListQueueViewFromFilters,
   resolveManagedListSavedViewFromFilters,
 } from "./managed-list-saved-views";
 
@@ -32,6 +35,53 @@ describe("managed-list-saved-views", () => {
     expect(resolveManagedListSavedViewFromFilters("all", "all")).toBe("all");
     expect(resolveManagedListSavedViewFromFilters("all", "all", "pending")).toBe(
       "pending_aid_receipt"
+    );
+  });
+
+  it("does not highlight a work queue for the certificate-only saved view", () => {
+    expect(
+      resolveManagedListQueueViewFromFilters("actionable", "required_not_received")
+    ).toBeNull();
+    expect(resolveManagedListQueueViewFromFilters("actionable", "all")).toBe("to_review");
+    expect(resolveManagedListQueueViewFromFilters("payment_requested", "all")).toBe(
+      "payment_pending"
+    );
+  });
+
+  it("keeps À traiter when a pipeline stage is selected inside that queue", () => {
+    expect(
+      inferManagedListQueueViewId({
+        vue: "to_review",
+        statusFilter: "submitted",
+        aidReceiptFilter: "all",
+      })
+    ).toBe("to_review");
+    expect(
+      inferManagedListQueueViewId({
+        vue: "to_review",
+        statusFilter: "payment_requested",
+        aidReceiptFilter: "all",
+      })
+    ).toBe("to_review");
+  });
+
+  it("exposes pipeline tabs that refine a queue instead of copying it", () => {
+    expect(getManagedListPipelineTabs("to_review").map((tab) => tab.value)).toEqual([
+      "submitted",
+      "in_review",
+      "payment_requested",
+    ]);
+    expect(getManagedListPipelineTabs("payment_pending")).toEqual([]);
+    expect(getManagedListPipelineTabs("all").map((tab) => tab.value)).toEqual([
+      "submitted",
+      "in_review",
+      "payment_requested",
+      "paid",
+      "approved",
+      "rejected",
+    ]);
+    expect(getManagedListPipelineTabs("pending_aid_receipt")).toEqual(
+      getManagedListPipelineTabs("all")
     );
   });
 });

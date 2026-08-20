@@ -18,7 +18,6 @@ import {
 } from "@mui/material";
 import { Search as SearchIcon } from "@mui/icons-material";
 import {
-  MANAGED_LIST_STATUS_FILTER_OPTIONS,
   REGISTRATION_STATUS_COLORS,
   REGISTRATION_STATUS_LABELS,
   type ManagedListStatusFilter,
@@ -38,7 +37,12 @@ import { MembershipRequestCardFollowUpChips } from "./MembershipRequestCardFollo
 import { MembershipRequestCardQuickActions } from "./MembershipRequestCardQuickActions";
 import type { ManagedRegistrationsPageInfo } from "./useManagedRegistrations";
 import type { MembershipListReloadFn, RegistrationSummary } from "./types";
-import type { SpreadsheetSavedViewId } from "@/lib/club-registration/spreadsheet/quick-filters";
+import {
+  getManagedListFiltersForSavedView,
+  getManagedListPipelineTabs,
+  type ManagedListQueueViewCounts,
+  type ManagedListQueueViewId,
+} from "@/lib/club-registration/managed-list-saved-views";
 import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
 
 function formatDate(iso: string | null | undefined): string {
@@ -87,10 +91,11 @@ type MembershipRequestsListPanelProps = {
   onLoadMore: () => void;
   searchInputRef?: React.RefObject<HTMLInputElement | null>;
   sessionViewedIds?: ReadonlySet<string>;
-  actionableCount?: number | null;
   onListReload?: MembershipListReloadFn;
-  activeViewId?: SpreadsheetSavedViewId | null;
-  onSelectSavedView?: (viewId: SpreadsheetSavedViewId) => void;
+  activeViewId: ManagedListQueueViewId;
+  onSelectSavedView?: ((viewId: ManagedListQueueViewId) => void) | undefined;
+  queueViewCounts?: ManagedListQueueViewCounts | undefined;
+  pipelineTabCounts?: Partial<Record<RegistrationStatus, number>> | undefined;
 };
 
 export function MembershipRequestsListPanel({
@@ -118,10 +123,11 @@ export function MembershipRequestsListPanel({
   onLoadMore,
   searchInputRef,
   sessionViewedIds,
-  actionableCount,
   onListReload,
-  activeViewId = null,
+  activeViewId,
   onSelectSavedView,
+  queueViewCounts,
+  pipelineTabCounts,
 }: MembershipRequestsListPanelProps) {
   const searchActive = searchInput.trim().length >= 2;
   const medicalFilterActive = medicalCertificateFilter !== "all";
@@ -130,19 +136,10 @@ export function MembershipRequestsListPanel({
   const jerseyFilterActive = jerseyFollowUpFilter !== "all";
   const attestationFilterActive = registrationCertificateFollowUpFilter !== "all";
   const aidFilterActive = aidReceiptFilter !== "all";
-  const showResultCount =
-    searchActive ||
-    ((medicalFilterActive ||
-      ppsFilterActive ||
-      criteriumFilterActive ||
-      jerseyFilterActive ||
-      attestationFilterActive ||
-      aidFilterActive) &&
-      pageInfo.totalMatched != null);
   const hasActiveSelection = selectedId != null;
-  const activeTabIndex = MANAGED_LIST_STATUS_FILTER_OPTIONS.findIndex(
-    (option) => option.value === statusFilter
-  );
+  const pipelineTabs = getManagedListPipelineTabs(activeViewId);
+  const queueDefaultStatus = getManagedListFiltersForSavedView(activeViewId).statusFilter;
+  const activeTabIndex = pipelineTabs.findIndex((option) => option.value === statusFilter);
 
   return (
     <Stack
@@ -172,26 +169,12 @@ export function MembershipRequestsListPanel({
             ),
           },
         }}
-        sx={{
-          "& .MuiFormHelperText-root": {
-            mt: 0.75,
-            minHeight: "1.25em",
-          },
-        }}
-        helperText={
-          showResultCount
-            ? pageInfo.totalMatched != null
-              ? `${pageInfo.totalMatched} résultat${pageInfo.totalMatched > 1 ? "s" : ""}`
-              : "Filtrage en cours…"
-            : searchActive
-              ? "2 caractères minimum"
-              : undefined
-        }
       />
       {onSelectSavedView ? (
         <ManagedListSavedViewsBar
           activeViewId={activeViewId}
           onSelectView={onSelectSavedView}
+          viewCounts={queueViewCounts}
         />
       ) : null}
       <ManagedListFollowUpFilters
@@ -209,32 +192,35 @@ export function MembershipRequestsListPanel({
         }
       />
 
-      <Tabs
-        value={activeTabIndex >= 0 ? activeTabIndex : 0}
-        onChange={(_event, index: number) => {
-          const option = MANAGED_LIST_STATUS_FILTER_OPTIONS[index];
-          if (option) {
-            onStatusFilterChange(option.value);
-          }
-        }}
-        variant="scrollable"
-        scrollButtons="auto"
-        allowScrollButtonsMobile
-        sx={{
-          minHeight: 40,
-          "& .MuiTab-root": { minHeight: 40, py: 0.5, fontSize: "0.78rem", px: 1.25 },
-        }}
-      >
-        {MANAGED_LIST_STATUS_FILTER_OPTIONS.map((option) => {
-          const tabLabel =
-            option.value === "actionable" &&
-            actionableCount != null &&
-            actionableCount > 0
-              ? `${option.label} (${actionableCount})`
-              : option.label;
-          return <Tab key={option.value} label={tabLabel} />;
-        })}
-      </Tabs>
+      {pipelineTabs.length > 0 ? (
+        <Tabs
+          value={activeTabIndex >= 0 ? activeTabIndex : false}
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
+          sx={{
+            minHeight: 40,
+            "& .MuiTab-root": { minHeight: 40, py: 0.5, fontSize: "0.78rem", px: 1.25 },
+          }}
+        >
+          {pipelineTabs.map((option) => {
+            const count = pipelineTabCounts?.[option.value];
+            const label =
+              count == null ? option.label : `${option.label} (${count})`;
+            return (
+              <Tab
+                key={option.value}
+                label={label}
+                onClick={() => {
+                  onStatusFilterChange(
+                    option.value === statusFilter ? queueDefaultStatus : option.value
+                  );
+                }}
+              />
+            );
+          })}
+        </Tabs>
+      ) : null}
       </Stack>
 
       <Box sx={{ flex: 1, minHeight: 0, minWidth: 0, overflowY: "auto", pr: 0.75, pt: 1 }}>
@@ -249,7 +235,8 @@ export function MembershipRequestsListPanel({
           ppsFilterActive ||
           criteriumFilterActive ||
           jerseyFilterActive ||
-          attestationFilterActive
+          attestationFilterActive ||
+          aidFilterActive
             ? "Aucun dossier ne correspond à vos critères."
             : "Aucune demande dans cette catégorie pour le moment."}
         </Alert>

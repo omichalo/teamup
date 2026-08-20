@@ -14,6 +14,7 @@ describe("license-validation access", () => {
   it("denies other roles", () => {
     expect(canAccessLicenseValidation(USER_ROLES.PLAYER)).toBe(false);
     expect(canAccessLicenseValidation(USER_ROLES.COACH)).toBe(false);
+    expect(canAccessLicenseValidation(USER_ROLES.BOARD_MEMBER)).toBe(false);
   });
 
   it("exposes the expected role constant", () => {

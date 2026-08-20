@@ -31,7 +31,8 @@ import {
 import { AuthGuard } from "@/components/AuthGuard";
 import { useAuth } from "@/hooks/useAuth";
 import { COACH_REQUEST_STATUS, USER_ROLES } from "@/lib/auth/roles";
-import { User, UserRole } from "@/types";
+import { getRoleLabel } from "@/lib/auth/role-labels";
+import { User } from "@/types";
 import { useDiscordMembers } from "@/hooks/useDiscordMembers";
 import {
   DiscordAvailabilitySection,
@@ -477,21 +478,6 @@ export default function AdminPage() {
         return "default";
     }
   };
-
-  const getRoleLabel = useCallback((role: UserRole) => {
-    switch (role) {
-      case USER_ROLES.ADMIN:
-        return "admin";
-      case USER_ROLES.SECRETARY:
-        return "secrétaire";
-      case USER_ROLES.ASSISTANT_SECRETARY:
-        return "secrétaire adjoint";
-      case USER_ROLES.COACH:
-        return "coach";
-      default:
-        return "joueur";
-    }
-  }, []);
 
   const getCoachStatusLabel = useCallback(
     (
