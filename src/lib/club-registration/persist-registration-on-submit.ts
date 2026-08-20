@@ -2,6 +2,9 @@ import { FieldValue } from "firebase-admin/firestore";
 import type { UserRole } from "@/lib/auth/roles";
 import type { MedicalCertificateStatus } from "@/lib/club-registration/medical-certificate";
 import { initialPpsFollowUpStatus } from "@/lib/club-registration/pps-follow-up";
+import { initialCriteriumFederalRegistrationStatus } from "@/lib/club-registration/criterium-federal-follow-up";
+import { initialJerseyFollowUpStatus } from "@/lib/club-registration/jersey-follow-up";
+import { initialRegistrationCertificateFollowUpStatus } from "@/lib/club-registration/registration-certificate-follow-up";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import { calculateQuoteWithConfig } from "@/lib/club-registration-config/pricing-resolve";
 import { buildPricingContext } from "@/lib/pricing/build-context";
@@ -93,6 +96,16 @@ export function buildRegistrationSubmitDocument(params: {
       payload.birthDate
     ),
     ppsFollowUpEvents: [],
+    criteriumFederalRegistrationStatus: initialCriteriumFederalRegistrationStatus(
+      payload.competitionIds
+    ),
+    jerseyFollowUpStatus: initialJerseyFollowUpStatus(
+      payload.wantsCompetitorExtras,
+      payload.wantsOptionalJersey
+    ),
+    registrationCertificateFollowUpStatus: initialRegistrationCertificateFollowUpStatus(
+      payload.wantsRegistrationCertificate
+    ),
     licenseValidationStatus: "to_do",
     submitterUid,
     submitterAccountEmail,

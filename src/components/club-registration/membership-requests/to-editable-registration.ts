@@ -3,6 +3,9 @@ import { getEnabledSections } from "@/lib/club-registration-config/helpers";
 import {
   normalizeMedicalCertificateStatus,
 } from "@/lib/club-registration/medical-certificate";
+import { normalizeCriteriumFederalRegistrationStatus } from "@/lib/club-registration/criterium-federal-follow-up";
+import { normalizeJerseyFollowUpStatus } from "@/lib/club-registration/jersey-follow-up";
+import { normalizeRegistrationCertificateFollowUpStatus } from "@/lib/club-registration/registration-certificate-follow-up";
 import { normalizeReductionReferenceCodes } from "@/lib/club-registration/reduction-reference-codes";
 import { expandCompetitionIdsForFormFromConfig } from "@/lib/club-registration-config/helpers";
 import { normalizePaymentAidList } from "@/lib/club-registration/payment/payment-draft-helpers";
@@ -30,6 +33,10 @@ export function toEditableRegistration(
   config: RegistrationConfigV1,
   payment: RegistrationPayment | null
 ): EditableRegistration {
+  const competitionIds = expandCompetitionIdsForFormFromConfig(
+    config,
+    registration.competitionIds ?? []
+  );
   return {
     adherentRole: registration.adherentRole ?? "self",
     wasSqyMemberLastYear: registration.wasSqyMemberLastYear,
@@ -84,9 +91,20 @@ export function toEditableRegistration(
     competitionJerseySize: registration.competitionJerseySize ?? "",
     wantsOptionalJersey: registration.wantsOptionalJersey ?? false,
     optionalJerseySize: registration.optionalJerseySize ?? "",
-    competitionIds: expandCompetitionIdsForFormFromConfig(
-      config,
-      registration.competitionIds ?? []
+    competitionIds,
+    criteriumFederalRegistrationStatus: normalizeCriteriumFederalRegistrationStatus(
+      registration.criteriumFederalRegistrationStatus,
+      competitionIds
+    ),
+    jerseyFollowUpStatus: normalizeJerseyFollowUpStatus(
+      registration.jerseyFollowUpStatus,
+      registration.wantsCompetitorExtras ??
+        registration.handisportPracticeLevel === "competition",
+      registration.wantsOptionalJersey ?? false
+    ),
+    registrationCertificateFollowUpStatus: normalizeRegistrationCertificateFollowUpStatus(
+      registration.registrationCertificateFollowUpStatus,
+      registration.wantsRegistrationCertificate ?? false
     ),
     applicantNotes: registration.applicantNotes ?? "",
     reviewNotes: registration.reviewNotes ?? "",

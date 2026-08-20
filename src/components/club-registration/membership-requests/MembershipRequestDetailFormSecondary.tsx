@@ -16,6 +16,9 @@ import { APPLICANT_NOTES_MAX_LENGTH } from "@/lib/club-registration/applicant-no
 import { formatCentsAsEuros } from "@/lib/pricing";
 import { PricingBreakdown } from "../PricingBreakdown";
 import { RegistrationCompetitionFields } from "../RegistrationCompetitionFields";
+import { CriteriumFederalFollowUpField } from "../CriteriumFederalFollowUpField";
+import { JerseyFollowUpField } from "../JerseyFollowUpField";
+import { RegistrationCertificateFollowUpField } from "../RegistrationCertificateFollowUpField";
 import { ReductionReferenceCodeAdminFields } from "../ReductionReferenceCodeAdminFields";
 import { RegistrationMultiSelectField } from "../RegistrationMultiSelectField";
 import type { RegistrationDraft } from "../registration-defaults";
@@ -183,6 +186,13 @@ export function MembershipRequestDetailFormSecondary({
             label="Demande d'attestation d'inscription"
           />
         </Grid>
+        <Grid size={{ xs: 12, sm: 6 }}>
+          <RegistrationCertificateFollowUpField
+            requested={form.wantsRegistrationCertificate}
+            value={form.registrationCertificateFollowUpStatus}
+            onChange={(status) => updateField("registrationCertificateFollowUpStatus", status)}
+          />
+        </Grid>
       </Grid>
 
       <DetailSectionTitle>Autorisations et engagements</DetailSectionTitle>
@@ -262,6 +272,25 @@ export function MembershipRequestDetailFormSecondary({
         competitionOptions={competitionOptions}
         onFieldChange={updateField}
       />
+      <Grid container spacing={2}>
+        <Grid size={{ xs: 12, sm: 6 }}>
+          <CriteriumFederalFollowUpField
+            competitionIds={form.competitionIds}
+            value={form.criteriumFederalRegistrationStatus}
+            onChange={(status) =>
+              updateField("criteriumFederalRegistrationStatus", status)
+            }
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6 }}>
+          <JerseyFollowUpField
+            wantsCompetitorExtras={form.wantsCompetitorExtras}
+            wantsOptionalJersey={form.wantsOptionalJersey}
+            value={form.jerseyFollowUpStatus}
+            onChange={(status) => updateField("jerseyFollowUpStatus", status)}
+          />
+        </Grid>
+      </Grid>
 
       <DetailSectionTitle>Tarification</DetailSectionTitle>
       <Stack spacing={2}>

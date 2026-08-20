@@ -49,6 +49,78 @@ describe("formatSpreadsheetCellValue user labels", () => {
       formatSpreadsheetCellValue("lastName", { id: "r1", lastName: "dupont" }, null)
     ).toBe("DUPONT");
   });
+
+  it("affiche le suivi d’inscription au Critérium fédéral", () => {
+    expect(
+      formatSpreadsheetCellValue(
+        "criteriumFederalRegistrationStatus",
+        { id: "r1", criteriumFederalRegistrationStatus: "to_do" },
+        null
+      )
+    ).toBe("À faire");
+    expect(
+      formatSpreadsheetCellValue(
+        "criteriumFederalRegistrationStatus",
+        { id: "r2", criteriumFederalRegistrationStatus: "validated" },
+        null
+      )
+    ).toBe("Validé");
+    expect(
+      formatSpreadsheetCellValue(
+        "criteriumFederalRegistrationStatus",
+        { id: "r3", criteriumFederalRegistrationStatus: "not_applicable" },
+        null
+      )
+    ).toBe("Non applicable");
+  });
+
+  it("affiche le suivi de remise du maillot", () => {
+    expect(
+      formatSpreadsheetCellValue(
+        "jerseyFollowUpStatus",
+        { id: "r1", jerseyFollowUpStatus: "to_do" },
+        null
+      )
+    ).toBe("À faire");
+    expect(
+      formatSpreadsheetCellValue(
+        "jerseyFollowUpStatus",
+        { id: "r2", jerseyFollowUpStatus: "given" },
+        null
+      )
+    ).toBe("Donné");
+    expect(
+      formatSpreadsheetCellValue(
+        "jerseyFollowUpStatus",
+        { id: "r3", jerseyFollowUpStatus: "not_applicable" },
+        null
+      )
+    ).toBe("Non applicable");
+  });
+
+  it("affiche le suivi d’envoi de l’attestation d’inscription", () => {
+    expect(
+      formatSpreadsheetCellValue(
+        "registrationCertificateFollowUpStatus",
+        { id: "r1", registrationCertificateFollowUpStatus: "to_do" },
+        null
+      )
+    ).toBe("À faire");
+    expect(
+      formatSpreadsheetCellValue(
+        "registrationCertificateFollowUpStatus",
+        { id: "r2", registrationCertificateFollowUpStatus: "sent" },
+        null
+      )
+    ).toBe("Envoyée");
+    expect(
+      formatSpreadsheetCellValue(
+        "registrationCertificateFollowUpStatus",
+        { id: "r3", registrationCertificateFollowUpStatus: "not_applicable" },
+        null
+      )
+    ).toBe("Non applicable");
+  });
 });
 
 describe("formatSpreadsheetCellValue structured fields", () => {

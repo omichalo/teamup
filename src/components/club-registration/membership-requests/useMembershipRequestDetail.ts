@@ -14,6 +14,7 @@ import type { PpsFollowUpState } from "@/lib/club-registration/pps-follow-up";
 import { buildPricingContext, calculateQuote, resolveDonationPricing } from "@/lib/pricing";
 import type { RegistrationFfttPatch } from "./RegistrationSupplementarySections";
 import { toEditableRegistration } from "./to-editable-registration";
+import { buildManagerRegistrationSavePayload } from "./build-manager-registration-save-payload";
 import {
   createEmptyRepresentative,
   formToPricingInput,
@@ -237,56 +238,7 @@ export function useMembershipRequestDetail(
           method: "PATCH",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            adherentRole: form.adherentRole,
-            wasSqyMemberLastYear: form.wasSqyMemberLastYear ?? false,
-            ffttLicense: form.ffttLicense.trim() || null,
-            ffttLicenseLookup: form.ffttLicenseLookup ?? null,
-            firstName: form.firstName,
-            lastName: form.lastName,
-            sex: form.sex,
-            birthCity: form.birthCity,
-            birthDate: form.birthDate,
-            adherentEmail: form.adherentEmail,
-            adherentPhonePrimary: form.adherentPhonePrimary,
-            adherentPhoneSecondary: form.adherentPhoneSecondary,
-            addressLine1: form.addressLine1,
-            addressLine2: form.addressLine2,
-            postalCode: form.postalCode,
-            city: form.city,
-            representatives: form.representatives,
-            mainSectionId: form.mainSectionId,
-            additionalSectionIds: form.additionalSectionIds,
-            slotIds: form.slotIds,
-            schoolPickupSlotIds: form.schoolPickupSlotIds.filter((id) =>
-              form.slotIds.includes(id)
-            ),
-            medicalCertificateDeclaration: form.medicalCertificateDeclaration,
-            medicalCertificateStatus: form.medicalCertificateStatus,
-            wantsRegistrationCertificate: form.wantsRegistrationCertificate,
-            familyRegistrationOrder: form.familyRegistrationOrder,
-            reductionTypes: form.reductionTypes,
-            reductionReferenceCodes: form.reductionReferenceCodes,
-            firstFemaleRegistrationSqy:
-              form.sex === "female" ? form.firstFemaleRegistrationSqy ?? false : undefined,
-            photoConsent: form.photoConsent,
-            emergencyMedicalAuthorization: form.emergencyMedicalAuthorization,
-            supervisionAcknowledgement: form.supervisionAcknowledgement,
-            internalRulesAccepted: form.internalRulesAccepted,
-            wantsCompetitorExtras: form.wantsCompetitorExtras,
-            competitionJerseySize: form.competitionJerseySize || undefined,
-            wantsOptionalJersey: form.wantsCompetitorExtras ? false : form.wantsOptionalJersey,
-            optionalJerseySize:
-              !form.wantsCompetitorExtras && form.wantsOptionalJersey
-                ? form.optionalJerseySize || undefined
-                : undefined,
-            competitionIds: form.competitionIds,
-            applicantNotes: form.applicantNotes.trim() || undefined,
-            reviewNotes: form.reviewNotes,
-            voluntaryDonationCents: form.voluntaryDonationCents,
-            paymentAids: form.paymentAids,
-            ...(amountCents !== null ? { paymentAmountCents: amountCents } : {}),
-          }),
+          body: JSON.stringify(buildManagerRegistrationSavePayload(form)),
         }
       );
       const json = await res.json().catch(() => ({}));

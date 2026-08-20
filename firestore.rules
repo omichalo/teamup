@@ -225,8 +225,10 @@ service cloud.firestore {
     // - get    : owner (submitterUid == uid), admin, secrétariat ou secrétaire adjoint
     // - list   : owner uniquement, requête where submitterUid == uid, limit <= 50
     //            (listes secrétariat via API / Admin SDK)
-    // - create : owner se déclare comme submitterUid, schemaVersion strict
-    // - update : owner uniquement, tant que status != 'approved'
+    // - create : owner se déclare comme submitterUid, schemaVersion strict ;
+    //            le suivi Critérium fédéral / maillot / attestation n’est pas saisissable côté client
+    // - update : owner uniquement, tant que status != 'approved' ;
+    //            les suivis secrétariat (critérium, maillot, attestation) sont figés (écrits via Admin SDK)
     // - delete : interdit côté client (l'admin gère via Admin SDK)
     match /clubRegistrations/{registrationId} {
       allow get: if isAuthenticated()
@@ -236,11 +238,18 @@ service cloud.firestore {
                   && isPersonalClubRegistrationListQuery();
       allow create: if isAuthenticated()
                     && request.resource.data.submitterUid == request.auth.uid
-                    && request.resource.data.schemaVersion == 1;
+                    && request.resource.data.schemaVersion == 1
+                    && !request.resource.data.keys().hasAny(['criteriumFederalRegistrationStatus', 'jerseyFollowUpStatus', 'registrationCertificateFollowUpStatus']);
       allow update: if isAuthenticated()
                     && resource.data.submitterUid == request.auth.uid
                     && request.resource.data.submitterUid == request.auth.uid
-                    && resource.data.get('status', 'draft') != 'approved';
+                    && resource.data.get('status', 'draft') != 'approved'
+                    && request.resource.data.get('criteriumFederalRegistrationStatus', '')
+                       == resource.data.get('criteriumFederalRegistrationStatus', '')
+                    && request.resource.data.get('jerseyFollowUpStatus', '')
+                       == resource.data.get('jerseyFollowUpStatus', '')
+                    && request.resource.data.get('registrationCertificateFollowUpStatus', '')
+                       == resource.data.get('registrationCertificateFollowUpStatus', '');
       allow delete: if false;
     }
 

@@ -9,6 +9,18 @@ import {
   normalizeMedicalCertificateStatus,
 } from "@/lib/club-registration/medical-certificate";
 import { normalizePpsFollowUpStatus } from "@/lib/club-registration/pps-follow-up";
+import {
+  isCriteriumFederalRegistrationStatus,
+  resolveCriteriumFederalRegistrationStatusForPatch,
+} from "@/lib/club-registration/criterium-federal-follow-up";
+import {
+  isJerseyFollowUpStatus,
+  resolveJerseyFollowUpStatusForPatch,
+} from "@/lib/club-registration/jersey-follow-up";
+import {
+  isRegistrationCertificateFollowUpStatus,
+  resolveRegistrationCertificateFollowUpStatusForPatch,
+} from "@/lib/club-registration/registration-certificate-follow-up";
 import { buildManagerRegistrationPricingPatch } from "@/lib/club-registration/build-manager-registration-pricing-patch";
 import { resolveManagerPaymentAidsUpdate } from "@/lib/club-registration/build-manager-registration-aids-patch";
 import {
@@ -96,6 +108,33 @@ export async function patchManagerRegistration(
     !isMedicalCertificateStatus(updates.medicalCertificateStatus)
   ) {
     return jsonNoStore({ error: "Statut de certificat médical invalide" }, { status: 400 });
+  }
+
+  if (
+    updates.criteriumFederalRegistrationStatus !== undefined &&
+    !isCriteriumFederalRegistrationStatus(updates.criteriumFederalRegistrationStatus)
+  ) {
+    return jsonNoStore(
+      { error: "Statut d’inscription au Critérium fédéral invalide" },
+      { status: 400 }
+    );
+  }
+
+  if (
+    updates.jerseyFollowUpStatus !== undefined &&
+    !isJerseyFollowUpStatus(updates.jerseyFollowUpStatus)
+  ) {
+    return jsonNoStore({ error: "Statut de remise du maillot invalide" }, { status: 400 });
+  }
+
+  if (
+    updates.registrationCertificateFollowUpStatus !== undefined &&
+    !isRegistrationCertificateFollowUpStatus(updates.registrationCertificateFollowUpStatus)
+  ) {
+    return jsonNoStore(
+      { error: "Statut d’envoi de l’attestation d’inscription invalide" },
+      { status: 400 }
+    );
   }
 
   if (updates.ffttLicense !== undefined) {
@@ -191,6 +230,55 @@ export async function patchManagerRegistration(
         updates.ppsFollowUpUpdatedAt = FieldValue.serverTimestamp();
       }
     }
+  }
+
+  if (
+    updates.competitionIds !== undefined ||
+    updates.criteriumFederalRegistrationStatus !== undefined
+  ) {
+    updates.criteriumFederalRegistrationStatus =
+      resolveCriteriumFederalRegistrationStatusForPatch({
+        competitionIds:
+          updates.competitionIds !== undefined
+            ? updates.competitionIds
+            : currentData.competitionIds,
+        currentStatus: currentData.criteriumFederalRegistrationStatus,
+        requestedStatus: updates.criteriumFederalRegistrationStatus,
+      });
+  }
+
+  if (
+    updates.wantsCompetitorExtras !== undefined ||
+    updates.wantsOptionalJersey !== undefined ||
+    updates.jerseyFollowUpStatus !== undefined
+  ) {
+    updates.jerseyFollowUpStatus = resolveJerseyFollowUpStatusForPatch({
+      wantsCompetitorExtras:
+        updates.wantsCompetitorExtras !== undefined
+          ? updates.wantsCompetitorExtras
+          : currentData.wantsCompetitorExtras,
+      wantsOptionalJersey:
+        updates.wantsOptionalJersey !== undefined
+          ? updates.wantsOptionalJersey
+          : currentData.wantsOptionalJersey,
+      currentStatus: currentData.jerseyFollowUpStatus,
+      requestedStatus: updates.jerseyFollowUpStatus,
+    });
+  }
+
+  if (
+    updates.wantsRegistrationCertificate !== undefined ||
+    updates.registrationCertificateFollowUpStatus !== undefined
+  ) {
+    updates.registrationCertificateFollowUpStatus =
+      resolveRegistrationCertificateFollowUpStatusForPatch({
+        wantsCertificate:
+          updates.wantsRegistrationCertificate !== undefined
+            ? updates.wantsRegistrationCertificate
+            : currentData.wantsRegistrationCertificate,
+        currentStatus: currentData.registrationCertificateFollowUpStatus,
+        requestedStatus: updates.registrationCertificateFollowUpStatus,
+      });
   }
 
   if (updates.paymentAids !== undefined) {
