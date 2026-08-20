@@ -4,7 +4,7 @@ import { jsonNoStore } from "@/lib/http/cache-headers";
 import { mapRegistrationDocToClient } from "@/lib/club-registration/map-registration-doc-to-client";
 import { cookies } from "next/headers";
 import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
-import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
+import { ALL_USER_ROLES, hasAnyRole, resolveRole } from "@/lib/auth/roles";
 import {
   canViewClubRegistration,
   isClubRegistrationManager,
@@ -53,7 +53,7 @@ function stripUndefined<T extends Record<string, unknown>>(obj: T): Record<strin
   return out;
 }
 
-/** GET /api/club/registration?id={registrationId} — lecture d'un dossier (owner, secrétariat, secrétaire adjoint). */
+/** GET /api/club/registration?id={registrationId} — lecture d'un dossier (owner, tableau, secrétariat). */
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
@@ -124,15 +124,7 @@ export async function POST(req: Request) {
     const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     const role = resolveRole(decoded.role as string | undefined);
 
-    if (
-      !hasAnyRole(role, [
-        USER_ROLES.PLAYER,
-        USER_ROLES.ASSISTANT_SECRETARY,
-        USER_ROLES.SECRETARY,
-        USER_ROLES.COACH,
-        USER_ROLES.ADMIN,
-      ])
-    ) {
+    if (!hasAnyRole(role, ALL_USER_ROLES)) {
       return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
     }
 

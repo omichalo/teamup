@@ -1,8 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ManagedListStatusFilter } from "@/lib/club-registration/registration-status";
-import { MANAGED_LIST_STATUS_FILTER_OPTIONS } from "@/lib/club-registration/registration-status";
+import {
+  REGISTRATION_STATUS_LABELS,
+  isRegistrationStatus,
+  type ManagedListStatusFilter,
+} from "@/lib/club-registration/registration-status";
+import {
+  getManagedListFiltersForSavedView,
+  MANAGED_LIST_QUEUE_VIEWS,
+  type ManagedListQueueViewId,
+} from "@/lib/club-registration/managed-list-saved-views";
 import {
   getQueueMetrics,
   pickAdjacentRegistrationId,
@@ -19,7 +27,8 @@ export function useMembershipRequestQueue(
   selectedId: string | null,
   setSelectedId: (id: string | null) => void,
   reload: ReloadFn,
-  statusFilter: ManagedListStatusFilter
+  statusFilter: ManagedListStatusFilter,
+  queueViewId: ManagedListQueueViewId
 ) {
   const [sessionProcessedIds, setSessionProcessedIds] = useState<Set<string>>(() => new Set());
   const [sessionViewedIds, setSessionViewedIds] = useState<Set<string>>(() => new Set());
@@ -32,11 +41,17 @@ export function useMembershipRequestQueue(
   );
 
   const filterLabel = useMemo(() => {
-    return (
-      MANAGED_LIST_STATUS_FILTER_OPTIONS.find((option) => option.value === statusFilter)?.label ??
-      "File courante"
-    );
-  }, [statusFilter]);
+    const queueLabel =
+      MANAGED_LIST_QUEUE_VIEWS.find((view) => view.id === queueViewId)?.label ?? "File courante";
+    const queueDefaultStatus = getManagedListFiltersForSavedView(queueViewId).statusFilter;
+    if (statusFilter === queueDefaultStatus) {
+      return queueLabel;
+    }
+    if (isRegistrationStatus(statusFilter)) {
+      return REGISTRATION_STATUS_LABELS[statusFilter];
+    }
+    return queueLabel;
+  }, [queueViewId, statusFilter]);
 
   useEffect(() => {
     if (registrations.length > 0) {

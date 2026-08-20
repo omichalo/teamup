@@ -16,6 +16,7 @@ const ALLOWED_ROLES = new Set([
   "admin",
   "secretary",
   "assistant_secretary",
+  "board_member",
   "coach",
   "player",
 ]);
@@ -30,6 +31,7 @@ type AllowedRole =
   | "admin"
   | "secretary"
   | "assistant_secretary"
+  | "board_member"
   | "coach"
   | "player";
 
