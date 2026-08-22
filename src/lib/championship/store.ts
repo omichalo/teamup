@@ -6,6 +6,7 @@ import type {
   PlayerClubProfileRecord,
 } from "./records";
 import { PLAYER_CLUB_PROFILES_COLLECTION } from "./paths";
+import { omitUndefinedFields } from "./omit-undefined-fields";
 
 export function championshipPlayersCollection(
   db: Firestore,
@@ -47,12 +48,12 @@ export async function upsertChampionshipPlayer(
   await championshipPlayersCollection(db, seasonLabel)
     .doc(personKey)
     .set(
-      {
+      omitUndefinedFields({
         ...rest,
         personKey,
         seasonLabel,
         updatedAt: FieldValue.serverTimestamp(),
-      },
+      }),
       { merge: true }
     );
 }
@@ -103,10 +104,10 @@ export async function upsertPlayerClubProfile(
     .collection(PLAYER_CLUB_PROFILES_COLLECTION)
     .doc(profile.personKey)
     .set(
-      {
+      omitUndefinedFields({
         ...profile,
         updatedAt: FieldValue.serverTimestamp(),
-      },
+      }),
       { merge: true }
     );
 }
