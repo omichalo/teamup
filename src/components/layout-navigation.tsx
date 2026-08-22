@@ -18,6 +18,7 @@ import {
   TipsAndUpdates,
   Tune,
   VerifiedUser,
+  ViewWeek,
 } from "@mui/icons-material";
 
 export interface LayoutNavigationItem {
@@ -109,6 +110,11 @@ const NAV = {
     href: "/club/presences",
     icon: <EventAvailable />,
   },
+  creneaux: {
+    label: "Créneaux",
+    href: "/club/creneaux",
+    icon: <ViewWeek />,
+  },
   presencesEssais: {
     label: "Essais présence",
     href: "/club/presences/essais",
@@ -179,7 +185,7 @@ export function buildLayoutNavigation(
       primary.push(NAV.tableauAdhesions);
     }
     if (isBoardMember) {
-      primary.push(NAV.presences, NAV.presencesEssais);
+      primary.push(NAV.presences, NAV.creneaux, NAV.presencesEssais);
     }
     if (isAssistantSecretary) {
       primary.push(NAV.validationsLicence);
@@ -193,6 +199,7 @@ export function buildLayoutNavigation(
         NAV.accueilStaff,
         NAV.dossiersAValider,
         NAV.presences,
+        NAV.creneaux,
         NAV.boiteIdees,
       ],
       groups: [
@@ -237,6 +244,7 @@ export function buildLayoutNavigation(
           items: [
             NAV.tableauAdhesions,
             NAV.presences,
+            NAV.creneaux,
             NAV.presencesEssais,
             NAV.campagnesTarifs,
             NAV.apercuFormulaire,
@@ -251,6 +259,7 @@ export function buildLayoutNavigation(
     primary: [
       NAV.accueilStaff,
       NAV.presences,
+      NAV.creneaux,
       NAV.compositions,
       NAV.disponibilites,
       NAV.tableauAdhesions,

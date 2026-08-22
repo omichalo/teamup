@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import {
   Accordion,
   AccordionDetails,
@@ -7,6 +8,7 @@ import {
   Alert,
   Box,
   Checkbox,
+  Chip,
   FormControlLabel,
   FormGroup,
   Stack,
@@ -18,6 +20,11 @@ import {
   sanitizeSchoolPickupSlotIdsFromConfig,
 } from "@/lib/club-registration-config/helpers";
 import { registrationSiteGymnasiumLabel } from "@/lib/club-registration-config/site-display";
+import {
+  isSlotEnrollmentsClosed,
+  omitClosedSlotsFromSelection,
+  SLOT_ENROLLMENTS_CLOSED_LABEL,
+} from "@/lib/club-registration-config/slot-enrollments";
 import { useRegistrationConfigValue } from "@/hooks/useRegistrationConfig";
 import type { RegistrationDraft } from "./registration-defaults";
 
@@ -26,6 +33,7 @@ type Props = {
   expandedSiteIds: Set<string>;
   onExpandedSiteIdsChange: (next: Set<string>) => void;
   onChange: (patch: Partial<RegistrationDraft>) => void;
+  canSelectClosedSlots?: boolean;
 };
 
 export function PracticeSlotPicker({
@@ -33,12 +41,34 @@ export function PracticeSlotPicker({
   expandedSiteIds,
   onExpandedSiteIdsChange,
   onChange,
+  canSelectClosedSlots = false,
 }: Props) {
   const config = useRegistrationConfigValue();
   const sites = getEnabledSites(config);
   const schoolPickupCopy = config.uiCopy.schoolPickupService;
 
-  const toggleSlot = (id: string) => {
+  useEffect(() => {
+    if (canSelectClosedSlots) {
+      return;
+    }
+    const nextSlotIds = omitClosedSlotsFromSelection(config, draft.slotIds);
+    if (nextSlotIds.length === draft.slotIds.length) {
+      return;
+    }
+    onChange({
+      slotIds: nextSlotIds,
+      schoolPickupSlotIds: sanitizeSchoolPickupSlotIdsFromConfig(
+        config,
+        nextSlotIds,
+        draft.schoolPickupSlotIds
+      ),
+    });
+  }, [canSelectClosedSlots, config, draft.schoolPickupSlotIds, draft.slotIds, onChange]);
+
+  const toggleSlot = (id: string, closed: boolean) => {
+    if (closed && !canSelectClosedSlots) {
+      return;
+    }
     const slotSet = new Set(draft.slotIds);
     const pickupSet = new Set(draft.schoolPickupSlotIds);
     if (slotSet.has(id)) {
@@ -114,6 +144,8 @@ export function PracticeSlotPicker({
                 .map((slot) => {
                 const isSelected = draft.slotIds.includes(slot.id);
                 const wantsSchoolPickup = draft.schoolPickupSlotIds.includes(slot.id);
+                const closed = isSlotEnrollmentsClosed(slot);
+                const blocked = closed && !canSelectClosedSlots;
 
                 return (
                   <Box key={slot.id} sx={{ mb: slot.schoolPickupSchool ? 1.5 : 0 }}>
@@ -121,10 +153,18 @@ export function PracticeSlotPicker({
                       control={
                         <Checkbox
                           checked={isSelected}
-                          onChange={() => toggleSlot(slot.id)}
+                          disabled={blocked}
+                          onChange={() => toggleSlot(slot.id, closed)}
                         />
                       }
-                      label={slot.label}
+                      label={
+                        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                          <Typography component="span">{slot.label}</Typography>
+                          {closed ? (
+                            <Chip size="small" color="warning" label={SLOT_ENROLLMENTS_CLOSED_LABEL} />
+                          ) : null}
+                        </Stack>
+                      }
                     />
                     {isSelected && slot.schoolPickupSchool ? (
                       <Box sx={{ pl: 4, mt: 0.5 }}>

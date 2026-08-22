@@ -32,6 +32,7 @@ import { getCompetitionsRequiringAvailabilityCommitment } from "@/lib/club-regis
 type Props = {
   draft: RegistrationDraft;
   onChange: (patch: Partial<RegistrationDraft>) => void;
+  canSelectClosedSlots?: boolean;
 };
 
 function siteIdsMatchingMainSection(
@@ -69,7 +70,7 @@ function formatCompetitionAddonEuros(priceCents: number): string {
  * Villepreux, etc.). Les sections « handisport » et « sport-adapté » restent
  * proposées dans la même liste.
  */
-export function PracticeStep({ draft, onChange }: Props) {
+export function PracticeStep({ draft, onChange, canSelectClosedSlots = false }: Props) {
   const config = useRegistrationConfigValue();
   const sectionOptions = getEnabledSections(config);
   const youthCompetitions = config.competitions.filter(
@@ -182,6 +183,7 @@ export function PracticeStep({ draft, onChange }: Props) {
         expandedSiteIds={expandedSiteIds}
         onExpandedSiteIdsChange={setExpandedSiteIds}
         onChange={onChange}
+        canSelectClosedSlots={canSelectClosedSlots}
       />
 
       <Typography

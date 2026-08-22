@@ -9,6 +9,7 @@ import {
 import EditIcon from "@mui/icons-material/Edit";
 import { SectionCard } from "@/components/ui";
 import { getEnabledSections, getEnabledSites } from "@/lib/club-registration-config/helpers";
+import { SLOT_ENROLLMENTS_CLOSED_LABEL } from "@/lib/club-registration-config/slot-enrollments";
 import { formatRegistrationSiteLabel } from "@/lib/club-registration-config/site-display";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import { MEDICAL_CERTIFICATE_DECLARATION_LABELS } from "@/lib/club-registration/medical-declaration-labels";
@@ -77,7 +78,11 @@ export function findSectionLabel(config: RegistrationConfigV1, id: string): stri
 export function findSlotLabel(config: RegistrationConfigV1, id: string): string {
   for (const site of getEnabledSites(config)) {
     const found = site.slots.find((s) => s.id === id);
-    if (found) return `${formatRegistrationSiteLabel(site)} — ${found.label}`;
+    if (found) {
+      return found.enrollmentsClosed
+        ? `${formatRegistrationSiteLabel(site)} — ${found.label} (${SLOT_ENROLLMENTS_CLOSED_LABEL})`
+        : `${formatRegistrationSiteLabel(site)} — ${found.label}`;
+    }
   }
   return id;
 }

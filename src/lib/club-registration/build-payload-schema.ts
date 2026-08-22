@@ -6,6 +6,7 @@ import {
   getEnabledSectionIds,
   getSchoolPickupSlotIds,
 } from "@/lib/club-registration-config/helpers";
+import { getClosedEnabledSlotIds } from "@/lib/club-registration-config/slot-enrollments";
 import { getToggleAidRules } from "@/lib/club-registration-config/aid-rules";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import { preprocessRegistrationPayloadInput } from "./reduction-reference-codes";
@@ -69,7 +70,10 @@ function asNonEmptyTuple(ids: string[]): [string, ...string[]] {
   return ids as [string, ...string[]];
 }
 
-export function buildRegistrationPayloadSchema(config: RegistrationConfigV1) {
+export function buildRegistrationPayloadSchema(
+  config: RegistrationConfigV1,
+  options: { allowClosedSlots?: boolean } = {}
+) {
   const sectionIds = asNonEmptyTuple(getEnabledSectionIds(config));
   const competitionIds = asNonEmptyTuple(getEnabledCompetitionIds(config));
   const reductionIds = asNonEmptyTuple(getEnabledReductionIds(config));
@@ -145,6 +149,18 @@ export function buildRegistrationPayloadSchema(config: RegistrationConfigV1) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message: "Créneau inconnu",
+            path: ["slotIds"],
+          });
+          return;
+        }
+      }
+
+      if (!options.allowClosedSlots) {
+        const closedSlotIds = getClosedEnabledSlotIds(config);
+        if (data.slotIds.some((id) => closedSlotIds.has(id))) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Les inscriptions sont fermées sur un créneau sélectionné.",
             path: ["slotIds"],
           });
           return;

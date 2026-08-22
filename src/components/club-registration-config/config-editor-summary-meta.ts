@@ -4,6 +4,7 @@ import {
   formatSlotScheduleSummary,
   resolveSlotSchedule,
 } from "@/lib/club-registration-config/slot-schedule";
+import { SLOT_ENROLLMENTS_CLOSED_LABEL } from "@/lib/club-registration-config/slot-enrollments";
 import { centsToEuroInput } from "./config-editor-utils";
 
 export function sectionSummaryMeta(
@@ -27,6 +28,8 @@ export function slotSummaryMeta(
     weekday?: number | undefined;
     startMinutes?: number | undefined;
     endMinutes?: number | undefined;
+    capacity?: number | undefined;
+    enrollmentsClosed?: boolean | undefined;
     id?: string;
     label?: string;
   }
@@ -42,6 +45,10 @@ export function slotSummaryMeta(
   if (schedule) {
     parts.push(formatSlotScheduleSummary(schedule));
   }
+  if (typeof slot.capacity === "number") {
+    parts.push(`${slot.capacity} places`);
+  }
+  if (slot.enrollmentsClosed) parts.push(SLOT_ENROLLMENTS_CLOSED_LABEL);
   if (!slot.enabled) parts.push("Inactif");
   if (slot.schoolPickupSchool) parts.push("Récup. scolaire");
   return parts.length > 0 ? parts.join(" · ") : undefined;

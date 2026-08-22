@@ -25,6 +25,7 @@ export function useRegistrationWizardSubmit(params: {
   sequence: RegistrationStepId[];
   storage: DraftStorage;
   accountEmail: string | null;
+  allowClosedSlots?: boolean;
   buildPayload: () => ClubRegistrationPayload | null;
   setActiveStep: (step: number | ((prev: number) => number)) => void;
   stepErrorAlertRef: RefObject<HTMLDivElement | null>;
@@ -35,6 +36,7 @@ export function useRegistrationWizardSubmit(params: {
     sequence,
     storage,
     accountEmail,
+    allowClosedSlots = false,
     buildPayload,
     setActiveStep,
     stepErrorAlertRef,
@@ -103,7 +105,7 @@ export function useRegistrationWizardSubmit(params: {
     });
     for (let i = 0; i < sequence.length - 1; i++) {
       const stepId = sequence[i];
-      const result = validateStep(stepId, draft, config);
+      const result = validateStep(stepId, draft, config, { allowClosedSlots });
       if (!result.valid) {
         logRegistrationWizardDebug("handleSubmit: validateStep échoué", {
           stepIndex: i,
@@ -135,7 +137,7 @@ export function useRegistrationWizardSubmit(params: {
       setSubmitError("Certaines informations obligatoires sont manquantes.");
       return;
     }
-    const parsed = buildRegistrationPayloadSchema(config).safeParse(payload);
+    const parsed = buildRegistrationPayloadSchema(config, { allowClosedSlots }).safeParse(payload);
     if (!parsed.success) {
       const flat = parsed.error.flatten().fieldErrors as Record<
         string,
@@ -169,6 +171,7 @@ export function useRegistrationWizardSubmit(params: {
     await performSubmit(payload, attemptId);
   }, [
     accountEmail,
+    allowClosedSlots,
     buildPayload,
     config,
     draft,

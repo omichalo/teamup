@@ -1,5 +1,6 @@
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import { getEnabledSites } from "@/lib/club-registration-config/helpers";
+import { SLOT_ENROLLMENTS_CLOSED_LABEL } from "@/lib/club-registration-config/slot-enrollments";
 import { formatRegistrationSiteLabel } from "@/lib/club-registration-config/site-display";
 import {
   syncPaymentAidsWithReductionTypes,
@@ -74,7 +75,9 @@ export function buildSlotOptions(config: RegistrationConfigV1) {
       .filter((slot) => slot.enabled)
       .map((slot) => ({
         value: slot.id,
-        label: `${formatRegistrationSiteLabel(site)} — ${slot.label}`,
+        label: slot.enrollmentsClosed
+          ? `${formatRegistrationSiteLabel(site)} — ${slot.label} (${SLOT_ENROLLMENTS_CLOSED_LABEL})`
+          : `${formatRegistrationSiteLabel(site)} — ${slot.label}`,
       }))
   );
 }
