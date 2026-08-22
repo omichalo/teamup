@@ -305,6 +305,21 @@ service cloud.firestore {
     }
 
     // ============================================
+    // Collections: seasons / championshipPlayers, playerClubProfiles
+    // ============================================
+    // Effectif championnat saisonnier + profils durables (Discord, fauteuil).
+    // Lectures / écritures via Admin SDK (routes /api/club/championship/*).
+    match /seasons/{seasonId} {
+      allow read, write: if false;
+      match /championshipPlayers/{personKey} {
+        allow read, write: if false;
+      }
+    }
+    match /playerClubProfiles/{personKey} {
+      allow read, write: if false;
+    }
+
+    // ============================================
     // Règle par défaut : refuser tout accès non explicitement autorisé
     // ============================================
     match /{document=**} {

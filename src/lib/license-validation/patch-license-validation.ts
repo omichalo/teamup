@@ -10,6 +10,7 @@ import { COLLECTION } from "@/lib/club-registration/list-registrations";
 import { normalizeLicenseValidationStatus } from "@/lib/license-validation/license-validation-status";
 import { mapRegistrationToLicenseValidationDetail } from "@/lib/license-validation/map-registration";
 import { resolveLicenseValidationPatchFields } from "@/lib/license-validation/resolve-license-validation-patch";
+import { syncRosterAfterRegistrationChange } from "@/lib/championship/sync-after-registration";
 
 export type LicenseValidationPatchInput = {
   ffttLicense?: unknown;
@@ -103,6 +104,8 @@ export async function patchLicenseValidation(
     },
     success: true,
   });
+
+  await syncRosterAfterRegistrationChange(db, registrationId);
 
   return { ok: true, data: detail };
 }

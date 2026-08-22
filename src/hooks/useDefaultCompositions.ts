@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { CompositionDefaultsService } from "@/lib/services/composition-defaults-service";
+import { EquipeWithMatches } from "@/hooks/useTeamData";
+import { EpreuveType, resolveIdEpreuveFromEquipes } from "@/lib/shared/epreuve-utils";
 
 interface DefaultCompositionsState {
   masculin: Record<string, string[]>;
@@ -8,11 +10,15 @@ interface DefaultCompositionsState {
 
 interface UseDefaultCompositionsParams {
   selectedPhase: "aller" | "retour" | null;
+  selectedEpreuve?: EpreuveType | null;
+  equipes?: EquipeWithMatches[];
   compositionDefaultsService: CompositionDefaultsService;
 }
 
 export function useDefaultCompositions({
   selectedPhase,
+  selectedEpreuve = null,
+  equipes = [],
   compositionDefaultsService,
 }: UseDefaultCompositionsParams) {
   const [defaultCompositions, setDefaultCompositions] =
@@ -35,8 +41,16 @@ export function useDefaultCompositions({
     const loadDefaults = async () => {
       try {
         const [masculineDefaults, feminineDefaults] = await Promise.all([
-          compositionDefaultsService.getDefaults(selectedPhase, "masculin"),
-          compositionDefaultsService.getDefaults(selectedPhase, "feminin"),
+          compositionDefaultsService.getDefaults(
+            selectedPhase,
+            "masculin",
+            resolveIdEpreuveFromEquipes(equipes, "masculin", selectedEpreuve)
+          ),
+          compositionDefaultsService.getDefaults(
+            selectedPhase,
+            "feminin",
+            resolveIdEpreuveFromEquipes(equipes, "feminin", selectedEpreuve)
+          ),
         ]);
 
         setDefaultCompositions({
@@ -55,7 +69,7 @@ export function useDefaultCompositions({
     };
 
     void loadDefaults();
-  }, [selectedPhase, compositionDefaultsService]);
+  }, [equipes, selectedEpreuve, selectedPhase, compositionDefaultsService]);
 
   return {
     defaultCompositions,

@@ -17,6 +17,7 @@ import {
   DragIndicator,
   Warning,
 } from "@mui/icons-material";
+import { ChampionshipStatusChips } from "@/components/championship/ChampionshipStatusChips";
 import { Player } from "@/types/team-management";
 
 interface AvailablePlayerListItemProps {
@@ -85,6 +86,7 @@ export function AvailablePlayerListItem({
               <Typography variant="body2" component="span">
                 {player.firstName} {player.name}
               </Typography>
+              <ChampionshipStatusChips player={player} />
               {player.isWheelchair && (
                 <Tooltip title="Joueur en fauteuil">
                   <AccessibleIcon fontSize="small" sx={{ color: "primary.main", ml: 0.5 }} />

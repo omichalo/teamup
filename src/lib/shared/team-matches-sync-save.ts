@@ -6,6 +6,7 @@ import {
   hasMatchCompositionData,
   playerNameKey,
 } from "./team-matches-roster-utils";
+import { markMatchesListedInFftt } from "./mark-matches-listed-in-fftt";
 
 type SyncPlayer = NonNullable<MatchData["joueursSQY"]>[number];
 type ResultPlayer = { nom: string; prenom: string; points?: number };
@@ -211,6 +212,7 @@ export async function saveMatchesToTeamSubcollections(
 
           const matchData = {
             ...match,
+            listedInFftt: true,
             joueursSQY: mergedComposition.joueursSQY,
             resultatsIndividuels: mergedComposition.resultatsIndividuels,
             date: Timestamp.fromDate(match.date),
@@ -436,6 +438,13 @@ export async function saveMatchesToTeamSubcollections(
     }
 
     await Promise.all(batchPromises);
+
+    for (const [teamId, teamMatches] of matchesByTeam) {
+      const listedIds = teamMatches
+        .map((match) => (typeof match.id === "string" ? match.id.trim() : ""))
+        .filter((id) => id.length > 0);
+      await markMatchesListedInFftt(db, teamId, listedIds);
+    }
 
     console.log(
       `✅ Synchronisation terminée: ${saved} matchs sauvegardés sur ${matches.length} matchs reçus`

@@ -10,6 +10,7 @@ import {
 import { ChampionshipType } from "@/types";
 import { Player } from "@/types/team-management";
 import { CompositionService } from "@/lib/services/composition-service";
+import { resolveIdEpreuveFromEquipes } from "@/lib/shared/epreuve-utils";
 
 interface UseCompositionAssignmentsParams {
   players: Player[];
@@ -178,6 +179,15 @@ export function useCompositionAssignments({
                 phase: selectedPhase,
                 championshipType,
                 teams: newCompositions,
+                ...(resolveIdEpreuveFromEquipes(filteredEquipes, championshipType) !==
+                undefined
+                  ? {
+                      idEpreuve: resolveIdEpreuveFromEquipes(
+                        filteredEquipes,
+                        championshipType
+                      ),
+                    }
+                  : {}),
               });
             } catch (error) {
               console.error("Erreur lors de la sauvegarde:", error);
@@ -228,6 +238,15 @@ export function useCompositionAssignments({
                 phase: selectedPhase,
                 championshipType,
                 teams: newCompositions,
+                ...(resolveIdEpreuveFromEquipes(filteredEquipes, championshipType) !==
+                undefined
+                  ? {
+                      idEpreuve: resolveIdEpreuveFromEquipes(
+                        filteredEquipes,
+                        championshipType
+                      ),
+                    }
+                  : {}),
               });
             } catch (error) {
               console.error("Erreur lors de la sauvegarde:", error);

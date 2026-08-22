@@ -6,6 +6,7 @@ import {
 } from "firebase/firestore";
 import { getDbInstanceDirect } from "@/lib/firebase";
 import { ChampionshipType } from "@/types";
+import { getCompositionDefaultsDocumentId } from "@/lib/compositions/document-id";
 
 export interface PhaseCompositionDefaults {
   phase: "aller" | "retour";
@@ -19,17 +20,19 @@ export class CompositionDefaultsService {
 
   private getDocumentId(
     phase: "aller" | "retour",
-    championshipType: ChampionshipType
+    championshipType: ChampionshipType,
+    idEpreuve?: number
   ): string {
-    return `${phase}_${championshipType}`;
+    return getCompositionDefaultsDocumentId(phase, championshipType, idEpreuve);
   }
 
   async getDefaults(
     phase: "aller" | "retour",
-    championshipType: ChampionshipType
+    championshipType: ChampionshipType,
+    idEpreuve?: number | undefined
   ): Promise<PhaseCompositionDefaults | null> {
     try {
-      const docId = this.getDocumentId(phase, championshipType);
+      const docId = this.getDocumentId(phase, championshipType, idEpreuve);
       const docRef = doc(getDbInstanceDirect(), this.collectionName, docId);
       const docSnap = await getDoc(docRef);
 
@@ -62,11 +65,12 @@ export class CompositionDefaultsService {
     phase: "aller" | "retour";
     championshipType: ChampionshipType;
     teams: Record<string, string[]>;
+    idEpreuve?: number | undefined;
   }): Promise<void> {
-    const { phase, championshipType, teams } = params;
+    const { phase, championshipType, teams, idEpreuve } = params;
 
     try {
-      const docId = this.getDocumentId(phase, championshipType);
+      const docId = this.getDocumentId(phase, championshipType, idEpreuve);
       const docRef = doc(getDbInstanceDirect(), this.collectionName, docId);
 
       await setDoc(
@@ -76,6 +80,7 @@ export class CompositionDefaultsService {
           championshipType,
           teams,
           updatedAt: Timestamp.fromDate(new Date()),
+          ...(idEpreuve !== undefined ? { idEpreuve } : {}),
         },
         { merge: true }
       );

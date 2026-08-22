@@ -40,6 +40,7 @@ import {
 import { MANAGER_EDITABLE_FIELDS } from "@/lib/club-registration/registration-api-fields";
 import { ffttLicenseLookupSchema } from "@/lib/club-registration/schema-base";
 import { normalizeRegistrationLastNamePatch } from "@/lib/shared/person-name-format";
+import { syncRosterAfterRegistrationChange } from "@/lib/championship/sync-after-registration";
 
 const COLLECTION = "clubRegistrations";
 const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
@@ -322,6 +323,8 @@ export async function patchManagerRegistration(
     details: { fields: Object.keys(updates) },
     success: true,
   });
+
+  await syncRosterAfterRegistrationChange(db, registrationId);
 
   return jsonNoStore({ success: true }, { status: 200 });
 }

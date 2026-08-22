@@ -3,7 +3,7 @@ import { useAvailabilities } from "@/hooks/useAvailabilities";
 import { useCompositions } from "@/hooks/useCompositions";
 import { EquipeWithMatches } from "@/hooks/useTeamData";
 import { getPlayersByType } from "@/lib/compositions/championship-utils";
-import { getIdEpreuve, isParisEpreuve, EpreuveType } from "@/lib/shared/epreuve-utils";
+import { getIdEpreuve, isParisEpreuve, EpreuveType, resolveIdEpreuveFromEquipes } from "@/lib/shared/epreuve-utils";
 import { Player } from "@/types/team-management";
 import { ChampionshipType } from "@/types";
 
@@ -41,13 +41,25 @@ export function useCompositionsRealtimeSync({
   const [availabilitiesLoaded, setAvailabilitiesLoaded] = useState(false);
 
   const idEpreuve = useMemo(() => getIdEpreuve(selectedEpreuve), [selectedEpreuve]);
+  const masculinIdEpreuve = useMemo(
+    () =>
+      resolveIdEpreuveFromEquipes(equipes, "masculin", selectedEpreuve) ??
+      idEpreuve,
+    [equipes, idEpreuve, selectedEpreuve]
+  );
+  const femininIdEpreuve = useMemo(
+    () =>
+      resolveIdEpreuveFromEquipes(equipes, "feminin", selectedEpreuve) ??
+      idEpreuve,
+    [equipes, idEpreuve, selectedEpreuve]
+  );
 
   const { availability: masculineAvailability, error: errorMasculineAvailability } =
     useAvailabilities({
       journee: selectedJournee,
       phase: selectedPhase,
       championshipType: "masculin",
-      ...(idEpreuve !== undefined ? { idEpreuve } : {}),
+      ...(masculinIdEpreuve !== undefined ? { idEpreuve: masculinIdEpreuve } : {}),
     });
 
   const { availability: feminineAvailability, error: errorFeminineAvailability } =
@@ -55,7 +67,7 @@ export function useCompositionsRealtimeSync({
       journee: selectedJournee,
       phase: selectedPhase,
       championshipType: "feminin",
-      ...(idEpreuve !== undefined ? { idEpreuve } : {}),
+      ...(femininIdEpreuve !== undefined ? { idEpreuve: femininIdEpreuve } : {}),
     });
 
   useEffect(() => {
@@ -86,11 +98,14 @@ export function useCompositionsRealtimeSync({
     : tabValue === 0
     ? "masculin"
     : "feminin";
+  const compositionIdEpreuve =
+    championshipType === "feminin" ? femininIdEpreuve : masculinIdEpreuve;
 
   const { composition: realtimeComposition, error: compositionError } = useCompositions({
     journee: selectedJournee,
     phase: selectedPhase,
     championshipType,
+    ...(compositionIdEpreuve !== undefined ? { idEpreuve: compositionIdEpreuve } : {}),
   });
 
   useEffect(() => {

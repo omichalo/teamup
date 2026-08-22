@@ -7,6 +7,31 @@ import { isParisChampionship } from "@/lib/compositions/validators/team-utils";
 
 type CompositionMap = Record<string, string[]>;
 
+function idEpreuveFromTeams(teams: TeamListItem[]): number | undefined {
+  for (const equipe of teams) {
+    if (equipe.team.idEpreuve != null) {
+      return equipe.team.idEpreuve;
+    }
+  }
+  return undefined;
+}
+
+function compositionPayload(
+  journee: number,
+  phase: "aller" | "retour",
+  championshipType: ChampionshipType,
+  teams: CompositionMap,
+  idEpreuve: number | undefined
+) {
+  return {
+    journee,
+    phase,
+    championshipType,
+    teams,
+    ...(idEpreuve !== undefined ? { idEpreuve } : {}),
+  };
+}
+
 interface TeamAvailabilitiesMap {
   [playerId: string]: {
     available?: boolean;
@@ -22,7 +47,7 @@ interface ApplyAvailabilities {
 }
 
 interface TeamListItem {
-  team: { id: string; name?: string };
+  team: { id: string; name?: string; idEpreuve?: number };
 }
 
 interface ResetParams {
@@ -62,24 +87,30 @@ export async function resetCompositionsBatch({
   try {
     await Promise.all([
       masculineTeamIds.length > 0
-        ? compositionService.saveComposition({
-            journee: selectedJournee,
-            phase: selectedPhase,
-            championshipType: "masculin",
-            teams: Object.fromEntries(
-              masculineTeamIds.map<[string, string[]]>((teamId) => [teamId, []])
-            ),
-          })
+        ? compositionService.saveComposition(
+            compositionPayload(
+              selectedJournee,
+              selectedPhase,
+              "masculin",
+              Object.fromEntries(
+                masculineTeamIds.map<[string, string[]]>((teamId) => [teamId, []])
+              ),
+              idEpreuveFromTeams(equipesByType.masculin)
+            )
+          )
         : Promise.resolve(),
       feminineTeamIds.length > 0
-        ? compositionService.saveComposition({
-            journee: selectedJournee,
-            phase: selectedPhase,
-            championshipType: "feminin",
-            teams: Object.fromEntries(
-              feminineTeamIds.map<[string, string[]]>((teamId) => [teamId, []])
-            ),
-          })
+        ? compositionService.saveComposition(
+            compositionPayload(
+              selectedJournee,
+              selectedPhase,
+              "feminin",
+              Object.fromEntries(
+                feminineTeamIds.map<[string, string[]]>((teamId) => [teamId, []])
+              ),
+              idEpreuveFromTeams(equipesByType.feminin)
+            )
+          )
         : Promise.resolve(),
     ]);
   } catch (error) {
@@ -199,30 +230,36 @@ export async function applyDefaultCompositionsBatch({
 
     await Promise.all([
       masculineTeamIds.length > 0
-        ? compositionService.saveComposition({
-            journee: selectedJournee,
-            phase: selectedPhase,
-            championshipType: "masculin",
-            teams: Object.fromEntries(
-              masculineTeamIds.map<[string, string[]]>((teamId) => [
-                teamId,
-                nextCompositions[teamId] || [],
-              ])
-            ),
-          })
+        ? compositionService.saveComposition(
+            compositionPayload(
+              selectedJournee,
+              selectedPhase,
+              "masculin",
+              Object.fromEntries(
+                masculineTeamIds.map<[string, string[]]>((teamId) => [
+                  teamId,
+                  nextCompositions[teamId] || [],
+                ])
+              ),
+              idEpreuveFromTeams(equipesByType.masculin)
+            )
+          )
         : Promise.resolve(),
       feminineTeamIds.length > 0
-        ? compositionService.saveComposition({
-            journee: selectedJournee,
-            phase: selectedPhase,
-            championshipType: "feminin",
-            teams: Object.fromEntries(
-              feminineTeamIds.map<[string, string[]]>((teamId) => [
-                teamId,
-                nextCompositions[teamId] || [],
-              ])
-            ),
-          })
+        ? compositionService.saveComposition(
+            compositionPayload(
+              selectedJournee,
+              selectedPhase,
+              "feminin",
+              Object.fromEntries(
+                feminineTeamIds.map<[string, string[]]>((teamId) => [
+                  teamId,
+                  nextCompositions[teamId] || [],
+                ])
+              ),
+              idEpreuveFromTeams(equipesByType.feminin)
+            )
+          )
         : Promise.resolve(),
     ]);
   } catch (error) {

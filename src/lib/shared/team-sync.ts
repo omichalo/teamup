@@ -7,6 +7,8 @@ import {
 } from "./fftt-utils";
 import type { Firestore } from "firebase-admin/firestore";
 import { Timestamp } from "firebase-admin/firestore";
+import { markTeamsListedInFftt } from "./mark-teams-listed-in-fftt";
+import { isTrackedClubChampionshipEpreuve } from "./epreuve-utils";
 import type { FFTTEquipe } from "./fftt-types";
 
 export interface TeamSyncResult {
@@ -95,17 +97,24 @@ export class TeamSyncService {
 
       console.log(`✅ ${equipes.length} équipes récupérées depuis l&apos;API FFTT`);
 
-      // Filtrer les équipes pour les épreuves spécifiques
-      // 15954 = Championnat de France par Équipes Masculin
-      // 15955 = Championnat de France par Équipes Féminin
-      // 15980 = Championnat de Paris IDF (Excellence)
-      const filteredEquipes = equipes.filter(
-        (equipe: FFTTEquipe) =>
-          equipe.idEpreuve === 15954 || equipe.idEpreuve === 15955 || equipe.idEpreuve === 15980
+      // Les IDs d'épreuve FFTT changent chaque saison : filtrer par ID connus + libellé.
+      const filteredEquipes = equipes.filter((equipe: FFTTEquipe) =>
+        isTrackedClubChampionshipEpreuve(equipe)
+      );
+      const ignoredEquipes = equipes.filter(
+        (equipe: FFTTEquipe) => !isTrackedClubChampionshipEpreuve(equipe)
       );
       console.log(
-        `Équipes filtrées (épreuves 15954, 15955 et 15980): ${filteredEquipes.length}`
+        `Équipes filtrées (championnat France / Paris): ${filteredEquipes.length}`
       );
+      if (ignoredEquipes.length > 0) {
+        console.log(
+          "Épreuves ignorées:",
+          ignoredEquipes
+            .map((equipe) => `${equipe.idEpreuve}:${equipe.libelleEpreuve}`)
+            .join(" | ")
+        );
+      }
 
       // Traiter les équipes
       const processedTeams: TeamData[] = [];
@@ -171,6 +180,13 @@ export class TeamSyncService {
         `💾 Sauvegarde de ${teamsData.length} équipes dans Firestore...`
       );
 
+      if (teamsData.length === 0) {
+        console.log(
+          "⚠️ Aucune équipe championnat à sauvegarder, listing Firestore inchangé"
+        );
+        return { saved: 0, errors: 0 };
+      }
+
       // Traitement par batch pour éviter les limites Firestore
       const batchSize = 500;
       for (let i = 0; i < teamsData.length; i += batchSize) {
@@ -196,6 +212,7 @@ export class TeamSyncService {
           // Ne pas inclure les champs undefined car Firestore ne les accepte pas
           const teamData: Record<string, unknown> = {
             ...team,
+            listedInFftt: true,
             createdAt: Timestamp.fromDate(team.createdAt),
             updatedAt: Timestamp.fromDate(team.updatedAt),
           };
@@ -237,6 +254,14 @@ export class TeamSyncService {
           console.log(`🗑️ Ancien doc équipe supprimé: ${baseId}`);
         }
       }
+
+      const listedMark = await markTeamsListedInFftt(
+        db,
+        teamsData.map((team) => team.id)
+      );
+      console.log(
+        `🏷️ Listing FFTT mis à jour: ${listedMark.listed} courantes, ${listedMark.unlisted} masquées`
+      );
 
       // Mettre à jour les métadonnées
       await db.collection("metadata").doc("lastSync").set(
