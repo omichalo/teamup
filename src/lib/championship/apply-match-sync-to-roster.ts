@@ -1,5 +1,6 @@
 import type { Firestore } from "firebase-admin/firestore";
 import { FieldValue } from "firebase-admin/firestore";
+import { omitUndefinedFields } from "./omit-undefined-fields";
 import { championshipPlayersCollection } from "./store";
 
 export type MatchSyncBurnoutUpdate = Record<string, unknown>;
@@ -26,7 +27,7 @@ function remapMatchSyncUpdates(
     next.championnatParis = true;
     delete next["participation.championnatParis"];
   }
-  return next;
+  return omitUndefinedFields(next);
 }
 
 export async function applyMatchSyncUpdatesToRoster(
