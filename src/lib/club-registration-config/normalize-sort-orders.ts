@@ -29,10 +29,17 @@ export function normalizeRegistrationConfigSortOrders(
           ...slot,
           sortOrder: slot.sortOrder ?? slotIndex,
         }))
-      ).map((slot, slotIndex) => ({
-        ...slot,
-        sortOrder: slotIndex,
-      })),
+      ).map((slot, slotIndex) => {
+        const { capacity, enrollmentsClosed, ...slotRest } = slot;
+        return {
+          ...slotRest,
+          sortOrder: slotIndex,
+          ...(typeof capacity === "number" && Number.isInteger(capacity) && capacity >= 1
+            ? { capacity }
+            : {}),
+          ...(enrollmentsClosed === true ? { enrollmentsClosed: true } : {}),
+        };
+      }),
     };
     }),
   };

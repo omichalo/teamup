@@ -11,6 +11,7 @@ import {
 } from "@mui/material";
 import type { AttendanceSlotOption } from "@/lib/attendance/types";
 import { formatMinutesAsLabel } from "@/lib/club-registration-config/slot-schedule";
+import { SLOT_ENROLLMENTS_CLOSED_LABEL } from "@/lib/club-registration-config/slot-enrollments";
 
 type Props = {
   slots: AttendanceSlotOption[];
@@ -85,6 +86,9 @@ export function AttendanceSlotPicker({
                     </Typography>
                     {slot.highlighted ? (
                       <Chip size="small" label="Proche de maintenant" />
+                    ) : null}
+                    {slot.enrollmentsClosed ? (
+                      <Chip size="small" color="warning" label={SLOT_ENROLLMENTS_CLOSED_LABEL} />
                     ) : null}
                   </Stack>
                 </Button>

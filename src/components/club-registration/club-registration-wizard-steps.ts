@@ -3,7 +3,7 @@ import { getDefaultRegistrationConfig } from "@/lib/club-registration-config/def
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import type { RegistrationStepId } from "@/lib/club-registration/field-to-step";
 import type { RegistrationDraft } from "./registration-defaults";
-import { validateStepById } from "./step-validation";
+import { validateStepById, type StepValidationOptions } from "./step-validation";
 
 export const STEP_TITLES: Record<RegistrationStepId, string> = {
   audience: "Pour qui ?",
@@ -67,11 +67,12 @@ export function canNavigateToRegistrationStep(
   activeStep: number,
   sequence: ReadonlyArray<RegistrationStepId>,
   draft: RegistrationDraft,
-  config: RegistrationConfigV1 = getDefaultRegistrationConfig()
+  config: RegistrationConfigV1 = getDefaultRegistrationConfig(),
+  options: StepValidationOptions = {}
 ): boolean {
   if (targetIndex <= activeStep) return true;
   for (let s = activeStep; s < targetIndex; s++) {
-    if (validateStepById(sequence[s], draft, config) !== null) return false;
+    if (validateStepById(sequence[s], draft, config, options) !== null) return false;
   }
   return true;
 }

@@ -1,4 +1,4 @@
-import { VisibilityOff } from "@mui/icons-material";
+import { Lock, VisibilityOff } from "@mui/icons-material";
 import type { SvgIconComponent } from "@mui/icons-material";
 import type { PricingProfileDefinition, RegistrationCompetition, RegistrationConfigV1, RegistrationSection, RegistrationSiteSlot } from "@/lib/club-registration-config/types";
 import {
@@ -44,6 +44,9 @@ export const siteItemDecor: ConfigEditorItemDecor = {
 };
 
 export function slotItemDecor(slot: RegistrationSiteSlot): ConfigEditorItemDecor {
+  if (slot.enrollmentsClosed) {
+    return { accent: "warning", Icon: Lock };
+  }
   if (!slot.enabled) {
     return { accent: "warning", Icon: VisibilityOff };
   }

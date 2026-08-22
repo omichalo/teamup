@@ -57,6 +57,7 @@ function toSlotOption(
     weekday: schedule.weekday,
     startMinutes: schedule.startMinutes,
     endMinutes: schedule.endMinutes,
+    enrollmentsClosed: slot.enrollmentsClosed === true,
   };
 }
 
@@ -104,6 +105,7 @@ export function findSlotOption(
         startMinutes: 0,
         endMinutes: 0,
         highlighted: false,
+        enrollmentsClosed: slot.enrollmentsClosed === true,
       };
     }
     return { ...option, highlighted: false };

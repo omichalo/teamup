@@ -4,6 +4,7 @@ import { Box, CircularProgress, Container } from "@mui/material";
 import { ClubRegistrationWizard } from "@/components/club-registration/ClubRegistrationWizard";
 import { useAuth } from "@/hooks/useAuth";
 import { isClubRegistrationManager } from "@/lib/club-registration/registration-access";
+import { canBypassSlotEnrollmentClose } from "@/lib/club-registration-config/slot-enrollments";
 
 /**
  * Page d'inscription au club (parcours hybride).
@@ -33,6 +34,7 @@ export default function ClubInscriptionPage() {
         isRegistrationManager={
           user?.role != null && isClubRegistrationManager(user.role)
         }
+        canSelectClosedSlots={canBypassSlotEnrollmentClose(user?.role)}
       />
     </Container>
   );
