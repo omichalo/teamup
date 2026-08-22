@@ -2,13 +2,8 @@ import { FFTTAPI } from "@omichalo/ffttapi-node";
 import { createFFTTAPI, getFFTTConfig } from "./fftt-utils";
 import { FFTTEquipe, FFTTRencontre } from "./fftt-types";
 import { createBaseMatch, isFemaleTeam, determinePhaseFromDivision } from "./fftt-utils";
-import type {
-  Firestore,
-  DocumentReference,
-  UpdateData,
-  DocumentData,
-} from "firebase-admin/firestore";
-import { Timestamp, FieldValue } from "firebase-admin/firestore";
+import type { Firestore } from "firebase-admin/firestore";
+import { FieldValue } from "firebase-admin/firestore";
 import type {
   MatchData,
   TeamMatchesSyncResult,
@@ -22,8 +17,16 @@ import {
   extractClubIdFromLien,
 } from "./team-matches-sync-enrichment";
 import { recalculateJourneesByDate } from "./team-matches-sync-journee";
+import { isTrackedClubChampionshipEpreuve } from "./epreuve-utils";
 import { saveMatchesToTeamSubcollections } from "./team-matches-sync-save";
 import { listLicensedSqyPlayersInMatch } from "./match-composition-utils";
+import { readPublishedSeasonLabel } from "@/lib/championship/season-label";
+import { listChampionshipPlayers } from "@/lib/championship/store";
+import { rosterDocIdsWithSeasonalMatchStats } from "@/lib/championship/roster-match-stats";
+import {
+  commitMatchSyncUpdatesToRoster,
+  loadChampionshipPlayersByIds,
+} from "@/lib/championship/apply-match-sync-to-roster";
 
 export type {
   TeamMatchesSyncResult,
@@ -240,17 +243,8 @@ export class TeamMatchesSyncService {
       // Récupérer les équipes du club
       const equipes = await this.ffttApi.getEquipesByClub(this.clubCode);
 
-      // Filtrer les équipes pour les épreuves spécifiques et ajouter le champ isFemale
-      // 15954 = Championnat de France par Équipes Masculin
-      // 15955 = Championnat de France par Équipes Féminin
-      // 15980 = Championnat de Paris IDF (Excellence)
       const filteredEquipes = equipes
-        .filter(
-          (equipe: FFTTEquipe) =>
-            equipe.idEpreuve === 15954 ||
-            equipe.idEpreuve === 15955 ||
-            equipe.idEpreuve === 15980
-        )
+        .filter((equipe: FFTTEquipe) => isTrackedClubChampionshipEpreuve(equipe))
         .map((equipe: FFTTEquipe) => {
           // S'assurer que isFemale est défini en utilisant toutes les informations disponibles
           return {
@@ -803,65 +797,25 @@ export class TeamMatchesSyncService {
         ...Array.from(feminineMatchesByTeamByPlayerByPhase.keys()),
         ...Array.from(matchesByTeamByPlayerByPhaseParis.keys()),
       ]);
-      const playerIds = Array.from(allPlayerIds);
-      const playersToUpdate = [];
+      const playersToUpdate: Array<{
+        playerId: string;
+        updates: Record<string, unknown>;
+      }> = [];
 
-      // OPTIMISATION : Utiliser le cache de joueurs si fourni, sinon récupérer avec getAll()
-      console.log(`📥 Récupération de ${playerIds.length} joueurs...`);
-
-      // Créer une Map pour un accès rapide aux données existantes
-      const playerDataMap = new Map<string, Record<string, unknown>>();
-
-      if (playersCache) {
-        // Utiliser le cache de joueurs déjà chargé (évite les reads supplémentaires)
-        console.log(
-          `✅ Utilisation du cache de joueurs (${playersCache.length} joueurs en cache)`
-        );
-        for (const player of playersCache) {
-          if (playerIds.includes(player.id)) {
-            playerDataMap.set(player.id, player);
-          }
-        }
-      } else {
-        // Fallback : récupérer avec getAll() si pas de cache
-        const docRefs = playerIds.map((playerId) =>
-          db.collection("players").doc(playerId)
-        );
-
-        // getAll() peut récupérer jusqu'à 10 documents à la fois
-        // Diviser en sous-batches de 10 et les traiter en parallèle
-        const getAllBatchSize = 10;
-        const getAllBatches: Array<Array<DocumentReference>> = [];
-
-        for (let k = 0; k < docRefs.length; k += getAllBatchSize) {
-          getAllBatches.push(docRefs.slice(k, k + getAllBatchSize));
-        }
-
-        // Traiter les batches getAll() en parallèle (max 5 à la fois pour ne pas surcharger)
-        const maxConcurrentGetAll = 5;
-        for (let k = 0; k < getAllBatches.length; k += maxConcurrentGetAll) {
-          const concurrentBatches = getAllBatches.slice(
-            k,
-            k + maxConcurrentGetAll
-          );
-          const getAllPromises = concurrentBatches.map((batch) =>
-            db.getAll(...batch)
-          );
-
-          const results = await Promise.all(getAllPromises);
-
-          results.forEach((docs) => {
-            docs.forEach((doc) => {
-              if (doc.exists) {
-                playerDataMap.set(
-                  doc.id,
-                  doc.data() as Record<string, unknown>
-                );
-              }
-            });
-          });
-        }
+      const seasonLabel = await readPublishedSeasonLabel(db);
+      const rosterWithStats = rosterDocIdsWithSeasonalMatchStats(
+        await listChampionshipPlayers(db, seasonLabel)
+      );
+      for (const playerId of rosterWithStats) {
+        allPlayerIds.add(playerId);
       }
+      const playerIds = Array.from(allPlayerIds);
+      console.log(`📥 Récupération de ${playerIds.length} fiches roster...`);
+      const playerDataMap = await loadChampionshipPlayersByIds(
+        db,
+        seasonLabel,
+        playerIds
+      );
 
       type BurnoutTeamByPhase = { aller?: number; retour?: number };
       type BurnoutPhaseFieldUpdate =
@@ -900,43 +854,37 @@ export class TeamMatchesSyncService {
 
       for (const playerId of playerIds) {
         try {
-          const playerData = playerDataMap.get(playerId);
-          if (playerData) {
-            const updates: Record<string, unknown> = {};
+          const playerData = playerDataMap.get(playerId) ?? {};
+          const updates: Record<string, unknown> = {};
 
-            // Mettre à jour hasPlayedAtLeastOneMatch si pas déjà true (championnat par équipes)
+            if (participatingPlayers.has(playerId)) {
+              if (playerData?.hasPlayedAtLeastOneMatch !== true) {
+                updates.hasPlayedAtLeastOneMatch = true;
+              }
+            } else if (playerData?.hasPlayedAtLeastOneMatch === true) {
+              updates.hasPlayedAtLeastOneMatch = false;
+            }
+
+            if (participatingPlayersParis.has(playerId)) {
+              if (playerData?.hasPlayedAtLeastOneMatchParis !== true) {
+                updates.hasPlayedAtLeastOneMatchParis = true;
+              }
+            } else if (playerData?.hasPlayedAtLeastOneMatchParis === true) {
+              updates.hasPlayedAtLeastOneMatchParis = false;
+            }
+
             if (
               participatingPlayers.has(playerId) &&
-              !playerData?.hasPlayedAtLeastOneMatch
+              playerData.championnat !== true
             ) {
-              updates.hasPlayedAtLeastOneMatch = true;
+              updates.championnat = true;
             }
 
-            // Mettre à jour hasPlayedAtLeastOneMatchParis si pas déjà true (championnat de Paris)
             if (
               participatingPlayersParis.has(playerId) &&
-              !playerData?.hasPlayedAtLeastOneMatchParis
+              playerData.championnatParis !== true
             ) {
-              updates.hasPlayedAtLeastOneMatchParis = true;
-            }
-
-            // Mettre à jour participation.championnat si pas déjà true
-            const participation = playerData?.participation as
-              | { championnat?: boolean; championnatParis?: boolean }
-              | undefined;
-            if (
-              participatingPlayers.has(playerId) &&
-              !participation?.championnat
-            ) {
-              updates["participation.championnat"] = true;
-            }
-
-            // Mettre à jour participation.championnatParis si pas déjà true
-            if (
-              participatingPlayersParis.has(playerId) &&
-              !participation?.championnatParis
-            ) {
-              updates["participation.championnatParis"] = true;
+              updates.championnatParis = true;
             }
 
             const masculineBurnUpdate = resolveBurnoutByPhaseFieldUpdate(
@@ -980,6 +928,8 @@ export class TeamMatchesSyncService {
               }
 
               updates.masculineMatchesByTeamByPhase = matchesByTeamByPhaseObj;
+            } else if (playerData?.masculineMatchesByTeamByPhase !== undefined) {
+              updates.masculineMatchesByTeamByPhase = FieldValue.delete();
             }
 
             // Mettre à jour feminineMatchesByTeamByPhase pour l'affichage dans le tooltip
@@ -1003,6 +953,8 @@ export class TeamMatchesSyncService {
               }
 
               updates.feminineMatchesByTeamByPhase = matchesByTeamByPhaseObj;
+            } else if (playerData?.feminineMatchesByTeamByPhase !== undefined) {
+              updates.feminineMatchesByTeamByPhase = FieldValue.delete();
             }
 
             const parisBurnUpdate = resolveBurnoutByPhaseFieldUpdate(
@@ -1035,14 +987,13 @@ export class TeamMatchesSyncService {
               }
 
               updates.matchesByTeamByPhaseParis = matchesByTeamByPhaseObj;
+            } else if (playerData?.matchesByTeamByPhaseParis !== undefined) {
+              updates.matchesByTeamByPhaseParis = FieldValue.delete();
             }
 
-            // Ajouter updatedAt si il y a des mises à jour
             if (Object.keys(updates).length > 0) {
-              updates.updatedAt = Timestamp.now();
               playersToUpdate.push({ playerId, updates });
             }
-          }
         } catch (error) {
           console.error(
             `❌ Erreur lors de la récupération du joueur ${playerId}:`,
@@ -1056,39 +1007,16 @@ export class TeamMatchesSyncService {
         `\n📊 ${playersToUpdate.length} joueurs nécessitent une mise à jour de leur statut`
       );
 
-      // Mettre à jour par batch
-      const batchSize = 500;
-      for (let i = 0; i < playersToUpdate.length; i += batchSize) {
-        const batch = db.batch();
-        const batchEnd = Math.min(i + batchSize, playersToUpdate.length);
-
-        for (let j = i; j < batchEnd; j++) {
-          const { playerId, updates } = playersToUpdate[j];
-          const playerRef = db.collection("players").doc(playerId);
-          batch.update(playerRef, updates as UpdateData<DocumentData>);
-          updated++;
-        }
-
-        try {
-          await batch.commit();
-          console.log(
-            `✅ Batch ${Math.floor(i / batchSize) + 1} traité: ${
-              batchEnd - i
-            } joueurs mis à jour`
-          );
-        } catch (error) {
-          console.error(
-            `❌ Erreur lors du commit du batch ${
-              Math.floor(i / batchSize) + 1
-            }:`,
-            error
-          );
-          errors += batchEnd - i;
-        }
-      }
+      const commitResult = await commitMatchSyncUpdatesToRoster(
+        db,
+        seasonLabel,
+        playersToUpdate
+      );
+      updated += commitResult.updated;
+      errors += commitResult.errors;
 
       console.log(
-        `✅ Participation mise à jour: ${updated} joueurs, ${errors} erreurs`
+        `✅ Participation roster mise à jour: ${updated} joueurs, ${errors} erreurs`
       );
       return { updated, errors };
     } catch (error) {

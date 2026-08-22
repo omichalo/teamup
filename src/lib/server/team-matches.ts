@@ -1,5 +1,13 @@
 import type { Firestore } from "firebase-admin/firestore";
 import { Timestamp } from "firebase-admin/firestore";
+import { parseSeasonAgeReferenceDate } from "@/lib/club-registration/season-age";
+import { getDefaultRegistrationConfig } from "@/lib/club-registration-config/default-config";
+import { readPublishedSeasonLabel } from "@/lib/championship/season-label";
+import {
+  selectCurrentSeasonTeams,
+  selectLatestEpreuveGenerations,
+} from "@/lib/shared/team-listing";
+import { classifyClubChampionshipEpreuve } from "@/lib/shared/epreuve-utils";
 
 // Fonction helper pour convertir les Timestamps Firestore en Date
 function convertFirestoreTimestamp(value: unknown): Date | null {
@@ -54,7 +62,8 @@ export interface TeamMatch {
   isFemale?: boolean;
   division?: string;
   teamId?: string;
-  epreuve?: string;
+  epreuve?: string | undefined;
+  idEpreuve?: number | undefined;
   score?: unknown;
   result?: string;
   rencontreId?: string;
@@ -63,6 +72,7 @@ export interface TeamMatch {
   resultatsIndividuels?: unknown;
   joueursSQY: unknown[];
   joueursAdversaires: unknown[];
+  listedInFftt?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -77,17 +87,18 @@ export interface TeamSummary {
   discordChannelId?: string; // ID du canal Discord associé à l'équipe
   epreuve?: string; // Libellé de l'épreuve FFTT
   idEpreuve?: number; // ID de l'épreuve FFTT (15954, 15955, 15980, etc.)
+  listedInFftt?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export async function getTeams(firestore: Firestore): Promise<TeamSummary[]> {
   const teamsSnapshot = await firestore.collection("teams").get();
+  const seasonStart = await readSeasonStart(firestore);
 
-  const teams: TeamSummary[] = [];
-  teamsSnapshot.forEach((doc) => {
+  const mapped: TeamSummary[] = teamsSnapshot.docs.map((doc) => {
     const data = doc.data();
-    teams.push({
+    return {
       id: doc.id,
       name: data.name,
       division: data.division,
@@ -97,12 +108,34 @@ export async function getTeams(firestore: Firestore): Promise<TeamSummary[]> {
       discordChannelId: data.discordChannelId,
       epreuve: data.epreuve,
       idEpreuve: data.idEpreuve,
-      createdAt: data.createdAt?.toDate?.() || data.createdAt || new Date(),
-      updatedAt: data.updatedAt?.toDate?.() || data.updatedAt || new Date(),
-    });
+      listedInFftt: data.listedInFftt === true,
+      createdAt: convertFirestoreTimestamp(data.createdAt) || new Date(),
+      updatedAt: convertFirestoreTimestamp(data.updatedAt) || new Date(),
+    };
   });
 
+  const seasonal = selectCurrentSeasonTeams(
+    mapped,
+    (team) => ({
+      listedInFftt: team.listedInFftt === true,
+      updatedAt: team.updatedAt,
+    }),
+    seasonStart
+  );
+  const teams = selectLatestEpreuveGenerations(seasonal, (team) => ({
+    epreuveType: classifyClubChampionshipEpreuve({
+      idEpreuve: team.idEpreuve,
+      epreuve: team.epreuve,
+    }),
+    idEpreuve: team.idEpreuve,
+    updatedAt: team.updatedAt,
+  }));
+
   teams.sort((a, b) => (a.teamNumber || 0) - (b.teamNumber || 0));
+
+  console.log(
+    `📊 [getTeams] ${teams.length} équipes saison courante (${mapped.length} docs, listedInFftt=${mapped.filter((team) => team.listedInFftt).length})`
+  );
 
   return teams;
 }
@@ -117,7 +150,7 @@ export async function getTeamMatches(
     .collection("matches")
     .get();
 
-  const matches: TeamMatch[] = [];
+  const mapped: TeamMatch[] = [];
 
   matchesSnapshot.forEach((doc) => {
     const data = doc.data();
@@ -128,7 +161,7 @@ export async function getTeamMatches(
       return new Date();
     })();
     
-    matches.push({
+    mapped.push({
       id: doc.id,
       ffttId: data.ffttId,
       teamNumber: data.teamNumber,
@@ -145,6 +178,7 @@ export async function getTeamMatches(
       division: data.division,
       teamId: data.teamId,
       epreuve: data.epreuve,
+      idEpreuve: data.idEpreuve,
       score: data.score,
       result: data.result,
       rencontreId: data.rencontreId,
@@ -153,10 +187,28 @@ export async function getTeamMatches(
       resultatsIndividuels: data.resultatsIndividuels,
       joueursSQY: data.joueursSQY || [],
       joueursAdversaires: data.joueursAdversaires || [],
+      listedInFftt: data.listedInFftt === true,
       createdAt: convertFirestoreTimestamp(data.createdAt) || new Date(),
       updatedAt: convertFirestoreTimestamp(data.updatedAt) || new Date(),
     });
   });
+
+  const seasonal = selectCurrentSeasonTeams(
+    mapped,
+    (match) => ({
+      listedInFftt: match.listedInFftt === true,
+      updatedAt: match.updatedAt,
+    }),
+    null
+  );
+  const matches = selectLatestEpreuveGenerations(seasonal, (match) => ({
+    epreuveType: classifyClubChampionshipEpreuve({
+      idEpreuve: match.idEpreuve,
+      epreuve: match.epreuve,
+    }),
+    idEpreuve: match.idEpreuve,
+    updatedAt: match.updatedAt,
+  }));
 
   matches.sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
@@ -164,4 +216,16 @@ export async function getTeamMatches(
 
   return matches;
 }
+
+async function readSeasonStart(firestore: Firestore): Promise<Date | null> {
+  try {
+    const label = await readPublishedSeasonLabel(firestore);
+    return parseSeasonAgeReferenceDate(label);
+  } catch {
+    return parseSeasonAgeReferenceDate(
+      getDefaultRegistrationConfig().meta.seasonLabel
+    );
+  }
+}
+
 

@@ -32,7 +32,7 @@ import { EquipeAccordion } from "@/components/equipes/EquipeAccordion";
 
 export default function EquipesPage() {
   const { user } = useAuth();
-  const { equipes: initialEquipes, loading, error, currentPhase } = useTeamData();
+  const { equipes: initialEquipes, loading, error, currentPhase } = useTeamData({ refreshOnMount: true });
   const updateTeamInStore = useTeamManagementStore((state) => state.updateTeam);
   const [equipes, setEquipes] = React.useState(initialEquipes);
   const [tabValue, setTabValue] = React.useState(0);

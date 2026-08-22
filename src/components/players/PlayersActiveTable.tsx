@@ -23,6 +23,7 @@ import {
   AlternateEmail as AlternateEmailIcon,
   SportsTennis as SportsTennisIcon,
 } from "@mui/icons-material";
+import { ChampionshipStatusChips } from "@/components/championship/ChampionshipStatusChips";
 import { Player } from "@/types/team-management";
 
 interface PlayersActiveTableProps {
@@ -151,6 +152,7 @@ export function PlayersActiveTable({
                   <Typography variant="body2" fontWeight="medium">
                     {player.firstName} {player.name}
                   </Typography>
+                  <ChampionshipStatusChips player={player} />
                   {player.hasPlayedAtLeastOneMatch && (
                     <Chip
                       icon={<SportsTennisIcon />}

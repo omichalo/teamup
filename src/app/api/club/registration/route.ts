@@ -25,6 +25,7 @@ import {
 } from "@/lib/club-registration-config/store";
 import { canBypassSlotEnrollmentClose } from "@/lib/club-registration-config/slot-enrollments";
 import { createRegistrationWithIdempotency } from "@/lib/club-registration/create-registration-with-idempotency";
+import { syncRosterAfterRegistrationChange } from "@/lib/championship/sync-after-registration";
 import {
   findRegistrationLicenseConflicts,
   formatBlockingLicenseConflictMessage,
@@ -211,6 +212,10 @@ export async function POST(req: Request) {
         })
       ),
     });
+
+    if (!duplicated) {
+      await syncRosterAfterRegistrationChange(db, registrationId);
+    }
 
     logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_SUBMITTED, decoded.uid, {
       resource: "clubRegistration",

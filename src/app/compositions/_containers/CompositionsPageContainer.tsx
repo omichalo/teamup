@@ -155,8 +155,7 @@ export function CompositionsPageContainer() {
     setDefaultCompositions,
     defaultCompositionsLoaded,
   } = useDefaultCompositions({
-    selectedPhase,
-    compositionDefaultsService,
+    selectedPhase, selectedEpreuve, equipes, compositionDefaultsService,
   });
 
   const availablePlayersSubtitle = useMemo(() => {

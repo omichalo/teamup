@@ -9,6 +9,7 @@ import { verifyStripeWebhookSignature } from "@/lib/club-registration/stripe";
 import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
 import { applyStripeCheckoutPaid } from "@/lib/club-registration/payment/apply-stripe-checkout-paid";
 import { paymentWriteWithSettlement } from "@/lib/club-registration/payment/settlement-firestore";
+import { syncRosterAfterRegistrationChange } from "@/lib/championship/sync-after-registration";
 
 type StripeWebhookEvent = {
   id: string;
@@ -128,6 +129,8 @@ export async function POST(req: Request) {
       },
       success: true,
     });
+
+    await syncRosterAfterRegistrationChange(getFirestoreAdmin(), registrationId);
 
     if (applied.amountCents > 0 && applied.markRegistrationPaid) {
       try {

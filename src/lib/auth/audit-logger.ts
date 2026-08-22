@@ -109,4 +109,7 @@ export const AUDIT_ACTIONS = {
   ATTENDANCE_LEAD_CREATED: "attendance.lead.created",
   ATTENDANCE_LEAD_UPDATED: "attendance.lead.updated",
   ATTENDANCE_SLOT_ADDED: "attendance.slot.added",
+  CHAMPIONSHIP_ROSTER_RECALCULATED: "championship.roster.recalculated",
+  CHAMPIONSHIP_ROSTER_UPDATED: "championship.roster.updated",
+  CHAMPIONSHIP_ROSTER_DELETED: "championship.roster.deleted",
 } as const;

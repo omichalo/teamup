@@ -14,6 +14,7 @@ import {
   deleteField,
 } from "firebase/firestore";
 import { getDbInstanceDirect } from "@/lib/firebase";
+import { currentClubLicenseFields } from "@/lib/players/current-club-license";
 import { Player } from "@/types/team-management";
 
 export class FirestorePlayerService {
@@ -22,12 +23,19 @@ export class FirestorePlayerService {
   // Convertir les données Firestore vers le format Player
   private convertFirestoreToPlayer(doc: QueryDocumentSnapshot<DocumentData>): Player {
     const data = doc.data();
+    const listedInClub = data.listedInClub === true;
+    const license = data.licence || "";
+    const { isActive, typeLicence } = currentClubLicenseFields({
+      listedInClub,
+      license,
+      typeLicence: data.typeLicence || "",
+    });
     return {
       id: doc.id,
       name: data.nom || "",
       firstName: data.prenom || "",
-      license: data.licence || "",
-      typeLicence: data.typeLicence || "",
+      license,
+      typeLicence,
       gender: data.sexe === "F" ? "F" : "M",
       nationality:
         data.nationalite === "F"
@@ -35,12 +43,12 @@ export class FirestorePlayerService {
           : data.nationalite === "C"
           ? "C"
           : "ETR",
-      isActive: this.calculateIsActive(data.licence, data.typeLicence),
+      isActive,
       isTemporary: data.isTemporary || false,
-      isWheelchair: data.isWheelchair || false,
+      isWheelchair: data.isWheelchair === true,
+      listedInClub,
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: data.updatedAt?.toDate() || new Date(),
-      // Champs de gestion des équipes
       preferredTeams: {
         masculine: data.preferredTeams?.masculine || [],
         feminine: data.preferredTeams?.feminine || [],
@@ -79,21 +87,6 @@ export class FirestorePlayerService {
       isHomme: data.isHomme,
       ...(data.place ? { place: parseInt(data.place) } : {}),
     };
-  }
-
-  // Calculer si un joueur est actif basé sur sa licence et son type
-  private calculateIsActive(licence: string, typeLicence?: string): boolean {
-    if (!licence || licence.trim() === "") {
-      return false; // Pas de licence = pas actif
-    }
-
-    // Si typeLicence existe, seuls T, P et A sont actifs
-    if (typeLicence) {
-      return typeLicence === "T" || typeLicence === "P" || typeLicence === "A";
-    }
-
-    // Si pas de typeLicence mais licence existe, considérer comme inactif
-    return false;
   }
 
   async getAllPlayers(): Promise<Player[]> {

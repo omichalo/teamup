@@ -111,6 +111,7 @@ export function buildRegistrationSubmitDocument(params: {
     submitterAccountEmail,
     submitterRole,
     schemaVersion: 1,
+    seasonLabel: config.meta.seasonLabel,
     status: "submitted",
     submittedAt: now,
     updatedAt: now,

@@ -76,6 +76,7 @@ interface TeamManagementState {
     journee: number;
     phase: "aller" | "retour";
     championshipType: ChampionshipType;
+    idEpreuve?: number;
   }) => () => void;
   fetchCompositionDefaults: (params: {
     phase: "aller" | "retour";
@@ -119,7 +120,11 @@ export const useTeamManagementStore = create<TeamManagementState>((set, get) => 
     try {
       set({ playersLoading: true, playersError: null });
       const players = await playerService.getAllPlayers();
-      set({ players, playersLoading: false });
+      const { mergeLoadedPlayersWithRoster } = await import(
+        "@/lib/championship/load-merged-players"
+      );
+      const merged = await mergeLoadedPlayersWithRoster(players);
+      set({ players: merged, playersLoading: false });
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Erreur de chargement";
@@ -261,8 +266,13 @@ export const useTeamManagementStore = create<TeamManagementState>((set, get) => 
     };
   },
 
-  subscribeToComposition: ({ journee, phase, championshipType }) => {
-    const key = getDayKey({ journee, phase, championshipType });
+  subscribeToComposition: ({ journee, phase, championshipType, idEpreuve }) => {
+    const key = getDayKey({
+      journee,
+      phase,
+      championshipType,
+      ...(idEpreuve !== undefined ? { idEpreuve } : {}),
+    });
     const existing = get().compositionSubscriptions[key];
     if (existing) {
       existing();
@@ -284,7 +294,8 @@ export const useTeamManagementStore = create<TeamManagementState>((set, get) => 
             : state.compositionsByKey,
           compositionsLoading: { ...state.compositionsLoading, [key]: false },
         }));
-      }
+      },
+      idEpreuve
     );
 
     set((state) => ({

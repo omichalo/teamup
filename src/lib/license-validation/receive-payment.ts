@@ -18,6 +18,7 @@ import {
 } from "@/lib/club-registration/payment-constants";
 import { normalizePaymentReference } from "@/lib/club-registration/payment/payment-reference";
 import { wouldCreateOverpayment } from "@/lib/club-registration/payment/overpayment";
+import { syncRosterAfterRegistrationChange } from "@/lib/championship/sync-after-registration";
 
 const ALLOWED_METHODS = new Set<ReceivedPaymentMethodId>(RECEIVED_PAYMENT_METHOD_IDS);
 
@@ -159,6 +160,8 @@ export async function receiveLicenseValidationPayment(
     },
     success: true,
   });
+
+  await syncRosterAfterRegistrationChange(db, registrationId);
 
   return { ok: true };
 }

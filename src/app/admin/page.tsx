@@ -40,10 +40,12 @@ import {
 } from "@/components/admin/DiscordAvailabilitySection";
 import { LocationsManagementSection } from "@/components/admin/LocationsManagementSection";
 import { SyncOperationCard } from "@/components/admin/SyncOperationCard";
+import { ChampionshipRosterSyncCard } from "@/components/admin/ChampionshipRosterSyncCard";
 import { CoachRequestsSection } from "@/components/admin/CoachRequestsSection";
 import { UsersManagementTable } from "@/components/admin/UsersManagementTable";
 import { useUserAdminActions } from "@/components/admin/useUserAdminActions";
 import { TabPanel } from "@/components/ui/TabPanel";
+import { useTeamManagementStore } from "@/stores/teamManagementStore";
 
 const ADMIN_TAB_PANEL_PROPS = {
   baseId: "admin",
@@ -240,6 +242,7 @@ export default function AdminPage() {
             duration: result.data?.duration || null,
           },
         }));
+        void useTeamManagementStore.getState().loadEquipesWithMatches();
       } else {
         setSyncStatus((prev) => ({
           ...prev,
@@ -294,6 +297,7 @@ export default function AdminPage() {
             duration: result.data?.duration || null,
           },
         }));
+        void useTeamManagementStore.getState().loadEquipesWithMatches();
       } else {
         const errorMessage =
           result.details ||
@@ -692,6 +696,8 @@ export default function AdminPage() {
                   headerIcon={<SportsIcon sx={{ mr: 1, color: "primary.main" }} />}
                   onSync={() => handleSyncTeamMatches()}
                 />
+
+                <ChampionshipRosterSyncCard />
 
                 <Card>
                   <CardContent>
