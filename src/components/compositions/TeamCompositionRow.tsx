@@ -11,6 +11,7 @@ import {
 import { EquipeWithMatches } from "@/hooks/useTeamData";
 import { ChampionshipType, Match } from "@/types";
 import { Player } from "@/types/team-management";
+import { ChampionshipStatusChips } from "@/components/championship/ChampionshipStatusChips";
 import { TeamCompositionCard } from "@/components/compositions/TeamCompositionCard";
 import { PoolRankingPopover } from "@/components/compositions/PoolRankingPopover";
 import { PoolSchedulePopover } from "@/components/compositions/PoolSchedulePopover";
@@ -196,6 +197,7 @@ export function TeamCompositionRow({
 
     return (
       <>
+        <ChampionshipStatusChips player={player} />
         {player.nationality === "C" && <Chip label="EUR" size="small" color="info" variant="outlined" sx={{ height: 18, fontSize: "0.65rem" }} />}
         {player.nationality === "ETR" && <Chip label="ETR" size="small" color="warning" variant="outlined" sx={{ height: 18, fontSize: "0.65rem" }} />}
         {burnedTeam !== undefined && burnedTeam !== null && (

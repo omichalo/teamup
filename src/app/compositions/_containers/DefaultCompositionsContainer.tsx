@@ -40,6 +40,7 @@ import {
 } from "@/lib/compositions/championship-utils";
 import { divisionIndicatesPhase2 } from "@/lib/shared/fftt-utils";
 import type { Player } from "@/types/team-management";
+import { ChampionshipStatusChips } from "@/components/championship/ChampionshipStatusChips";
 import { AvailablePlayersPanel } from "@/components/compositions/AvailablePlayersPanel";
 import { AvailablePlayerListItem } from "@/components/compositions/AvailablePlayerListItem";
 import { TeamCompositionCard } from "@/components/compositions/TeamCompositionCard";
@@ -723,6 +724,7 @@ export function DefaultCompositionsContainer() {
                                       ];
                                   return (
                                     <>
+                                      <ChampionshipStatusChips player={player} />
                                       {player.nationality === "C" && (
                                         <Chip
                                           label="EUR"
@@ -931,6 +933,7 @@ export function DefaultCompositionsContainer() {
                                       ];
                                   return (
                                     <>
+                                      <ChampionshipStatusChips player={player} />
                                       {player.nationality === "C" && (
                                         <Chip
                                           label="EUR"

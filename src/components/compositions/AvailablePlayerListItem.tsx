@@ -41,6 +41,13 @@ export function AvailablePlayerListItem({
 }: AvailablePlayerListItemProps) {
   const isForeign = player.nationality === "ETR";
   const isEuropean = player.nationality === "C";
+  const hasLicenseAlert = (player.championshipAlerts ?? []).some(
+    (code) =>
+      code === "fftt_sqy_unlicensed" ||
+      code === "no_license" ||
+      code === "not_in_club_list" ||
+      code === "other_federation"
+  );
 
   return (
     <ListItem disablePadding sx={{ mb: 1 }} secondaryAction={null}>
@@ -125,7 +132,10 @@ export function AvailablePlayerListItem({
                   sx={{ height: 20, fontSize: "0.7rem" }}
                 />
               )}
-              {showEligibilityChips && !player.isActive && !player.isTemporary && (
+              {showEligibilityChips &&
+                !player.isActive &&
+                !player.isTemporary &&
+                !hasLicenseAlert && (
                 <Chip
                   label="Sans licence"
                   size="small"
