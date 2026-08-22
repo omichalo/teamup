@@ -1,9 +1,11 @@
 import type { Firestore } from "firebase-admin/firestore";
 import { FieldValue } from "firebase-admin/firestore";
 import { championshipPlayersCollectionPath } from "./paths";
-import type { ChampionshipPlayerRecord } from "./schema";
+import type {
+  ChampionshipPlayerRecord,
+  PlayerClubProfileRecord,
+} from "./records";
 import { PLAYER_CLUB_PROFILES_COLLECTION } from "./paths";
-import type { PlayerClubProfileRecord } from "./schema";
 
 export function championshipPlayersCollection(
   db: Firestore,

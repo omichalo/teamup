@@ -69,7 +69,7 @@ export interface Player {
   discordMentions?: string[]; // IDs des membres Discord à notifier
   listedInClub?: boolean;
   championshipPersonKey?: string;
-  championshipAlerts?: import("@/lib/championship/merge-players").ChampionshipAlertCode[];
+  championshipAlerts?: import("@/lib/championship/records").ChampionshipAlertCode[];
 }
 
 export interface Team {

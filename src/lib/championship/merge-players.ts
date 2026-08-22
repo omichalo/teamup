@@ -1,16 +1,13 @@
 import { currentClubLicenseFields } from "@/lib/players/current-club-license";
 import { resolveLicensePresence } from "./license-presence";
-import type { ChampionshipPlayerRecord, LicensePresence } from "./schema";
+import type {
+  ChampionshipAlertCode,
+  ChampionshipPlayerRecord,
+  LicensePresence,
+} from "./records";
 import type { Player } from "@/types/team-management";
 
-export type ChampionshipAlertCode =
-  | "unpaid"
-  | "payment_requested"
-  | "not_in_club_list"
-  | "fftt_sqy_unlicensed"
-  | "other_club"
-  | "other_federation"
-  | "no_license";
+export type { ChampionshipAlertCode };
 
 export type ChampionshipRosterView = ChampionshipPlayerRecord & {
   id: string;

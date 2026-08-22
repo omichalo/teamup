@@ -1,5 +1,5 @@
 import { isPlayableLicenseType } from "@/lib/players/current-club-license";
-import type { LicensePresence } from "./schema";
+import type { LicensePresence } from "./records";
 
 export type LicensePresenceInput = {
   ffttLicense?: string | null;

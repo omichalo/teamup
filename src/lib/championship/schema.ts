@@ -1,15 +1,13 @@
 import { z } from "zod";
+import { LICENSE_PRESENCE_VALUES } from "./records";
 
-export const LICENSE_PRESENCE_VALUES = [
-  "in_club_list",
-  "fftt_sqy_unlicensed",
-  "other_club",
-  "other_federation",
-  "none",
-  "unknown",
-] as const;
-
-export type LicensePresence = (typeof LICENSE_PRESENCE_VALUES)[number];
+export { LICENSE_PRESENCE_VALUES } from "./records";
+export type {
+  ChampionshipPlayerRecord,
+  LicensePresence,
+  PlayerClubProfileRecord,
+  RosterParticipationPatch,
+} from "./records";
 
 export const licensePresenceSchema = z.enum(LICENSE_PRESENCE_VALUES);
 
@@ -61,15 +59,11 @@ export const championshipPlayerSchema = z.object({
   matchesByTeamByPhaseParis: matchesByTeamByPhaseSchema,
 });
 
-export type ChampionshipPlayerRecord = z.infer<typeof championshipPlayerSchema>;
-
 export const playerClubProfileSchema = z.object({
   personKey: z.string().min(1),
   discordMentions: z.array(z.string()).default([]),
   isWheelchair: z.boolean().default(false),
 });
-
-export type PlayerClubProfileRecord = z.infer<typeof playerClubProfileSchema>;
 
 export const rosterParticipationPatchSchema = z
   .object({
@@ -89,5 +83,3 @@ export const rosterParticipationPatchSchema = z
     (value) => Object.values(value).some((entry) => entry !== undefined),
     { message: "Aucun champ modifiable fourni" }
   );
-
-export type RosterParticipationPatch = z.infer<typeof rosterParticipationPatchSchema>;

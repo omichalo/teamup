@@ -1,4 +1,4 @@
-import type { ChampionshipPlayerRecord } from "./schema";
+import type { ChampionshipPlayerRecord } from "./records";
 
 const SEASONAL_MATCH_STAT_KEYS = [
   "hasPlayedAtLeastOneMatch",

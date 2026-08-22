@@ -4,7 +4,7 @@ import {
 } from "./competition-mapping";
 import { resolveLicensePresence } from "./license-presence";
 import { resolveChampionshipPersonKey } from "./person-key";
-import type { ChampionshipPlayerRecord } from "./schema";
+import type { ChampionshipPlayerRecord } from "./records";
 
 export type ExistingRosterState = {
   coachExcluded: boolean;
