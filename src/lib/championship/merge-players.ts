@@ -40,15 +40,17 @@ function withCurrentClubLicense(player: Player): Player {
   return { ...player, ...currentClubLicenseFields(player) };
 }
 
-function alertsFromPlayerMirror(player: Player): ChampionshipAlertCode[] {
-  return alertsFromRoster({
-    licensePresence: resolveLicensePresence({
-      ffttLicense: player.license,
-      listedInClub: player.listedInClub === true,
-      typeLicence: player.typeLicence,
-      playerNomClub: player.nomClub ?? player.club ?? null,
-    }),
+function licensePresenceFromPlayerMirror(player: Player): LicensePresence {
+  return resolveLicensePresence({
+    ffttLicense: player.license,
+    listedInClub: player.listedInClub === true,
+    typeLicence: player.typeLicence,
+    playerNomClub: player.nomClub ?? player.club ?? null,
   });
+}
+
+function isHiddenOtherClubPresence(presence: LicensePresence): boolean {
+  return presence === "other_club";
 }
 
 export function alertsFromRoster(record: {
@@ -125,6 +127,10 @@ export function mergePlayersWithChampionshipRoster(
       rosterByLicense.get(player.id) ??
       (player.license ? rosterByLicense.get(player.license) : undefined);
     if (!entry) {
+      const licensePresence = licensePresenceFromPlayerMirror(player);
+      if (isHiddenOtherClubPresence(licensePresence)) {
+        continue;
+      }
       result.push(
         withCurrentClubLicense({
           ...withoutSeasonalMatchStats(player),
@@ -133,7 +139,7 @@ export function mergePlayersWithChampionshipRoster(
             championnat: false,
             championnatParis: false,
           },
-          championshipAlerts: alertsFromPlayerMirror(player),
+          championshipAlerts: alertsFromRoster({ licensePresence }),
           championshipPersonKey: player.id,
           hasPlayedAtLeastOneMatch: false,
           hasPlayedAtLeastOneMatchParis: false,
@@ -145,6 +151,9 @@ export function mergePlayersWithChampionshipRoster(
     if (entry.ffttLicense) {
       mergedIds.add(entry.ffttLicense);
     }
+    if (isHiddenOtherClubPresence(entry.licensePresence)) {
+      continue;
+    }
     result.push(withCurrentClubLicense(applyRosterToPlayer(player, entry)));
   }
 
@@ -153,6 +162,9 @@ export function mergePlayersWithChampionshipRoster(
       continue;
     }
     if (entry.ffttLicense && mergedIds.has(entry.ffttLicense)) {
+      continue;
+    }
+    if (isHiddenOtherClubPresence(entry.licensePresence)) {
       continue;
     }
     result.push(
