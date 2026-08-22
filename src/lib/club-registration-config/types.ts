@@ -47,6 +47,10 @@ export type RegistrationSiteSlot = {
   startMinutes?: number | undefined;
   /** Minutes depuis minuit (fin, exclusive du lendemain). */
   endMinutes?: number | undefined;
+  /** Max d'inscrits pour le taux de remplissage (informatif, n'empêche pas les inscriptions). */
+  capacity?: number | undefined;
+  /** Inscriptions fermées sur ce créneau. */
+  enrollmentsClosed?: boolean | undefined;
 };
 
 export type RegistrationSite = {

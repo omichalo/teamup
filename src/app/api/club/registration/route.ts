@@ -23,6 +23,7 @@ import {
   ensureRegistrationConfigSeeded,
   getActiveRegistrationConfig,
 } from "@/lib/club-registration-config/store";
+import { canBypassSlotEnrollmentClose } from "@/lib/club-registration-config/slot-enrollments";
 import { createRegistrationWithIdempotency } from "@/lib/club-registration/create-registration-with-idempotency";
 import {
   findRegistrationLicenseConflicts,
@@ -139,7 +140,8 @@ export async function POST(req: Request) {
     const json = (await req.json()) ?? {};
     await ensureRegistrationConfigSeeded();
     const activeConfig = await getActiveRegistrationConfig();
-    const parsed = buildRegistrationPayloadSchema(activeConfig).safeParse(json);
+    const allowClosedSlots = canBypassSlotEnrollmentClose(role);
+    const parsed = buildRegistrationPayloadSchema(activeConfig, { allowClosedSlots }).safeParse(json);
 
     if (!parsed.success) {
       const first = parsed.error.flatten();
@@ -153,7 +155,7 @@ export async function POST(req: Request) {
       ? stripSubmitterEmailFromRegistrationPayload(parsed.data, decoded.email)
       : parsed.data;
 
-    const payloadCheck = buildRegistrationPayloadSchema(activeConfig).safeParse(payload);
+    const payloadCheck = buildRegistrationPayloadSchema(activeConfig, { allowClosedSlots }).safeParse(payload);
     if (!payloadCheck.success) {
       const first = payloadCheck.error.flatten();
       return jsonNoStore(

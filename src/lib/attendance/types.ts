@@ -40,6 +40,7 @@ export type AttendanceSlotOption = {
   startMinutes: number;
   endMinutes: number;
   highlighted: boolean;
+  enrollmentsClosed: boolean;
 };
 
 export type AttendanceRosterPerson = {

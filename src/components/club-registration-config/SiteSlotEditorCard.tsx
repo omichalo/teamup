@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { ConfigEditorDragHandleProps } from "./ConfigEditorLayout";
 import {
   FormControl,
@@ -21,6 +22,7 @@ import {
 } from "@/lib/club-registration-config/slot-schedule";
 import { ConfigEditorCollapsibleItem, ConfigEditorOptionPanel } from "./ConfigEditorLayout";
 import { ConfigEditorRemoveAction } from "./ConfigEditorRemoveAction";
+import { SlotEnrollmentsConfirmDialog } from "./SlotEnrollmentsConfirmDialog";
 import { slotItemDecor } from "./config-editor-item-decor";
 import { slotSummaryMeta } from "./config-editor-summary-meta";
 import { configEditorSwitchLabelSx } from "./config-editor-layout";
@@ -48,6 +50,8 @@ export function SiteSlotEditorCard({
   dragHandleProps,
   isDragging = false,
 }: Props) {
+  const [enrollmentsConfirmOpen, setEnrollmentsConfirmOpen] = useState(false);
+  const [pendingEnrollmentsClosed, setPendingEnrollmentsClosed] = useState(false);
   const schoolPickupEnabled = Boolean(slot.schoolPickupSchool);
   const weekday = isIsoWeekday(slot.weekday) ? slot.weekday : 1;
   const startInput = formatMinutesAsInput(slot.startMinutes ?? 17 * 60);
@@ -117,6 +121,27 @@ export function SiteSlotEditorCard({
         />
       </Stack>
 
+      <TextField
+        label="Capacité (inscrits)"
+        type="number"
+        size="small"
+        value={slot.capacity ?? ""}
+        onChange={(e) => {
+          const raw = e.target.value.trim();
+          if (raw === "") {
+            onChange({ capacity: undefined });
+            return;
+          }
+          const parsed = Number.parseInt(raw, 10);
+          if (Number.isInteger(parsed) && parsed >= 1) {
+            onChange({ capacity: parsed });
+          }
+        }}
+        helperText="Nombre max d'inscrits pour le taux de remplissage. N'empêche pas les inscriptions."
+        slotProps={{ htmlInput: { min: 1, step: 1 } }}
+        sx={{ maxWidth: 280 }}
+      />
+
       <ConfigEditorOptionPanel title="Récupération scolaire">
         <FormControlLabel
           sx={configEditorSwitchLabelSx}
@@ -144,6 +169,30 @@ export function SiteSlotEditorCard({
           />
         ) : null}
       </ConfigEditorOptionPanel>
+
+      <FormControlLabel
+        sx={configEditorSwitchLabelSx}
+        control={
+          <Switch
+            checked={slot.enrollmentsClosed === true}
+            onChange={(e) => {
+              setPendingEnrollmentsClosed(e.target.checked);
+              setEnrollmentsConfirmOpen(true);
+            }}
+          />
+        }
+        label="Fermer les adhésions sur ce créneau"
+      />
+      <SlotEnrollmentsConfirmDialog
+        open={enrollmentsConfirmOpen}
+        closing={pendingEnrollmentsClosed}
+        slotLabel={slot.label}
+        onCancel={() => setEnrollmentsConfirmOpen(false)}
+        onConfirm={() => {
+          setEnrollmentsConfirmOpen(false);
+          onChange({ enrollmentsClosed: pendingEnrollmentsClosed ? true : undefined });
+        }}
+      />
 
       <FormControlLabel
         sx={configEditorSwitchLabelSx}

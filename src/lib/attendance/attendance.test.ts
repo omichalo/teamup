@@ -82,6 +82,7 @@ describe("attendance roster", () => {
         startMinutes: 19 * 60,
         endMinutes: 20 * 60 + 45,
         highlighted: true,
+        enrollmentsClosed: false,
       },
       registrations: [
         {

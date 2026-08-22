@@ -86,6 +86,7 @@ describe("buildRoleHomeContent", () => {
     expect(listHomeCardHrefs(content)).toEqual([
       "/club/adhesions-tableau",
       "/club/presences",
+      "/club/creneaux",
       "/club/presences/essais",
       "/club/inscription",
       "/club/mes-inscriptions",

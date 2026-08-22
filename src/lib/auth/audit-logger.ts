@@ -92,6 +92,7 @@ export const AUDIT_ACTIONS = {
   CLUB_REGISTRATION_DELETED: "club.registration.deleted",
   CLUB_REGISTRATION_CONFIG_PUBLISHED: "club.registration.config_published",
   CLUB_REGISTRATION_CONFIG_IMPORTED: "club.registration.config_imported",
+  CLUB_REGISTRATION_SLOT_ENROLLMENTS_TOGGLED: "club.registration.slot_enrollments_toggled",
   TEAM_CREATED: "team.created",
   TEAM_UPDATED: "team.updated",
   TEAM_DELETED: "team.deleted",

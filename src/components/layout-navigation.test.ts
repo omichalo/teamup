@@ -57,6 +57,7 @@ describe("buildLayoutNavigation", () => {
       "/club/mes-inscriptions",
       "/club/adhesions-tableau",
       "/club/presences",
+      "/club/creneaux",
       "/club/presences/essais",
     ]);
   });
@@ -83,6 +84,7 @@ describe("buildLayoutNavigation", () => {
       "/",
       "/club/demandes-adhesion",
       "/club/presences",
+      "/club/creneaux",
       "/club/idees",
     ]);
     expect(nav.groups).toHaveLength(1);
@@ -102,6 +104,7 @@ describe("buildLayoutNavigation", () => {
     expect(nav.primary.map((item) => item.href)).toEqual([
       "/",
       "/club/presences",
+      "/club/creneaux",
       "/compositions",
       "/disponibilites",
       "/club/adhesions-tableau",
@@ -137,6 +140,7 @@ describe("buildLayoutNavigation", () => {
     expect(nav.groups[1]?.items.map((item) => item.href)).toEqual([
       "/club/adhesions-tableau",
       "/club/presences",
+      "/club/creneaux",
       "/club/presences/essais",
       "/club/parametrage-inscription",
       "/club/inscription",

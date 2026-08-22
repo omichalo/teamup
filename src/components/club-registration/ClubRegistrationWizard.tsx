@@ -79,11 +79,14 @@ type Props = {
   accountEmail: string | null;
   /** Admin / secrétariat : inscription pour un tiers, pas de préremplissage contact. */
   isRegistrationManager?: boolean;
+  /** Admin, secrétaire, coach, bureau : peuvent inscrire sur un créneau fermé. */
+  canSelectClosedSlots?: boolean;
 };
 
 export function ClubRegistrationWizard({
   accountEmail,
   isRegistrationManager = false,
+  canSelectClosedSlots = false,
 }: Props) {
   const { config: loadedConfig, loading: configLoading } = useRegistrationConfig();
   const config = loadedConfig ?? getDefaultRegistrationConfig();
@@ -128,8 +131,8 @@ export function ClubRegistrationWizard({
   }, [activeStep, sequence.length]);
 
   const stepValidity = useMemo<(string | null)[]>(
-    () => sequence.map((id) => validateStepById(id, draft, config)),
-    [config, draft, sequence]
+    () => sequence.map((id) => validateStepById(id, draft, config, { allowClosedSlots: canSelectClosedSlots })),
+    [canSelectClosedSlots, config, draft, sequence]
   );
 
   const completedStepsCount = useMemo(
@@ -270,6 +273,7 @@ export function ClubRegistrationWizard({
     sequence,
     storage,
     accountEmail,
+    allowClosedSlots: canSelectClosedSlots,
     buildPayload,
     setActiveStep,
     stepErrorAlertRef,
@@ -277,7 +281,7 @@ export function ClubRegistrationWizard({
 
   const revealStepValidationError = useCallback(
     (stepId: RegistrationStepId) => {
-      const result = validateStep(stepId, draft, config);
+      const result = validateStep(stepId, draft, config, { allowClosedSlots: canSelectClosedSlots });
       if (result.valid) return true;
       setSubmitError(result.message);
       scrollToFormTarget(result.focusSelector, {
@@ -290,7 +294,7 @@ export function ClubRegistrationWizard({
       });
       return false;
     },
-    [config, draft, setSubmitError, stepErrorAlertRef]
+    [canSelectClosedSlots, config, draft, setSubmitError, stepErrorAlertRef]
   );
 
   /* Auto-save à chaque changement de draft. */
@@ -481,7 +485,7 @@ export function ClubRegistrationWizard({
       }
       for (let s = activeStep; s < to; s++) {
         const stepId = sequence[s];
-        const result = validateStep(stepId, draft, config);
+        const result = validateStep(stepId, draft, config, { allowClosedSlots: canSelectClosedSlots });
         if (!result.valid) {
           setActiveStep(s);
           setSubmitError(result.message);
@@ -498,7 +502,7 @@ export function ClubRegistrationWizard({
       }
       setActiveStep(to);
     },
-    [activeStep, clearSubmitFeedback, config, draft, sequence, setSubmitError]
+    [activeStep, canSelectClosedSlots, clearSubmitFeedback, config, draft, sequence, setSubmitError]
   );
 
   /** Navigation vers une étape par son identifiant symbolique (utilisée par
@@ -583,7 +587,8 @@ export function ClubRegistrationWizard({
                           activeStep,
                           sequence,
                           draft,
-                          config
+                          config,
+                          { allowClosedSlots: canSelectClosedSlots }
                         )
                       }
                       onClick={() => handleGoToStep(index)}
@@ -628,7 +633,8 @@ export function ClubRegistrationWizard({
                         activeStep,
                         sequence,
                         draft,
-                        config
+                        config,
+                        { allowClosedSlots: canSelectClosedSlots }
                       )
                     }
                     onClick={() => handleGoToStep(index)}
@@ -757,6 +763,7 @@ export function ClubRegistrationWizard({
               {currentStepId === "practice" && (
                 <PracticeStep
                   draft={draft}
+                  canSelectClosedSlots={canSelectClosedSlots}
                   onChange={actions.patchFields}
                 />
               )}

@@ -2,6 +2,7 @@ import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { getDefaultRegistrationConfig } from "./default-config";
 import { normalizeRegistrationConfigSortOrders } from "./normalize-sort-orders";
 import { registrationConfigV1Schema } from "./schema";
+import { applySlotEnrollmentsClosed } from "./slot-enrollments";
 import type { RegistrationConfigV1 } from "./types";
 
 export const REGISTRATION_CONFIG_COLLECTION = "clubRegistrationConfig";
@@ -158,4 +159,54 @@ export async function getRegistrationConfigByCatalogVersion(
     return defaultConfig;
   }
   return active;
+}
+
+export async function patchSlotEnrollmentsClosed(
+  slotId: string,
+  closed: boolean,
+  updatedBy: string
+): Promise<"updated" | "not_found"> {
+  const activeDoc = await getRegistrationConfigDoc(REGISTRATION_CONFIG_ACTIVE_ID);
+  const draftDoc = await getRegistrationConfigDoc(REGISTRATION_CONFIG_DRAFT_ID);
+  const activeConfig = activeDoc?.config ?? getDefaultRegistrationConfig();
+  const nextActive = applySlotEnrollmentsClosed(activeConfig, slotId, closed);
+  if (!nextActive) {
+    return "not_found";
+  }
+
+  const db = getFirestoreAdmin();
+  const now = new Date().toISOString();
+  const normalizedActive = normalizeRegistrationConfigSortOrders(nextActive);
+  const activePayload: Record<string, unknown> = {
+    config: normalizedActive,
+    updatedAt: now,
+    updatedBy,
+  };
+  if (activeDoc?.publishedAt) {
+    activePayload.publishedAt = activeDoc.publishedAt;
+  }
+  if (activeDoc?.publishedBy) {
+    activePayload.publishedBy = activeDoc.publishedBy;
+  }
+
+  const batch = db.batch();
+  batch.set(
+    db.collection(REGISTRATION_CONFIG_COLLECTION).doc(REGISTRATION_CONFIG_ACTIVE_ID),
+    activePayload
+  );
+
+  const draftConfig = draftDoc?.config ?? nextActive;
+  const nextDraft = applySlotEnrollmentsClosed(draftConfig, slotId, closed) ?? draftConfig;
+  batch.set(
+    db.collection(REGISTRATION_CONFIG_COLLECTION).doc(REGISTRATION_CONFIG_DRAFT_ID),
+    {
+      config: normalizeRegistrationConfigSortOrders(nextDraft),
+      updatedAt: now,
+      updatedBy,
+    },
+    { merge: true }
+  );
+
+  await batch.commit();
+  return "updated";
 }

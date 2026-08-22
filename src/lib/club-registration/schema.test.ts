@@ -1,7 +1,9 @@
 import { APPLICANT_NOTES_MAX_LENGTH } from "./applicant-notes";
-import { clubRegistrationPayloadSchema } from "./schema";
+import { buildRegistrationPayloadSchema, clubRegistrationPayloadSchema } from "./schema";
 import { inferMedicalDossierFromDeclaration } from "./medical-dossier";
 import { isAtLeast65At, isMinorAt } from "./age";
+import { buildDefaultRegistrationConfig } from "@/lib/club-registration-config/default-config";
+import { applySlotEnrollmentsClosed } from "@/lib/club-registration-config/slot-enrollments";
 
 /**
  * Helper qui construit un payload valide minimal pour un adulte qui s'inscrit lui-même,
@@ -372,6 +374,22 @@ describe("clubRegistrationPayloadSchema", () => {
   it("refuse un payload sans créneau", () => {
     const r = clubRegistrationPayloadSchema.safeParse(buildPayload({ slotIds: [] }));
     expect(r.success).toBe(false);
+  });
+
+  it("refuse un créneau dont les inscriptions sont fermées", () => {
+    const config = buildDefaultRegistrationConfig();
+    const slotId = "voisins-mar-2030-adultes-loisirs";
+    const closedConfig = applySlotEnrollmentsClosed(config, slotId, true);
+    expect(closedConfig).not.toBeNull();
+    if (!closedConfig) {
+      return;
+    }
+    const blocked = buildRegistrationPayloadSchema(closedConfig).safeParse(buildPayload({ slotIds: [slotId] }));
+    expect(blocked.success).toBe(false);
+    const allowed = buildRegistrationPayloadSchema(closedConfig, { allowClosedSlots: true }).safeParse(
+      buildPayload({ slotIds: [slotId] })
+    );
+    expect(allowed.success).toBe(true);
   });
 
   it("accepte schoolPickupSlotIds pour un créneau éligible sélectionné", () => {

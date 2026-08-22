@@ -41,6 +41,8 @@ const registrationSiteSlotSchema = z.object({
   weekday: z.number().int().min(1).max(7).optional(),
   startMinutes: z.number().int().min(0).max(23 * 60 + 59).optional(),
   endMinutes: z.number().int().min(1).max(23 * 60 + 59).optional(),
+  capacity: z.number().int().min(1).max(500).optional(),
+  enrollmentsClosed: z.boolean().optional(),
 });
 
 /** Chaîne optionnelle : vide ou espaces → `undefined` (champ masqué côté formulaire). */

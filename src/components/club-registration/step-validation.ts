@@ -14,6 +14,7 @@ import { validatePaymentDraft } from "@/lib/club-registration/payment/validate-p
 import { validateAdminAids } from "@/lib/club-registration/validate-admin-aids";
 import { isValidFrenchPhoneSurface } from "@/lib/club-registration/phone-fr";
 import type { RegistrationDraft } from "./registration-defaults";
+import { getClosedEnabledSlotIds } from "@/lib/club-registration-config/slot-enrollments";
 
 export type StepValidationResult =
   | { valid: true }
@@ -65,10 +66,15 @@ function getMedicalFocusSelector(draft: RegistrationDraft): string {
   return "#medical-dossier-section";
 }
 
+export type StepValidationOptions = {
+  allowClosedSlots?: boolean;
+};
+
 export function validateStep(
   stepId: RegistrationStepId,
   draft: RegistrationDraft,
-  config: RegistrationConfigV1 = getDefaultRegistrationConfig()
+  config: RegistrationConfigV1 = getDefaultRegistrationConfig(),
+  options: StepValidationOptions = {}
 ): StepValidationResult {
   if (stepId === "audience") {
     if (!draft.birthDate) {
@@ -230,6 +236,15 @@ export function validateStep(
     if (draft.slotIds.length === 0) {
       return invalid("Sélectionnez au moins un créneau.", '[data-field="slotIds"]');
     }
+    if (!options.allowClosedSlots) {
+      const closedSlotIds = getClosedEnabledSlotIds(config);
+      if (draft.slotIds.some((id) => closedSlotIds.has(id))) {
+        return invalid(
+          "Les inscriptions sont fermées sur un créneau sélectionné.",
+          '[data-field="slotIds"]'
+        );
+      }
+    }
     if (draft.wantsCompetitorExtras && !draft.competitionJerseySize) {
       return invalid(
         "Indiquez une taille de maillot pour la section compétiteur.",
@@ -341,8 +356,9 @@ export function validateStep(
 export function validateStepById(
   stepId: RegistrationStepId,
   draft: RegistrationDraft,
-  config: RegistrationConfigV1 = getDefaultRegistrationConfig()
+  config: RegistrationConfigV1 = getDefaultRegistrationConfig(),
+  options: StepValidationOptions = {}
 ): string | null {
-  const result = validateStep(stepId, draft, config);
+  const result = validateStep(stepId, draft, config, options);
   return result.valid ? null : result.message;
 }

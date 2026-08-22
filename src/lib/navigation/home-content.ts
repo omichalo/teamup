@@ -109,6 +109,11 @@ const HOME_LINK_META: Record<
     cta: "Ouvrir le pointage",
     color: "info",
   },
+  "/club/creneaux": {
+    description: "Taux de remplissage des créneaux et liste des inscrits.",
+    cta: "Voir les créneaux",
+    color: "info",
+  },
   "/club/presences/essais": {
     description: "Relancer les personnes venues essayer un entraînement.",
     cta: "Ouvrir les essais",
@@ -180,6 +185,7 @@ function boardMemberHome(): RoleHomeContent {
         items: cards([
           LAYOUT_NAV.tableauAdhesions,
           LAYOUT_NAV.presences,
+          LAYOUT_NAV.creneaux,
           LAYOUT_NAV.presencesEssais,
           LAYOUT_NAV.nouvelleAdhesion,
           LAYOUT_NAV.mesDossiers,
@@ -242,7 +248,7 @@ function coachHome(): RoleHomeContent {
         title: "Vie du club",
         description:
           "Présences aux entraînements et remontées sur l'application.",
-        items: cards([LAYOUT_NAV.presences, LAYOUT_NAV.boiteIdees]),
+        items: cards([LAYOUT_NAV.presences, LAYOUT_NAV.creneaux, LAYOUT_NAV.boiteIdees]),
       },
     ],
   );
@@ -275,6 +281,7 @@ function secretaryHome(): RoleHomeContent {
           "Présences aux entraînements et remontées sur l'application.",
         items: cards([
           LAYOUT_NAV.presences,
+          LAYOUT_NAV.creneaux,
           LAYOUT_NAV.presencesEssais,
           LAYOUT_NAV.boiteIdees,
         ]),
@@ -321,6 +328,7 @@ function adminHome(): RoleHomeContent {
         description: "Présences, administration de la plateforme et remontées.",
         items: cards([
           LAYOUT_NAV.presences,
+          LAYOUT_NAV.creneaux,
           LAYOUT_NAV.presencesEssais,
           LAYOUT_NAV.administration,
           LAYOUT_NAV.boiteIdees,
