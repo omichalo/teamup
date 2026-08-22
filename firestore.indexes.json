@@ -467,16 +467,6 @@
           "order": "DESCENDING"
         }
       ]
-    },
-    {
-      "collectionGroup": "championshipPlayers",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "registrationId",
-          "order": "ASCENDING"
-        }
-      ]
     }
   ],
   "fieldOverrides": []
