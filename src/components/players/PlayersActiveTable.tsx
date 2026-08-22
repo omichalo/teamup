@@ -152,7 +152,10 @@ export function PlayersActiveTable({
                   <Typography variant="body2" fontWeight="medium">
                     {player.firstName} {player.name}
                   </Typography>
-                  <ChampionshipStatusChips player={player} />
+                  <ChampionshipStatusChips
+                    player={player}
+                    hideCodes={["fftt_sqy_unlicensed"]}
+                  />
                   {player.hasPlayedAtLeastOneMatch && (
                     <Chip
                       icon={<SportsTennisIcon />}

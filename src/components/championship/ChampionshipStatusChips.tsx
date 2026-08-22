@@ -15,7 +15,7 @@ const ALERT_LABELS: Record<ChampionshipAlertCode, { label: string; title: string
     title: "Licence absente de la liste club FFTT de la saison",
   },
   fftt_sqy_unlicensed: {
-    label: "Licence saison",
+    label: "Non licencié",
     title: "Toujours affilié SQY à la FFTT, sans licence de saison",
   },
   other_club: { label: "Autre club", title: "Licence rattachée à un autre club FFTT" },
@@ -28,10 +28,12 @@ const ALERT_LABELS: Record<ChampionshipAlertCode, { label: string; title: string
 
 type Props = {
   player: Player;
+  hideCodes?: readonly ChampionshipAlertCode[];
 };
 
-export function ChampionshipStatusChips({ player }: Props) {
-  const alerts = player.championshipAlerts ?? [];
+export function ChampionshipStatusChips({ player, hideCodes = [] }: Props) {
+  const hidden = new Set(hideCodes);
+  const alerts = (player.championshipAlerts ?? []).filter((code) => !hidden.has(code));
   if (alerts.length === 0) {
     return null;
   }

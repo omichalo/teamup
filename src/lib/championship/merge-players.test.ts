@@ -44,7 +44,7 @@ function roster(
 }
 
 describe("mergePlayersWithChampionshipRoster", () => {
-  it("flags a leftover player who moved to another club", () => {
+  it("hides leftover players who moved to another club", () => {
     const merged = mergePlayersWithChampionshipRoster(
       [
         player({
@@ -58,8 +58,47 @@ describe("mergePlayersWithChampionshipRoster", () => {
       ],
       []
     );
-    expect(merged[0].isActive).toBe(false);
-    expect(merged[0].championshipAlerts).toEqual(["other_club"]);
+    expect(merged).toHaveLength(0);
+  });
+
+  it("hides a roster entry whose FFTT licence is now at another club", () => {
+    const merged = mergePlayersWithChampionshipRoster(
+      [
+        player({
+          id: "7859322",
+          name: "LECHEMINANT",
+          firstName: "Claude",
+          listedInClub: false,
+          nomClub: "CHESNAY 78 AS",
+        }),
+      ],
+      [
+        roster({
+          id: "7859322",
+          personKey: "7859322",
+          licensePresence: "other_club",
+        }),
+      ]
+    );
+    expect(merged).toHaveLength(0);
+  });
+
+  it("keeps leftover SQY affiliates without a season licence", () => {
+    const merged = mergePlayersWithChampionshipRoster(
+      [
+        player({
+          id: "5984668",
+          name: "NEMACIUC",
+          firstName: "Mihai",
+          listedInClub: true,
+          nomClub: "SQY PING",
+          typeLicence: "",
+        }),
+      ],
+      []
+    );
+    expect(merged).toHaveLength(1);
+    expect(merged[0].championshipAlerts).toEqual(["fftt_sqy_unlicensed"]);
   });
 
   it("clears last-season participation when the player is absent from the roster", () => {
