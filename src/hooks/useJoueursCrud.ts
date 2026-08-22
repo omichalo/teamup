@@ -3,6 +3,11 @@ import { doc, getDoc } from "firebase/firestore";
 import { getDbInstanceDirect } from "@/lib/firebase";
 import { Player } from "@/types/team-management";
 import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
+import {
+  createTemporaryChampionshipPlayer,
+  deleteChampionshipRosterPerson,
+  patchChampionshipRosterPerson,
+} from "@/lib/championship/client";
 
 interface JoueurFormState {
   firstName: string;
@@ -114,25 +119,14 @@ export function useJoueursCrud({
         newPlayer.firstName.trim().charAt(0).toUpperCase() +
         newPlayer.firstName.trim().slice(1).toLowerCase();
 
-      await playerService.createTemporaryPlayer({
+      await createTemporaryChampionshipPlayer({
         firstName: normalizedFirstName,
-        name: normalizedName,
-        license: newPlayer.license.trim() || "",
+        lastName: normalizedName,
+        license: newPlayer.license.trim() || undefined,
         gender: newPlayer.gender,
-        nationality: newPlayer.nationality,
-        isActive: false,
-        isTemporary: true,
+        inChampionship: newPlayer.inChampionship,
         isWheelchair: newPlayer.isWheelchair,
-        typeLicence: "",
-        points: newPlayer.points || 500,
-        preferredTeams: { masculine: [], feminine: [] },
-        participation: {
-          championnat: newPlayer.inChampionship,
-          championnatParis: false,
-        },
-        hasPlayedAtLeastOneMatch: false,
-        hasPlayedAtLeastOneMatchParis: false,
-        ...(discordMentions.length > 0 ? { discordMentions } : {}),
+        discordMentions,
       });
 
       await loadPlayers();
@@ -148,7 +142,7 @@ export function useJoueursCrud({
     } finally {
       setCreating(false);
     }
-  }, [discordMentions, licenseExists, loadPlayers, newPlayer, playerService]);
+  }, [discordMentions, licenseExists, loadPlayers, newPlayer]);
 
   const handleEditPlayer = useCallback((player: Player) => {
     setEditingPlayer(player);
@@ -193,30 +187,20 @@ export function useJoueursCrud({
         newPlayer.firstName.trim().charAt(0).toUpperCase() +
         newPlayer.firstName.trim().slice(1).toLowerCase();
 
+      const personKey = editingPlayer.championshipPersonKey || editingPlayer.id;
       if (editingPlayer.isTemporary) {
-        await playerService.updateTemporaryPlayer(editingPlayer.id, {
+        await patchChampionshipRosterPerson(personKey, {
           firstName: normalizedFirstName,
-          name: normalizedName,
-          license: newPlayer.license.trim() || "",
-          gender: newPlayer.gender,
-          nationality: newPlayer.nationality,
-          isActive: false,
+          lastName: normalizedName,
+          ffttLicense: newPlayer.license.trim() || null,
+          sex: newPlayer.gender === "F" ? "female" : "male",
           isTemporary: true,
+          championnat: newPlayer.inChampionship,
           isWheelchair: newPlayer.isWheelchair,
-          typeLicence: editingPlayer.typeLicence || "",
-          points: newPlayer.points || 500,
-          preferredTeams: editingPlayer.preferredTeams || { masculine: [], feminine: [] },
-          participation: {
-            championnat: newPlayer.inChampionship,
-            championnatParis: false,
-          },
-          hasPlayedAtLeastOneMatch: editingPlayer.hasPlayedAtLeastOneMatch || false,
-          hasPlayedAtLeastOneMatchParis:
-            editingPlayer.hasPlayedAtLeastOneMatchParis || false,
-          ...(discordMentions.length > 0 ? { discordMentions } : {}),
+          discordMentions,
         });
       } else {
-        await playerService.updatePlayer(editingPlayer.id, {
+        await patchChampionshipRosterPerson(personKey, {
           discordMentions,
           isWheelchair: newPlayer.isWheelchair,
         });
@@ -285,7 +269,6 @@ export function useJoueursCrud({
     editingPlayer,
     licenseExistsForOther,
     newPlayer,
-    playerService,
     players,
     playersWithoutLicense,
     recomputeFilteredPlayersFromLists,
@@ -304,7 +287,9 @@ export function useJoueursCrud({
       if (!confirmDelete) return;
       try {
         setDeleting(player.id);
-        await playerService.deletePlayer(player.id);
+        await deleteChampionshipRosterPerson(
+          player.championshipPersonKey || player.id
+        );
         removePlayerFromStore(player.id);
         await loadPlayers();
       } catch (error) {
@@ -314,7 +299,7 @@ export function useJoueursCrud({
         setDeleting(null);
       }
     },
-    [loadPlayers, playerService, removePlayerFromStore]
+    [loadPlayers, removePlayerFromStore]
   );
 
   return {

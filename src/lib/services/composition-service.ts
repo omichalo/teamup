@@ -8,6 +8,7 @@ import {
 } from "firebase/firestore";
 import { getDbInstanceDirect } from "@/lib/firebase";
 import { ChampionshipType } from "@/types";
+import { getCompositionDocumentId } from "@/lib/compositions/document-id";
 
 export interface DayComposition {
   journee: number;
@@ -16,6 +17,7 @@ export interface DayComposition {
   teams: {
     [teamId: string]: string[]; // teamId -> playerIds[]
   };
+  idEpreuve?: number | undefined;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -26,18 +28,25 @@ export class CompositionService {
   private getDocumentId(
     journee: number,
     phase: "aller" | "retour",
-    championshipType: ChampionshipType
+    championshipType: ChampionshipType,
+    idEpreuve?: number
   ): string {
-    return `${phase}_${journee}_${championshipType}`;
+    return getCompositionDocumentId(journee, phase, championshipType, idEpreuve);
   }
 
   async getComposition(
     journee: number,
     phase: "aller" | "retour",
-    championshipType: ChampionshipType
+    championshipType: ChampionshipType,
+    idEpreuve?: number
   ): Promise<DayComposition | null> {
     try {
-      const docId = this.getDocumentId(journee, phase, championshipType);
+      const docId = this.getDocumentId(
+        journee,
+        phase,
+        championshipType,
+        idEpreuve
+      );
       const docRef = doc(getDbInstanceDirect(), this.collectionName, docId);
       const docSnap = await getDoc(docRef);
 
@@ -71,7 +80,8 @@ export class CompositionService {
       const docId = this.getDocumentId(
         composition.journee,
         composition.phase,
-        composition.championshipType
+        composition.championshipType,
+        composition.idEpreuve
       );
       const docRef = doc(getDbInstanceDirect(), this.collectionName, docId);
 
@@ -87,6 +97,9 @@ export class CompositionService {
             : Timestamp.fromDate(new Date(composition.createdAt))
           : Timestamp.fromDate(new Date()),
       };
+      if (composition.idEpreuve !== undefined) {
+        dataToSave.idEpreuve = composition.idEpreuve;
+      }
 
       await setDoc(docRef, dataToSave, { merge: true });
     } catch (error) {
@@ -107,10 +120,16 @@ export class CompositionService {
     journee: number,
     phase: "aller" | "retour",
     championshipType: ChampionshipType,
-    callback: (composition: DayComposition | null) => void
+    callback: (composition: DayComposition | null) => void,
+    idEpreuve?: number
   ): Unsubscribe {
     try {
-      const docId = this.getDocumentId(journee, phase, championshipType);
+      const docId = this.getDocumentId(
+        journee,
+        phase,
+        championshipType,
+        idEpreuve
+      );
       const docRef = doc(getDbInstanceDirect(), this.collectionName, docId);
 
       const unsubscribe = onSnapshot(

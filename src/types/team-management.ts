@@ -67,6 +67,9 @@ export interface Player {
   isHomme?: boolean;
   // Mentions Discord pour les notifications
   discordMentions?: string[]; // IDs des membres Discord à notifier
+  listedInClub?: boolean;
+  championshipPersonKey?: string;
+  championshipAlerts?: import("@/lib/championship/records").ChampionshipAlertCode[];
 }
 
 export interface Team {

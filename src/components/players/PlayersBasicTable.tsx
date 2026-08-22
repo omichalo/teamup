@@ -25,6 +25,7 @@ import {
   Edit as EditIcon,
   SportsTennis as SportsTennisIcon,
 } from "@mui/icons-material";
+import { ChampionshipStatusChips } from "@/components/championship/ChampionshipStatusChips";
 import { Player } from "@/types/team-management";
 
 interface PlayersBasicTableProps {
@@ -56,11 +57,18 @@ export function PlayersBasicTable({
   onToggleWheelchair,
 }: PlayersBasicTableProps) {
   const renderLicenseCell = (player: Player) => {
-    if (licenseMode === "withoutLicense") {
-      return <Chip label="Sans licence" color="warning" size="small" />;
-    }
     if (licenseMode === "temporary") {
       return <Chip label="Temporaire" color="error" size="small" />;
+    }
+    if (player.championshipAlerts?.includes("other_club")) {
+      return player.license || (
+        <Chip label="Autre club" color="warning" size="small" />
+      );
+    }
+    if (licenseMode === "withoutLicense") {
+      return player.license || (
+        <Chip label="Sans licence" color="warning" size="small" />
+      );
     }
     return player.license;
   };
@@ -91,6 +99,7 @@ export function PlayersBasicTable({
                   <Typography variant="body2" fontWeight="medium">
                     {player.firstName} {player.name}
                   </Typography>
+                  <ChampionshipStatusChips player={player} />
                   {player.hasPlayedAtLeastOneMatch && (
                     <Chip
                       icon={<SportsTennisIcon />}

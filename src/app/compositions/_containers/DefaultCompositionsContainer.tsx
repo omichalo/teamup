@@ -91,8 +91,7 @@ export function DefaultCompositionsContainer() {
     setDefaultCompositions,
     defaultCompositionsLoaded,
   } = useDefaultCompositions({
-    selectedPhase,
-    compositionDefaultsService,
+    selectedPhase, selectedEpreuve, equipes, compositionDefaultsService,
   });
 
   const {
@@ -162,12 +161,7 @@ export function DefaultCompositionsContainer() {
   );
 
   const championshipPlayers = useMemo(
-    () =>
-      players.filter(
-        (player) => 
-          player.participation?.championnat === true && 
-          (player.isActive || player.isTemporary)
-      ),
+    () => players.filter((player) => player.participation?.championnat === true),
     [players]
   );
 

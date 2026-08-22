@@ -41,6 +41,11 @@ import {
   type JoueursFilters,
 } from "@/lib/players/player-filters";
 import { useJoueursCrud } from "@/hooks/useJoueursCrud";
+import { useJoueursRosterToggles } from "@/hooks/useJoueursRosterToggles";
+import {
+  mergeLoadedPlayersWithRoster,
+  splitMergedPlayersByTab,
+} from "@/lib/championship/load-merged-players";
 import { PlayersBasicTable } from "@/components/players/PlayersBasicTable";
 import { PlayersActiveTable } from "@/components/players/PlayersActiveTable";
 import { DiscordMentionsAutocomplete } from "@/components/players/DiscordMentionsAutocomplete";
@@ -113,10 +118,15 @@ export default function JoueursPage() {
         playerService.getPlayersWithoutLicense(),
         playerService.getTemporaryPlayers(),
       ]);
-
-      setPlayers(activePlayers);
-      setPlayersWithoutLicense(withoutLicense);
-      setTemporaryPlayers(temporary);
+      const merged = await mergeLoadedPlayersWithRoster([
+        ...activePlayers,
+        ...withoutLicense,
+        ...temporary,
+      ]);
+      const split = splitMergedPlayersByTab(merged);
+      setPlayers(split.active);
+      setPlayersWithoutLicense(split.withoutLicense);
+      setTemporaryPlayers(split.temporary);
     } catch (error) {
       console.error("Erreur lors du chargement des joueurs:", error);
     } finally {
@@ -312,143 +322,21 @@ export default function JoueursPage() {
     recomputeFilteredPlayersFromLists,
   });
 
-  const handleToggleParticipationParis = async (
-    player: Player,
-    inChampionshipParis: boolean
-  ) => {
-    try {
-      // Mettre à jour seulement la participation au championnat de Paris
-      await playerService.updatePlayer(player.id, {
-        participation: {
-          ...player.participation,
-          championnatParis: inChampionshipParis,
-        },
-      });
-
-      // Mettre à jour l'état local
-      setPlayers((prevPlayers) =>
-        prevPlayers.map((p) =>
-          p.id === player.id
-            ? {
-                ...p,
-                participation: {
-                  ...p.participation,
-                  championnatParis: inChampionshipParis,
-                },
-              }
-            : p
-        )
-      );
-
-      // Mettre à jour le store Zustand pour synchroniser avec les autres pages
-      updatePlayerInStore(player.id, {
-        participation: {
-          ...player.participation,
-          championnatParis: inChampionshipParis,
-        },
-      });
-    } catch (error) {
-      console.error(
-        "Erreur lors de la mise à jour de la participation au championnat de Paris:",
-        error
-      );
-      alert("Erreur lors de la mise à jour de la participation");
-    }
-  };
-
-  const handleToggleParticipation = async (
-    player: Player,
-    isParticipating: boolean
-  ) => {
-    try {
-      // Mettre à jour seulement la participation au championnat
-      await playerService.updatePlayer(player.id, {
-        participation: {
-          ...player.participation,
-          championnat: isParticipating,
-        },
-      });
-      // Mettre à jour l&apos;état local immédiatement pour un feedback visuel rapide
-      const updatePlayerInList = (p: Player) =>
-        p.id === player.id
-          ? {
-              ...p,
-              participation: {
-                ...p.participation,
-                championnat: isParticipating,
-              },
-            }
-          : p;
-
-      const updatedPlayers = players.map(updatePlayerInList);
-      const updatedTemporaryPlayers = temporaryPlayers.map(updatePlayerInList);
-      const updatedPlayersWithoutLicense =
-        playersWithoutLicense.map(updatePlayerInList);
-
-      setPlayers(updatedPlayers);
-      setTemporaryPlayers(updatedTemporaryPlayers);
-      setPlayersWithoutLicense(updatedPlayersWithoutLicense);
-
-      // Mettre à jour le store Zustand pour synchroniser avec les autres pages
-      updatePlayerInStore(player.id, {
-        participation: {
-          ...player.participation,
-          championnat: isParticipating,
-        },
-      });
-
-      recomputeFilteredPlayersFromLists(
-        updatedPlayers,
-        updatedPlayersWithoutLicense,
-        updatedTemporaryPlayers
-      );
-    } catch (error) {
-      console.error(
-        "Erreur lors de la mise à jour de la participation:",
-        error
-      );
-    }
-  };
-
-  const handleToggleWheelchair = useCallback(
-    async (player: Player) => {
-      const newValue = !player.isWheelchair;
-      const oldValue = player.isWheelchair;
-
-      const applyWheelchairState = (value: boolean) => {
-        setPlayers((prev) =>
-          prev.map((p) =>
-            p.id === player.id ? { ...p, isWheelchair: value } : p
-          )
-        );
-        setPlayersWithoutLicense((prev) =>
-          prev.map((p) =>
-            p.id === player.id ? { ...p, isWheelchair: value } : p
-          )
-        );
-        setTemporaryPlayers((prev) =>
-          prev.map((p) =>
-            p.id === player.id ? { ...p, isWheelchair: value } : p
-          )
-        );
-        setFilteredPlayers((prev) =>
-          prev.map((p) =>
-            p.id === player.id ? { ...p, isWheelchair: value } : p
-          )
-        );
-      };
-
-      applyWheelchairState(newValue ?? false);
-      try {
-        await playerService.updatePlayer(player.id, { isWheelchair: newValue });
-        updatePlayerInStore(player.id, { isWheelchair: newValue });
-      } catch (error) {
-        console.error("Erreur lors de la mise à jour du flag fauteuil:", error);
-        applyWheelchairState(oldValue ?? false);
-      }
-    },
-    [playerService, updatePlayerInStore]
-  );
+  const {
+    handleToggleParticipation,
+    handleToggleParticipationParis,
+    handleToggleWheelchair,
+  } = useJoueursRosterToggles({
+    players,
+    playersWithoutLicense,
+    temporaryPlayers,
+    setPlayers,
+    setPlayersWithoutLicense,
+    setTemporaryPlayers,
+    setFilteredPlayers,
+    updatePlayerInStore,
+    recomputeFilteredPlayersFromLists,
+  });
 
   return (
     <AuthGuard

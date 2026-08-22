@@ -15,7 +15,10 @@ interface TeamDataState {
   currentPhase: "aller" | "retour";
 }
 
-export function useTeamData(): TeamDataState {
+export function useTeamData(options?: {
+  refreshOnMount?: boolean;
+}): TeamDataState {
+  const refreshOnMount = options?.refreshOnMount === true;
   const {
     equipesWithMatches,
     equipesLoading,
@@ -29,10 +32,22 @@ export function useTeamData(): TeamDataState {
   }));
 
   useEffect(() => {
+    if (!refreshOnMount) return;
+    void loadEquipesWithMatches();
+  }, [loadEquipesWithMatches, refreshOnMount]);
+
+  useEffect(() => {
+    if (refreshOnMount) return;
     if (!equipesWithMatches.length && !equipesLoading && !equipesError) {
       void loadEquipesWithMatches();
     }
-  }, [equipesError, equipesLoading, equipesWithMatches.length, loadEquipesWithMatches]);
+  }, [
+    equipesError,
+    equipesLoading,
+    equipesWithMatches.length,
+    loadEquipesWithMatches,
+    refreshOnMount,
+  ]);
 
   const currentPhase = useMemo(() => {
     if (equipesWithMatches.length === 0) {

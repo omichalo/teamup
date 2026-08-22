@@ -11,12 +11,14 @@ interface CompositionParams {
   journee: number | null;
   phase: "aller" | "retour" | null;
   championshipType: ChampionshipType;
+  idEpreuve?: number;
 }
 
 export const useCompositions = ({
   journee,
   phase,
   championshipType,
+  idEpreuve,
 }: CompositionParams) => {
   const {
     subscribeToComposition,
@@ -30,16 +32,16 @@ export const useCompositions = ({
 
   const composition = useTeamManagementStore((state) =>
     journee && phase
-      ? getCompositionByDay(state, { journee, phase, championshipType })
+      ? getCompositionByDay(state, { journee, phase, championshipType, ...(idEpreuve !== undefined ? { idEpreuve } : {}) })
       : null
   );
 
   const key = useMemo(
     () =>
       journee && phase
-        ? getDayKey({ journee, phase, championshipType })
+        ? getDayKey({ journee, phase, championshipType, ...(idEpreuve !== undefined ? { idEpreuve } : {}) })
         : null,
-    [championshipType, journee, phase]
+    [championshipType, idEpreuve, journee, phase]
   );
 
   useEffect(() => {
@@ -47,8 +49,13 @@ export const useCompositions = ({
       return undefined;
     }
 
-    return subscribeToComposition({ journee, phase, championshipType });
-  }, [championshipType, journee, phase, subscribeToComposition]);
+    return subscribeToComposition({
+      journee,
+      phase,
+      championshipType,
+      ...(idEpreuve !== undefined ? { idEpreuve } : {}),
+    });
+  }, [championshipType, idEpreuve, journee, phase, subscribeToComposition]);
 
   return {
     composition: composition as DayComposition | null,

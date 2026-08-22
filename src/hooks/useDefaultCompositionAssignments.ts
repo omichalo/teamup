@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { usePlayerDrag } from "@/hooks/usePlayerDrag";
-import { EpreuveType, isParisEpreuve } from "@/lib/shared/epreuve-utils";
 import { CompositionDefaultsService } from "@/lib/services/composition-defaults-service";
+import { EpreuveType, isParisEpreuve, resolveIdEpreuveFromEquipes } from "@/lib/shared/epreuve-utils";
 import { EquipeWithMatches } from "@/hooks/useTeamData";
 import { ChampionshipType } from "@/types";
 import { Player } from "@/types/team-management";
@@ -12,6 +12,20 @@ import {
 } from "@/lib/compositions/validators";
 
 const MAX_PLAYERS_PER_DEFAULT_TEAM = 5;
+
+function defaultsPayload(
+  phase: "aller" | "retour",
+  championshipType: ChampionshipType,
+  teams: Record<string, string[]>,
+  idEpreuve: number | undefined
+) {
+  return {
+    phase,
+    championshipType,
+    teams,
+    ...(idEpreuve !== undefined ? { idEpreuve } : {}),
+  };
+}
 
 interface DefaultCompositionsState {
   masculin: Record<string, string[]>;
@@ -47,6 +61,11 @@ export function useDefaultCompositionAssignments({
   compositionDefaultsService,
   setDefaultCompositionMessage,
 }: UseDefaultCompositionAssignmentsParams) {
+  const idEpreuveFor = useCallback(
+    (championshipType: ChampionshipType) =>
+      resolveIdEpreuveFromEquipes(equipes, championshipType, selectedEpreuve),
+    [equipes, selectedEpreuve]
+  );
   const canDropPlayer = useCallback(
     (playerId: string, teamId: string): AssignmentValidationResult => {
       const equipe = equipes.find((e) => e.team.id === teamId);
@@ -139,11 +158,14 @@ export function useDefaultCompositionAssignments({
         };
         setDefaultCompositions(nextState);
         try {
-          await compositionDefaultsService.saveDefaults({
-            phase: selectedPhase,
-            championshipType,
-            teams: updatedForType,
-          });
+          await compositionDefaultsService.saveDefaults(
+            defaultsPayload(
+              selectedPhase,
+              championshipType,
+              updatedForType,
+              idEpreuveFor(championshipType)
+            )
+          );
           setDefaultCompositionMessage(null);
           return true;
         } catch {
@@ -171,11 +193,14 @@ export function useDefaultCompositionAssignments({
       });
 
       try {
-        await compositionDefaultsService.saveDefaults({
-          phase: selectedPhase,
-          championshipType,
-          teams: updatedForType,
-        });
+        await compositionDefaultsService.saveDefaults(
+          defaultsPayload(
+            selectedPhase,
+            championshipType,
+            updatedForType,
+            idEpreuveFor(championshipType)
+          )
+        );
         setDefaultCompositionMessage(null);
         return true;
       } catch {
@@ -192,6 +217,7 @@ export function useDefaultCompositionAssignments({
       canDropPlayer,
       selectedEpreuve,
       equipesByType,
+      idEpreuveFor,
       defaultCompositions,
       setDefaultCompositions,
       compositionDefaultsService,
@@ -229,11 +255,14 @@ export function useDefaultCompositionAssignments({
       if (!nextTeamsForType) return;
 
       try {
-        await compositionDefaultsService.saveDefaults({
-          phase: selectedPhase,
-          championshipType,
-          teams: nextTeamsForType,
-        });
+        await compositionDefaultsService.saveDefaults(
+          defaultsPayload(
+            selectedPhase,
+            championshipType,
+            nextTeamsForType,
+            idEpreuveFor(championshipType)
+          )
+        );
       } catch {
         setDefaultCompositionMessage(
           "Erreur lors de la sauvegarde de la composition par défaut."
@@ -246,6 +275,7 @@ export function useDefaultCompositionAssignments({
       selectedEpreuve,
       setDefaultCompositions,
       compositionDefaultsService,
+      idEpreuveFor,
       setDefaultCompositionMessage,
     ]
   );
