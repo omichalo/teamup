@@ -85,7 +85,9 @@ export function AddManualPaymentDialog({
     setNote("");
     setConfirmOverpayment(false);
     setAmountError(null);
-  }, [open, suggestedAmountCents, defaultMethod]);
+    // Réinitialiser uniquement à l'ouverture — pas quand le solde change pendant le submit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: open edge only
+  }, [open]);
 
   const amountCents = eurosInputToCents(amountEuros);
   const isOverpayment =
@@ -116,6 +118,8 @@ export function AddManualPaymentDialog({
         ...(isOverpayment ? { confirmOverpayment: true } : {}),
       });
       onClose();
+    } catch {
+      // L'erreur est gérée par le parent ; la popin reste ouverte.
     } finally {
       setSubmitting(false);
     }
@@ -125,7 +129,12 @@ export function AddManualPaymentDialog({
     method === "cheque" || method === "holiday_vouchers";
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+    <Dialog
+      open={open}
+      onClose={submitting ? undefined : onClose}
+      fullWidth
+      maxWidth="sm"
+    >
       <DialogTitle>Ajouter un paiement reçu</DialogTitle>
       <DialogContent>
         <DialogContentText sx={{ mb: 1 }}>

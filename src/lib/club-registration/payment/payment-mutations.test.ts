@@ -2,8 +2,11 @@ import {
   CANCELLED_EXPECTED_REPLACED_NOTE,
   addManualReceivedPayment,
   cancelOutstandingExpectedPayments,
+  isReceivedPaymentReversible,
+  isReceivedPaymentReversed,
   markExpectedPaymentReceived,
   markPaymentFullyPaid,
+  reverseReceivedPayment,
 } from "./payment-mutations";
 import type { ExpectedPayment, ReceivedPayment, RegistrationPayment } from "./types";
 
@@ -177,5 +180,116 @@ describe("markPaymentFullyPaid", () => {
     expect(next.paymentMethod).toBe("cheque");
     expect(next.remainingAmountCents).toBe(0);
     expect(next.paymentStatus).toBe("paid");
+  });
+});
+
+describe("reverseReceivedPayment", () => {
+  it("annule un encaissement manuel et recalcule le solde", () => {
+    const withReceipt = addManualReceivedPayment(basePayment(), {
+      method: "cash",
+      label: "Espèces",
+      amountCents: 10_000,
+      receivedAt: "2026-08-17T10:00:00.000Z",
+      recordedBy: "secretary_uid",
+    });
+    const receivedId = withReceipt.receivedPayments[0].id;
+
+    const next = reverseReceivedPayment(withReceipt, receivedId, {
+      reason: "Erreur de saisie",
+      reversedBy: "admin_uid",
+      reversedAt: "2026-08-18T09:00:00.000Z",
+    });
+
+    expect(next).not.toBeNull();
+    expect(next!.paidAmountCents).toBe(0);
+    expect(next!.remainingAmountCents).toBe(30_000);
+    expect(next!.paymentStatus).toBe("waiting_payment");
+    expect(next!.receivedPayments[0].reversedAt).toBe("2026-08-18T09:00:00.000Z");
+    expect(next!.receivedPayments[0].reversalReason).toBe("Erreur de saisie");
+    expect(isReceivedPaymentReversed(next!.receivedPayments[0])).toBe(true);
+  });
+
+  it("restaure l'échéance prévue liée", () => {
+    const afterExpected = markExpectedPaymentReceived(basePayment(), "ep_1", {
+      amountCents: 10_000,
+      receivedAt: "2026-08-17T10:00:00.000Z",
+      recordedBy: "secretary_uid",
+    });
+    expect(afterExpected!.expectedPayments[0].status).toBe("received");
+    const receivedId = afterExpected!.receivedPayments[0].id;
+
+    const next = reverseReceivedPayment(afterExpected!, receivedId, {
+      reason: "Chèque refusé",
+      reversedBy: "admin_uid",
+    });
+
+    expect(next!.expectedPayments[0].status).toBe("expected");
+    expect(next!.paidAmountCents).toBe(0);
+    expect(next!.remainingAmountCents).toBe(30_000);
+  });
+
+  it("repasse le dossier de payé à en attente", () => {
+    const paid = addManualReceivedPayment(basePayment(), {
+      method: "cheque",
+      label: "Chèque global",
+      amountCents: 30_000,
+      receivedAt: "2026-08-17T10:00:00.000Z",
+    });
+    expect(paid.paymentStatus).toBe("paid");
+    const receivedId = paid.receivedPayments[0].id;
+
+    const next = reverseReceivedPayment(paid, receivedId, {
+      reason: "Montant incorrect",
+      reversedBy: "admin_uid",
+    });
+
+    expect(next!.paymentStatus).toBe("waiting_payment");
+    expect(next!.remainingAmountCents).toBe(30_000);
+  });
+
+  it("refuse les encaissements Stripe", () => {
+    const stripeReceipt: ReceivedPayment = {
+      id: "rp_stripe",
+      method: "card",
+      label: "Paiement Stripe",
+      amountCents: 30_000,
+      receivedAt: "2026-08-17T10:00:00.000Z",
+      recordedBy: "stripe",
+    };
+    const payment = basePayment({
+      receivedPayments: [stripeReceipt],
+      paidAmountCents: 30_000,
+      remainingAmountCents: 0,
+      paymentStatus: "paid",
+    });
+
+    expect(isReceivedPaymentReversible(stripeReceipt)).toBe(false);
+    expect(
+      reverseReceivedPayment(payment, "rp_stripe", {
+        reason: "Test",
+        reversedBy: "admin_uid",
+      })
+    ).toBeNull();
+  });
+
+  it("refuse une double annulation", () => {
+    const withReceipt = addManualReceivedPayment(basePayment(), {
+      method: "cash",
+      label: "Espèces",
+      amountCents: 5_000,
+      receivedAt: "2026-08-17T10:00:00.000Z",
+    });
+    const receivedId = withReceipt.receivedPayments[0].id;
+    const once = reverseReceivedPayment(withReceipt, receivedId, {
+      reason: "Erreur",
+      reversedBy: "admin_uid",
+    });
+
+    expect(
+      reverseReceivedPayment(once!, receivedId, {
+        reason: "Encore",
+        reversedBy: "admin_uid",
+      })
+    ).toBeNull();
   });
 });

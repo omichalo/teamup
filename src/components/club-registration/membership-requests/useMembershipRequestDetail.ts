@@ -50,8 +50,10 @@ export function useMembershipRequestDetail(
   const [success, setSuccess] = useState<string | null>(null);
 
   const fetchDetail = useCallback(
-    async (id: string) => {
-      setLoadingDetail(true);
+    async (id: string, options?: { silent?: boolean }) => {
+      if (!options?.silent) {
+        setLoadingDetail(true);
+      }
       setError(null);
       try {
         const res = await fetch(`/api/club/registration?id=${encodeURIComponent(id)}`, {
@@ -69,10 +71,14 @@ export function useMembershipRequestDetail(
         setForm(toEditableRegistration(registration, config, payment));
       } catch (err) {
         setError(err instanceof Error ? err.message : "Erreur de chargement.");
-        setSelected(null);
-        setForm(null);
+        if (!options?.silent) {
+          setSelected(null);
+          setForm(null);
+        }
       } finally {
-        setLoadingDetail(false);
+        if (!options?.silent) {
+          setLoadingDetail(false);
+        }
       }
     },
     [config]

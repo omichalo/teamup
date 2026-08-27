@@ -381,7 +381,7 @@ export function MembershipRequestDetailFormSecondary({
           onRefresh={async () => {
             const result = await onListReload?.({ advance: "if_removed" });
             if (!result?.advanced && registrationId) {
-              await fetchDetail(registrationId);
+              await fetchDetail(registrationId, { silent: true });
             }
           }}
           onAidsChange={applyPaymentAids}
