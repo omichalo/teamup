@@ -81,4 +81,23 @@ describe("calculatePaymentSummary", () => {
     });
     expect(summary.paymentStatus).toBe("manual_follow_up");
   });
+
+  it("ignore les encaissements annulés dans les totaux", () => {
+    const summary = calculatePaymentSummary({
+      totalAmountCents: 20_000,
+      aids: [],
+      receivedPayments: [
+        received(10_000),
+        {
+          ...received(5_000),
+          id: "r2",
+          reversedAt: "2026-08-18T09:00:00.000Z",
+          reversalReason: "Erreur",
+        },
+      ],
+    });
+    expect(summary.paidAmountCents).toBe(10_000);
+    expect(summary.remainingAmountCents).toBe(10_000);
+    expect(summary.paymentStatus).toBe("partially_paid");
+  });
 });

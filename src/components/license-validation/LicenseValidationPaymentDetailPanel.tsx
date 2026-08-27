@@ -9,9 +9,11 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import type { ExpectedPayment } from "@/lib/club-registration/payment/types";
+import type { ExpectedPayment, ReceivedPayment } from "@/lib/club-registration/payment/types";
 import { MarkExpectedPaymentReceivedDialog } from "@/components/club-registration/secretariat/MarkExpectedPaymentReceivedDialog";
 import { AddManualPaymentDialog } from "@/components/club-registration/secretariat/AddManualPaymentDialog";
+import { ReceivedPaymentsTable } from "@/components/club-registration/secretariat/ReceivedPaymentsTable";
+import { ReverseReceivedPaymentDialog } from "@/components/club-registration/secretariat/ReverseReceivedPaymentDialog";
 import {
   PAYMENT_METHOD_LABELS,
   RECEIVED_PAYMENT_METHOD_LABELS,
@@ -47,6 +49,7 @@ export function LicenseValidationPaymentDetailPanel({
   const [receiveExpected, setReceiveExpected] = useState<ExpectedPayment | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
+  const [reverseReceived, setReverseReceived] = useState<ReceivedPayment | null>(null);
 
   const pendingChequePayments = useMemo(() => {
     if (!detail?.payment) {
@@ -77,7 +80,10 @@ export function LicenseValidationPaymentDetailPanel({
     if (!res.ok) {
       throw new Error(json.error || "Paiement impossible");
     }
-    await reload();
+  };
+
+  const refreshAfterPayment = async () => {
+    await reload({ silent: true });
     await onSaved();
   };
 
@@ -99,7 +105,7 @@ export function LicenseValidationPaymentDetailPanel({
     );
   }
 
-  if (loading) {
+  if (loading && !detail) {
     return (
       <Typography color="text.secondary" sx={{ py: 4 }}>
         Chargement du dossier…
@@ -168,6 +174,18 @@ export function LicenseValidationPaymentDetailPanel({
         <Alert severity="warning">Aucune information de paiement sur ce dossier.</Alert>
       )}
 
+      {payment && payment.receivedPayments.length > 0 ? (
+        <Stack spacing={1}>
+          <Typography variant="subtitle2" color="text.secondary">
+            Encaissements enregistrés
+          </Typography>
+          <ReceivedPaymentsTable
+            receivedPayments={payment.receivedPayments}
+            onReverse={(line) => setReverseReceived(line)}
+          />
+        </Stack>
+      ) : null}
+
       <Stack spacing={1}>
         <Typography variant="subtitle2" color="text.secondary">
           Échéances en attente
@@ -234,6 +252,8 @@ export function LicenseValidationPaymentDetailPanel({
               ...(input.reference ? { reference: input.reference } : {}),
               ...(input.note ? { note: input.note } : {}),
             });
+            setReceiveExpected(null);
+            await refreshAfterPayment();
           } catch (err) {
             setPaymentError(err instanceof Error ? err.message : "Erreur inconnue");
             throw err;
@@ -248,19 +268,54 @@ export function LicenseValidationPaymentDetailPanel({
           remainingAmountCents={payment.remainingAmountCents}
           onClose={() => setManualOpen(false)}
           onSubmit={async (input) => {
-            await postPaymentReceive({
-              mode: "manual",
-              method: input.method,
-              label: input.label || RECEIVED_PAYMENT_METHOD_LABELS[input.method],
-              amountCents: input.amountCents,
-              receivedAt: input.receivedAt,
-              ...(input.confirmOverpayment ? { confirmOverpayment: true } : {}),
-              ...(input.reference ? { reference: input.reference } : {}),
-              ...(input.note ? { note: input.note } : {}),
-            });
+            try {
+              await postPaymentReceive({
+                mode: "manual",
+                method: input.method,
+                label: input.label || RECEIVED_PAYMENT_METHOD_LABELS[input.method],
+                amountCents: input.amountCents,
+                receivedAt: input.receivedAt,
+                ...(input.confirmOverpayment ? { confirmOverpayment: true } : {}),
+                ...(input.reference ? { reference: input.reference } : {}),
+                ...(input.note ? { note: input.note } : {}),
+              });
+              setManualOpen(false);
+              await refreshAfterPayment();
+            } catch (err) {
+              setPaymentError(err instanceof Error ? err.message : "Erreur inconnue");
+              throw err;
+            }
           }}
         />
       ) : null}
+
+      <ReverseReceivedPaymentDialog
+        open={reverseReceived !== null}
+        payment={reverseReceived}
+        onClose={() => setReverseReceived(null)}
+        onSubmit={async ({ reason }) => {
+          if (!reverseReceived || !registrationId) {
+            return;
+          }
+          setPaymentError(null);
+          const receivedId = reverseReceived.id;
+          const res = await fetch(
+            `/api/club/license-validations/${encodeURIComponent(registrationId)}/payment/received/${encodeURIComponent(receivedId)}/reverse`,
+            {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ reason }),
+            }
+          );
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            throw new Error(json.error || "Annulation impossible");
+          }
+          setReverseReceived(null);
+          await refreshAfterPayment();
+        }}
+      />
     </Stack>
   );
 }

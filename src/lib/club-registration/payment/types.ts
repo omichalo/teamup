@@ -39,6 +39,10 @@ export type ReceivedPayment = {
   reference?: string;
   note?: string;
   expectedPaymentId?: string;
+  /** Encaissement annulé (erreur de saisie, remboursement manuel hors Stripe). */
+  reversedAt?: string;
+  reversedBy?: string;
+  reversalReason?: string;
 };
 
 export type RegistrationPayment = {
