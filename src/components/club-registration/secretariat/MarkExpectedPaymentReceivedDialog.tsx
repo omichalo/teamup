@@ -82,13 +82,20 @@ export function MarkExpectedPaymentReceivedDialog({
         ...(note.trim() ? { note: note.trim() } : {}),
       });
       onClose();
+    } catch {
+      // L'erreur est gérée par le parent ; la popin reste ouverte.
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+    <Dialog
+      open={open}
+      onClose={submitting ? undefined : onClose}
+      fullWidth
+      maxWidth="sm"
+    >
       <DialogTitle>Marquer comme reçu — {expected?.label ?? ""}</DialogTitle>
       <DialogContent>
         <DialogContentText sx={{ mb: 1 }}>

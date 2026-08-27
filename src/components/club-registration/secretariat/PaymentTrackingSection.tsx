@@ -23,11 +23,13 @@ import {
 } from "@/lib/club-registration/payment-constants";
 import { receivedMethodFromPlanned } from "@/lib/club-registration/payment/received-method-from-planned";
 import { resolveExpectedLineReceivedCents } from "@/lib/club-registration/payment/expected-line-received";
-import type { ExpectedPayment, RegistrationPayment } from "@/lib/club-registration/payment/types";
+import type { ExpectedPayment, ReceivedPayment, RegistrationPayment } from "@/lib/club-registration/payment/types";
 import { formatCentsAsEuros } from "@/lib/pricing";
 import { AddManualPaymentDialog } from "./AddManualPaymentDialog";
 import { MarkExpectedPaymentReceivedDialog } from "./MarkExpectedPaymentReceivedDialog";
 import { PaymentDeclaredAidsTable } from "./PaymentDeclaredAidsTable";
+import { ReceivedPaymentsTable } from "./ReceivedPaymentsTable";
+import { ReverseReceivedPaymentDialog } from "./ReverseReceivedPaymentDialog";
 
 type Props = {
   registrationId: string;
@@ -67,6 +69,7 @@ export function PaymentTrackingSection({
 }: Props) {
   const [manualOpen, setManualOpen] = useState(false);
   const [receiveExpected, setReceiveExpected] = useState<ExpectedPayment | null>(null);
+  const [reverseReceived, setReverseReceived] = useState<ReceivedPayment | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const summaryRows = useMemo(
@@ -97,13 +100,18 @@ export function PaymentTrackingSection({
     [payment]
   );
 
-  const runAction = async (fn: () => Promise<void>) => {
+  const runAction = async (
+    fn: () => Promise<void>,
+    options?: { closeDialog?: () => void }
+  ) => {
     setActionError(null);
     try {
       await fn();
+      options?.closeDialog?.();
       await onRefresh();
     } catch (err) {
       setActionError(err instanceof Error ? err.message : "Erreur");
+      throw err;
     }
   };
 
@@ -252,30 +260,10 @@ export function PaymentTrackingSection({
           <Typography variant="subtitle2" fontWeight={600}>
             Encaissements reçus
           </Typography>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Date</TableCell>
-                <TableCell>Libellé</TableCell>
-                <TableCell>N° / réf.</TableCell>
-                <TableCell align="right">Montant</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {payment.receivedPayments.map((line) => (
-                <TableRow key={line.id}>
-                  <TableCell>
-                    {new Date(line.receivedAt).toLocaleDateString("fr-FR")}
-                  </TableCell>
-                  <TableCell>{line.label}</TableCell>
-                  <TableCell>{line.reference?.trim() || "—"}</TableCell>
-                  <TableCell align="right">
-                    {formatCentsAsEuros(line.amountCents)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <ReceivedPaymentsTable
+            receivedPayments={payment.receivedPayments}
+            onReverse={(line) => setReverseReceived(line)}
+          />
         </>
       ) : null}
 
@@ -328,8 +316,9 @@ export function PaymentTrackingSection({
         defaultMethod={receivedMethodFromPlanned(payment.paymentMethod)}
         onClose={() => setManualOpen(false)}
         onSubmit={async (input) => {
-          await runAction(() =>
-            postPaymentAction(registrationId, "/received", input)
+          await runAction(
+            () => postPaymentAction(registrationId, "/received", input),
+            { closeDialog: () => setManualOpen(false) }
           );
         }}
       />
@@ -340,12 +329,43 @@ export function PaymentTrackingSection({
         onClose={() => setReceiveExpected(null)}
         onSubmit={async (input) => {
           if (!receiveExpected) return;
-          await runAction(() =>
-            postPaymentAction(
-              registrationId,
-              `/expected/${encodeURIComponent(receiveExpected.id)}/receive`,
-              input
-            )
+          const expectedId = receiveExpected.id;
+          await runAction(
+            () =>
+              postPaymentAction(
+                registrationId,
+                `/expected/${encodeURIComponent(expectedId)}/receive`,
+                input
+              ),
+            { closeDialog: () => setReceiveExpected(null) }
+          );
+        }}
+      />
+
+      <ReverseReceivedPaymentDialog
+        open={reverseReceived !== null}
+        payment={reverseReceived}
+        onClose={() => setReverseReceived(null)}
+        onSubmit={async ({ reason }) => {
+          if (!reverseReceived) return;
+          const receivedId = reverseReceived.id;
+          await runAction(
+            async () => {
+              const res = await fetch(
+                `/api/club/registration/${encodeURIComponent(registrationId)}/payment/received/${encodeURIComponent(receivedId)}/reverse`,
+                {
+                  method: "POST",
+                  credentials: "include",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ reason }),
+                }
+              );
+              const json = await res.json().catch(() => ({}));
+              if (!res.ok || json.error) {
+                throw new Error(json.error || "Annulation impossible");
+              }
+            },
+            { closeDialog: () => setReverseReceived(null) }
           );
         }}
       />

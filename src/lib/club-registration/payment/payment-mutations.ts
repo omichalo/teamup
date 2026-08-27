@@ -263,6 +263,71 @@ export function setManualFollowUp(
   };
 }
 
+export function isReceivedPaymentReversed(payment: ReceivedPayment): boolean {
+  return Boolean(payment.reversedAt);
+}
+
+/** Encaissements manuels uniquement — les paiements Stripe se gèrent hors app. */
+export function isReceivedPaymentReversible(payment: ReceivedPayment): boolean {
+  return !isReceivedPaymentReversed(payment) && payment.recordedBy !== "stripe";
+}
+
+export function reverseReceivedPayment(
+  payment: RegistrationPayment,
+  receivedId: string,
+  input: {
+    reason: string;
+    reversedBy: string;
+    reversedAt?: string;
+  }
+): RegistrationPayment | null {
+  const receivedIndex = payment.receivedPayments.findIndex((line) => line.id === receivedId);
+  if (receivedIndex === -1) {
+    return null;
+  }
+
+  const received = payment.receivedPayments[receivedIndex];
+  if (!isReceivedPaymentReversible(received)) {
+    return null;
+  }
+
+  const reason = input.reason.trim();
+  if (!reason) {
+    return null;
+  }
+
+  const reversedAt = input.reversedAt ?? new Date().toISOString();
+  const receivedPayments = payment.receivedPayments.map((line, index) => {
+    if (index !== receivedIndex) {
+      return line;
+    }
+    return {
+      ...line,
+      reversedAt,
+      reversedBy: input.reversedBy,
+      reversalReason: reason,
+    };
+  });
+
+  let expectedPayments = payment.expectedPayments;
+  if (received.expectedPaymentId) {
+    expectedPayments = payment.expectedPayments.map((line) => {
+      if (line.id !== received.expectedPaymentId || line.status !== "received") {
+        return line;
+      }
+      return { ...line, status: "expected" as const };
+    });
+  }
+
+  const next: RegistrationPayment = {
+    ...payment,
+    expectedPayments,
+    receivedPayments,
+  };
+
+  return rebalanceOutstandingExpectedPayments(recalculateRegistrationPayment(next));
+}
+
 export function updateExpectedPaymentNote(
   payment: RegistrationPayment,
   expectedId: string,

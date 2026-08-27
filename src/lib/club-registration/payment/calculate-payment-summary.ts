@@ -14,7 +14,12 @@ function sumAidAmounts(aids: PaymentAid[]): number {
 }
 
 function sumReceivedAmounts(receivedPayments: ReceivedPayment[]): number {
-  return receivedPayments.reduce((acc, p) => acc + Math.max(0, p.amountCents), 0);
+  return receivedPayments.reduce((acc, p) => {
+    if (p.reversedAt) {
+      return acc;
+    }
+    return acc + Math.max(0, p.amountCents);
+  }, 0);
 }
 
 function derivePaymentStatus(

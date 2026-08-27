@@ -57,37 +57,39 @@ export function MembershipRequestDetailPanel({
   const showQueueBar =
     queueTotal > 0 && onQueuePrevious != null && onQueueNext != null;
 
-  const formContent = loadingDetail ? (
-    <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
-      <CircularProgress />
-    </Box>
-  ) : !selected || !form ? (
-    <Typography color="text.secondary">{emptyMessage}</Typography>
-  ) : (
-    <Stack spacing={3}>
-      <MembershipRequestDetailFormPrimary detail={detail} hideTitleHeader={showQueueBar} />
-      {registrationId && selected ? (
-        <PpsFollowUpPanel
-          registrationId={registrationId}
-          medicalCertificateDeclaration={selected.medicalCertificateDeclaration}
-          birthDate={selected.birthDate ?? null}
-          ppsFollowUp={readPpsFollowUpState(
-            selected as unknown as Record<string, unknown>,
-            selected.medicalCertificateDeclaration
-          )}
-          onUpdated={(next) => {
-            detail.applyPpsFollowUp(next);
-            onPpsFollowUpPatched?.(registrationId, next);
-          }}
+  // Garder le formulaire monté pendant un rechargement (évite le clignotement des popins).
+  const formContent =
+    loadingDetail && (!selected || !form) ? (
+      <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+        <CircularProgress />
+      </Box>
+    ) : !selected || !form ? (
+      <Typography color="text.secondary">{emptyMessage}</Typography>
+    ) : (
+      <Stack spacing={3}>
+        <MembershipRequestDetailFormPrimary detail={detail} hideTitleHeader={showQueueBar} />
+        {registrationId && selected ? (
+          <PpsFollowUpPanel
+            registrationId={registrationId}
+            medicalCertificateDeclaration={selected.medicalCertificateDeclaration}
+            birthDate={selected.birthDate ?? null}
+            ppsFollowUp={readPpsFollowUpState(
+              selected as unknown as Record<string, unknown>,
+              selected.medicalCertificateDeclaration
+            )}
+            onUpdated={(next) => {
+              detail.applyPpsFollowUp(next);
+              onPpsFollowUpPatched?.(registrationId, next);
+            }}
+          />
+        ) : null}
+        <MembershipRequestDetailFormSecondary
+          detail={detail}
+          onListReload={onListReload}
+          onDeleted={onDeleted}
         />
-      ) : null}
-      <MembershipRequestDetailFormSecondary
-        detail={detail}
-        onListReload={onListReload}
-        onDeleted={onDeleted}
-      />
-    </Stack>
-  );
+      </Stack>
+    );
 
   const alerts = showAlerts ? (
     <>

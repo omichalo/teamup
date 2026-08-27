@@ -6,17 +6,36 @@ export function shouldMarkRegistrationPaid(payment: RegistrationPayment): boolea
   return payment.remainingAmountCents === 0 && payment.paymentStatus === "paid";
 }
 
+export type PaymentSettlementWriteOptions = {
+  /** Statut dossier avant mutation (pour dé-solder après annulation d'encaissement). */
+  previousRegistrationStatus?: string;
+};
+
 /** Champs Firestore à merger après un encaissement (y compris soldé). */
 export function paymentWriteWithSettlement(
-  payment: RegistrationPayment
+  payment: RegistrationPayment,
+  options?: PaymentSettlementWriteOptions
 ): Record<string, unknown> {
-  return {
-    ...paymentToFirestoreUpdate(payment),
-    ...(shouldMarkRegistrationPaid(payment)
-      ? {
-          status: "paid",
-          paidAt: FieldValue.serverTimestamp(),
-        }
-      : {}),
-  };
+  const base = paymentToFirestoreUpdate(payment);
+
+  if (shouldMarkRegistrationPaid(payment)) {
+    return {
+      ...base,
+      status: "paid",
+      paidAt: FieldValue.serverTimestamp(),
+    };
+  }
+
+  if (
+    options?.previousRegistrationStatus === "paid" &&
+    !shouldMarkRegistrationPaid(payment)
+  ) {
+    return {
+      ...base,
+      status: "payment_requested",
+      paidAt: FieldValue.delete(),
+    };
+  }
+
+  return base;
 }
