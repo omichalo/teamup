@@ -3,7 +3,20 @@ import { buildAttendanceMarkId } from "./mark-id";
 import { buildSessionPayload } from "./roster";
 import { registrationMatchesQuery } from "./search-members";
 import { buildSlotStats, buildAttendanceExportCsv } from "./stats";
-import { countIsoWeekdayOccurrences, isoWeekdayFromYmd, seasonBoundsYmd } from "./calendar";
+import {
+  countIsoWeekdayOccurrences,
+  isoWeekdayFromYmd,
+  isoWeekDates,
+  isoWeekStartYmd,
+  seasonBoundsYmd,
+} from "./calendar";
+import {
+  applyCancellationsToSlots,
+  cancellationKey,
+  cancelledKeySet,
+  filterActiveTargets,
+  resolveCancellationTargets,
+} from "./cancellations";
 import { getDefaultRegistrationConfig } from "@/lib/club-registration-config/default-config";
 import { listSlotsForDate } from "./slots-for-date";
 
@@ -83,6 +96,7 @@ describe("attendance roster", () => {
         endMinutes: 20 * 60 + 45,
         highlighted: true,
         enrollmentsClosed: false,
+        cancelled: false,
       },
       registrations: [
         {
@@ -133,6 +147,7 @@ describe("attendance roster", () => {
       walkin: 0,
       guest: 1,
     });
+    expect(payload.cancelled).toBe(false);
   });
 });
 
@@ -142,6 +157,7 @@ describe("attendance calendar / stats", () => {
     const slots = listSlotsForDate(config, "2026-08-20", 19 * 60);
     expect(slots.length).toBeGreaterThan(0);
     expect(slots.every((slot) => slot.weekday === 4)).toBe(true);
+    expect(slots.every((slot) => slot.cancelled === false)).toBe(true);
     expect(slots.some((slot) => slot.highlighted)).toBe(true);
   });
 
@@ -202,6 +218,95 @@ describe("attendance calendar / stats", () => {
     );
     expect(stats.players[0]?.presentCount).toBe(1);
     expect(stats.walkin).toBe(1);
+  });
+
+  it("retire les dates annulées du dénominateur et du numérateur", () => {
+    const stats = buildSlotStats({
+      date: "2026-08-20",
+      slotId: "slot-a",
+      weekday: 4,
+      seasonLabel: "2025-2026",
+      cancelledDates: new Set(["2026-08-13"]),
+      registrations: [
+        {
+          id: "reg-1",
+          data: {
+            firstName: "Alain",
+            lastName: "Dupont",
+            submittedAt: "2026-08-06T10:00:00.000Z",
+          },
+        },
+      ],
+      marks: [
+        {
+          id: "m1",
+          date: "2026-08-13",
+          slotId: "slot-a",
+          siteId: "voisins",
+          seasonLabel: "2025-2026",
+          sessionId: "s",
+          kind: "enrolled",
+          registrationId: "reg-1",
+          displayName: "Alain Dupont",
+          markedAt: "x",
+          markedByUid: "c",
+        },
+      ],
+    });
+    const base = countIsoWeekdayOccurrences("2026-08-06", "2026-08-20", 4);
+    expect(stats.players[0]?.expectedCount).toBe(base - 1);
+    expect(stats.players[0]?.presentCount).toBe(0);
+  });
+});
+
+describe("attendance cancellations helpers", () => {
+  it("calcule la semaine ISO lundi-dimanche", () => {
+    expect(isoWeekStartYmd("2026-08-17")).toBe("2026-08-17");
+    expect(isoWeekDates("2026-08-19")).toEqual([
+      "2026-08-17",
+      "2026-08-18",
+      "2026-08-19",
+      "2026-08-20",
+      "2026-08-21",
+      "2026-08-22",
+      "2026-08-23",
+    ]);
+  });
+
+  it("marque les créneaux annulés sans les retirer", () => {
+    const config = getDefaultRegistrationConfig();
+    const slots = listSlotsForDate(config, "2026-08-17", 12 * 60);
+    expect(slots.length).toBeGreaterThan(0);
+    const first = slots[0];
+    if (!first) {
+      throw new Error("expected slot");
+    }
+    const marked = applyCancellationsToSlots(
+      slots,
+      new Set([cancellationKey("2026-08-17", first.slotId)]),
+      "2026-08-17"
+    );
+    expect(marked.find((slot) => slot.slotId === first.slotId)?.cancelled).toBe(true);
+    expect(marked.filter((slot) => !slot.cancelled).length).toBe(slots.length - 1);
+  });
+
+  it("résout les cibles day et week", () => {
+    const config = getDefaultRegistrationConfig();
+    const dayTargets = resolveCancellationTargets({
+      config,
+      date: "2026-08-17",
+      scope: "day",
+    });
+    const weekTargets = resolveCancellationTargets({
+      config,
+      date: "2026-08-17",
+      scope: "week",
+    });
+    expect(dayTargets.length).toBeGreaterThan(0);
+    expect(weekTargets.length).toBeGreaterThan(dayTargets.length);
+    expect(dayTargets.every((target) => target.date === "2026-08-17")).toBe(true);
+    const active = filterActiveTargets(dayTargets, cancelledKeySet([dayTargets[0]!]));
+    expect(active).toHaveLength(dayTargets.length - 1);
   });
 });
 

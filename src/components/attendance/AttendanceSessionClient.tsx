@@ -14,7 +14,9 @@ import {
 import ArrowBack from "@mui/icons-material/ArrowBack";
 import { PageHeader } from "@/components/ui";
 import { TabPanel } from "@/components/ui";
+import { useAuth } from "@/hooks/useAuth";
 import { readJsonResponse } from "@/lib/http/read-json-response";
+import { isAttendanceCancellationManager } from "@/lib/attendance/access";
 import { todayYmdInParis } from "@/lib/attendance/calendar";
 import {
   attendancePickerHref,
@@ -22,16 +24,19 @@ import {
 } from "@/lib/attendance/urls";
 import { formatMinutesAsLabel } from "@/lib/club-registration-config/slot-schedule";
 import type { AttendanceMemberSearchHit, AttendanceRosterPerson } from "@/lib/attendance/types";
+import { resolveRole } from "@/lib/auth/roles";
 import { useAttendanceSession } from "./useAttendanceSession";
 import { AttendanceRoster } from "./AttendanceRoster";
 import { AttendanceSearchDialog } from "./AttendanceSearchDialog";
 import { AttendanceGuestDialog } from "./AttendanceGuestDialog";
 import { AttendanceStatsPanel } from "./AttendanceStatsPanel";
 import { AttendanceSessionDock, AttendanceSessionDockSpacer } from "./AttendanceSessionDock";
+import { AttendanceCancellationConfirmDialog } from "./AttendanceCancellationConfirmDialog";
 
 export function AttendanceSessionClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user } = useAuth();
   const date = readAttendanceDateParam(searchParams.get("date"), todayYmdInParis());
   const slotId = searchParams.get("slot")?.trim() || null;
   const [filter, setFilter] = useState("");
@@ -39,11 +44,15 @@ export function AttendanceSessionClient() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [guestOpen, setGuestOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [restoreOpen, setRestoreOpen] = useState(false);
+  const [restoreBusy, setRestoreBusy] = useState(false);
 
   const { session, loading, error, busyKey, reload, togglePresent } = useAttendanceSession(
     date,
     slotId
   );
+
+  const canManage = isAttendanceCancellationManager(resolveRole(user?.role));
 
   useEffect(() => {
     if (!slotId) {
@@ -54,9 +63,10 @@ export function AttendanceSessionClient() {
   const waiting = session?.roster.filter((person) => !person.present) ?? [];
   const present = session?.roster.filter((person) => person.present) ?? [];
   const counts = session?.counts;
+  const cancelled = session?.cancelled === true;
 
   async function handleWalkIn(member: AttendanceMemberSearchHit, addSlot: boolean) {
-    if (!slotId) return;
+    if (!slotId || cancelled) return;
     setActionError(null);
     try {
       const markRes = await fetch("/api/club/attendance/marks", {
@@ -102,7 +112,7 @@ export function AttendanceSessionClient() {
     phone: string;
     email?: string;
   }) {
-    if (!slotId) return;
+    if (!slotId || cancelled) return;
     setActionError(null);
     try {
       const res = await fetch("/api/club/attendance/leads", {
@@ -122,7 +132,31 @@ export function AttendanceSessionClient() {
     }
   }
 
+  async function confirmRestore() {
+    if (!slotId) return;
+    setRestoreBusy(true);
+    setActionError(null);
+    try {
+      const res = await fetch("/api/club/attendance/cancellations", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date, slotId }),
+      });
+      const json = await readJsonResponse<{ error?: string }>(res);
+      if (!res.ok) {
+        throw new Error(json.error ?? "Impossible de restaurer");
+      }
+      setRestoreOpen(false);
+      await reload();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Erreur");
+    } finally {
+      setRestoreBusy(false);
+    }
+  }
+
   function onToggle(person: AttendanceRosterPerson) {
+    if (cancelled) return;
     void togglePresent({
       personKey: person.personKey,
       kind: person.kind,
@@ -174,6 +208,22 @@ export function AttendanceSessionClient() {
         <Tab id="attendance-tab-0" aria-controls="attendance-tabpanel-0" label="Pointage" />
         <Tab id="attendance-tab-1" aria-controls="attendance-tabpanel-1" label="Taux" />
       </Tabs>
+      {cancelled ? (
+        <Alert
+          severity="warning"
+          sx={{ mb: 2 }}
+          action={
+            canManage ? (
+              <Button color="inherit" size="small" onClick={() => setRestoreOpen(true)}>
+                Restaurer
+              </Button>
+            ) : undefined
+          }
+        >
+          Séance annulée — le pointage est désactivé. Les présences déjà
+          enregistrées sont conservées.
+        </Alert>
+      ) : null}
       {actionError || error ? (
         <Alert severity="error" sx={{ mb: 2 }}>
           {actionError ?? error}
@@ -190,6 +240,7 @@ export function AttendanceSessionClient() {
             filter={filter}
             onFilterChange={setFilter}
             busyKey={busyKey}
+            disabled={cancelled}
             onToggle={onToggle}
             emptyLabel="Tout le monde est pointé, ou aucun inscrit."
           />
@@ -198,6 +249,7 @@ export function AttendanceSessionClient() {
             people={present}
             filter={filter}
             busyKey={busyKey}
+            disabled={cancelled}
             onToggle={onToggle}
             emptyLabel="Personne n'est encore pointé."
           />
@@ -206,10 +258,11 @@ export function AttendanceSessionClient() {
             people={session?.extras ?? []}
             filter=""
             busyKey={busyKey}
+            disabled={cancelled}
             onToggle={onToggle}
             emptyLabel="Aucun visiteur pour cette séance."
           />
-          <AttendanceSessionDockSpacer />
+          {!cancelled ? <AttendanceSessionDockSpacer /> : null}
         </Stack>
       </TabPanel>
       <TabPanel value={tab} index={1} baseId="attendance">
@@ -224,7 +277,7 @@ export function AttendanceSessionClient() {
           <AttendanceStatsPanel date={date} slotId={slotId} />
         </Stack>
       </TabPanel>
-      {tab === 0 ? (
+      {tab === 0 && !cancelled ? (
         <AttendanceSessionDock
           onSearch={() => setSearchOpen(true)}
           onGuest={() => setGuestOpen(true)}
@@ -240,6 +293,20 @@ export function AttendanceSessionClient() {
         open={guestOpen}
         onClose={() => setGuestOpen(false)}
         onSubmit={handleGuest}
+      />
+      <AttendanceCancellationConfirmDialog
+        open={restoreOpen}
+        mode="restore"
+        scope="slot"
+        dateLabel={date}
+        slotLabel={session?.slot.label}
+        count={1}
+        busy={restoreBusy}
+        error={actionError}
+        onCancel={() => {
+          if (!restoreBusy) setRestoreOpen(false);
+        }}
+        onConfirm={() => void confirmRestore()}
       />
     </Container>
   );

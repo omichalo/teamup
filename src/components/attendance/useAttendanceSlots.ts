@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { readJsonResponse } from "@/lib/http/read-json-response";
-import type { AttendanceSlotOption } from "@/lib/attendance/types";
+import type { AttendanceSlotOption, AttendanceWeekSummary } from "@/lib/attendance/types";
 import { todayYmdInParis } from "@/lib/attendance/calendar";
 
 export function useAttendanceSlots(date: string) {
   const [slots, setSlots] = useState<AttendanceSlotOption[]>([]);
+  const [week, setWeek] = useState<AttendanceWeekSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -15,16 +16,20 @@ export function useAttendanceSlots(date: string) {
     setError(null);
     try {
       const res = await fetch(`/api/club/attendance/slots?date=${encodeURIComponent(date)}`);
-      const json = await readJsonResponse<{ slots?: AttendanceSlotOption[]; error?: string }>(
-        res
-      );
+      const json = await readJsonResponse<{
+        slots?: AttendanceSlotOption[];
+        week?: AttendanceWeekSummary;
+        error?: string;
+      }>(res);
       if (!res.ok) {
         throw new Error(json.error ?? "Impossible de charger les créneaux");
       }
       setSlots(json.slots ?? []);
+      setWeek(json.week ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur");
       setSlots([]);
+      setWeek(null);
     } finally {
       setLoading(false);
     }
@@ -34,7 +39,7 @@ export function useAttendanceSlots(date: string) {
     void load();
   }, [load]);
 
-  return { slots, loading, error, reload: load };
+  return { slots, week, loading, error, reload: load };
 }
 
 export function useDefaultAttendanceDate(): [string, (value: string) => void] {

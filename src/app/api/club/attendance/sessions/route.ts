@@ -5,7 +5,11 @@ import { getActiveRegistrationConfig } from "@/lib/club-registration-config/stor
 import { requireAttendanceOperator } from "@/lib/attendance/api-auth";
 import { isYmd, todayYmdInParis } from "@/lib/attendance/calendar";
 import { findSlotOption } from "@/lib/attendance/slots-for-date";
-import { listMarksForSession, listRegistrationsForSlot } from "@/lib/attendance/store";
+import {
+  getSlotCancellation,
+  listMarksForSession,
+  listRegistrationsForSlot,
+} from "@/lib/attendance/store";
 import { buildSessionPayload } from "@/lib/attendance/roster";
 
 /** GET /api/club/attendance/sessions?date=&slotId= */
@@ -25,7 +29,9 @@ export async function GET(req: Request) {
 
   try {
     const config = await getActiveRegistrationConfig();
-    const slot = findSlotOption(config, slotId, date);
+    const cancellation = await getSlotCancellation(auth.session.db, date, slotId);
+    const cancelled = cancellation !== null;
+    const slot = findSlotOption(config, slotId, date, cancelled);
     if (!slot) {
       return jsonNoStore({ error: "Créneau introuvable" }, { status: 404 });
     }
@@ -33,7 +39,13 @@ export async function GET(req: Request) {
       listRegistrationsForSlot(auth.session.db, slotId),
       listMarksForSession(auth.session.db, date, slotId),
     ]);
-    const session = buildSessionPayload({ date, slot, registrations, marks });
+    const session = buildSessionPayload({
+      date,
+      slot,
+      cancelled,
+      registrations,
+      marks,
+    });
     return jsonNoStore({ session, seasonLabel: config.meta.seasonLabel });
   } catch (error) {
     console.error("[api/club/attendance/sessions GET]", error);

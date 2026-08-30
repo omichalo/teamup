@@ -1,5 +1,6 @@
 export const ATTENDANCE_MARKS_COLLECTION = "attendanceMarks";
 export const ATTENDANCE_LEADS_COLLECTION = "attendanceLeads";
+export const ATTENDANCE_SLOT_CANCELLATIONS_COLLECTION = "attendanceSlotCancellations";
 export const ATTENDANCE_TIMEZONE = "Europe/Paris";
 
 export const ATTENDANCE_MARK_KINDS = ["enrolled", "walkin", "guest"] as const;
