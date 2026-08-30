@@ -5,6 +5,7 @@ export const SPREADSHEET_COLUMN_LABELS: Record<SpreadsheetColumnId, string> = {
   adherentRole: "Pour qui",
   wasSqyMemberLastYear: "Adhérent l'an dernier",
   ffttLicense: "Licence",
+  ffttCategorie: "Catégorie FFTT",
   ffttLicenseLookup: "Données licence",
   firstName: "Prénom",
   lastName: "Nom",
