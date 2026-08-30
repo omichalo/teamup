@@ -5,12 +5,13 @@ import { isRejectedRegistration } from "./alerts";
 import {
   ATTENDANCE_LEADS_COLLECTION,
   ATTENDANCE_MARKS_COLLECTION,
+  ATTENDANCE_SLOT_CANCELLATIONS_COLLECTION,
   LEADS_PAGE_SIZE_DEFAULT,
   type AttendanceLeadStatus,
   type AttendanceMarkKind,
 } from "./constants";
 import { attendanceSessionId, buildAttendanceMarkId } from "./mark-id";
-import type { AttendanceLead, AttendanceMark } from "./types";
+import type { AttendanceLead, AttendanceMark, AttendanceSlotCancellation } from "./types";
 
 function readString(data: DocumentData, key: string): string {
   const value = data[key];
@@ -50,6 +51,18 @@ export function mapLeadDoc(id: string, data: DocumentData): AttendanceLead {
     createdAt: readString(data, "createdAt"),
     createdByUid: readString(data, "createdByUid"),
     status: data.status as AttendanceLeadStatus,
+  };
+}
+
+export function mapCancellationDoc(id: string, data: DocumentData): AttendanceSlotCancellation {
+  return {
+    id,
+    date: readString(data, "date"),
+    slotId: readString(data, "slotId"),
+    siteId: readString(data, "siteId"),
+    seasonLabel: readString(data, "seasonLabel"),
+    cancelledAt: readString(data, "cancelledAt"),
+    cancelledByUid: readString(data, "cancelledByUid"),
   };
 }
 
@@ -300,4 +313,139 @@ export async function addSlotToRegistration(
   });
 
   return { slotAdded: true };
+}
+
+export async function getSlotCancellation(
+  db: Firestore,
+  date: string,
+  slotId: string
+): Promise<AttendanceSlotCancellation | null> {
+  const id = attendanceSessionId(date, slotId);
+  const snap = await db.collection(ATTENDANCE_SLOT_CANCELLATIONS_COLLECTION).doc(id).get();
+  if (!snap.exists) {
+    return null;
+  }
+  return mapCancellationDoc(id, snap.data() ?? {});
+}
+
+export async function listCancellationsForDate(
+  db: Firestore,
+  date: string
+): Promise<AttendanceSlotCancellation[]> {
+  const snap = await db
+    .collection(ATTENDANCE_SLOT_CANCELLATIONS_COLLECTION)
+    .where("date", "==", date)
+    .get();
+  return snap.docs.map((doc) => mapCancellationDoc(doc.id, doc.data()));
+}
+
+export async function listCancellationsForDates(
+  db: Firestore,
+  dates: readonly string[]
+): Promise<AttendanceSlotCancellation[]> {
+  if (dates.length === 0) {
+    return [];
+  }
+  const unique = [...new Set(dates)];
+  const chunks: string[][] = [];
+  for (let i = 0; i < unique.length; i += 10) {
+    chunks.push(unique.slice(i, i + 10));
+  }
+  const results = await Promise.all(
+    chunks.map(async (chunk) => {
+      const snap = await db
+        .collection(ATTENDANCE_SLOT_CANCELLATIONS_COLLECTION)
+        .where("date", "in", chunk)
+        .get();
+      return snap.docs.map((doc) => mapCancellationDoc(doc.id, doc.data()));
+    })
+  );
+  return results.flat();
+}
+
+export async function listCancellationsForSlot(
+  db: Firestore,
+  slotId: string,
+  fromDate: string,
+  toDate: string
+): Promise<AttendanceSlotCancellation[]> {
+  const snap = await db
+    .collection(ATTENDANCE_SLOT_CANCELLATIONS_COLLECTION)
+    .where("slotId", "==", slotId)
+    .where("date", ">=", fromDate)
+    .where("date", "<=", toDate)
+    .get();
+  return snap.docs.map((doc) => mapCancellationDoc(doc.id, doc.data()));
+}
+
+export async function upsertSlotCancellations(
+  db: Firestore,
+  items: Array<{
+    date: string;
+    slotId: string;
+    siteId: string;
+    seasonLabel: string;
+    cancelledByUid: string;
+  }>
+): Promise<{ written: number; ids: string[] }> {
+  if (items.length === 0) {
+    return { written: 0, ids: [] };
+  }
+  const now = new Date().toISOString();
+  const ids: string[] = [];
+  let batch = db.batch();
+  let ops = 0;
+  for (const item of items) {
+    const id = attendanceSessionId(item.date, item.slotId);
+    ids.push(id);
+    const ref = db.collection(ATTENDANCE_SLOT_CANCELLATIONS_COLLECTION).doc(id);
+    batch.set(ref, {
+      date: item.date,
+      slotId: item.slotId,
+      siteId: item.siteId,
+      seasonLabel: item.seasonLabel,
+      cancelledAt: now,
+      cancelledByUid: item.cancelledByUid,
+    });
+    ops += 1;
+    if (ops >= 400) {
+      await batch.commit();
+      batch = db.batch();
+      ops = 0;
+    }
+  }
+  if (ops > 0) {
+    await batch.commit();
+  }
+  return { written: ids.length, ids };
+}
+
+export async function deleteSlotCancellations(
+  db: Firestore,
+  targets: Array<{ date: string; slotId: string }>
+): Promise<{ deleted: number; ids: string[] }> {
+  if (targets.length === 0) {
+    return { deleted: 0, ids: [] };
+  }
+  const ids = targets.map((item) => attendanceSessionId(item.date, item.slotId));
+  const refs = ids.map((id) => db.collection(ATTENDANCE_SLOT_CANCELLATIONS_COLLECTION).doc(id));
+  const snaps = await db.getAll(...refs);
+  const existing = snaps.filter((snap) => snap.exists);
+  let batch = db.batch();
+  let ops = 0;
+  const deletedIds: string[] = [];
+  for (const snap of existing) {
+    batch.delete(snap.ref);
+    deletedIds.push(snap.id);
+    ops += 1;
+    if (ops >= 400) {
+      await batch.commit();
+      batch = db.batch();
+      ops = 0;
+    }
+  }
+  if (ops > 0) {
+    await batch.commit();
+  }
+  return { deleted: deletedIds.length, ids: deletedIds };
 }

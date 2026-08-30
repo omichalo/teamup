@@ -17,6 +17,9 @@
       "@/*": ["../src/*"]
     }
   },
+  "tsc-alias": {
+    "verbose": false
+  },
   "compileOnSave": true,
   "include": ["src"]
 }

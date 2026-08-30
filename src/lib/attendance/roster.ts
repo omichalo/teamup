@@ -57,6 +57,7 @@ export function extraPersonFromMark(mark: AttendanceMark): AttendanceRosterPerso
 export function buildSessionPayload(params: {
   date: string;
   slot: AttendanceSlotOption;
+  cancelled?: boolean;
   registrations: Array<{ id: string; data: Record<string, unknown> }>;
   marks: AttendanceMark[];
 }): AttendanceSessionPayload {
@@ -86,9 +87,12 @@ export function buildSessionPayload(params: {
     .map(extraPersonFromMark)
     .sort((a, b) => a.displayName.localeCompare(b.displayName, "fr"));
 
+  const cancelled = params.cancelled ?? params.slot.cancelled === true;
+
   return {
     date: params.date,
-    slot: params.slot,
+    slot: { ...params.slot, cancelled },
+    cancelled,
     roster,
     extras,
     counts: {

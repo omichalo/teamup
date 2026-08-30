@@ -6,9 +6,12 @@ import {
   Button,
   Chip,
   CircularProgress,
+  IconButton,
   Stack,
   Typography,
 } from "@mui/material";
+import DeleteOutline from "@mui/icons-material/DeleteOutline";
+import Undo from "@mui/icons-material/Undo";
 import type { AttendanceSlotOption } from "@/lib/attendance/types";
 import { formatMinutesAsLabel } from "@/lib/club-registration-config/slot-schedule";
 import { SLOT_ENROLLMENTS_CLOSED_LABEL } from "@/lib/club-registration-config/slot-enrollments";
@@ -18,7 +21,10 @@ type Props = {
   loading: boolean;
   error: string | null;
   selectedSlotId: string | null;
+  canManageCancellations: boolean;
   onSelect: (slotId: string) => void;
+  onCancelSlot?: ((slot: AttendanceSlotOption) => void) | undefined;
+  onRestoreSlot?: ((slot: AttendanceSlotOption) => void) | undefined;
 };
 
 export function AttendanceSlotPicker({
@@ -26,7 +32,10 @@ export function AttendanceSlotPicker({
   loading,
   error,
   selectedSlotId,
+  canManageCancellations,
   onSelect,
+  onCancelSlot,
+  onRestoreSlot,
 }: Props) {
   if (loading) {
     return (
@@ -39,9 +48,7 @@ export function AttendanceSlotPicker({
     return <Alert severity="error">{error}</Alert>;
   }
   if (slots.length === 0) {
-    return (
-      <Alert severity="info">Aucun créneau prévu pour ce jour.</Alert>
-    );
+    return <Alert severity="info">Aucun créneau prévu pour ce jour.</Alert>;
   }
 
   const bySite = new Map<string, AttendanceSlotOption[]>();
@@ -62,36 +69,81 @@ export function AttendanceSlotPicker({
           <Stack direction="row" flexWrap="wrap" gap={1.5}>
             {siteSlots.map((slot) => {
               const selected = slot.slotId === selectedSlotId;
+              const cancelled = slot.cancelled === true;
               return (
-                <Button
+                <Stack
                   key={slot.slotId}
-                  variant={selected ? "contained" : "outlined"}
-                  color={slot.highlighted ? "secondary" : "primary"}
-                  onClick={() => onSelect(slot.slotId)}
+                  direction="row"
+                  alignItems="stretch"
                   sx={{
-                    minHeight: 64,
-                    px: 2,
-                    justifyContent: "flex-start",
-                    textAlign: "left",
-                    borderWidth: slot.highlighted ? 2 : 1,
+                    border: 1,
+                    borderColor: cancelled
+                      ? "divider"
+                      : slot.highlighted
+                        ? "secondary.main"
+                        : "divider",
+                    borderWidth: slot.highlighted && !cancelled ? 2 : 1,
+                    borderRadius: 1,
+                    opacity: cancelled ? 0.72 : 1,
+                    bgcolor: cancelled ? "action.hover" : "transparent",
                   }}
                 >
-                  <Stack spacing={0.25} alignItems="flex-start">
-                    <Typography variant="body1" sx={{ fontWeight: 700 }}>
-                      {formatMinutesAsLabel(slot.startMinutes)} –{" "}
-                      {formatMinutesAsLabel(slot.endMinutes)}
-                    </Typography>
-                    <Typography variant="caption" sx={{ opacity: 0.9 }}>
-                      {slot.label}
-                    </Typography>
-                    {slot.highlighted ? (
-                      <Chip size="small" label="Proche de maintenant" />
-                    ) : null}
-                    {slot.enrollmentsClosed ? (
-                      <Chip size="small" color="warning" label={SLOT_ENROLLMENTS_CLOSED_LABEL} />
-                    ) : null}
-                  </Stack>
-                </Button>
+                  <Button
+                    variant={selected ? "contained" : "text"}
+                    color={slot.highlighted && !cancelled ? "secondary" : "primary"}
+                    disabled={cancelled}
+                    onClick={() => onSelect(slot.slotId)}
+                    sx={{
+                      minHeight: 64,
+                      px: 2,
+                      justifyContent: "flex-start",
+                      textAlign: "left",
+                      borderRadius: 0,
+                      flex: 1,
+                    }}
+                  >
+                    <Stack spacing={0.25} alignItems="flex-start">
+                      <Typography variant="body1" sx={{ fontWeight: 700 }}>
+                        {formatMinutesAsLabel(slot.startMinutes)} –{" "}
+                        {formatMinutesAsLabel(slot.endMinutes)}
+                      </Typography>
+                      <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                        {slot.label}
+                      </Typography>
+                      {cancelled ? <Chip size="small" label="Annulé" color="default" /> : null}
+                      {!cancelled && slot.highlighted ? (
+                        <Chip size="small" label="Proche de maintenant" />
+                      ) : null}
+                      {slot.enrollmentsClosed ? (
+                        <Chip
+                          size="small"
+                          color="warning"
+                          label={SLOT_ENROLLMENTS_CLOSED_LABEL}
+                        />
+                      ) : null}
+                    </Stack>
+                  </Button>
+                  {canManageCancellations ? (
+                    cancelled ? (
+                      <IconButton
+                        aria-label={`Restaurer ${slot.label}`}
+                        onClick={() => onRestoreSlot?.(slot)}
+                        sx={{ borderRadius: 0, px: 1.25 }}
+                      >
+                        <Undo fontSize="small" />
+                      </IconButton>
+                    ) : (
+                      <IconButton
+                        aria-label={`Supprimer ${slot.label}`}
+                        color="error"
+                        onClick={() => onCancelSlot?.(slot)}
+                        sx={{ borderRadius: 0, px: 1.25 }}
+                      >
+                        <DeleteOutline fontSize="small" />
+                      </IconButton>
+                    )
+                  ) : null}
+                </Stack>
               );
             })}
           </Stack>

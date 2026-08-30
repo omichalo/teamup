@@ -50,6 +50,16 @@ describe("formatSpreadsheetCellValue user labels", () => {
     ).toBe("DUPONT");
   });
 
+  it("affiche la catégorie FFTT dérivée", () => {
+    expect(
+      formatSpreadsheetCellValue(
+        "ffttCategorie",
+        { id: "r1", ffttCategorie: "Sénior" },
+        null
+      )
+    ).toBe("Sénior");
+  });
+
   it("affiche le suivi d’inscription au Critérium fédéral", () => {
     expect(
       formatSpreadsheetCellValue(

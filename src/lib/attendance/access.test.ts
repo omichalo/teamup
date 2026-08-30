@@ -2,8 +2,10 @@ import { USER_ROLES } from "@/lib/auth/roles";
 import {
   ATTENDANCE_LEAD_MANAGER_ROLES,
   ATTENDANCE_OPERATOR_ROLES,
+  ATTENDANCE_CANCELLATION_ROLES,
   isAttendanceLeadManager,
   isAttendanceOperator,
+  isAttendanceCancellationManager,
 } from "./access";
 
 describe("attendance access", () => {
@@ -22,5 +24,13 @@ describe("attendance access", () => {
     expect(isAttendanceLeadManager(USER_ROLES.COACH)).toBe(false);
     expect(ATTENDANCE_OPERATOR_ROLES).toContain(USER_ROLES.BOARD_MEMBER);
     expect(ATTENDANCE_LEAD_MANAGER_ROLES).toContain(USER_ROLES.SECRETARY);
+  });
+
+  it("autorise les annulations aux mêmes rôles que la file des essais", () => {
+    expect(isAttendanceCancellationManager(USER_ROLES.ADMIN)).toBe(true);
+    expect(isAttendanceCancellationManager(USER_ROLES.SECRETARY)).toBe(true);
+    expect(isAttendanceCancellationManager(USER_ROLES.BOARD_MEMBER)).toBe(true);
+    expect(isAttendanceCancellationManager(USER_ROLES.COACH)).toBe(false);
+    expect(ATTENDANCE_CANCELLATION_ROLES).toEqual(ATTENDANCE_LEAD_MANAGER_ROLES);
   });
 });

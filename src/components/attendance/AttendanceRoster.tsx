@@ -10,6 +10,7 @@ type Props = {
   filter: string;
   onFilterChange?: (value: string) => void;
   busyKey: string | null;
+  disabled?: boolean;
   onToggle: (person: AttendanceRosterPerson) => void;
   emptyLabel: string;
 };
@@ -20,6 +21,7 @@ export function AttendanceRoster({
   filter,
   onFilterChange,
   busyKey,
+  disabled = false,
   onToggle,
   emptyLabel,
 }: Props) {
@@ -38,6 +40,7 @@ export function AttendanceRoster({
           placeholder="Filtrer la liste…"
           size="medium"
           fullWidth
+          disabled={disabled}
           inputProps={{ "aria-label": "Filtrer les inscrits" }}
         />
       ) : null}
@@ -48,7 +51,7 @@ export function AttendanceRoster({
           <AttendancePlayerCard
             key={person.personKey}
             person={person}
-            busy={busyKey === person.personKey}
+            busy={disabled || busyKey === person.personKey}
             onToggle={() => onToggle(person)}
           />
         ))

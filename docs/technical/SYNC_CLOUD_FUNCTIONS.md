@@ -14,7 +14,9 @@ Les Cloud Functions (`functions/src/`) ne font que :
 - appeler les wrappers → `sync-utils` ;
 - mettre à jour `metadata/lastSync` (timestamps).
 
-L’admin Next.js appelle les **mêmes** fonctions via `/api/admin/sync-*`.
+L’admin Next.js appelle les **mêmes** fonctions via `/api/admin/sync-*` (App Hosting). Un merge Git **ne met pas à jour** le cron : il faut `npm run functions:deploy:prod`.
+
+Le `tsc` des Functions ne réécrit pas les imports `@/…`. Le build fait `tsc && tsc-alias` pour les convertir en chemins relatifs (Node ne résout pas cet alias).
 
 ## Fonctions planifiées (prod)
 
@@ -63,5 +65,5 @@ App Hosting utilise déjà les secrets `fftt-id-secret` / `fftt-pwd-secret` mapp
 
 ## Déploiement
 
-- **App Hosting** : ne déploie pas `functions/` (voir `firebase.json` apphosting.ignore).
-- **Functions** : déploiement manuel ou CI dédié — pas inclus dans le merge `staging` → App Hosting seul.
+- **App Hosting** : ne déploie pas `functions/` (voir `firebase.json` apphosting.ignore). Le bouton admin « Synchroniser » tourne donc toujours le code Next.js le plus récent.
+- **Functions** : déploiement manuel (`npm run functions:deploy:prod`) — pas inclus dans le merge `staging` → App Hosting. Après un changement de `src/lib/shared/player-sync.ts` (ou matchs / équipes), redéployer les Functions, sinon le cron 6h reste sur l’ancien bundle.

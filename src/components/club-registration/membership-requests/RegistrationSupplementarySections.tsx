@@ -222,6 +222,9 @@ export function RegistrationFfttFields({
             Licence retrouvée&nbsp;: {ffttLicenseLookup.prenom}{" "}
             {ffttLicenseLookup.nom}
             {ffttLicenseLookup.nomClub ? ` — ${ffttLicenseLookup.nomClub}` : ""}
+            {ffttLicenseLookup.categorie
+              ? ` — ${ffttLicenseLookup.categorie}`
+              : ""}
             .
           </Alert>
         ) : null}
@@ -248,42 +251,35 @@ export function RegistrationFfttFields({
           </Alert>
         ) : null}
 
-        {ffttLicenseLookup?.nomClub ||
-        ffttLicenseLookup?.categorie ||
-        (ffttLicenseLookup?.pointsLicence !== undefined &&
-          ffttLicenseLookup.pointsLicence !== null) ||
-        ffttLicenseLookup?.prenom ||
-        ffttLicenseLookup?.nom ? (
+        {ffttLicenseLookup ? (
           <Grid container spacing={2}>
-            {ffttLicenseLookup.nomClub ? (
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <ReadOnlyField
+                label="Club FFTT"
+                value={ffttLicenseLookup.nomClub?.trim() || "—"}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 3 }}>
+              <ReadOnlyField
+                label="Catégorie FFTT"
+                value={ffttLicenseLookup.categorie?.trim() || "—"}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 3 }}>
+              <ReadOnlyField
+                label="Points licence"
+                value={
+                  ffttLicenseLookup.pointsLicence !== undefined &&
+                  ffttLicenseLookup.pointsLicence !== null
+                    ? String(ffttLicenseLookup.pointsLicence)
+                    : "—"
+                }
+              />
+            </Grid>
+            {ffttLicenseLookup.prenom || ffttLicenseLookup.nom ? (
               <Grid size={{ xs: 12, sm: 6 }}>
                 <ReadOnlyField
-                  label="Club FFTT (lookup)"
-                  value={ffttLicenseLookup.nomClub}
-                />
-              </Grid>
-            ) : null}
-            {ffttLicenseLookup.categorie ? (
-              <Grid size={{ xs: 12, sm: 4 }}>
-                <ReadOnlyField
-                  label="Catégorie FFTT"
-                  value={ffttLicenseLookup.categorie}
-                />
-              </Grid>
-            ) : null}
-            {ffttLicenseLookup.pointsLicence !== undefined &&
-            ffttLicenseLookup.pointsLicence !== null ? (
-              <Grid size={{ xs: 12, sm: 4 }}>
-                <ReadOnlyField
-                  label="Points licence"
-                  value={String(ffttLicenseLookup.pointsLicence)}
-                />
-              </Grid>
-            ) : null}
-            {ffttLicenseLookup.prenom || ffttLicenseLookup.nom ? (
-              <Grid size={{ xs: 12, sm: 4 }}>
-                <ReadOnlyField
-                  label="Identité FFTT (lookup)"
+                  label="Identité FFTT"
                   value={[ffttLicenseLookup.prenom, ffttLicenseLookup.nom]
                     .filter(Boolean)
                     .join(" ")}

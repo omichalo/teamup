@@ -17,6 +17,7 @@ import { buildAttendanceMarkId } from "@/lib/attendance/mark-id";
 import {
   deleteAttendanceMark,
   getRegistrationData,
+  getSlotCancellation,
   upsertAttendanceMark,
 } from "@/lib/attendance/store";
 
@@ -56,6 +57,17 @@ export async function PUT(req: Request) {
     const slot = findSlotOption(config, body.slotId, body.date);
     if (!slot) {
       return jsonNoStore({ error: "Créneau introuvable" }, { status: 404 });
+    }
+    const cancellation = await getSlotCancellation(
+      auth.session.db,
+      body.date,
+      body.slotId
+    );
+    if (cancellation) {
+      return jsonNoStore(
+        { error: "Séance annulée : pointage impossible" },
+        { status: 409 }
+      );
     }
 
     let displayName = "Présent";

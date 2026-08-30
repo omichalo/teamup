@@ -18,7 +18,7 @@ export function listSlotsForDate(
       }
       const option = toSlotOption(site.id, site.label, site.gymnasiumName, slot, weekday);
       if (option) {
-        options.push({ ...option, highlighted: false });
+        options.push({ ...option, highlighted: false, cancelled: false });
       }
     }
   }
@@ -43,7 +43,7 @@ function toSlotOption(
   gymnasiumName: string | undefined,
   slot: RegistrationSiteSlot,
   weekday: number
-): Omit<AttendanceSlotOption, "highlighted"> | null {
+): Omit<AttendanceSlotOption, "highlighted" | "cancelled"> | null {
   const schedule = resolveSlotSchedule(slot);
   if (!schedule || schedule.weekday !== weekday) {
     return null;
@@ -62,7 +62,7 @@ function toSlotOption(
 }
 
 export function pickHighlightedSlotId(
-  options: readonly Omit<AttendanceSlotOption, "highlighted">[],
+  options: readonly Omit<AttendanceSlotOption, "highlighted" | "cancelled">[],
   nowMinutes: number
 ): string | null {
   if (options.length === 0) {
@@ -85,7 +85,8 @@ export function pickHighlightedSlotId(
 export function findSlotOption(
   config: RegistrationConfigV1,
   slotId: string,
-  dateYmd: string
+  dateYmd: string,
+  cancelled = false
 ): AttendanceSlotOption | null {
   const weekday = isoWeekdayFromYmd(dateYmd);
   for (const site of config.sites) {
@@ -106,9 +107,10 @@ export function findSlotOption(
         endMinutes: 0,
         highlighted: false,
         enrollmentsClosed: slot.enrollmentsClosed === true,
+        cancelled,
       };
     }
-    return { ...option, highlighted: false };
+    return { ...option, highlighted: false, cancelled };
   }
   return null;
 }

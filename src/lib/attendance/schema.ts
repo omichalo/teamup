@@ -52,3 +52,22 @@ export const attendanceAddSlotSchema = z.object({
   slotId: z.string().trim().min(1).max(120),
   registrationId: z.string().trim().min(1).max(120),
 });
+
+const attendanceCancellationSlotSchema = z.object({
+  date: attendanceDateSchema,
+  slotId: z.string().trim().min(1).max(120),
+  scope: z.undefined().optional(),
+});
+
+const attendanceCancellationBulkSchema = z.object({
+  date: attendanceDateSchema,
+  scope: z.enum(["day", "week"]),
+  slotId: z.undefined().optional(),
+});
+
+export const attendanceCancellationBodySchema = z.union([
+  attendanceCancellationSlotSchema,
+  attendanceCancellationBulkSchema,
+]);
+
+export type AttendanceCancellationBody = z.infer<typeof attendanceCancellationBodySchema>;

@@ -77,6 +77,18 @@ export function addDaysYmd(ymd: string, days: number): string {
   return next.toISOString().slice(0, 10);
 }
 
+/** Lundi (ISO) de la semaine contenant `ymd`. */
+export function isoWeekStartYmd(ymd: string): string {
+  const weekday = isoWeekdayFromYmd(ymd);
+  return addDaysYmd(ymd, 1 - weekday);
+}
+
+/** Les 7 dates YMD de la semaine ISO (lundi → dimanche) contenant `ymd`. */
+export function isoWeekDates(ymd: string): string[] {
+  const start = isoWeekStartYmd(ymd);
+  return Array.from({ length: 7 }, (_, index) => addDaysYmd(start, index));
+}
+
 export function countIsoWeekdayOccurrences(
   fromYmd: string,
   toYmd: string,

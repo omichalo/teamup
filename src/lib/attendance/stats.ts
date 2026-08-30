@@ -5,7 +5,8 @@ import type {
   AttendanceSlotStats,
 } from "./types";
 import {
-  countIsoWeekdayOccurrences,
+  addDaysYmd,
+  isoWeekdayFromYmd,
   maxYmd,
   minYmd,
   seasonBoundsYmd,
@@ -14,6 +15,25 @@ import {
 import type { IsoWeekday } from "@/lib/club-registration-config/slot-schedule";
 import { ATTENDANCE_ALERT_LABELS, type AttendanceAlert } from "./constants";
 
+function listWeekdayDatesInRange(
+  fromYmd: string,
+  toYmd: string,
+  weekday: IsoWeekday
+): string[] {
+  if (fromYmd > toYmd) {
+    return [];
+  }
+  const dates: string[] = [];
+  let cursor = fromYmd;
+  while (cursor <= toYmd) {
+    if (isoWeekdayFromYmd(cursor) === weekday) {
+      dates.push(cursor);
+    }
+    cursor = addDaysYmd(cursor, 1);
+  }
+  return dates;
+}
+
 export function buildSlotStats(params: {
   date: string;
   slotId: string;
@@ -21,13 +41,18 @@ export function buildSlotStats(params: {
   seasonLabel: string;
   registrations: Array<{ id: string; data: Record<string, unknown> }>;
   marks: AttendanceMark[];
+  cancelledDates?: ReadonlySet<string> | undefined;
 }): AttendanceSlotStats {
   const bounds = seasonBoundsYmd(params.seasonLabel);
   const toDate = minYmd(params.date, bounds.end);
+  const cancelledDates = params.cancelledDates ?? new Set<string>();
   const enrolledMarks = params.marks.filter((mark) => mark.kind === "enrolled");
   const presentByReg = new Map<string, number>();
   for (const mark of enrolledMarks) {
     if (!mark.registrationId || mark.date > params.date) {
+      continue;
+    }
+    if (cancelledDates.has(mark.date)) {
       continue;
     }
     presentByReg.set(mark.registrationId, (presentByReg.get(mark.registrationId) ?? 0) + 1);
@@ -37,7 +62,9 @@ export function buildSlotStats(params: {
   const players: AttendancePlayerStat[] = params.registrations.map((item) => {
     const submitted = ymdFromTimestamp(item.data.submittedAt) ?? bounds.start;
     const from = maxYmd(bounds.start, submitted);
-    const expectedCount = countIsoWeekdayOccurrences(from, toDate, params.weekday);
+    const weekdayDates = listWeekdayDatesInRange(from, toDate, params.weekday);
+    const cancelledInRange = weekdayDates.filter((day) => cancelledDates.has(day)).length;
+    const expectedCount = Math.max(0, weekdayDates.length - cancelledInRange);
     const presentCount = presentByReg.get(item.id) ?? 0;
     const firstName = typeof item.data.firstName === "string" ? item.data.firstName : "";
     const lastName = typeof item.data.lastName === "string" ? item.data.lastName : "";

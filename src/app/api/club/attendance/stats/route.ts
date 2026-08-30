@@ -3,9 +3,13 @@ export const runtime = "nodejs";
 import { jsonNoStore } from "@/lib/http/cache-headers";
 import { getActiveRegistrationConfig } from "@/lib/club-registration-config/store";
 import { requireAttendanceOperator } from "@/lib/attendance/api-auth";
-import { isYmd, todayYmdInParis } from "@/lib/attendance/calendar";
+import { isYmd, todayYmdInParis, seasonBoundsYmd } from "@/lib/attendance/calendar";
 import { findSlotOption } from "@/lib/attendance/slots-for-date";
-import { listMarksForSlotSeason, listRegistrationsForSlot } from "@/lib/attendance/store";
+import {
+  listCancellationsForSlot,
+  listMarksForSlotSeason,
+  listRegistrationsForSlot,
+} from "@/lib/attendance/store";
 import { buildSlotStats } from "@/lib/attendance/stats";
 import { isIsoWeekday, resolveSlotSchedule } from "@/lib/club-registration-config/slot-schedule";
 
@@ -37,10 +41,13 @@ export async function GET(req: Request) {
     if (!isIsoWeekday(weekday)) {
       return jsonNoStore({ error: "Créneau sans horaire structuré" }, { status: 400 });
     }
-    const [registrations, marks] = await Promise.all([
+    const bounds = seasonBoundsYmd(config.meta.seasonLabel);
+    const [registrations, marks, cancellations] = await Promise.all([
       listRegistrationsForSlot(auth.session.db, slotId),
       listMarksForSlotSeason(auth.session.db, config.meta.seasonLabel, slotId),
+      listCancellationsForSlot(auth.session.db, slotId, bounds.start, date),
     ]);
+    const cancelledDates = new Set(cancellations.map((item) => item.date));
     const stats = buildSlotStats({
       date,
       slotId,
@@ -48,6 +55,7 @@ export async function GET(req: Request) {
       seasonLabel: config.meta.seasonLabel,
       registrations,
       marks,
+      cancelledDates,
     });
     return jsonNoStore({ stats });
   } catch (error) {

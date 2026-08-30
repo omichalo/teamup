@@ -12,7 +12,7 @@ import { attendanceAddSlotSchema } from "@/lib/attendance/schema";
 import { findSlotOption } from "@/lib/attendance/slots-for-date";
 import { isRejectedRegistration } from "@/lib/attendance/alerts";
 import { displayNameFromParts } from "@/lib/attendance/roster";
-import { addSlotToRegistration, getRegistrationData } from "@/lib/attendance/store";
+import { addSlotToRegistration, getRegistrationData, getSlotCancellation } from "@/lib/attendance/store";
 
 /** POST /api/club/attendance/add-slot — ajoute le créneau au dossier (arrayUnion). */
 export async function POST(req: Request) {
@@ -40,6 +40,17 @@ export async function POST(req: Request) {
     const slot = findSlotOption(config, parsed.data.slotId, parsed.data.date);
     if (!slot) {
       return jsonNoStore({ error: "Créneau introuvable" }, { status: 404 });
+    }
+    const cancellation = await getSlotCancellation(
+      auth.session.db,
+      parsed.data.date,
+      parsed.data.slotId
+    );
+    if (cancellation) {
+      return jsonNoStore(
+        { error: "Séance annulée : pointage impossible" },
+        { status: 409 }
+      );
     }
     const data = await getRegistrationData(auth.session.db, parsed.data.registrationId);
     if (!data || isRejectedRegistration(data)) {

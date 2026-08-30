@@ -1,18 +1,19 @@
 import type { Firestore } from "firebase-admin/firestore";
 import { COLLECTION as REGISTRATIONS_COLLECTION } from "@/lib/club-registration/list-registrations";
 import { readKnownFfttLicenseFromRegistrationData } from "@/lib/license-validation/known-fftt-license";
+import { loadRosterPlayerMirror } from "@/lib/players/fftt-mirror";
+import { parseRegistrationPersonKey } from "./person-key";
+import {
+  resolveRosterEntryFromRegistration,
+  type ExistingRosterState,
+  type RegistrationRosterInput,
+} from "./resolve-roster-entry";
 import {
   deleteChampionshipPlayer,
   findChampionshipPlayerByRegistrationId,
   getChampionshipPlayer,
   upsertChampionshipPlayer,
 } from "./store";
-import {
-  resolveRosterEntryFromRegistration,
-  type ExistingRosterState,
-  type RegistrationRosterInput,
-} from "./resolve-roster-entry";
-import { parseRegistrationPersonKey } from "./person-key";
 
 function asString(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value : null;
@@ -50,29 +51,6 @@ export function registrationToRosterInput(
       (data.ffttLicenseLookup && typeof data.ffttLicenseLookup === "object"
         ? asString((data.ffttLicenseLookup as Record<string, unknown>).nomClub)
         : null),
-  };
-}
-
-async function loadPlayerMirror(
-  db: Firestore,
-  license: string | null
-): Promise<{
-  listedInClub?: boolean | null;
-  typeLicence?: string | null;
-  nomClub?: string | null;
-} | null> {
-  if (!license) {
-    return null;
-  }
-  const snap = await db.collection("players").doc(license).get();
-  if (!snap.exists) {
-    return { listedInClub: false, typeLicence: null, nomClub: null };
-  }
-  const data = snap.data() ?? {};
-  return {
-    listedInClub: data.listedInClub === true,
-    typeLicence: asString(data.typeLicence),
-    nomClub: asString(data.nomClub) ?? asString(data.club),
   };
 }
 
@@ -132,7 +110,7 @@ export async function syncChampionshipRosterFromRegistration(
   }
   const data = (snap.data() ?? {}) as Record<string, unknown>;
   const license = readKnownFfttLicenseFromRegistrationData(data);
-  const player = await loadPlayerMirror(db, license);
+  const player = await loadRosterPlayerMirror(db, license);
 
   const existingByReg = await findChampionshipPlayerByRegistrationId(
     db,
