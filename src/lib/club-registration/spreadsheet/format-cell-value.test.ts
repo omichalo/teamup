@@ -92,6 +92,13 @@ describe("formatSpreadsheetCellValue user labels", () => {
     expect(
       formatSpreadsheetCellValue(
         "jerseyFollowUpStatus",
+        { id: "r4", jerseyFollowUpStatus: "prepared_awaiting_payment" },
+        null
+      )
+    ).toBe("Préparé - attente paiement");
+    expect(
+      formatSpreadsheetCellValue(
+        "jerseyFollowUpStatus",
         { id: "r3", jerseyFollowUpStatus: "not_applicable" },
         null
       )

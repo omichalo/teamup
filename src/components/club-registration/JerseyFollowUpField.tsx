@@ -15,7 +15,7 @@ type Props = {
   onChange: (value: JerseyFollowUpStatus) => void;
 };
 
-const ACTIONABLE_OPTIONS = ["to_do", "given"] as const;
+const ACTIONABLE_OPTIONS = ["to_do", "prepared_awaiting_payment", "given"] as const;
 
 export function JerseyFollowUpField({
   wantsCompetitorExtras,
@@ -39,7 +39,7 @@ export function JerseyFollowUpField({
       labels={JERSEY_FOLLOW_UP_STATUS_LABELS}
       notApplicableValue="not_applicable"
       onChange={onChange}
-      enabledHelper="À saisir une fois le maillot remis à l’adhérent."
+      enabledHelper="À mettre à jour selon la préparation et la remise du maillot."
       disabledHelper="S’active si un maillot compétiteur ou optionnel est commandé."
     />
   );
