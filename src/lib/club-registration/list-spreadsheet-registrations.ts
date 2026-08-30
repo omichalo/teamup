@@ -7,6 +7,7 @@ import {
   mapRegistrationDocToClient,
   type RegistrationClientRecord,
 } from "@/lib/club-registration/map-registration-doc-to-client";
+import { hydrateRegistrationsFfttLookup } from "@/lib/club-registration/hydrate-registration-fftt-lookup";
 
 export const SPREADSHEET_SCAN_LIMIT = 500;
 
@@ -66,6 +67,8 @@ export async function listSpreadsheetRegistrations(
   if (truncated) {
     registrations = registrations.slice(0, SPREADSHEET_SCAN_LIMIT);
   }
+
+  registrations = await hydrateRegistrationsFfttLookup(db, registrations);
 
   return {
     registrations,

@@ -2,6 +2,8 @@
 
 Logique métier : **`../src/lib/shared/`** (via `sync-wrappers.ts`). Ne pas dupliquer dans `functions/shared/`.
 
+Build : `tsc && tsc-alias` — les imports `@/…` doivent être réécrits en chemins relatifs, sinon Node plante au runtime.
+
 ## Fonctions
 
 | Export | Déclencheur |

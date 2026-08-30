@@ -41,6 +41,24 @@ export type AttendanceSlotOption = {
   endMinutes: number;
   highlighted: boolean;
   enrollmentsClosed: boolean;
+  cancelled: boolean;
+};
+
+export type AttendanceSlotCancellation = {
+  id: string;
+  date: string;
+  slotId: string;
+  siteId: string;
+  seasonLabel: string;
+  cancelledAt: string;
+  cancelledByUid: string;
+};
+
+export type AttendanceWeekSummary = {
+  weekStart: string;
+  weekEnd: string;
+  weekActiveCount: number;
+  weekCancelledCount: number;
 };
 
 export type AttendanceRosterPerson = {
@@ -60,6 +78,7 @@ export type AttendanceRosterPerson = {
 export type AttendanceSessionPayload = {
   date: string;
   slot: AttendanceSlotOption;
+  cancelled: boolean;
   roster: AttendanceRosterPerson[];
   extras: AttendanceRosterPerson[];
   counts: {

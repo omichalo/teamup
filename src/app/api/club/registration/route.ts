@@ -1,6 +1,7 @@
 export const runtime = "nodejs";
 
 import { jsonNoStore } from "@/lib/http/cache-headers";
+import { hydrateRegistrationFfttLookup } from "@/lib/club-registration/hydrate-registration-fftt-lookup";
 import { mapRegistrationDocToClient } from "@/lib/club-registration/map-registration-doc-to-client";
 import { cookies } from "next/headers";
 import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
@@ -89,7 +90,10 @@ export async function GET(req: Request) {
       return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
     }
 
-    const registration = mapRegistrationDocToClient(snap);
+    const registration = await hydrateRegistrationFfttLookup(
+      db,
+      mapRegistrationDocToClient(snap)
+    );
 
     return jsonNoStore({ registration }, { status: 200 });
   } catch (error) {

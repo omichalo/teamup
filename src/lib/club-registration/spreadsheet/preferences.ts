@@ -38,6 +38,8 @@ const DEFAULT_HIDDEN_COLUMN_IDS = new Set<SpreadsheetColumnId>(["submitterUid", 
 const DEFAULT_COLUMN_ORDER: SpreadsheetColumnId[] = [
   "lastName",
   "firstName",
+  "ffttLicense",
+  "ffttCategorie",
   "status",
   "mainSectionId",
   "adherentEmail",
@@ -56,7 +58,6 @@ const DEFAULT_COLUMN_ORDER: SpreadsheetColumnId[] = [
   "updatedAt",
   "adherentRole",
   "wasSqyMemberLastYear",
-  "ffttLicense",
   "ffttLicenseLookup",
   "birthCity",
   "addressLine1",
@@ -134,6 +135,55 @@ function defaultColumnVisible(id: SpreadsheetColumnId): boolean {
   return !DEFAULT_HIDDEN_COLUMN_IDS.has(id);
 }
 
+/** Place une colonne manquante selon l’ordre métier, pas à la fin de la liste sauvegardée. */
+export function insertMissingSpreadsheetColumn(
+  columns: SpreadsheetColumnPreference[],
+  columnId: SpreadsheetColumnId
+): SpreadsheetColumnPreference[] {
+  if (columns.some((column) => column.id === columnId)) {
+    return columns;
+  }
+  const pref: SpreadsheetColumnPreference = {
+    id: columnId,
+    visible: defaultColumnVisible(columnId),
+  };
+  const defaultIndex = DEFAULT_COLUMN_ORDER.indexOf(columnId);
+  if (defaultIndex === -1) {
+    return [...columns, pref];
+  }
+  if (defaultIndex === 0) {
+    return [pref, ...columns];
+  }
+  for (let i = defaultIndex - 1; i >= 0; i--) {
+    const predecessor = DEFAULT_COLUMN_ORDER[i];
+    const idx = columns.findIndex((column) => column.id === predecessor);
+    if (idx !== -1) {
+      return [...columns.slice(0, idx + 1), pref, ...columns.slice(idx + 1)];
+    }
+  }
+  return [...columns, pref];
+}
+
+function placeColumnAfter(
+  columns: SpreadsheetColumnPreference[],
+  columnId: SpreadsheetColumnId,
+  afterId: SpreadsheetColumnId
+): SpreadsheetColumnPreference[] {
+  const from = columns.findIndex((column) => column.id === columnId);
+  const after = columns.findIndex((column) => column.id === afterId);
+  if (from === -1 || after === -1 || from === after + 1) {
+    return columns;
+  }
+  const next = [...columns];
+  const [moved] = next.splice(from, 1);
+  if (!moved) {
+    return columns;
+  }
+  const afterAfterMove = next.findIndex((column) => column.id === afterId);
+  next.splice(afterAfterMove + 1, 0, moved);
+  return next;
+}
+
 export function getDefaultSpreadsheetPreferences(): RegistrationsSpreadsheetPreferences {
   return { columns: buildDefaultColumnList() };
 }
@@ -153,7 +203,7 @@ export function normalizeSpreadsheetPreferences(
   }
 
   const seen = new Set<SpreadsheetColumnId>();
-  const columns: SpreadsheetColumnPreference[] = [];
+  let columns: SpreadsheetColumnPreference[] = [];
 
   for (const entry of columnsRaw) {
     if (!entry || typeof entry !== "object") continue;
@@ -168,9 +218,11 @@ export function normalizeSpreadsheetPreferences(
 
   for (const columnId of SPREADSHEET_COLUMN_IDS) {
     if (!seen.has(columnId)) {
-      columns.push({ id: columnId, visible: defaultColumnVisible(columnId) });
+      columns = insertMissingSpreadsheetColumn(columns, columnId);
+      seen.add(columnId);
     }
   }
+  columns = placeColumnAfter(columns, "ffttCategorie", "ffttLicense");
 
   if (columns.every((column) => !column.visible)) {
     return defaults;

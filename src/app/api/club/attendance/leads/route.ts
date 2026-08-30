@@ -16,7 +16,7 @@ import {
 } from "@/lib/attendance/constants";
 import { attendanceLeadCreateSchema } from "@/lib/attendance/schema";
 import { findSlotOption } from "@/lib/attendance/slots-for-date";
-import { createLeadWithGuestMark, listLeads } from "@/lib/attendance/store";
+import { createLeadWithGuestMark, getSlotCancellation, listLeads } from "@/lib/attendance/store";
 
 function isLeadStatus(value: string | null): value is AttendanceLeadStatus {
   return Boolean(
@@ -82,6 +82,17 @@ export async function POST(req: Request) {
     const slot = findSlotOption(config, parsed.data.slotId, parsed.data.date);
     if (!slot) {
       return jsonNoStore({ error: "Créneau introuvable" }, { status: 404 });
+    }
+    const cancellation = await getSlotCancellation(
+      auth.session.db,
+      parsed.data.date,
+      parsed.data.slotId
+    );
+    if (cancellation) {
+      return jsonNoStore(
+        { error: "Séance annulée : pointage impossible" },
+        { status: 409 }
+      );
     }
     const email = parsed.data.email?.trim()
       ? parsed.data.email.trim()

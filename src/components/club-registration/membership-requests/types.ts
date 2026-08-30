@@ -25,6 +25,7 @@ export type FfttLicenseLookup = {
   prenom?: string;
   nomClub?: string;
   categorie?: string;
+  typeLicence?: string | null;
   pointsLicence?: number | null;
 };
 
@@ -66,6 +67,7 @@ export type RegistrationDetail = RegistrationSummary & {
   wasSqyMemberLastYear?: boolean;
   ffttLicense?: string;
   ffttLicenseLookup?: FfttLicenseLookup;
+  ffttCategorie?: string;
   sex?: "female" | "male" | "other";
   birthCity?: string;
   birthDate?: string;

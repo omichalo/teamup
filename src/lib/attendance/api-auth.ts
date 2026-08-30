@@ -5,6 +5,7 @@ import { hasAnyRole, resolveRole, type UserRole } from "@/lib/auth/roles";
 import {
   ATTENDANCE_LEAD_MANAGER_ROLES,
   ATTENDANCE_OPERATOR_ROLES,
+  ATTENDANCE_CANCELLATION_ROLES,
 } from "./access";
 
 export type AttendanceSessionAuth = {
@@ -64,6 +65,10 @@ export function requireAttendanceOperator() {
 
 export function requireAttendanceLeadManager() {
   return requireAttendanceRoles(ATTENDANCE_LEAD_MANAGER_ROLES);
+}
+
+export function requireAttendanceCancellationManager() {
+  return requireAttendanceRoles(ATTENDANCE_CANCELLATION_ROLES);
 }
 
 export function invalidOriginResponse() {

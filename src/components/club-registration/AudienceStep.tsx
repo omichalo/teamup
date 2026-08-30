@@ -205,6 +205,9 @@ export function AudienceStep({
             {draft.ffttLicenseLookup.nomClub
               ? ` — ${draft.ffttLicenseLookup.nomClub}`
               : ""}
+            {draft.ffttLicenseLookup.categorie
+              ? ` — ${draft.ffttLicenseLookup.categorie}`
+              : ""}
             . Vérifiez l&apos;identité à l&apos;étape suivante si besoin.
           </Alert>
         ) : null}

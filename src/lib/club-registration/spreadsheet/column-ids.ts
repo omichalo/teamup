@@ -3,9 +3,13 @@ import { REGISTRATION_CLIENT_FIELDS } from "@/lib/club-registration/registration
 /** Champs métadonnées en plus des champs dossier. */
 export const SPREADSHEET_META_FIELDS = ["id", "submittedAt", "updatedAt"] as const;
 
+/** Champs dérivés à la lecture (non persistés sur le document). */
+export const SPREADSHEET_DERIVED_FIELDS = ["ffttCategorie"] as const;
+
 export const SPREADSHEET_COLUMN_IDS = [
   ...SPREADSHEET_META_FIELDS,
   ...REGISTRATION_CLIENT_FIELDS,
+  ...SPREADSHEET_DERIVED_FIELDS,
 ] as const;
 
 export type SpreadsheetColumnId = (typeof SPREADSHEET_COLUMN_IDS)[number];
