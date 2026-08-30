@@ -39,4 +39,16 @@ describe("summarizeActiveFollowUpFilters", () => {
       })
     ).toEqual([{ id: "attestation", label: "Attestation · À faire" }]);
   });
+
+  it("affiche le suivi de maillot filtré", () => {
+    expect(
+      summarizeActiveFollowUpFilters({
+        medicalCertificateFilter: "all",
+        ppsFollowUpFilter: "all",
+        criteriumFederalFilter: "all",
+        jerseyFollowUpFilter: "prepared_awaiting_payment",
+        registrationCertificateFollowUpFilter: "all",
+      })
+    ).toEqual([{ id: "jersey", label: "Maillot · Préparé - attente paiement" }]);
+  });
 });

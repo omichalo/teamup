@@ -26,6 +26,12 @@ describe("jersey-follow-up", () => {
     expect(normalizeJerseyFollowUpStatus("to_do", false, true)).toBe("to_do");
   });
 
+  it("conserve Préparé - attente paiement tant qu’un maillot reste commandé", () => {
+    expect(normalizeJerseyFollowUpStatus("prepared_awaiting_payment", true, false)).toBe(
+      "prepared_awaiting_payment"
+    );
+  });
+
   it("repasse à non applicable si plus aucun maillot n’est commandé", () => {
     expect(normalizeJerseyFollowUpStatus("given", false, false)).toBe("not_applicable");
   });
@@ -57,14 +63,21 @@ describe("jersey-follow-up", () => {
     ).toBe("not_applicable");
   });
 
-  it("filtre la liste secrétariat sur À faire / Donné", () => {
+  it("filtre la liste secrétariat sur À faire / Préparé / Donné", () => {
     expect(resolveManagedListJerseyFollowUpFilter(null)).toBe("all");
     expect(resolveManagedListJerseyFollowUpFilter("not_applicable")).toBe("all");
     expect(resolveManagedListJerseyFollowUpFilter("given")).toBe("given");
+    expect(resolveManagedListJerseyFollowUpFilter("prepared_awaiting_payment")).toBe(
+      "prepared_awaiting_payment"
+    );
 
     const awaiting = {
       wantsCompetitorExtras: true,
       jerseyFollowUpStatus: "to_do",
+    };
+    const prepared = {
+      wantsCompetitorExtras: true,
+      jerseyFollowUpStatus: "prepared_awaiting_payment",
     };
     const done = {
       wantsOptionalJersey: true,
@@ -79,8 +92,11 @@ describe("jersey-follow-up", () => {
     expect(matchesJerseyFollowUpFilter(awaiting, "all")).toBe(true);
     expect(matchesJerseyFollowUpFilter(awaiting, "to_do")).toBe(true);
     expect(matchesJerseyFollowUpFilter(awaiting, "given")).toBe(false);
+    expect(matchesJerseyFollowUpFilter(prepared, "prepared_awaiting_payment")).toBe(true);
+    expect(matchesJerseyFollowUpFilter(prepared, "to_do")).toBe(false);
     expect(matchesJerseyFollowUpFilter(done, "given")).toBe(true);
     expect(matchesJerseyFollowUpFilter(leisure, "to_do")).toBe(false);
     expect(matchesJerseyFollowUpFilter(leisure, "given")).toBe(false);
+    expect(matchesJerseyFollowUpFilter(leisure, "prepared_awaiting_payment")).toBe(false);
   });
 });

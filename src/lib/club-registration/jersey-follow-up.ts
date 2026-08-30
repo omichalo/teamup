@@ -6,6 +6,7 @@
 export const JERSEY_FOLLOW_UP_STATUS_VALUES = [
   "not_applicable",
   "to_do",
+  "prepared_awaiting_payment",
   "given",
 ] as const;
 
@@ -14,6 +15,7 @@ export type JerseyFollowUpStatus = (typeof JERSEY_FOLLOW_UP_STATUS_VALUES)[numbe
 export const JERSEY_FOLLOW_UP_STATUS_LABELS: Record<JerseyFollowUpStatus, string> = {
   not_applicable: "Non applicable",
   to_do: "À faire",
+  prepared_awaiting_payment: "Préparé - attente paiement",
   given: "Donné",
 };
 
@@ -84,6 +86,11 @@ export const MANAGED_LIST_JERSEY_FOLLOW_UP_FILTER_OPTIONS: {
     hint: "Maillot commandé, pas encore remis à l’adhérent.",
   },
   {
+    value: "prepared_awaiting_payment",
+    label: "Préparé - attente paiement",
+    hint: "Maillot préparé, en attente du paiement de l’adhérent.",
+  },
+  {
     value: "given",
     label: "Donné",
     hint: "Maillot remis à l’adhérent.",
@@ -95,6 +102,7 @@ export const JERSEY_FOLLOW_UP_CARD_LABELS: Record<
   string
 > = {
   to_do: "Maillot à donner",
+  prepared_awaiting_payment: "Maillot préparé — attente paiement",
   given: "Maillot donné",
 };
 
@@ -104,7 +112,11 @@ export function resolveManagedListJerseyFollowUpFilter(
   if (!value || value === "all") {
     return "all";
   }
-  if (value === "to_do" || value === "given") {
+  if (
+    value === "to_do" ||
+    value === "prepared_awaiting_payment" ||
+    value === "given"
+  ) {
     return value;
   }
   return "all";
