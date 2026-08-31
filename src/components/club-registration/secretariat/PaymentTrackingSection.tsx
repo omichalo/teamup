@@ -30,6 +30,10 @@ import { MarkExpectedPaymentReceivedDialog } from "./MarkExpectedPaymentReceived
 import { PaymentDeclaredAidsTable } from "./PaymentDeclaredAidsTable";
 import { ReceivedPaymentsTable } from "./ReceivedPaymentsTable";
 import { ReverseReceivedPaymentDialog } from "./ReverseReceivedPaymentDialog";
+import {
+  canShowRequestRemainingCardButton,
+  RequestRemainingCardButton,
+} from "./RequestRemainingCardButton";
 
 type Props = {
   registrationId: string;
@@ -268,6 +272,19 @@ export function PaymentTrackingSection({
       ) : null}
 
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1} flexWrap="wrap">
+        {canShowRequestRemainingCardButton({
+          remainingAmountCents: payment.remainingAmountCents,
+          paidAmountCents: payment.paidAmountCents,
+          paymentStatus: payment.paymentStatus,
+        }) ? (
+          <RequestRemainingCardButton
+            registrationId={registrationId}
+            remainingAmountCents={payment.remainingAmountCents}
+            paidAmountCents={payment.paidAmountCents}
+            onRefresh={onRefresh}
+            onError={(message) => setActionError(message || null)}
+          />
+        ) : null}
         <Tooltip
           title="Pour un encaissement qui ne correspond pas exactement aux lignes du tableau (montant ou libellé libres)."
           slotProps={{ popper: { sx: { maxWidth: 300 } } }}

@@ -78,6 +78,8 @@ export async function createMembershipCheckoutSession(params: {
   discountCouponIds?: string[];
   donationCents?: number;
   donationDiscountCents?: number;
+  /** Métadonnées session / PaymentIntent additionnelles (ex. checkoutKind). */
+  extraMetadata?: Record<string, string>;
 }): Promise<StripeCheckoutSession> {
   if (params.lineItems.length === 0) {
     throw new Error("Au moins une ligne de paiement est requise.");
@@ -103,6 +105,11 @@ export async function createMembershipCheckoutSession(params: {
   }
   if (params.donationDiscountCents != null && params.donationDiscountCents > 0) {
     body.set("metadata[donationDiscountCents]", String(params.donationDiscountCents));
+  }
+  for (const [key, value] of Object.entries(params.extraMetadata ?? {})) {
+    if (!key || !value) continue;
+    body.set(`metadata[${key}]`, value);
+    body.set(`payment_intent_data[metadata][${key}]`, value);
   }
   body.set("payment_intent_data[metadata][registrationId]", params.registrationId);
   body.set("payment_intent_data[metadata][catalogVersion]", params.catalogVersion);
@@ -159,23 +166,30 @@ export async function createLegacySingleLineCheckoutSession(params: {
   adherentName: string;
   successUrl: string;
   cancelUrl: string;
+  extraMetadata?: Record<string, string>;
+  lineItemName?: string;
+  lineItemDescription?: string;
+  invoiceDescription?: string;
 }): Promise<StripeCheckoutSession> {
   return createMembershipCheckoutSession({
     registrationId: params.registrationId,
     lineItems: [
       {
-        name: "Adhésion SQY Ping",
+        name: params.lineItemName ?? "Adhésion SQY Ping",
         amountCents: params.amountCents,
-        description: `Dossier ${params.registrationId}`,
+        description:
+          params.lineItemDescription ?? `Dossier ${params.registrationId}`,
       },
     ],
     customerEmail: params.customerEmail,
     customerName: params.adherentName,
-    invoiceDescription: `Adhésion SQY Ping — ${params.adherentName}`,
+    invoiceDescription:
+      params.invoiceDescription ?? `Adhésion SQY Ping — ${params.adherentName}`,
     catalogVersion: "legacy",
     quoteHash: "legacy",
     successUrl: params.successUrl,
     cancelUrl: params.cancelUrl,
+    ...(params.extraMetadata ? { extraMetadata: params.extraMetadata } : {}),
   });
 }
 

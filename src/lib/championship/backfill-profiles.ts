@@ -1,14 +1,22 @@
 import type { Firestore } from "firebase-admin/firestore";
 import { FieldValue } from "firebase-admin/firestore";
+import {
+  PLAYERS_ARCHIVE_COLLECTION,
+  PLAYERS_COLLECTION,
+} from "@/lib/players/collections";
 import { PLAYER_CLUB_PROFILES_COLLECTION } from "./paths";
 
 export async function backfillPlayerClubProfilesFromPlayers(
   db: Firestore
 ): Promise<{ copied: number }> {
-  const snap = await db.collection("players").get();
+  const [activeSnap, archiveSnap] = await Promise.all([
+    db.collection(PLAYERS_COLLECTION).get(),
+    db.collection(PLAYERS_ARCHIVE_COLLECTION).get(),
+  ]);
+  const snapDocs = [...activeSnap.docs, ...archiveSnap.docs];
   let copied = 0;
   const chunkSize = 400;
-  const docs = snap.docs.filter((doc) => {
+  const docs = snapDocs.filter((doc) => {
     const data = doc.data();
     return (
       Array.isArray(data.discordMentions) && data.discordMentions.length > 0

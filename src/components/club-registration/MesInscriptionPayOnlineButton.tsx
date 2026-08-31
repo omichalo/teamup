@@ -9,7 +9,10 @@ import {
   ADHERENT_PAY_ONLINE_HELPER,
   ADHERENT_PAY_REMAINING_BUTTON_LABEL,
   ADHERENT_PAY_REMAINING_HELPER,
+  ADHERENT_PAY_SUPPLEMENT_BUTTON_LABEL,
+  ADHERENT_PAY_SUPPLEMENT_HELPER,
 } from "@/lib/club-registration/payment/bnpl-checkout-copy";
+import { resolveMesInscriptionSupplementDue } from "@/lib/club-registration/mes-inscription-supplement-display";
 import {
   canSelfServiceOnlineCheckout,
   canSelfServiceRemainingOverride,
@@ -28,6 +31,15 @@ export function MesInscriptionPayOnlineButton({ registration, onError }: Props) 
   const [loadingCharge, setLoadingCharge] = useState<ChargeMode | null>(null);
   const canPayOnline = canSelfServiceOnlineCheckout(registration);
   const canPayRemaining = canSelfServiceRemainingOverride(registration);
+  const supplementDue = resolveMesInscriptionSupplementDue(registration);
+  const primaryButtonLabel = supplementDue
+    ? ADHERENT_PAY_SUPPLEMENT_BUTTON_LABEL
+    : ADHERENT_PAY_ONLINE_BUTTON_LABEL;
+  const helperText = supplementDue
+    ? ADHERENT_PAY_SUPPLEMENT_HELPER
+    : canPayRemaining
+      ? ADHERENT_PAY_REMAINING_HELPER
+      : ADHERENT_PAY_ONLINE_HELPER;
 
   if (!canPayOnline && !canPayRemaining) {
     if (isAwaitingNonCardPayment(registration)) {
@@ -87,7 +99,7 @@ export function MesInscriptionPayOnlineButton({ registration, onError }: Props) 
           onClick={() => void handlePay("online")}
           sx={{ alignSelf: { xs: "stretch", sm: "auto" }, flexShrink: 0 }}
         >
-          {loadingCharge === "online" ? "Redirection…" : ADHERENT_PAY_ONLINE_BUTTON_LABEL}
+          {loadingCharge === "online" ? "Redirection…" : primaryButtonLabel}
         </Button>
       ) : null}
       {canPayRemaining ? (
@@ -112,7 +124,7 @@ export function MesInscriptionPayOnlineButton({ registration, onError }: Props) 
         </Button>
       ) : null}
       <Typography variant="caption" color="text.secondary" sx={{ width: "100%" }}>
-        {canPayRemaining ? ADHERENT_PAY_REMAINING_HELPER : ADHERENT_PAY_ONLINE_HELPER}
+        {helperText}
       </Typography>
     </>
   );

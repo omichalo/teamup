@@ -53,6 +53,8 @@ export function MembershipRequestsClient() {
     setRegistrationCertificateFollowUpFilter,
     aidReceiptFilter,
     setAidReceiptFilter,
+    paymentSupplementFilter,
+    setPaymentSupplementFilter,
     searchInput,
     setSearchInput,
     registrations,
@@ -71,6 +73,7 @@ export function MembershipRequestsClient() {
     jerseyFollowUpFilter: initialUrlState.jerseyFollowUpFilter,
     registrationCertificateFollowUpFilter: initialUrlState.registrationCertificateFollowUpFilter,
     aidReceiptFilter: initialUrlState.aidReceiptFilter,
+    paymentSupplementFilter: initialUrlState.paymentSupplementFilter,
   });
   const [selectedId, setSelectedId] = useState<string | null>(initialUrlState.selectedId);
   const [queueViewId, setQueueViewId] = useState<ManagedListQueueViewId>(
@@ -134,12 +137,14 @@ export function MembershipRequestsClient() {
       setCriteriumFederalFilter("all");
       setJerseyFollowUpFilter("all");
       setRegistrationCertificateFollowUpFilter("all");
+      setPaymentSupplementFilter("all");
     },
     [
       setAidReceiptFilter,
       setCriteriumFederalFilter,
       setJerseyFollowUpFilter,
       setMedicalCertificateFilter,
+      setPaymentSupplementFilter,
       setPpsFollowUpFilter,
       setRegistrationCertificateFollowUpFilter,
       setStatusFilter,
@@ -156,12 +161,14 @@ export function MembershipRequestsClient() {
       jerseyFollowUpFilter,
       registrationCertificateFollowUpFilter,
       aidReceiptFilter,
+      paymentSupplementFilter,
       selectedId,
     });
   }, [
     aidReceiptFilter,
     criteriumFederalFilter,
     jerseyFollowUpFilter,
+    paymentSupplementFilter,
     queueViewId,
     registrationCertificateFollowUpFilter,
     medicalCertificateFilter,
@@ -252,6 +259,8 @@ export function MembershipRequestsClient() {
       registrationCertificateFollowUpFilter={registrationCertificateFollowUpFilter}
       onRegistrationCertificateFollowUpFilterChange={setRegistrationCertificateFollowUpFilter}
       aidReceiptFilter={aidReceiptFilter}
+      paymentSupplementFilter={paymentSupplementFilter}
+      onPaymentSupplementFilterChange={setPaymentSupplementFilter}
       searchInput={searchInput}
       onSearchInputChange={setSearchInput}
       pageInfo={pageInfo}

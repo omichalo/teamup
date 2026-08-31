@@ -77,6 +77,19 @@ describe("isRegistrationPaymentSettled", () => {
       )
     ).toBe(false);
   });
+
+  it("ne considère pas soldé un dossier payé avec reliquat", () => {
+    expect(
+      isRegistrationPaymentSettled(
+        { status: "paid", paymentStatus: "pending", paidAt: "2026-08-20T10:00:00.000Z" },
+        paidPayment({
+          paidAmountCents: 23_900,
+          remainingAmountCents: 3_500,
+          paymentStatus: "partially_paid",
+        })
+      )
+    ).toBe(false);
+  });
 });
 
 describe("resolveSettledRequestPaymentAction", () => {

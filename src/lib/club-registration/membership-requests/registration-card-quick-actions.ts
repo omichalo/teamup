@@ -1,5 +1,6 @@
 import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
 import { resolveOnlinePayableCents } from "@/lib/club-registration/payment/resolve-remaining-payable";
+import { isRegistrationSupplementDue } from "@/lib/club-registration/payment/registration-supplement";
 import { isRegistrationPaidRecord } from "@/lib/club-registration/payment-proof";
 import type { RegistrationSummary } from "@/components/club-registration/membership-requests/types";
 
@@ -47,7 +48,20 @@ export function canQuickRequestPayment(registration: RegistrationSummary): boole
   return amountCents !== null && amountCents > 0;
 }
 
+export function canQuickRequestSupplementPayment(registration: RegistrationSummary): boolean {
+  const payment =
+    registration.payment ??
+    normalizeRegistrationPayment(registration as unknown as Record<string, unknown>);
+  if (!payment || !isRegistrationSupplementDue(payment)) {
+    return false;
+  }
+  return resolveOnlinePayableCents(payment) > 0;
+}
+
 export function canQuickResendPaymentLink(registration: RegistrationSummary): boolean {
+  if (canQuickRequestSupplementPayment(registration)) {
+    return true;
+  }
   if (registration.status !== "payment_requested") {
     return false;
   }

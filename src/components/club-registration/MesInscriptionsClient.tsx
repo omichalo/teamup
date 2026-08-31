@@ -17,8 +17,9 @@ import NextLink from "next/link";
 import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/ui";
 import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
-import { ADHERENT_PAYMENT_EMAIL_LANDING_ALERT, ADHERENT_PAYMENT_PENDING_ALERT } from "@/lib/club-registration/payment/bnpl-checkout-copy";
+import { ADHERENT_PAYMENT_EMAIL_LANDING_ALERT, ADHERENT_PAYMENT_PENDING_ALERT, ADHERENT_SUPPLEMENT_DUE_ALERT } from "@/lib/club-registration/payment/bnpl-checkout-copy";
 import { canSelfServiceCheckout } from "@/lib/club-registration/self-service-checkout";
+import { resolveMesInscriptionSupplementDue } from "@/lib/club-registration/mes-inscription-supplement-display";
 import { MesInscriptionRegistrationCard } from "@/components/club-registration/MesInscriptionRegistrationCard";
 import {
   isMesInscriptionPaid,
@@ -121,6 +122,11 @@ export function MesInscriptionsClient() {
     [registrations]
   );
 
+  const hasSupplementDue = useMemo(
+    () => registrations.some((r) => resolveMesInscriptionSupplementDue(r)),
+    [registrations]
+  );
+
   const openInvoice = async (registrationId: string) => {
     setInvoiceLoadingId(registrationId);
     setInvoiceError(null);
@@ -214,7 +220,9 @@ export function MesInscriptionsClient() {
         ) : null}
 
         {hasPendingSelfServicePayment && !paymentLandingRegistration ? (
-          <Alert severity="warning">{ADHERENT_PAYMENT_PENDING_ALERT}</Alert>
+          <Alert severity="warning">
+            {hasSupplementDue ? ADHERENT_SUPPLEMENT_DUE_ALERT : ADHERENT_PAYMENT_PENDING_ALERT}
+          </Alert>
         ) : null}
 
         {error ? <Alert severity="error">{error}</Alert> : null}

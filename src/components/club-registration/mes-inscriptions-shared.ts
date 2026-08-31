@@ -3,6 +3,7 @@ import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/no
 import { resolveOnlinePayableCents } from "@/lib/club-registration/payment/resolve-remaining-payable";
 import { getEnabledSections } from "@/lib/club-registration-config/helpers";
 import { getDefaultRegistrationConfig } from "@/lib/club-registration-config/default-config";
+import { isMesInscriptionFullyPaid } from "@/lib/club-registration/mes-inscription-supplement-display";
 
 export type MesInscriptionSummary = {
   id: string;
@@ -109,9 +110,5 @@ export function findMesInscriptionSectionLabel(id: string | undefined): string {
 }
 
 export function isMesInscriptionPaid(r: MesInscriptionSummary): boolean {
-  return (
-    r.status === "paid" ||
-    r.paymentStatus === "paid" ||
-    r.paymentStatus === "complete"
-  );
+  return isMesInscriptionFullyPaid(r);
 }

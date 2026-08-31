@@ -26,6 +26,7 @@ import {
 import type { ManagedListMedicalCertificateFilter } from "@/lib/club-registration/medical-certificate";
 import type { ManagedListPpsFollowUpFilter } from "@/lib/club-registration/pps-follow-up";
 import type { ManagedListAidReceiptFilter } from "@/lib/club-registration/payment/aid-receipt";
+import type { ManagedListPaymentSupplementFilter } from "@/lib/club-registration/payment/supplement-managed-filter";
 import type { ManagedListCriteriumFederalFilter } from "@/lib/club-registration/criterium-federal-follow-up";
 import type { ManagedListJerseyFollowUpFilter } from "@/lib/club-registration/jersey-follow-up";
 import type { ManagedListRegistrationCertificateFollowUpFilter } from "@/lib/club-registration/registration-certificate-follow-up";
@@ -83,6 +84,8 @@ type MembershipRequestsListPanelProps = {
     value: ManagedListRegistrationCertificateFollowUpFilter
   ) => void;
   aidReceiptFilter: ManagedListAidReceiptFilter;
+  paymentSupplementFilter: ManagedListPaymentSupplementFilter;
+  onPaymentSupplementFilterChange: (value: ManagedListPaymentSupplementFilter) => void;
   searchInput: string;
   onSearchInputChange: (value: string) => void;
   pageInfo: ManagedRegistrationsPageInfo;
@@ -115,6 +118,8 @@ export function MembershipRequestsListPanel({
   registrationCertificateFollowUpFilter,
   onRegistrationCertificateFollowUpFilterChange,
   aidReceiptFilter,
+  paymentSupplementFilter,
+  onPaymentSupplementFilterChange,
   searchInput,
   onSearchInputChange,
   pageInfo,
@@ -190,6 +195,8 @@ export function MembershipRequestsListPanel({
         onRegistrationCertificateFollowUpFilterChange={
           onRegistrationCertificateFollowUpFilterChange
         }
+        paymentSupplementFilter={paymentSupplementFilter}
+        onPaymentSupplementFilterChange={onPaymentSupplementFilterChange}
       />
 
       {pipelineTabs.length > 0 ? (

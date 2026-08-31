@@ -305,6 +305,14 @@ export async function patchManagerRegistration(
     mergedForPricing
   );
 
+  const auditDetails: Record<string, unknown> = { fields: Object.keys(updates) };
+  if (pricingPatch.status === "payment_requested" && pricingPatch.supplementRequestedAt) {
+    auditDetails.supplementReopened = true;
+  }
+  if (typeof pricingPatch.jerseyFollowUpStatus === "string") {
+    auditDetails.jerseyFollowUpStatus = pricingPatch.jerseyFollowUpStatus;
+  }
+
   await docRef.set(
     {
       ...updates,
@@ -320,7 +328,7 @@ export async function patchManagerRegistration(
   logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_UPDATED, decoded.uid, {
     resource: "clubRegistration",
     resourceId: registrationId,
-    details: { fields: Object.keys(updates) },
+    details: auditDetails,
     success: true,
   });
 
