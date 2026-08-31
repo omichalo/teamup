@@ -329,7 +329,13 @@ export function useMembershipRequestDetail(
       return;
     }
 
-    const isResend = selected?.status === "payment_requested";
+    const isResend =
+      selected?.status === "payment_requested" &&
+      !(selectedPayment && selectedPayment.paidAmountCents > 0 && selectedPayment.remainingAmountCents > 0);
+    const isSupplementRequest =
+      selectedPayment != null &&
+      selectedPayment.paidAmountCents > 0 &&
+      selectedPayment.remainingAmountCents > 0;
     const paymentEmail =
       typeof selected?.paymentEmailSentTo === "string" ? selected.paymentEmailSentTo : null;
 
@@ -371,6 +377,12 @@ export function useMembershipRequestDetail(
             : isResend
               ? `Instructions de règlement renvoyées${paymentEmail ? ` à ${paymentEmail}` : ""}.`
               : "Dossier validé. Un e-mail d'instructions de règlement a été envoyé au contact du dossier."
+        );
+      } else if (isSupplementRequest) {
+        setSuccess(
+          paymentEmail
+            ? `Demande de complément envoyée à ${paymentEmail} — paiement via Mes dossiers.`
+            : "Demande de complément envoyée au contact du dossier — paiement via Mes dossiers."
         );
       } else if (isResend) {
         setSuccess(

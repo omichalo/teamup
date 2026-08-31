@@ -1,7 +1,6 @@
 import type { DocumentReference, Firestore } from "firebase-admin/firestore";
+import { PLAYERS_ARCHIVE_COLLECTION } from "@/lib/players/collections";
 import { typeLicenceFromFfttDetails } from "@/lib/players/current-club-license";
-
-const PLAYERS = "players";
 const FETCH_CONCURRENCY = 25;
 const WRITE_CHUNK = 400;
 
@@ -31,10 +30,8 @@ export async function refreshUnlistedPlayerMirrors(
   db: Firestore,
   fetchDetails: (licence: string) => Promise<Record<string, unknown> | null>
 ): Promise<{ updated: number; errors: number }> {
-  const snap = await db.collection(PLAYERS).get();
-  const unlisted = snap.docs.filter(
-    (doc) => doc.data().listedInClub !== true && doc.data().isTemporary !== true
-  );
+  const snap = await db.collection(PLAYERS_ARCHIVE_COLLECTION).get();
+  const unlisted = snap.docs.filter((doc) => doc.data().isTemporary !== true);
 
   const pending: Array<{ ref: DocumentReference; fields: UnlistedMirrorFields }> =
     [];

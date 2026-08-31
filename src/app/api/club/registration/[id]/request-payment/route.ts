@@ -91,7 +91,6 @@ export async function POST(
     }
 
     const data = snap.data() ?? {};
-    const isResend = data.status === "payment_requested";
     const requestedAmount = body.amountCents ?? data.paymentAmountCents;
 
     const adherentName =
@@ -123,6 +122,9 @@ export async function POST(
     );
     const amountToPayCents = charge.amountToPayCents;
     const payableCents = charge.remainingPayableCents;
+    const isSupplementRequest =
+      charge.alreadyPaidCents > 0 && charge.remainingPayableCents > 0;
+    const isResend = data.status === "payment_requested" && !isSupplementRequest;
 
     // Une remise à 0 € met paymentStatus à "paid" : traiter le zéro dû avant
     // le garde-fou « déjà réglé », sinon la validation est bloquée.
@@ -329,6 +331,7 @@ export async function POST(
       baseUrl,
       requestedByUid: decoded.uid,
       isResend,
+      ...(isSupplementRequest ? { emailVariant: "supplement" as const } : {}),
     });
 
     return jsonNoStore(

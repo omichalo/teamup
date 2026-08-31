@@ -44,6 +44,7 @@ type Props = {
   remainingAmountCents?: number | null;
   onlinePayableCents?: number | null;
   paymentSettled?: boolean;
+  paidAmountCents?: number | null;
   saving: boolean;
   requestingPayment: boolean;
   persistingQuote: boolean;
@@ -93,6 +94,7 @@ export function SecretariatPaymentNotesSection({
   paymentMethod,
   remainingAmountCents = null,
   onlinePayableCents = null,
+  paidAmountCents = null,
   paymentSettled = false,
   saving,
   requestingPayment,
@@ -104,12 +106,21 @@ export function SecretariatPaymentNotesSection({
 }: Props) {
   const remaining = remainingAmountCents ?? null;
   const onlinePayable = onlinePayableCents ?? remaining;
+  const alreadyPaidCents =
+    paidAmountCents ??
+    (remaining != null && paymentAmountCents != null && remaining < paymentAmountCents
+      ? paymentAmountCents - remaining
+      : null);
   const paymentCta = resolveSecretariatPaymentCta({
     registrationStatus,
     paymentSettled,
     paymentMethod,
+    remainingAmountCents: remaining,
+    paidAmountCents: alreadyPaidCents,
   });
-  const isPaymentResend = paymentCta.visible && paymentCta.kind === "resend";
+  const isPaymentResend =
+    paymentCta.visible &&
+    (paymentCta.kind === "resend" || paymentCta.kind === "supplement");
   const canOfferOnlineLink =
     paymentCta.visible &&
     paymentCta.kind !== "validate_settled" &&
@@ -128,10 +139,6 @@ export function SecretariatPaymentNotesSection({
   const remainingLabel = formatAmountCents(remaining);
   const onlineLabel = formatAmountCents(onlinePayable);
   const netLabel = formatAmountCents(paymentAmountCents);
-  const alreadyPaidCents =
-    remaining != null && paymentAmountCents != null && remaining < paymentAmountCents
-      ? paymentAmountCents - remaining
-      : null;
   const hasPartialReceipt = alreadyPaidCents != null && alreadyPaidCents > 0;
   const hasOfflineRemainder =
     remaining != null && onlinePayable != null && onlinePayable > 0 && onlinePayable < remaining;
@@ -256,10 +263,19 @@ export function SecretariatPaymentNotesSection({
         </Alert>
       ) : hasPartialReceipt && remainingLabel && netLabel && paymentCta.visible ? (
         <Alert severity="warning" variant="outlined">
-          Un encaissement est déjà enregistré.{" "}
-          {onlineChargeLabel && onlineLabel
-            ? `Le lien de paiement demandera ${onlineLabel}, pas ${netLabel}.`
-            : `Solde restant ${remainingLabel} (hors carte).`}
+          {paymentCta.kind === "supplement" ? (
+            <>
+              Un complément est dû après modification du dossier ({remainingLabel}
+              {onlineLabel ? `, dont ${onlineLabel} par carte` : ""}).
+            </>
+          ) : (
+            <>
+              Un encaissement est déjà enregistré.{" "}
+              {onlineChargeLabel && onlineLabel
+                ? `Le lien de paiement demandera ${onlineLabel}, pas ${netLabel}.`
+                : `Solde restant ${remainingLabel} (hors carte).`}
+            </>
+          )}
         </Alert>
       ) : null}
 

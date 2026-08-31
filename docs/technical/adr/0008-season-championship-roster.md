@@ -14,7 +14,7 @@ Le championnat 2026-2027 doit se baser sur l’intention des dossiers (paiement 
 
 ## Décision
 
-1. **`players`** : miroir FFTT uniquement, plus `listedInClub` / `lastSeenInClubListAt`. La synchro quotidienne n’écrit plus les champs club. `getJoueursByClub` peut encore renvoyer des affiliés SQY **sans** licence de saison (`typeLicence` null). Licence saison = type T/P/A renvoyé par `getJoueurDetailsByLicence` ; un ancien T/P/A doit être écrasé quand le détail est vide. Les fiches **hors liste club** sont quand même rafraîchies (nom de club, type) pour distinguer mutation et licence saison manquante.
+1. **`players`** : miroir FFTT actif (liste club courante), plus `listedInClub` / `lastSeenInClubListAt`. **`playersArchive`** : miroir historique des licences sorties de la liste club (rafraîchi à la synchro, restauré dans `players` si la licence réapparaît).
 2. **`seasons/{seasonLabel}/championshipPlayers/{personKey}`** : effectif championnat de la saison (`meta.seasonLabel`, 1er septembre → 31 août, comme ADR-0006). Seed automatique depuis les dossiers non refusés avec `championnat_equipe` et/ou `championnat_paris`. `coachExcluded` est sticky. Ajout coach sans intention dossier autorisé.
 3. **Paiement et licence** : informatifs (`paymentStatus`, `licensePresence`). L’entraîneur les voit ; ils n’excluent pas du pool.
 4. **Clé personne** : licence FFTT si connue, sinon `reg_{registrationId}`. Fusion vers la licence quand elle arrive.
@@ -39,7 +39,7 @@ Le championnat 2026-2027 doit se baser sur l’intention des dossiers (paiement 
 ### Neutres
 
 - Critérium fédéral / championnat jeunes hors UI compositions de cette vague.
-- Pas de purge physique des documents `players` hors liste club.
+- Pas de purge physique des documents `players` hors liste club ; archivage vers `playersArchive` lors de la synchro FFTT (restauration automatique si la licence revient dans `getJoueursByClub`).
 
 ## Alternatives considérées
 

@@ -1,8 +1,7 @@
 #!/usr/bin/env ts-node
 
 /**
- * Aligne paymentStatus (et l'objet payment imbriqué) sur les dossiers déjà réglés
- * (paidAt ou status === "paid") mais encore en paymentStatus legacy "pending", etc.
+ * Aligne paymentStatus (legacy) ou rouvre les dossiers payés avec reliquat (complément dû).
  *
  * Usage :
  *   # Staging (défaut via .env.local)
@@ -23,14 +22,12 @@ import * as dotenv from "dotenv";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { initializeApp, applicationDefault, cert, getApps } from "firebase-admin/app";
-import { FieldValue, getFirestore, type DocumentData } from "firebase-admin/firestore";
+import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import {
-  normalizeRegistrationPayment,
-  paymentToFirestoreUpdate,
-} from "../src/lib/club-registration/payment/normalize-payment";
-import { markPaymentFullyPaid } from "../src/lib/club-registration/payment/payment-mutations";
-import { receivedMethodFromPlanned } from "../src/lib/club-registration/payment/received-method-from-planned";
-import { needsRegistrationPaymentStatusRepair } from "../src/lib/club-registration/repair-registration-payment-status";
+  buildRegistrationPaymentRepairPatch,
+  detectRegistrationPaymentRepairKind,
+  type RegistrationPaymentRepairKind,
+} from "../src/lib/club-registration/repair-registration-payment-status";
 import { resolveRegistrationPaymentStatus } from "../src/lib/club-registration/resolve-registration-payment-status";
 import { formatPersonDisplayName } from "../src/lib/shared/person-name-format";
 
@@ -189,23 +186,6 @@ function formatPaidAt(value: unknown): string {
   return "—";
 }
 
-function buildRepairPatch(data: DocumentData): Record<string, unknown> {
-  const payment = normalizeRegistrationPayment(data);
-  const nextPayment = payment
-    ? markPaymentFullyPaid(payment, {
-        method: receivedMethodFromPlanned(payment.paymentMethod),
-        recordedBy: "repair-script",
-        note: "Réparation de statut — moyen repris du mode prévu",
-      })
-    : null;
-
-  return {
-    status: "paid",
-    ...(nextPayment ? paymentToFirestoreUpdate(nextPayment) : { paymentStatus: "paid" }),
-    updatedAt: FieldValue.serverTimestamp(),
-  };
-}
-
 async function commitBatch(
   batch: FirebaseFirestore.WriteBatch,
   pending: number
@@ -266,11 +246,13 @@ async function main(): Promise<void> {
     paymentStatus: string;
     paidAt: string;
     resolvedDisplay: string;
+    repairKind: RegistrationPaymentRepairKind;
   }> = [];
 
   for (const docSnap of snapshot.docs) {
     const data = docSnap.data();
-    if (!needsRegistrationPaymentStatusRepair(data)) {
+    const repairKind = detectRegistrationPaymentRepairKind(data);
+    if (!repairKind) {
       continue;
     }
 
@@ -286,6 +268,7 @@ async function main(): Promise<void> {
       paymentStatus: typeof data.paymentStatus === "string" ? data.paymentStatus : "—",
       paidAt: formatPaidAt(data.paidAt),
       resolvedDisplay: resolved,
+      repairKind,
     });
   }
 
@@ -299,13 +282,13 @@ async function main(): Promise<void> {
 
   for (const row of affected) {
     console.log(
-      `- ${row.name} (${row.id}) | status=${row.status} | paymentStatus=${row.paymentStatus} | paidAt=${row.paidAt}`
+      `- ${row.name} (${row.id}) | kind=${row.repairKind} | status=${row.status} | paymentStatus=${row.paymentStatus} | paidAt=${row.paidAt}`
     );
   }
 
   if (dryRun) {
     console.log(
-      "\nSimulation terminée. Relancez avec --apply pour écrire paymentStatus=paid sur ces dossiers."
+      "\nSimulation terminée. Relancez avec --apply pour appliquer les corrections."
     );
     return;
   }
@@ -318,12 +301,16 @@ async function main(): Promise<void> {
     const docRef = db.collection(COLLECTION).doc(row.id);
     const snap = await docRef.get();
     const data = snap.data();
-    if (!data || !needsRegistrationPaymentStatusRepair(data)) {
+    const repairKind = detectRegistrationPaymentRepairKind(data);
+    if (!data || !repairKind) {
       continue;
     }
 
-    const patch = buildRepairPatch(data);
-    batch.update(docRef, patch);
+    const patch = buildRegistrationPaymentRepairPatch(data, repairKind);
+    batch.update(docRef, {
+      ...patch,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
     batchCount += 1;
     updated += 1;
 

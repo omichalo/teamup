@@ -26,6 +26,10 @@ import {
   type ManagedListJerseyFollowUpFilter,
 } from "@/lib/club-registration/jersey-follow-up";
 import {
+  resolveManagedListPaymentSupplementFilter,
+  type ManagedListPaymentSupplementFilter,
+} from "@/lib/club-registration/payment/supplement-managed-filter";
+import {
   resolveManagedListRegistrationCertificateFollowUpFilter,
   type ManagedListRegistrationCertificateFollowUpFilter,
 } from "@/lib/club-registration/registration-certificate-follow-up";
@@ -43,6 +47,7 @@ export type ManagedListUrlState = {
   jerseyFollowUpFilter: ManagedListJerseyFollowUpFilter;
   registrationCertificateFollowUpFilter: ManagedListRegistrationCertificateFollowUpFilter;
   aidReceiptFilter: ManagedListAidReceiptFilter;
+  paymentSupplementFilter: ManagedListPaymentSupplementFilter;
   selectedId: string | null;
 };
 
@@ -86,6 +91,9 @@ export function parseManagedListUrlState(
         searchParams.get("attestation")
       ),
     aidReceiptFilter,
+    paymentSupplementFilter: resolveManagedListPaymentSupplementFilter(
+      searchParams.get("complement")
+    ),
     selectedId: searchParams.get("id"),
   };
 }
@@ -104,6 +112,7 @@ export function normalizeManagedListUrlState(input: ManagedListUrlState): Manage
     jerseyFollowUpFilter: input.jerseyFollowUpFilter,
     registrationCertificateFollowUpFilter: input.registrationCertificateFollowUpFilter,
     aidReceiptFilter: input.aidReceiptFilter,
+    paymentSupplementFilter: input.paymentSupplementFilter,
     selectedId: input.selectedId,
   };
 }
@@ -127,6 +136,7 @@ export function managedListUrlStatesEqual(
     normalizedLeft.registrationCertificateFollowUpFilter ===
       normalizedRight.registrationCertificateFollowUpFilter &&
     normalizedLeft.aidReceiptFilter === normalizedRight.aidReceiptFilter &&
+    normalizedLeft.paymentSupplementFilter === normalizedRight.paymentSupplementFilter &&
     (normalizedLeft.selectedId ?? null) === (normalizedRight.selectedId ?? null)
   );
 }
@@ -162,6 +172,10 @@ export function buildManagedListQueryString(input: ManagedListUrlState): string 
 
   if (state.registrationCertificateFollowUpFilter !== "all") {
     params.set("attestation", state.registrationCertificateFollowUpFilter);
+  }
+
+  if (state.paymentSupplementFilter !== "all") {
+    params.set("complement", state.paymentSupplementFilter);
   }
 
   if (state.selectedId) {

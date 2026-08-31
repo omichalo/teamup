@@ -49,6 +49,7 @@ export function MembershipRequestDetailFooter({
         paymentEmailSentTo={selected.paymentEmailSentTo ?? null}
         paymentMethod={selectedPayment?.paymentMethod}
         remainingAmountCents={selectedPayment?.remainingAmountCents ?? null}
+        paidAmountCents={selectedPayment?.paidAmountCents ?? null}
         onlinePayableCents={
           selectedPayment ? resolveOnlinePayableCents(selectedPayment) : null
         }

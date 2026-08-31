@@ -17,6 +17,7 @@ import { resolveManagedListCriteriumFederalFilter } from "@/lib/club-registratio
 import { resolveManagedListJerseyFollowUpFilter } from "@/lib/club-registration/jersey-follow-up";
 import { resolveManagedListRegistrationCertificateFollowUpFilter } from "@/lib/club-registration/registration-certificate-follow-up";
 import { resolveManagedListAidReceiptFilter } from "@/lib/club-registration/payment/aid-receipt";
+import { resolveManagedListPaymentSupplementFilter } from "@/lib/club-registration/payment/supplement-managed-filter";
 
 const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
 
@@ -64,6 +65,9 @@ export async function GET(req: Request) {
       const aidReceiptFilter = resolveManagedListAidReceiptFilter(
         url.searchParams.get("aidReceipt")
       );
+      const paymentSupplementFilter = resolveManagedListPaymentSupplementFilter(
+        url.searchParams.get("paymentSupplement")
+      );
       const rawLimit = Number.parseInt(url.searchParams.get("limit") ?? "", 10);
       const pageSize = Number.isFinite(rawLimit)
         ? Math.min(Math.max(rawLimit, 1), MANAGED_PAGE_SIZE_MAX)
@@ -79,6 +83,7 @@ export async function GET(req: Request) {
         jerseyFollowUpFilter,
         registrationCertificateFollowUpFilter,
         aidReceiptFilter,
+        paymentSupplementFilter,
         pageSize,
         cursor,
         searchQuery,

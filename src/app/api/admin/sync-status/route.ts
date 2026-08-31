@@ -3,6 +3,10 @@ export const runtime = "nodejs";
 import { jsonNoStore } from "@/lib/http/cache-headers";
 import { cookies } from "next/headers";
 import { initializeFirebaseAdmin, getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
+import {
+  PLAYERS_ARCHIVE_COLLECTION,
+  PLAYERS_COLLECTION,
+} from "@/lib/players/collections";
 import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
 
 export async function GET() {
@@ -35,19 +39,22 @@ export async function GET() {
     await initializeFirebaseAdmin();
     const db = getFirestoreAdmin();
 
-    const [metadataDoc, playersSnapshot, teamsSnapshot] = await Promise.all([
+    const [metadataDoc, playersSnapshot, archiveSnapshot, teamsSnapshot] =
+      await Promise.all([
       db.collection("metadata").doc("lastSync").get(),
-      db.collection("players").get(),
+      db.collection(PLAYERS_COLLECTION).get(),
+      db.collection(PLAYERS_ARCHIVE_COLLECTION).get(),
       db.collection("teams").get(),
     ]);
 
     const metadata = metadataDoc.exists ? metadataDoc.data() : {};
     const playersCount = playersSnapshot.size;
+    const archivedCount = archiveSnapshot.size;
     const teamsCount = teamsSnapshot.size;
     const teamMatchesCount = metadata?.teamMatchesCount || 0;
 
     console.log(
-      `✅ Statut récupéré: ${playersCount} joueurs, ${teamsCount} équipes, ${teamMatchesCount} matchs par équipe`
+      `✅ Statut récupéré: ${playersCount} joueurs actifs, ${archivedCount} archivés, ${teamsCount} équipes, ${teamMatchesCount} matchs par équipe`
     );
 
     return jsonNoStore(
@@ -57,6 +64,7 @@ export async function GET() {
           players: {
             lastSync: metadata?.players?.toDate?.()?.toISOString() || null,
             count: playersCount,
+            archivedCount,
             duration: metadata?.playersDuration || null,
           },
           teams: {

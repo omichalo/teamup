@@ -3,6 +3,10 @@ import {
   resolveOnlinePayableCents,
   resolveRemainingPayableCents,
 } from "@/lib/club-registration/payment/resolve-remaining-payable";
+import {
+  hasRegistrationOutstandingBalance,
+  isRegistrationSupplementDue,
+} from "@/lib/club-registration/payment/registration-supplement";
 import { isRegistrationPaidRecord } from "@/lib/club-registration/payment-proof";
 import type { PaymentMethodId } from "@/lib/club-registration/payment-constants";
 
@@ -20,6 +24,19 @@ export function resolveRegistrationPaymentMethod(
 }
 
 function isSelfServiceEligible(data: SelfServiceCheckoutRecord): boolean {
+  const status = data.status ?? "";
+  if (status === "rejected" || status === "approved") {
+    return false;
+  }
+
+  const payment = normalizeRegistrationPayment(data);
+  if (payment && hasRegistrationOutstandingBalance(payment)) {
+    if (isRegistrationSupplementDue(payment)) {
+      return status === "payment_requested" || status === "paid" || status === "in_review";
+    }
+    return status === "payment_requested";
+  }
+
   return data.status === "payment_requested" && !isRegistrationPaidRecord(data);
 }
 

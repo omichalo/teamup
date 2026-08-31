@@ -12,6 +12,7 @@ const FOLLOW_UPS_ALL = {
   criteriumFederalFilter: "all",
   jerseyFollowUpFilter: "all",
   registrationCertificateFollowUpFilter: "all",
+  paymentSupplementFilter: "all",
 } as const;
 
 function listState(

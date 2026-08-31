@@ -70,6 +70,19 @@ export const SELF_SERVICE_MES_INSCRIPTIONS_EMAIL_HTML =
 export const SELF_SERVICE_MES_INSCRIPTIONS_EMAIL_TEXT =
   "Vous pouvez aussi payer depuis Mes dossiers sur TeamUp :";
 
+/** Bouton adhérent — complément après paiement initial. */
+export const ADHERENT_PAY_SUPPLEMENT_BUTTON_LABEL = "Payer le complément";
+
+export const ADHERENT_PAY_SUPPLEMENT_HELPER =
+  "Un complément est dû suite à une modification de votre dossier. Paiement sécurisé Stripe.";
+
+/** Alerte Mes dossiers — complément en attente. */
+export const ADHERENT_SUPPLEMENT_DUE_ALERT =
+  "Un ou plusieurs dossiers ont un complément à régler pour finaliser l'inscription.";
+
+/** Statut affiché sur Mes dossiers. */
+export const MES_INSCRIPTION_SUPPLEMENT_STATUS_LABEL = "Complément à régler";
+
 /** Bouton adhérent — Mes dossiers. */
 export const ADHERENT_PAY_ONLINE_BUTTON_LABEL = "Payer en ligne";
 
@@ -103,6 +116,13 @@ export const SECRETARIAT_VALIDATE_SETTLED_TOOLTIP =
 
 /** Bouton secrétariat — renvoi lien. */
 export const SECRETARIAT_RESEND_PAYMENT_BUTTON = "Renvoyer le lien de paiement";
+
+/** Bouton secrétariat — complément après paiement initial. */
+export const SECRETARIAT_REQUEST_SUPPLEMENT_BUTTON = "Demander le complément par carte";
+
+/** Tooltip secrétariat — complément après paiement initial. */
+export const SECRETARIAT_REQUEST_SUPPLEMENT_TOOLTIP =
+  "Envoie un e-mail invitant l'adhérent à régler le complément par carte (Stripe), après modification du dossier.";
 
 /** Tooltip secrétariat — renvoi. */
 export const SECRETARIAT_RESEND_PAYMENT_TOOLTIP =

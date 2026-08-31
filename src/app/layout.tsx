@@ -7,7 +7,7 @@ import "@fontsource-variable/figtree";
 
 export const metadata: Metadata = {
   title: "SQY Ping - Team Up",
-  description: "Application de gestion des équipes pour le club SQY Ping",
+  description: "Espace club SQY Ping — adhésions, équipes et vie sportive",
   // Les fichiers icon.png, icon.svg, apple-icon.png et apple-icon.svg dans app/ 
   // sont automatiquement détectés et servis par Next.js App Router
 };

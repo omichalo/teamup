@@ -24,6 +24,10 @@ import {
   type ManagedListAidReceiptFilter,
 } from "@/lib/club-registration/payment/aid-receipt";
 import {
+  matchesPaymentSupplementFilter,
+  type ManagedListPaymentSupplementFilter,
+} from "@/lib/club-registration/payment/supplement-managed-filter";
+import {
   ACTIONABLE_REGISTRATION_STATUSES,
   type ManagedListStatusFilter,
 } from "@/lib/club-registration/registration-status";
@@ -38,6 +42,7 @@ export type ListManagedRegistrationsParams = {
   jerseyFollowUpFilter?: ManagedListJerseyFollowUpFilter;
   registrationCertificateFollowUpFilter?: ManagedListRegistrationCertificateFollowUpFilter;
   aidReceiptFilter?: ManagedListAidReceiptFilter;
+  paymentSupplementFilter?: ManagedListPaymentSupplementFilter;
   pageSize: number;
   cursor?: string | null;
   searchQuery?: string | null;
@@ -87,7 +92,8 @@ export function needsClientSideFiltering(params: ListManagedRegistrationsParams)
     (params.criteriumFederalFilter ?? "all") !== "all" ||
     (params.jerseyFollowUpFilter ?? "all") !== "all" ||
     (params.registrationCertificateFollowUpFilter ?? "all") !== "all" ||
-    (params.aidReceiptFilter ?? "all") !== "all"
+    (params.aidReceiptFilter ?? "all") !== "all" ||
+    (params.paymentSupplementFilter ?? "all") !== "all"
   );
 }
 
@@ -101,6 +107,7 @@ export function filterManagedSummaries(
   const jerseyFilter = params.jerseyFollowUpFilter ?? "all";
   const attestationFilter = params.registrationCertificateFollowUpFilter ?? "all";
   const aidReceiptFilter = params.aidReceiptFilter ?? "all";
+  const paymentSupplementFilter = params.paymentSupplementFilter ?? "all";
   return summaries.filter((summary) => {
     const declaration =
       typeof summary.medicalCertificateDeclaration === "string"
@@ -119,6 +126,7 @@ export function filterManagedSummaries(
       matchesJerseyFollowUpFilter(summary, jerseyFilter) &&
       matchesRegistrationCertificateFollowUpFilter(summary, attestationFilter) &&
       matchesManagedAidReceiptFilter(summary, aidReceiptFilter) &&
+      matchesPaymentSupplementFilter(summary, paymentSupplementFilter) &&
       registrationMatchesSearch(summary, params.searchQuery)
     );
   });

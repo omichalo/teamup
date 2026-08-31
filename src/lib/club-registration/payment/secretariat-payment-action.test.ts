@@ -1,5 +1,6 @@
 import {
   SECRETARIAT_INITIAL_PAYMENT_BUTTON,
+  SECRETARIAT_REQUEST_SUPPLEMENT_BUTTON,
   SECRETARIAT_RESEND_PAYMENT_BUTTON,
   SECRETARIAT_VALIDATE_SETTLED_BUTTON,
   SECRETARIAT_VALIDATE_SETTLED_TOOLTIP,
@@ -22,7 +23,7 @@ describe("resolveSecretariatPaymentCta", () => {
     });
   });
 
-  it("masque l'action une fois le dossier clos", () => {
+  it("masque l'action une fois le dossier clos sans reliquat", () => {
     expect(
       resolveSecretariatPaymentCta({
         registrationStatus: "paid",
@@ -37,6 +38,22 @@ describe("resolveSecretariatPaymentCta", () => {
         paymentMethod: "cheque",
       })
     ).toEqual({ visible: false });
+  });
+
+  it("propose le complément CB après paiement initial", () => {
+    expect(
+      resolveSecretariatPaymentCta({
+        registrationStatus: "paid",
+        paymentSettled: false,
+        paymentMethod: "card",
+        remainingAmountCents: 3_500,
+        paidAmountCents: 23_900,
+      })
+    ).toMatchObject({
+      visible: true,
+      label: SECRETARIAT_REQUEST_SUPPLEMENT_BUTTON,
+      kind: "supplement",
+    });
   });
 
   it("conserve la demande de paiement et le renvoi de lien", () => {
@@ -56,6 +73,8 @@ describe("resolveSecretariatPaymentCta", () => {
         registrationStatus: "payment_requested",
         paymentSettled: false,
         paymentMethod: "card",
+        remainingAmountCents: 23_900,
+        paidAmountCents: 0,
       })
     ).toMatchObject({
       visible: true,

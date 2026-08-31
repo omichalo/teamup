@@ -15,6 +15,10 @@ import {
   type JerseyFollowUpStatus,
 } from "@/lib/club-registration/jersey-follow-up";
 import { REGISTRATION_CERTIFICATE_FOLLOW_UP_CARD_LABELS } from "@/lib/club-registration/registration-certificate-follow-up";
+import {
+  PAYMENT_SUPPLEMENT_CARD_LABEL,
+  summaryHasPaymentSupplementDue,
+} from "@/lib/club-registration/payment/supplement-managed-filter";
 import type { RegistrationSummary } from "./types";
 
 const MEDICAL_CERTIFICATE_STATUS_COLOR: Record<
@@ -53,9 +57,15 @@ export function MembershipRequestCardFollowUpChips({ registration }: Props) {
   const criteriumStatus = registration.criteriumFederalRegistrationStatus;
   const jerseyStatus = registration.jerseyFollowUpStatus;
   const attestationStatus = registration.registrationCertificateFollowUpStatus;
+  const supplementDue = summaryHasPaymentSupplementDue(
+    registration as unknown as Record<string, unknown>
+  );
 
   return (
     <>
+      {supplementDue ? (
+        <Chip size="small" variant="outlined" label={PAYMENT_SUPPLEMENT_CARD_LABEL} color="warning" />
+      ) : null}
       {medicalStatus && medicalStatus !== "not_required" ? (
         <Chip
           size="small"

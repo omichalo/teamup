@@ -51,20 +51,38 @@ describe("self-service-checkout", () => {
     ).toBe(true);
   });
 
-  it("CAS G — refuse si déjà payé ou dossier pas encore prêt", () => {
+  it("CAS G — refuse si soldé sans reliquat ou dossier pas encore prêt", () => {
     expect(
       canSelfServiceCheckout({
         status: "paid",
         paymentAmountCents: 22_400,
-        payment: { paymentMethod: "card" },
+        payment: {
+          paymentMethod: "card",
+          amountToPayCents: 22_400,
+          totalAmountCents: 22_400,
+          assistanceTotalAmountCents: 0,
+          aids: [],
+          paymentInstallments: 1,
+          expectedPayments: [],
+          receivedPayments: [
+            {
+              id: "rp_1",
+              method: "card",
+              label: "Carte",
+              amountCents: 22_400,
+              receivedAt: "2026-06-27T08:31:30.000Z",
+            },
+          ],
+          paidAmountCents: 22_400,
+          remainingAmountCents: 0,
+          paymentStatus: "paid",
+        },
       })
     ).toBe(false);
 
     expect(
       canSelfServiceCheckout({
-        status: "payment_requested",
-        paymentStatus: "pending",
-        paidAt: "2026-06-27T08:31:30.000Z",
+        status: "in_review",
         paymentAmountCents: 22_400,
         payment: {
           paymentMethod: "card",
@@ -81,14 +99,64 @@ describe("self-service-checkout", () => {
         },
       })
     ).toBe(false);
+  });
 
+  it("autorise le complément CB depuis un dossier déjà payé", () => {
     expect(
       canSelfServiceCheckout({
-        status: "in_review",
-        paymentAmountCents: 22_400,
-        payment: { paymentMethod: "card" },
+        status: "paid",
+        paidAt: "2026-08-20T10:00:00.000Z",
+        paymentAmountCents: 27_400,
+        payment: {
+          paymentMethod: "card",
+          amountToPayCents: 27_400,
+          totalAmountCents: 27_400,
+          assistanceTotalAmountCents: 0,
+          aids: [],
+          paymentInstallments: 1,
+          expectedPayments: [],
+          receivedPayments: [
+            {
+              id: "rp_cb",
+              method: "card",
+              label: "Carte bancaire",
+              amountCents: 23_900,
+              receivedAt: "2026-08-20T10:00:00.000Z",
+            },
+          ],
+          paidAmountCents: 23_900,
+          remainingAmountCents: 3_500,
+          paymentStatus: "partially_paid",
+        },
       })
-    ).toBe(false);
+    ).toBe(true);
+    expect(
+      canSelfServiceCheckout({
+        status: "payment_requested",
+        paymentAmountCents: 27_400,
+        payment: {
+          paymentMethod: "card",
+          amountToPayCents: 27_400,
+          totalAmountCents: 27_400,
+          assistanceTotalAmountCents: 0,
+          aids: [],
+          paymentInstallments: 1,
+          expectedPayments: [],
+          receivedPayments: [
+            {
+              id: "rp_cb",
+              method: "card",
+              label: "Carte bancaire",
+              amountCents: 23_900,
+              receivedAt: "2026-08-20T10:00:00.000Z",
+            },
+          ],
+          paidAmountCents: 23_900,
+          remainingAmountCents: 3_500,
+          paymentStatus: "partially_paid",
+        },
+      })
+    ).toBe(true);
   });
 
   it("résout le montant depuis payment ou paymentAmountCents", () => {
