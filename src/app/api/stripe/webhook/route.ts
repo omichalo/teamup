@@ -130,6 +130,7 @@ export async function POST(req: Request) {
         checkoutSessionId: session?.id,
         amountCents: applied.amountCents,
         settled: applied.markRegistrationPaid,
+        checkoutKind: session?.metadata?.checkoutKind ?? "full",
         donationCents: session?.metadata?.donationCents,
         donationDiscountCents: session?.metadata?.donationDiscountCents,
       },
