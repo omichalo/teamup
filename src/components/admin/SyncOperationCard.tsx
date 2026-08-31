@@ -18,6 +18,8 @@ interface SyncOperationCardProps {
   duration: string;
   countLabel: string;
   count: number;
+  secondaryCountLabel?: string;
+  secondaryCount?: number;
   statusChip: React.ReactNode;
   error: string | null;
   isSyncing: boolean;
@@ -35,6 +37,8 @@ export function SyncOperationCard({
   duration,
   countLabel,
   count,
+  secondaryCountLabel,
+  secondaryCount,
   statusChip,
   error,
   isSyncing,
@@ -66,6 +70,11 @@ export function SyncOperationCard({
           <Typography variant="body2">
             <strong>{countLabel} :</strong> {count}
           </Typography>
+          {secondaryCountLabel !== undefined ? (
+            <Typography variant="body2">
+              <strong>{secondaryCountLabel} :</strong> {secondaryCount ?? 0}
+            </Typography>
+          ) : null}
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <Typography variant="body2" component="span">
               <strong>Statut :</strong>

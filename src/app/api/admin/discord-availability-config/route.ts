@@ -42,11 +42,11 @@ export async function GET() {
       );
     }
 
-    // Vérifier que l'utilisateur est admin
+    // Lecture autorisée aux coachs (création de sondages) et admins
     const role = resolveRole(decoded.role as string | undefined);
-    if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
+    if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
       return jsonNoStore(
-        { success: false, error: "Accès refusé - Admin uniquement" },
+        { success: false, error: "Accès refusé - Admin ou Coach requis" },
         { status: 403 }
       );
     }

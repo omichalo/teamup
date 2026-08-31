@@ -38,7 +38,10 @@ export async function syncPlayers(db: Firestore) {
   return {
     success: true,
     playersCount: saveResult.saved,
-    message: `Synchronisation réussie: ${saveResult.saved} joueurs synchronisés`,
+    archivedCount: saveResult.archived,
+    restoredCount: saveResult.restored,
+    archivedTotal: saveResult.archivedTotal,
+    message: `Synchronisation réussie: ${saveResult.saved} joueurs synchronisés (${saveResult.archivedTotal} en archive)`,
     duration: durationSeconds,
   };
 }
