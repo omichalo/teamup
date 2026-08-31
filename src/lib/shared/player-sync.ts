@@ -3,8 +3,10 @@ import { createFFTTAPI, getFFTTConfig } from "./fftt-utils";
 import { FFTTJoueurDetails } from "./fftt-types";
 import type { Firestore } from "firebase-admin/firestore";
 import { Timestamp } from "firebase-admin/firestore";
-import { markPlayersListedInClub } from "@/lib/championship/mark-listed-in-club";
+import { reconcilePlayersAfterSync } from "@/lib/championship/mark-listed-in-club";
 import { refreshUnlistedPlayerMirrors } from "@/lib/championship/unlisted-player-mirror";
+import { PLAYERS_COLLECTION } from "@/lib/players/collections";
+import { countArchivedPlayers } from "@/lib/players/player-archive";
 import { typeLicenceFromFfttDetails } from "@/lib/players/current-club-license";
 
 export interface PlayerSyncResult {
@@ -278,7 +280,13 @@ export class PlayerSyncService {
   async savePlayersToFirestore(
     players: FFTTJoueurDetails[],
     db: Firestore
-  ): Promise<{ saved: number; errors: number }> {
+  ): Promise<{
+    saved: number;
+    errors: number;
+    archived: number;
+    restored: number;
+    archivedTotal: number;
+  }> {
     let saved = 0;
     let errors = 0;
 
@@ -305,7 +313,7 @@ export class PlayerSyncService {
             }
             playerData.listedInClub = true;
             batch.set(
-              db.collection("players").doc(player.licence),
+              db.collection(PLAYERS_COLLECTION).doc(player.licence),
               playerData,
               { merge: true }
             );
@@ -325,30 +333,44 @@ export class PlayerSyncService {
         );
       }
 
-      await markPlayersListedInClub(
+      const reconcileResult = await reconcilePlayersAfterSync(
         db,
         players.map((player) => player.licence)
       );
       await refreshUnlistedPlayerMirrors(db, (licence) =>
         this.getPlayerDetails(licence)
       );
+      const archivedTotal = await countArchivedPlayers(db);
 
       await db.collection("metadata").doc("lastSync").set(
         {
           players: new Date(),
           playersEnriched: true,
+          playersArchivedCount: archivedTotal,
           updatedAt: new Date(),
         },
         { merge: true }
       );
 
       console.log(
-        `✅ Synchronisation terminée: ${saved} joueurs enrichis sauvegardés`
+        `✅ Synchronisation terminée: ${saved} joueurs enrichis sauvegardés, ${reconcileResult.archived} archivés, ${reconcileResult.restored} restaurés (${archivedTotal} en archive)`
       );
-      return { saved, errors };
+      return {
+        saved,
+        errors,
+        archived: reconcileResult.archived,
+        restored: reconcileResult.restored,
+        archivedTotal,
+      };
     } catch (error) {
       console.error("❌ Erreur lors de la sauvegarde:", error);
-      return { saved, errors: players.length - saved };
+      return {
+        saved,
+        errors: players.length - saved,
+        archived: 0,
+        restored: 0,
+        archivedTotal: 0,
+      };
     }
   }
 }

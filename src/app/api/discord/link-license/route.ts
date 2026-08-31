@@ -2,6 +2,11 @@ export const runtime = "nodejs";
 
 import { jsonNoStore } from "@/lib/http/cache-headers";
 import { getFirestoreAdmin, initializeFirebaseAdmin } from "@/lib/firebase-admin";
+import { PLAYERS_COLLECTION } from "@/lib/players/collections";
+import {
+  findPlayerByDiscordUserId,
+  getPlayerDocByLicence,
+} from "@/lib/players/resolve-player-doc";
 import { FieldValue } from "firebase-admin/firestore";
 
 const DISCORD_LICENSE_CHANNEL_ID = process.env.DISCORD_LICENSE_CHANNEL_ID;
@@ -76,14 +81,10 @@ export async function POST(req: Request) {
 
     // 1. Vérifier si l'utilisateur Discord est déjà associé à un joueur
     // Utiliser array-contains pour chercher dans discordMentions
-    const existingPlayerQuery = await db
-      .collection("players")
-      .where("discordMentions", "array-contains", userId)
-      .limit(1)
-      .get();
+    const existingPlayer = await findPlayerByDiscordUserId(db, userId);
 
-    if (!existingPlayerQuery.empty) {
-      const existingLicense = existingPlayerQuery.docs[0].id;
+    if (existingPlayer) {
+      const existingLicense = existingPlayer.snap.id;
       console.log(`[Discord Link License] Utilisateur ${userId} déjà associé à la licence ${existingLicense}`);
       
       // Envoyer un message d'erreur dans Discord
@@ -101,9 +102,9 @@ export async function POST(req: Request) {
     }
 
     // 2. Chercher le joueur par numéro de licence
-    const playerDoc = await db.collection("players").doc(licenseNumber).get();
+    const resolvedPlayer = await getPlayerDocByLicence(db, licenseNumber);
 
-    if (!playerDoc.exists) {
+    if (!resolvedPlayer || resolvedPlayer.collection !== PLAYERS_COLLECTION) {
       console.log(`[Discord Link License] Licence ${licenseNumber} non trouvée`);
       
       // Envoyer un message d'erreur dans Discord
@@ -121,7 +122,7 @@ export async function POST(req: Request) {
     }
 
     // 3. Ajouter l'ID Discord au joueur
-    const playerData = playerDoc.data();
+    const playerData = resolvedPlayer.snap.data();
     const existingDiscordMentions = playerData?.discordMentions || [];
     
     // Vérifier que l'ID Discord n'est pas déjà dans la liste
@@ -137,7 +138,7 @@ export async function POST(req: Request) {
     // Ajouter l'ID Discord
     const updatedDiscordMentions = [...existingDiscordMentions, userId];
 
-    await db.collection("players").doc(licenseNumber).update({
+    await resolvedPlayer.ref.update({
       discordMentions: updatedDiscordMentions,
       updatedAt: FieldValue.serverTimestamp(),
     });

@@ -1,6 +1,10 @@
 import type { Firestore } from "firebase-admin/firestore";
+import {
+  PLAYERS_ARCHIVE_COLLECTION,
+  PLAYERS_COLLECTION,
+} from "@/lib/players/collections";
 
-export const PLAYERS_COLLECTION = "players";
+export { PLAYERS_COLLECTION, PLAYERS_ARCHIVE_COLLECTION } from "@/lib/players/collections";
 const GETALL_CHUNK = 100;
 
 export type PlayerFfttMirror = {
@@ -123,11 +127,16 @@ export async function getPlayerFfttMirror(
   if (!id) {
     return null;
   }
-  const snap = await db.collection(PLAYERS_COLLECTION).doc(id).get();
-  if (!snap.exists) {
+  const activeSnap = await db.collection(PLAYERS_COLLECTION).doc(id).get();
+  if (activeSnap.exists) {
+    return playerDocDataToFfttMirror(id, activeSnap.data() ?? {});
+  }
+
+  const archiveSnap = await db.collection(PLAYERS_ARCHIVE_COLLECTION).doc(id).get();
+  if (!archiveSnap.exists) {
     return null;
   }
-  return playerDocDataToFfttMirror(id, snap.data() ?? {});
+  return playerDocDataToFfttMirror(id, archiveSnap.data() ?? {});
 }
 
 export async function loadRosterPlayerMirror(
@@ -157,11 +166,32 @@ export async function getPlayerFfttMirrorsByLicence(
 
   for (let i = 0; i < unique.length; i += GETALL_CHUNK) {
     const chunk = unique.slice(i, i + GETALL_CHUNK);
-    const snaps = await db.getAll(
-      ...chunk.map((licence) => db.collection(PLAYERS_COLLECTION).doc(licence))
+    const activeRefs = chunk.map((licence) =>
+      db.collection(PLAYERS_COLLECTION).doc(licence)
     );
+    const activeSnaps = await db.getAll(...activeRefs);
+    const missing: string[] = [];
+
     chunk.forEach((licence, index) => {
-      const snap = snaps[index];
+      const snap = activeSnaps[index];
+      if (snap?.exists) {
+        result.set(licence, playerDocDataToFfttMirror(licence, snap.data() ?? {}));
+        return;
+      }
+      missing.push(licence);
+    });
+
+    if (missing.length === 0) {
+      continue;
+    }
+
+    const archiveSnaps = await db.getAll(
+      ...missing.map((licence) =>
+        db.collection(PLAYERS_ARCHIVE_COLLECTION).doc(licence)
+      )
+    );
+    missing.forEach((licence, index) => {
+      const snap = archiveSnaps[index];
       if (!snap?.exists) {
         result.set(licence, null);
         return;

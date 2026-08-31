@@ -70,6 +70,7 @@ export async function POST(req: NextRequest) {
       details: {
         success: result.success,
         playersCount: result.playersCount,
+        archivedTotal: result.archivedTotal,
         duration: result.duration,
       },
       success: result.success,

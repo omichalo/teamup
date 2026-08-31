@@ -109,6 +109,20 @@ service cloud.firestore {
     match /players/{document=**} {
       allow list: if isAuthenticated();
     }
+
+    // ============================================
+    // Collection: playersArchive
+    // ============================================
+    // Miroir FFTT historique (joueurs hors liste club). Lecture authentifiée ;
+    // écriture réservée aux admins/coaches (synchro FFTT).
+    match /playersArchive/{playerId} {
+      allow read: if isAuthenticated();
+      allow write: if isCoach();
+    }
+
+    match /playersArchive/{document=**} {
+      allow list: if isAuthenticated();
+    }
     
     // ============================================
     // Collection: teams

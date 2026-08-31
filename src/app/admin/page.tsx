@@ -56,6 +56,7 @@ interface SyncStatus {
   players: {
     lastSync: string | null;
     count: number;
+    archivedCount: number;
     status: "idle" | "syncing" | "success" | "error";
     error: string | null;
     duration: number | null;
@@ -82,7 +83,7 @@ export default function AdminPage() {
   const [tabValue, setTabValue] = useState(0);
 
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
-    players: { lastSync: null, count: 0, status: "idle", error: null, duration: null },
+    players: { lastSync: null, count: 0, archivedCount: 0, status: "idle", error: null, duration: null },
     teams: { lastSync: null, count: 0, status: "idle", error: null, duration: null },
     teamMatches: { lastSync: null, count: 0, status: "idle", error: null, duration: null },
   });
@@ -123,6 +124,7 @@ export default function AdminPage() {
           players: {
             lastSync: result.data?.players?.lastSync || null,
             count: result.data?.players?.count || 0,
+            archivedCount: result.data?.players?.archivedCount || 0,
             status: "idle",
             error: null,
             duration: result.data?.players?.duration || null,
@@ -183,6 +185,10 @@ export default function AdminPage() {
             ...prev.players,
             lastSync: new Date().toISOString(),
             count: result.data?.playersCount || result.playersCount || 0,
+            archivedCount:
+              result.data?.archivedTotal ||
+              result.archivedTotal ||
+              prev.players.archivedCount,
             status: "success",
             error: null,
             duration: result.data?.duration || result.duration || null,
@@ -651,8 +657,10 @@ export default function AdminPage() {
                   description="Synchronise la liste des joueurs du club depuis l'API FFTT."
                   lastSync={formatLastSync(syncStatus.players.lastSync)}
                   duration={formatDuration(syncStatus.players.duration)}
-                  countLabel="Nombre de joueurs"
+                  countLabel="Joueurs actifs (liste FFTT)"
                   count={syncStatus.players.count}
+                  secondaryCountLabel="Fiches archivées"
+                  secondaryCount={syncStatus.players.archivedCount}
                   statusChip={getStatusChip(syncStatus.players.status)}
                   error={syncStatus.players.error}
                   isSyncing={syncStatus.players.status === "syncing"}

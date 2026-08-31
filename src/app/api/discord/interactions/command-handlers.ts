@@ -1,6 +1,11 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { jsonNoStore } from "@/lib/http/cache-headers";
 import { getFirestoreAdmin, initializeFirebaseAdmin } from "@/lib/firebase-admin";
+import { PLAYERS_COLLECTION } from "@/lib/players/collections";
+import {
+  findPlayerByDiscordUserId,
+  getPlayerDocByLicence,
+} from "@/lib/players/resolve-player-doc";
 import type {
   DiscordApplicationCommandOption,
   DiscordInteraction,
@@ -72,15 +77,11 @@ export async function handleLinkLicenseCommand(data: DiscordInteraction) {
     await initializeFirebaseAdmin();
     const db = getFirestoreAdmin();
 
-    const existingPlayerQuery = await db
-      .collection("players")
-      .where("discordMentions", "array-contains", userId)
-      .limit(1)
-      .get();
+    const existingPlayer = await findPlayerByDiscordUserId(db, userId);
 
-    if (!existingPlayerQuery.empty) {
-      const existingLicense = existingPlayerQuery.docs[0].id;
-      const existingPlayerData = existingPlayerQuery.docs[0].data();
+    if (existingPlayer) {
+      const existingLicense = existingPlayer.snap.id;
+      const existingPlayerData = existingPlayer.snap.data();
       const existingPlayerName = `${existingPlayerData?.prenom || ""} ${
         existingPlayerData?.nom || ""
       }`.trim();
@@ -96,8 +97,8 @@ export async function handleLinkLicenseCommand(data: DiscordInteraction) {
       });
     }
 
-    const playerDoc = await db.collection("players").doc(trimmedLicense).get();
-    if (!playerDoc.exists) {
+    const resolvedPlayer = await getPlayerDocByLicence(db, trimmedLicense);
+    if (!resolvedPlayer || resolvedPlayer.collection !== PLAYERS_COLLECTION) {
       return jsonNoStore({
         type: 4,
         data: {
@@ -107,7 +108,7 @@ export async function handleLinkLicenseCommand(data: DiscordInteraction) {
       });
     }
 
-    const playerData = playerDoc.data();
+    const playerData = resolvedPlayer.snap.data();
     const existingDiscordMentions = playerData?.discordMentions || [];
     if (existingDiscordMentions.includes(userId)) {
       const playerName = `${playerData?.prenom || ""} ${
@@ -125,7 +126,7 @@ export async function handleLinkLicenseCommand(data: DiscordInteraction) {
       });
     }
 
-    await db.collection("players").doc(trimmedLicense).update({
+    await resolvedPlayer.ref.update({
       discordMentions: [...existingDiscordMentions, userId],
       updatedAt: FieldValue.serverTimestamp(),
     });
@@ -179,13 +180,9 @@ export async function handleUpdateLicenseCommand(data: DiscordInteraction) {
     await initializeFirebaseAdmin();
     const db = getFirestoreAdmin();
 
-    const existingPlayerQuery = await db
-      .collection("players")
-      .where("discordMentions", "array-contains", userId)
-      .limit(1)
-      .get();
+    const existingPlayer = await findPlayerByDiscordUserId(db, userId);
 
-    if (existingPlayerQuery.empty) {
+    if (!existingPlayer) {
       return jsonNoStore({
         type: 4,
         data: {
@@ -196,8 +193,8 @@ export async function handleUpdateLicenseCommand(data: DiscordInteraction) {
       });
     }
 
-    const oldLicense = existingPlayerQuery.docs[0].id;
-    const oldPlayerData = existingPlayerQuery.docs[0].data();
+    const oldLicense = existingPlayer.snap.id;
+    const oldPlayerData = existingPlayer.snap.data();
     if (oldLicense === trimmedLicense) {
       const playerName = `${oldPlayerData?.prenom || ""} ${
         oldPlayerData?.nom || ""
@@ -213,8 +210,8 @@ export async function handleUpdateLicenseCommand(data: DiscordInteraction) {
       });
     }
 
-    const newPlayerDoc = await db.collection("players").doc(trimmedLicense).get();
-    if (!newPlayerDoc.exists) {
+    const newPlayer = await getPlayerDocByLicence(db, trimmedLicense);
+    if (!newPlayer || newPlayer.collection !== PLAYERS_COLLECTION) {
       return jsonNoStore({
         type: 4,
         data: {
@@ -225,15 +222,15 @@ export async function handleUpdateLicenseCommand(data: DiscordInteraction) {
     }
 
     const oldDiscordMentions = oldPlayerData?.discordMentions || [];
-    await db.collection("players").doc(oldLicense).update({
+    await existingPlayer.ref.update({
       discordMentions: oldDiscordMentions.filter((id: string) => id !== userId),
       updatedAt: FieldValue.serverTimestamp(),
     });
 
-    const newPlayerData = newPlayerDoc.data();
+    const newPlayerData = newPlayer.snap.data();
     const newDiscordMentions = newPlayerData?.discordMentions || [];
     if (!newDiscordMentions.includes(userId)) {
-      await db.collection("players").doc(trimmedLicense).update({
+      await newPlayer.ref.update({
         discordMentions: [...newDiscordMentions, userId],
         updatedAt: FieldValue.serverTimestamp(),
       });
@@ -289,13 +286,9 @@ export async function handleUnlinkLicenseCommand(data: DiscordInteraction) {
     await initializeFirebaseAdmin();
     const db = getFirestoreAdmin();
 
-    const existingPlayerQuery = await db
-      .collection("players")
-      .where("discordMentions", "array-contains", userId)
-      .limit(1)
-      .get();
+    const existingPlayer = await findPlayerByDiscordUserId(db, userId);
 
-    if (existingPlayerQuery.empty) {
+    if (!existingPlayer) {
       return jsonNoStore({
         type: 4,
         data: {
@@ -305,11 +298,11 @@ export async function handleUnlinkLicenseCommand(data: DiscordInteraction) {
       });
     }
 
-    const license = existingPlayerQuery.docs[0].id;
-    const playerData = existingPlayerQuery.docs[0].data();
+    const license = existingPlayer.snap.id;
+    const playerData = existingPlayer.snap.data();
     const discordMentions = playerData?.discordMentions || [];
 
-    await db.collection("players").doc(license).update({
+    await existingPlayer.ref.update({
       discordMentions: discordMentions.filter((id: string) => id !== userId),
       updatedAt: FieldValue.serverTimestamp(),
     });
@@ -359,13 +352,9 @@ export async function handleGetLicenseCommand(data: DiscordInteraction) {
     await initializeFirebaseAdmin();
     const db = getFirestoreAdmin();
 
-    const existingPlayerQuery = await db
-      .collection("players")
-      .where("discordMentions", "array-contains", userId)
-      .limit(1)
-      .get();
+    const existingPlayer = await findPlayerByDiscordUserId(db, userId);
 
-    if (existingPlayerQuery.empty) {
+    if (!existingPlayer) {
       return jsonNoStore({
         type: 4,
         data: {
@@ -376,8 +365,8 @@ export async function handleGetLicenseCommand(data: DiscordInteraction) {
       });
     }
 
-    const license = existingPlayerQuery.docs[0].id;
-    const playerData = existingPlayerQuery.docs[0].data();
+    const license = existingPlayer.snap.id;
+    const playerData = existingPlayer.snap.data();
     const playerName = `${playerData?.prenom || ""} ${
       playerData?.nom || ""
     }`.trim();
