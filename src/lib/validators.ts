@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  containsFirebaseSpecialCharacter,
+  FIREBASE_SPECIAL_CHARACTER_ERROR_MESSAGE,
+} from "@/lib/auth/password-policy";
 
 export const emailSchema = z.string().email("Email invalide");
 
@@ -7,14 +11,16 @@ export const emailSchema = z.string().email("Email invalide");
 // - Au moins une majuscule
 // - Au moins une minuscule
 // - Au moins un chiffre
-// - Au moins un caractère spécial
+// - Au moins un caractère spécial parmi la liste Firebase
 export const passwordSchema = z
   .string()
   .min(12, "Le mot de passe doit contenir au moins 12 caractères")
   .regex(/[A-Z]/, "Le mot de passe doit contenir au moins une majuscule")
   .regex(/[a-z]/, "Le mot de passe doit contenir au moins une minuscule")
   .regex(/[0-9]/, "Le mot de passe doit contenir au moins un chiffre")
-  .regex(/[^A-Za-z0-9]/, "Le mot de passe doit contenir au moins un caractère spécial");
+  .refine(containsFirebaseSpecialCharacter, {
+    message: FIREBASE_SPECIAL_CHARACTER_ERROR_MESSAGE,
+  });
 
 export const loginSchema = z.object({
   email: emailSchema,

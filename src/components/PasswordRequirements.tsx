@@ -2,6 +2,11 @@
 
 import { Box, Typography, List, ListItem, ListItemIcon, ListItemText } from "@mui/material";
 import { CheckCircle, Cancel } from "@mui/icons-material";
+import {
+  containsFirebaseSpecialCharacter,
+  FIREBASE_SPECIAL_CHARACTER_HINT,
+  FIREBASE_SPECIAL_CHARACTER_REQUIREMENT_LABEL,
+} from "@/lib/auth/password-policy";
 
 interface PasswordRequirementsProps {
   password: string;
@@ -10,6 +15,7 @@ interface PasswordRequirementsProps {
 interface Requirement {
   label: string;
   test: (password: string) => boolean;
+  hint?: string;
 }
 
 const requirements: Requirement[] = [
@@ -30,8 +36,9 @@ const requirements: Requirement[] = [
     test: (pwd) => /[0-9]/.test(pwd),
   },
   {
-    label: "Au moins un caractère spécial",
-    test: (pwd) => /[^A-Za-z0-9]/.test(pwd),
+    label: FIREBASE_SPECIAL_CHARACTER_REQUIREMENT_LABEL,
+    test: containsFirebaseSpecialCharacter,
+    hint: FIREBASE_SPECIAL_CHARACTER_HINT,
   },
 ];
 
@@ -55,12 +62,19 @@ export function PasswordRequirements({ password }: PasswordRequirementsProps) {
               </ListItemIcon>
               <ListItemText
                 primary={req.label}
+                secondary={req.hint}
                 primaryTypographyProps={{
                   variant: "caption",
                   color: isValid ? "text.secondary" : "text.disabled",
                   sx: {
                     textDecoration: isValid ? "none" : "none",
                   },
+                }}
+                secondaryTypographyProps={{
+                  variant: "caption",
+                  color: "text.disabled",
+                  component: "span",
+                  sx: { display: "block", mt: 0.25 },
                 }}
               />
             </ListItem>
