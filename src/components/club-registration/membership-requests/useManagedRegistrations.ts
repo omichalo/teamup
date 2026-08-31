@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ManagedListMedicalCertificateFilter } from "@/lib/club-registration/medical-certificate";
 import type { ManagedListAidReceiptFilter } from "@/lib/club-registration/payment/aid-receipt";
+import type { ManagedListPaymentSupplementFilter } from "@/lib/club-registration/payment/supplement-managed-filter";
 import type { ManagedListPpsFollowUpFilter } from "@/lib/club-registration/pps-follow-up";
 import type { ManagedListCriteriumFederalFilter } from "@/lib/club-registration/criterium-federal-follow-up";
 import type { ManagedListJerseyFollowUpFilter } from "@/lib/club-registration/jersey-follow-up";
@@ -32,6 +33,7 @@ function buildManagedRegistrationsUrl(params: {
   jerseyFollowUpFilter: ManagedListJerseyFollowUpFilter;
   registrationCertificateFollowUpFilter: ManagedListRegistrationCertificateFollowUpFilter;
   aidReceiptFilter: ManagedListAidReceiptFilter;
+  paymentSupplementFilter: ManagedListPaymentSupplementFilter;
   searchQuery: string;
   cursor?: string | null | undefined;
 }): string {
@@ -56,6 +58,9 @@ function buildManagedRegistrationsUrl(params: {
   if (params.aidReceiptFilter !== "all") {
     url.searchParams.set("aidReceipt", params.aidReceiptFilter);
   }
+  if (params.paymentSupplementFilter !== "all") {
+    url.searchParams.set("paymentSupplement", params.paymentSupplementFilter);
+  }
   if (params.searchQuery.trim().length >= 2) {
     url.searchParams.set("q", params.searchQuery.trim());
   }
@@ -74,6 +79,7 @@ type InitialState = Pick<
   | "jerseyFollowUpFilter"
   | "registrationCertificateFollowUpFilter"
   | "aidReceiptFilter"
+  | "paymentSupplementFilter"
 >;
 
 export function useManagedRegistrations(initial?: InitialState) {
@@ -97,6 +103,8 @@ export function useManagedRegistrations(initial?: InitialState) {
   const [aidReceiptFilter, setAidReceiptFilter] = useState<ManagedListAidReceiptFilter>(
     initial?.aidReceiptFilter ?? "all"
   );
+  const [paymentSupplementFilter, setPaymentSupplementFilter] =
+    useState<ManagedListPaymentSupplementFilter>(initial?.paymentSupplementFilter ?? "all");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [registrations, setRegistrations] = useState<RegistrationSummary[]>([]);
@@ -130,6 +138,7 @@ export function useManagedRegistrations(initial?: InitialState) {
       jersey: ManagedListJerseyFollowUpFilter;
       attestation: ManagedListRegistrationCertificateFollowUpFilter;
       aidReceipt: ManagedListAidReceiptFilter;
+      paymentSupplement: ManagedListPaymentSupplementFilter;
       query: string;
     }) => {
       const requestId = ++requestIdRef.current;
@@ -150,6 +159,7 @@ export function useManagedRegistrations(initial?: InitialState) {
             jerseyFollowUpFilter: options.jersey,
             registrationCertificateFollowUpFilter: options.attestation,
             aidReceiptFilter: options.aidReceipt,
+            paymentSupplementFilter: options.paymentSupplement,
             searchQuery: options.query,
             cursor: options.cursor,
           }),
@@ -205,6 +215,7 @@ export function useManagedRegistrations(initial?: InitialState) {
       jersey: jerseyFollowUpFilter,
       attestation: registrationCertificateFollowUpFilter,
       aidReceipt: aidReceiptFilter,
+      paymentSupplement: paymentSupplementFilter,
       query: searchQuery,
     });
   }, [
@@ -212,6 +223,7 @@ export function useManagedRegistrations(initial?: InitialState) {
     criteriumFederalFilter,
     fetchPage,
     jerseyFollowUpFilter,
+    paymentSupplementFilter,
     registrationCertificateFollowUpFilter,
     medicalCertificateFilter,
     ppsFollowUpFilter,
@@ -229,6 +241,7 @@ export function useManagedRegistrations(initial?: InitialState) {
       jersey: jerseyFollowUpFilter,
       attestation: registrationCertificateFollowUpFilter,
       aidReceipt: aidReceiptFilter,
+      paymentSupplement: paymentSupplementFilter,
       query: searchQuery,
     });
   }, [
@@ -236,6 +249,7 @@ export function useManagedRegistrations(initial?: InitialState) {
     criteriumFederalFilter,
     fetchPage,
     jerseyFollowUpFilter,
+    paymentSupplementFilter,
     registrationCertificateFollowUpFilter,
     medicalCertificateFilter,
     ppsFollowUpFilter,
@@ -257,12 +271,14 @@ export function useManagedRegistrations(initial?: InitialState) {
       jersey: jerseyFollowUpFilter,
       attestation: registrationCertificateFollowUpFilter,
       aidReceipt: aidReceiptFilter,
+      paymentSupplement: paymentSupplementFilter,
       query: searchQuery,
     });
   }, [
     aidReceiptFilter,
     fetchPage,
     jerseyFollowUpFilter,
+    paymentSupplementFilter,
     registrationCertificateFollowUpFilter,
     loadingList,
     loadingMore,
@@ -301,6 +317,8 @@ export function useManagedRegistrations(initial?: InitialState) {
     setRegistrationCertificateFollowUpFilter,
     aidReceiptFilter,
     setAidReceiptFilter,
+    paymentSupplementFilter,
+    setPaymentSupplementFilter,
     searchInput,
     setSearchInput,
     searchQuery,

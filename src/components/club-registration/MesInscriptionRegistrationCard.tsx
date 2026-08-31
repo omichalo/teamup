@@ -27,6 +27,7 @@ import {
   MES_INSCRIPTION_STATUS_LABEL,
   type MesInscriptionSummary,
 } from "@/components/club-registration/mes-inscriptions-shared";
+import { resolveMesInscriptionStatusPresentation } from "@/lib/club-registration/mes-inscription-supplement-display";
 
 type Props = {
   registration: MesInscriptionSummary;
@@ -41,6 +42,12 @@ export const MesInscriptionRegistrationCard = forwardRef<HTMLDivElement, Props>(
     { registration: r, highlighted = false, invoiceLoadingId, onOpenInvoice, onPaymentError },
     ref
   ) {
+    const statusPresentation = resolveMesInscriptionStatusPresentation(
+      r,
+      MES_INSCRIPTION_STATUS_LABEL,
+      MES_INSCRIPTION_STATUS_COLOR
+    );
+
     return (
       <Card
         ref={ref}
@@ -90,14 +97,18 @@ export const MesInscriptionRegistrationCard = forwardRef<HTMLDivElement, Props>(
             >
               <Chip
                 size="small"
-                label={MES_INSCRIPTION_STATUS_LABEL[r.status ?? ""] ?? r.status ?? "—"}
-                color={MES_INSCRIPTION_STATUS_COLOR[r.status ?? ""] ?? "default"}
+                label={statusPresentation.label}
+                color={statusPresentation.color}
                 sx={{ flexShrink: 0 }}
               />
               <Typography variant="caption" color="text.secondary">
                 Envoyé le {formatMesInscriptionDate(r.submittedAt)}
               </Typography>
-              {r.status === "payment_requested" ? (
+              {statusPresentation.supplementDue && statusPresentation.payableLabel ? (
+                <Typography variant="caption" color="warning.main" fontWeight={700}>
+                  Complément à régler : {statusPresentation.payableLabel}
+                </Typography>
+              ) : r.status === "payment_requested" ? (
                 <Typography variant="caption" color="secondary.main" fontWeight={700}>
                   Paiement attendu
                   {formatMesInscriptionPayableAmount(r)

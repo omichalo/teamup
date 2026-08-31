@@ -121,6 +121,42 @@ describe("buildPaymentSyncPatchForQuote", () => {
     });
   });
 
+  it("rouvre le dossier si un encaissement existe et un reliquat apparaît", () => {
+    const patch = buildPaymentSyncPatchForQuote({
+      currentData: {
+        status: "paid",
+        wantsOptionalJersey: true,
+        jerseyFollowUpStatus: "to_do",
+        payment: basePayment({
+          paymentMethod: "card",
+          receivedPayments: [
+            {
+              id: "rp_cb",
+              method: "card",
+              label: "Carte bancaire",
+              amountCents: 23_900,
+              receivedAt: "2026-08-20T10:00:00.000Z",
+            },
+          ],
+          paidAmountCents: 23_900,
+          remainingAmountCents: 0,
+          paymentStatus: "paid",
+        }),
+        paymentAmountCents: 23_900,
+      },
+      invoiceTotalCents: 27_400,
+    });
+
+    expect(patch.status).toBe("payment_requested");
+    expect(patch.payment).toMatchObject({
+      paidAmountCents: 23_900,
+      remainingAmountCents: 3_500,
+      paymentStatus: "partially_paid",
+    });
+    expect(patch.supplementRequestedAt).toBeDefined();
+    expect(patch.jerseyFollowUpStatus).toBe("prepared_awaiting_payment");
+  });
+
   it("ne réécrit pas si le paiement est déjà aligné", () => {
     const aligned = basePayment({
       totalAmountCents: 26_400,

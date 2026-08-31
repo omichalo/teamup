@@ -1,5 +1,6 @@
 import { isRegistrationPaidRecord } from "@/lib/club-registration/payment-proof";
 import { paymentToFirestoreUpdate } from "@/lib/club-registration/payment/normalize-payment";
+import { hasRegistrationOutstandingBalance } from "@/lib/club-registration/payment/registration-supplement";
 import type { RegistrationPayment } from "@/lib/club-registration/payment/types";
 
 export const ALREADY_PAID_RESEND_ERROR =
@@ -18,6 +19,9 @@ export function isRegistrationPaymentSettled(
     "paymentStatus" | "remainingAmountCents" | "paidAmountCents"
   > | null
 ): boolean {
+  if (hasRegistrationOutstandingBalance(payment)) {
+    return false;
+  }
   if (isRegistrationPaidRecord(data)) {
     return true;
   }

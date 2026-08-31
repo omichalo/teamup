@@ -21,7 +21,9 @@ import type { DonationPricingBreakdown } from "@/lib/pricing/donation-discount";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import type { RegistrationPayment } from "@/lib/club-registration/payment/types";
 import { formatRegistrationPaymentEmailsForStorage } from "@/lib/club-registration/resolve-registration-contact-email";
+import { isRegistrationSupplementDue } from "@/lib/club-registration/payment/registration-supplement";
 import type { PriceQuote } from "@/lib/pricing/types";
+import type { PaymentRequestEmailVariant } from "@/lib/email/payment-email";
 
 export function validateRegistrationStripeCheckout(params: {
   quote: PriceQuote | null;
@@ -168,6 +170,7 @@ export async function persistPaymentRequestedAndNotify(params: {
   baseUrl: string;
   requestedByUid: string;
   isResend?: boolean;
+  emailVariant?: PaymentRequestEmailVariant;
 }): Promise<void> {
   await params.docRef.set(
     buildPaymentRequestedFirestoreUpdate({
@@ -185,7 +188,13 @@ export async function persistPaymentRequestedAndNotify(params: {
     params.quote != null &&
     params.donationPricing != null &&
     params.donationPricing.invoiceTotalCents > 0;
-  const emailVariant = params.isResend ? "resend" : "initial";
+  const emailVariant =
+    params.emailVariant ??
+    (params.isResend
+      ? "resend"
+      : isRegistrationSupplementDue(params.payment)
+        ? "supplement"
+        : "initial");
   const emailAmountCents = params.payableCents ?? params.amountToPayCents;
   const paymentMail = buildPaymentRequestEmail({
     registrationId: params.registrationId,
@@ -212,6 +221,7 @@ export async function persistPaymentRequestedAndNotify(params: {
     details: {
       amountCents: emailAmountCents,
       resend: Boolean(params.isResend),
+      supplement: emailVariant === "supplement",
       paymentHub: "mes_inscriptions",
       ...(hasValidatedQuote
         ? {

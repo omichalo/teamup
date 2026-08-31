@@ -114,7 +114,7 @@ export function formatQuoteBreakdownHtmlForEmail(
   `;
 }
 
-export type PaymentRequestEmailVariant = "initial" | "resend";
+export type PaymentRequestEmailVariant = "initial" | "resend" | "supplement";
 
 export type PaymentRequestEmailContent = {
   registrationId: string;
@@ -133,6 +133,9 @@ export function buildPaymentRequestEmailSubject(
 ): string {
   if (variant === "resend") {
     return `Rappel — paiement de votre adhésion SQY Ping - ${adherentName}`;
+  }
+  if (variant === "supplement") {
+    return `Complément à régler — adhésion SQY Ping - ${adherentName}`;
   }
   return `Paiement de votre adhésion SQY Ping - ${adherentName}`;
 }
@@ -166,18 +169,24 @@ export function buildPaymentRequestEmail(
       );
 
   const introHtml =
-    variant === "resend"
+    variant === "supplement"
       ? emailParagraph(
-          `Rappel&nbsp;: votre adhésion <strong>SQY Ping</strong> attend encore votre règlement.`
+          `Suite à une modification de votre dossier d'adhésion <strong>SQY Ping</strong>, un <strong>complément</strong> reste à régler.`
         )
-      : emailParagraph(
-          `Bonne nouvelle&nbsp;: votre dossier d'adhésion <strong>SQY Ping</strong> a été relu et <strong>validé administrativement</strong> par le secrétariat.`
-        );
+      : variant === "resend"
+        ? emailParagraph(
+            `Rappel&nbsp;: votre adhésion <strong>SQY Ping</strong> attend encore votre règlement.`
+          )
+        : emailParagraph(
+            `Bonne nouvelle&nbsp;: votre dossier d'adhésion <strong>SQY Ping</strong> a été relu et <strong>validé administrativement</strong> par le secrétariat.`
+          );
 
   const introText =
-    variant === "resend"
-      ? "Rappel : votre adhésion SQY Ping attend encore votre règlement."
-      : "Votre dossier d'adhésion SQY Ping a été relu et validé administrativement.";
+    variant === "supplement"
+      ? "Suite à une modification de votre dossier d'adhésion SQY Ping, un complément reste à régler."
+      : variant === "resend"
+        ? "Rappel : votre adhésion SQY Ping attend encore votre règlement."
+        : "Votre dossier d'adhésion SQY Ping a été relu et validé administrativement.";
 
   const bodyHtml = [
     emailParagraph(`Bonjour${adherentName ? ` <strong>${safeName}</strong>` : ""},`),
@@ -198,11 +207,18 @@ export function buildPaymentRequestEmail(
   ].join("");
 
   const html = buildSqyPingEmailLayout({
-    title: variant === "resend" ? "Rappel — paiement de votre adhésion" : "Paiement de votre adhésion",
+    title:
+      variant === "supplement"
+        ? "Complément à régler pour votre adhésion"
+        : variant === "resend"
+          ? "Rappel — paiement de votre adhésion"
+          : "Paiement de votre adhésion",
     preheader:
-      variant === "resend"
-        ? `Finalisez votre adhésion SQY Ping — montant : ${formattedAmount}.`
-        : `Votre adhésion SQY Ping est validée — montant : ${formattedAmount}.`,
+      variant === "supplement"
+        ? `Complément adhésion SQY Ping — montant : ${formattedAmount}.`
+        : variant === "resend"
+          ? `Finalisez votre adhésion SQY Ping — montant : ${formattedAmount}.`
+          : `Votre adhésion SQY Ping est validée — montant : ${formattedAmount}.`,
     bodyHtml,
     appOrigin,
     primaryAction: {

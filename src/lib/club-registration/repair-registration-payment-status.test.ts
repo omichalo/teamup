@@ -1,4 +1,8 @@
-import { needsRegistrationPaymentStatusRepair } from "./repair-registration-payment-status";
+import {
+  detectRegistrationPaymentRepairKind,
+  needsRegistrationPaymentStatusRepair,
+  needsRegistrationSupplementReopenRepair,
+} from "./repair-registration-payment-status";
 
 describe("needsRegistrationPaymentStatusRepair", () => {
   it("détecte paidAt + paymentStatus pending", () => {
@@ -28,5 +32,70 @@ describe("needsRegistrationPaymentStatusRepair", () => {
         paymentStatus: "pending",
       })
     ).toBe(false);
+  });
+});
+
+describe("needsRegistrationSupplementReopenRepair", () => {
+  it("détecte un dossier payé avec reliquat", () => {
+    expect(
+      needsRegistrationSupplementReopenRepair({
+        status: "paid",
+        paidAt: "2026-08-20T10:00:00.000Z",
+        payment: {
+          paymentMethod: "card",
+          totalAmountCents: 27_400,
+          assistanceTotalAmountCents: 0,
+          amountToPayCents: 27_400,
+          aids: [],
+          paymentInstallments: 1,
+          expectedPayments: [],
+          receivedPayments: [
+            {
+              id: "rp_cb",
+              method: "card",
+              label: "Carte",
+              amountCents: 23_900,
+              receivedAt: "2026-08-20T10:00:00.000Z",
+            },
+          ],
+          paidAmountCents: 23_900,
+          remainingAmountCents: 3_500,
+          paymentStatus: "partially_paid",
+        },
+      })
+    ).toBe(true);
+  });
+});
+
+describe("detectRegistrationPaymentRepairKind", () => {
+  it("priorise la réouverture complément", () => {
+    expect(
+      detectRegistrationPaymentRepairKind({
+        status: "paid",
+        paymentStatus: "pending",
+        paidAt: "2026-08-20T10:00:00.000Z",
+        payment: {
+          paymentMethod: "card",
+          totalAmountCents: 27_400,
+          assistanceTotalAmountCents: 0,
+          amountToPayCents: 27_400,
+          aids: [],
+          paymentInstallments: 1,
+          expectedPayments: [],
+          receivedPayments: [
+            {
+              id: "rp_cb",
+              method: "card",
+              label: "Carte",
+              amountCents: 23_900,
+              receivedAt: "2026-08-20T10:00:00.000Z",
+            },
+          ],
+          paidAmountCents: 23_900,
+          remainingAmountCents: 3_500,
+          paymentStatus: "partially_paid",
+        },
+      })
+    ).toBe("supplement_reopen");
   });
 });

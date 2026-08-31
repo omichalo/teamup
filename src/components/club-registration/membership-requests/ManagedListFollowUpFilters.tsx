@@ -11,6 +11,8 @@ import { MANAGED_LIST_CRITERIUM_FEDERAL_FILTER_OPTIONS } from "@/lib/club-regist
 import type { ManagedListCriteriumFederalFilter } from "@/lib/club-registration/criterium-federal-follow-up";
 import { MANAGED_LIST_JERSEY_FOLLOW_UP_FILTER_OPTIONS } from "@/lib/club-registration/jersey-follow-up";
 import type { ManagedListJerseyFollowUpFilter } from "@/lib/club-registration/jersey-follow-up";
+import { MANAGED_LIST_PAYMENT_SUPPLEMENT_FILTER_OPTIONS } from "@/lib/club-registration/payment/supplement-managed-filter";
+import type { ManagedListPaymentSupplementFilter } from "@/lib/club-registration/payment/supplement-managed-filter";
 import { MANAGED_LIST_REGISTRATION_CERTIFICATE_FOLLOW_UP_FILTER_OPTIONS } from "@/lib/club-registration/registration-certificate-follow-up";
 import type { ManagedListRegistrationCertificateFollowUpFilter } from "@/lib/club-registration/registration-certificate-follow-up";
 import { ManagedListFollowUpFilterGroup } from "./ManagedListFollowUpFilterGroup";
@@ -32,6 +34,8 @@ type Props = {
   onRegistrationCertificateFollowUpFilterChange: (
     value: ManagedListRegistrationCertificateFollowUpFilter
   ) => void;
+  paymentSupplementFilter: ManagedListPaymentSupplementFilter;
+  onPaymentSupplementFilterChange: (value: ManagedListPaymentSupplementFilter) => void;
 };
 
 export function ManagedListFollowUpFilters({
@@ -45,6 +49,8 @@ export function ManagedListFollowUpFilters({
   onJerseyFollowUpFilterChange,
   registrationCertificateFollowUpFilter,
   onRegistrationCertificateFollowUpFilterChange,
+  paymentSupplementFilter,
+  onPaymentSupplementFilterChange,
 }: Props) {
   const popoverId = useId();
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -56,6 +62,7 @@ export function ManagedListFollowUpFilters({
     criteriumFederalFilter,
     jerseyFollowUpFilter,
     registrationCertificateFollowUpFilter,
+    paymentSupplementFilter,
   });
   const activeCount = activeChips.length;
 
@@ -65,6 +72,7 @@ export function ManagedListFollowUpFilters({
     if (id === "criterium") onCriteriumFederalFilterChange("all");
     if (id === "jersey") onJerseyFollowUpFilterChange("all");
     if (id === "attestation") onRegistrationCertificateFollowUpFilterChange("all");
+    if (id === "supplement") onPaymentSupplementFilterChange("all");
   };
 
   const clearAll = () => {
@@ -73,6 +81,7 @@ export function ManagedListFollowUpFilters({
     onCriteriumFederalFilterChange("all");
     onJerseyFollowUpFilterChange("all");
     onRegistrationCertificateFollowUpFilterChange("all");
+    onPaymentSupplementFilterChange("all");
   };
 
   return (
@@ -159,6 +168,12 @@ export function ManagedListFollowUpFilters({
             value={jerseyFollowUpFilter}
             options={MANAGED_LIST_JERSEY_FOLLOW_UP_FILTER_OPTIONS}
             onChange={onJerseyFollowUpFilterChange}
+          />
+          <ManagedListFollowUpFilterGroup
+            label="Paiement"
+            value={paymentSupplementFilter}
+            options={MANAGED_LIST_PAYMENT_SUPPLEMENT_FILTER_OPTIONS}
+            onChange={onPaymentSupplementFilterChange}
           />
           <ManagedListFollowUpFilterGroup
             label="Attestation"

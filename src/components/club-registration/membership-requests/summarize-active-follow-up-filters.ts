@@ -18,12 +18,17 @@ import {
   MANAGED_LIST_REGISTRATION_CERTIFICATE_FOLLOW_UP_FILTER_OPTIONS,
   type ManagedListRegistrationCertificateFollowUpFilter,
 } from "@/lib/club-registration/registration-certificate-follow-up";
+import {
+  MANAGED_LIST_PAYMENT_SUPPLEMENT_FILTER_OPTIONS,
+  type ManagedListPaymentSupplementFilter,
+} from "@/lib/club-registration/payment/supplement-managed-filter";
 
 export type ActiveFollowUpFilterId =
   | "certificate"
   | "pps"
   | "criterium"
   | "jersey"
+  | "supplement"
   | "attestation";
 
 export type ActiveFollowUpFilterChip = {
@@ -55,6 +60,7 @@ export function summarizeActiveFollowUpFilters(input: {
   criteriumFederalFilter: ManagedListCriteriumFederalFilter;
   jerseyFollowUpFilter: ManagedListJerseyFollowUpFilter;
   registrationCertificateFollowUpFilter: ManagedListRegistrationCertificateFollowUpFilter;
+  paymentSupplementFilter: ManagedListPaymentSupplementFilter;
 }): ActiveFollowUpFilterChip[] {
   return [
     chipForDimension(
@@ -80,6 +86,12 @@ export function summarizeActiveFollowUpFilters(input: {
       "Maillot",
       MANAGED_LIST_JERSEY_FOLLOW_UP_FILTER_OPTIONS,
       input.jerseyFollowUpFilter
+    ),
+    chipForDimension(
+      "supplement",
+      "Paiement",
+      MANAGED_LIST_PAYMENT_SUPPLEMENT_FILTER_OPTIONS,
+      input.paymentSupplementFilter
     ),
     chipForDimension(
       "attestation",
