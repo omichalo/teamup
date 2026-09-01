@@ -87,7 +87,6 @@ export async function POST(req: Request) {
           ? { paymentStatus: "paid", status: "paid", paidAt: FieldValue.serverTimestamp() }
           : {};
 
-
       tx.set(
         docRef,
         {
