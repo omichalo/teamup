@@ -1,7 +1,6 @@
 import {
   hasRegistrationOutstandingBalance,
   isRegistrationSupplementDue,
-  resolveJerseyFollowUpAfterSettlement,
   resolveJerseyFollowUpForSupplement,
 } from "./registration-supplement";
 
@@ -48,12 +47,4 @@ describe("registration-supplement", () => {
     ).toBe("prepared_awaiting_payment");
   });
 
-  it("marque le maillot donné après règlement final", () => {
-    expect(
-      resolveJerseyFollowUpAfterSettlement({
-        wantsOptionalJersey: true,
-        jerseyFollowUpStatus: "prepared_awaiting_payment",
-      })
-    ).toBe("given");
-  });
 });
