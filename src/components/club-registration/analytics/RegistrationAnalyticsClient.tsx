@@ -87,7 +87,11 @@ export function RegistrationAnalyticsClient() {
             ) : null}
 
             {tab === "overview" ? (
-              <AnalyticsOverviewTab summary={summary} sectionLabels={sectionLabels} />
+              <AnalyticsOverviewTab
+                summary={summary}
+                sectionLabels={sectionLabels}
+                records={filteredRecords}
+              />
             ) : null}
             {tab === "demographics" ? (
               <AnalyticsDemographicsTab summary={summary} sectionLabels={sectionLabels} />

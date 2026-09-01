@@ -15,6 +15,8 @@ export type AnalyticsRegistrationRecord = {
   wantsCompetitorExtras?: boolean;
   paymentAidTypes?: string[];
   isMinor?: boolean;
+  /** Date de soumission du dossier (ISO 8601). */
+  submittedAt?: string;
 };
 
 export type AnalyticsStatusFilter = RegistrationStatus | "all";
