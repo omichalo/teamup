@@ -230,7 +230,7 @@ export function buildDefaultRegistrationConfig(): RegistrationConfigV1 {
       catalogVersion: PRICING_CATALOG_VERSION,
       clubName: "SQY Ping",
       currency: "eur",
-      seasonLabel: "2025-2026",
+      seasonLabel: "2026-2027",
     },
     pricingProfiles: buildDefaultPricingProfilesRecord(),
     sections: SECTION_PRINCIPALE_OPTIONS.map((section, index) => {
