@@ -1,5 +1,10 @@
 import type { DocumentData } from "firebase-admin/firestore";
 import { isRegistrationStatus } from "@/lib/club-registration/registration-status";
+import {
+  ffttCategorieFromLookup,
+  mergeFfttLicenseLookupFromMirror,
+} from "@/lib/players/map-player-to-license-lookup";
+import type { PlayerFfttMirror } from "@/lib/players/fftt-mirror";
 import type { AnalyticsRegistrationRecord } from "./types";
 
 function readString(data: DocumentData, key: string): string | undefined {
@@ -13,13 +18,17 @@ function readSex(data: DocumentData): AnalyticsRegistrationRecord["sex"] | undef
   return undefined;
 }
 
-function readFfttCategorie(data: DocumentData): string | undefined {
-  const lookup = data.ffttLicenseLookup;
-  if (!lookup || typeof lookup !== "object") return undefined;
-  const categorie = (lookup as { categorie?: unknown }).categorie;
-  return typeof categorie === "string" && categorie.trim().length > 0
-    ? categorie.trim()
-    : undefined;
+/** Même logique que l'hydratation tableau adhésions : lookup persisté, puis miroir joueur. */
+export function resolveAnalyticsFfttCategorie(
+  data: DocumentData,
+  ffttMirror: PlayerFfttMirror | null = null
+): string | undefined {
+  const merged = mergeFfttLicenseLookupFromMirror(data.ffttLicenseLookup, ffttMirror);
+  const fromLookup = ffttCategorieFromLookup(merged ?? data.ffttLicenseLookup);
+  if (fromLookup) {
+    return fromLookup;
+  }
+  return readString(data, "ffttCategorie");
 }
 
 function readAdditionalSectionIds(data: DocumentData): string[] {
@@ -64,7 +73,10 @@ function readSubmittedAt(data: DocumentData): string | undefined {
   return undefined;
 }
 
-export function mapDocToAnalyticsRecord(data: DocumentData): AnalyticsRegistrationRecord {
+export function mapDocToAnalyticsRecord(
+  data: DocumentData,
+  options?: { ffttMirror?: PlayerFfttMirror | null }
+): AnalyticsRegistrationRecord {
   const record: AnalyticsRegistrationRecord = {
     additionalSectionIds: readAdditionalSectionIds(data),
     paymentAidTypes: readPaymentAidTypes(data),
@@ -76,7 +88,7 @@ export function mapDocToAnalyticsRecord(data: DocumentData): AnalyticsRegistrati
   const birthDate = readString(data, "birthDate");
   if (birthDate) record.birthDate = birthDate;
 
-  const ffttCategorie = readFfttCategorie(data);
+  const ffttCategorie = resolveAnalyticsFfttCategorie(data, options?.ffttMirror ?? null);
   if (ffttCategorie) record.ffttCategorie = ffttCategorie;
 
   const mainSectionId = readString(data, "mainSectionId");
