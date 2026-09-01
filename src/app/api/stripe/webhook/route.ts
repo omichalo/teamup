@@ -8,7 +8,6 @@ import { dispatchPaymentConfirmedEmail } from "@/lib/email/dispatch-payment-conf
 import { verifyStripeWebhookSignature } from "@/lib/club-registration/stripe";
 import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
 import { applyStripeCheckoutPaid } from "@/lib/club-registration/payment/apply-stripe-checkout-paid";
-import { resolveJerseyFollowUpAfterSettlement } from "@/lib/club-registration/payment/registration-supplement";
 import { paymentWriteWithSettlement } from "@/lib/club-registration/payment/settlement-firestore";
 import { syncRosterAfterRegistrationChange } from "@/lib/championship/sync-after-registration";
 
@@ -88,10 +87,6 @@ export async function POST(req: Request) {
           ? { paymentStatus: "paid", status: "paid", paidAt: FieldValue.serverTimestamp() }
           : {};
 
-      const jerseyStatus = result.markRegistrationPaid
-        ? resolveJerseyFollowUpAfterSettlement(existing)
-        : undefined;
-
       tx.set(
         docRef,
         {
@@ -99,7 +94,6 @@ export async function POST(req: Request) {
           ...(result.markRegistrationPaid
             ? { status: "paid", paidAt: FieldValue.serverTimestamp() }
             : {}),
-          ...(jerseyStatus ? { jerseyFollowUpStatus: jerseyStatus } : {}),
           stripeCheckoutSessionId: session?.id ?? null,
           stripeInvoiceId: session?.invoice ?? null,
           stripePaymentUrl: null,

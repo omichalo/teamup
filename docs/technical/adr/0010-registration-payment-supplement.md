@@ -15,7 +15,7 @@ Un adhérent peut régler son adhésion par carte avant que le secrétariat n’
 3. **Modification tarifaire post-paiement** : réouverture automatique en `payment_requested`, conservation de `paidAt`, horodatage `supplementRequestedAt`.
 4. **Stripe** : réutilisation du checkout existant (coupon « déjà encaissé » sur le devis multi-lignes) ; montant demandé = `onlinePayableCents` (complément CB).
 5. **Self-service** : adhérent peut payer le complément depuis Mes dossiers ; secrétariat envoie un e-mail dédié « Complément à régler ».
-6. **Maillot** : si complément dû et maillot demandé, passage auto en `prepared_awaiting_payment` ; après règlement final, `given` si le maillot était en attente de paiement.
+6. **Maillot** : si complément dû et maillot demandé, passage auto en `prepared_awaiting_payment`. Le règlement ne modifie jamais le suivi du maillot ; seul le secrétariat peut le passer à `given`.
 7. **Aides secrétariat** : pas de recalcul rétroactif automatique sur le complément (delta tarif brut).
 8. **Dossier `approved`** : même logique de réouverture si un reliquat apparaît après modification.
 

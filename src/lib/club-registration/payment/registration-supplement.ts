@@ -51,16 +51,3 @@ export function resolveJerseyFollowUpForSupplement(params: {
   return "prepared_awaiting_payment";
 }
 
-/** Après règlement final, marquer le maillot remis si l'attente portait sur le paiement. */
-export function resolveJerseyFollowUpAfterSettlement(
-  data: Record<string, unknown>
-): JerseyFollowUpStatus | undefined {
-  if (!isJerseyRequested(data.wantsCompetitorExtras, data.wantsOptionalJersey)) {
-    return undefined;
-  }
-  const status = data.jerseyFollowUpStatus;
-  if (status === "prepared_awaiting_payment" || status === "to_do") {
-    return "given";
-  }
-  return undefined;
-}
