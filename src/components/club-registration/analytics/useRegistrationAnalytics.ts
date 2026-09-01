@@ -21,7 +21,7 @@ type AnalyticsApiResponse = {
 };
 
 const DEFAULT_FILTERS: AnalyticsFilters = {
-  status: "approved",
+  status: "all",
 };
 
 export function useRegistrationAnalytics() {
