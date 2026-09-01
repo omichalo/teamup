@@ -54,7 +54,7 @@ export function ConfigMetaSection({ config, onChange }: Props) {
               meta: { ...config.meta, seasonLabel: e.target.value },
             })
           }
-          helperText="Ex. 2025-2026"
+          helperText="Ex. 2026-2027"
           fullWidth
         />
         <ConfigEditorOptionPanel title="Version technique">

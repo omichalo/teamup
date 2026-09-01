@@ -35,7 +35,7 @@ describe("resolveMedicalFollowUpKind", () => {
         "not_required",
         "adult_pps_declared",
         "expected",
-        "2008-01-15"
+        "2009-01-15"
       )
     ).toBe("OK");
     expect(

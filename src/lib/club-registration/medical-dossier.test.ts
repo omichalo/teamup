@@ -108,9 +108,10 @@ describe("medical-dossier", () => {
   });
 
   it("traite comme mineur un joueur déjà majeur au calendrier mais pas à la date de saison", () => {
+    const birthDate = "2009-01-15";
     expect(
       deriveMedicalCertificateDeclaration({
-        birthDate: "2008-01-15",
+        birthDate,
         questionnaire: { summary: "all_no", answers: {} },
         veteranPath: createEmptyMedicalVeteranPath(),
         hasVerifiedFfttLicense: false,
@@ -118,7 +119,7 @@ describe("medical-dossier", () => {
     ).toBe("minor_all_no");
     expect(
       deriveMedicalCertificateDeclaration({
-        birthDate: "2008-01-15",
+        birthDate,
         questionnaire: { summary: "pps_declared", answers: {} },
         veteranPath: createEmptyMedicalVeteranPath(),
         hasVerifiedFfttLicense: false,

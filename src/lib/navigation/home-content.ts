@@ -72,6 +72,11 @@ const HOME_LINK_META: Record<
     cta: "Ouvrir le tableau",
     color: "info",
   },
+  "/club/statistiques-adherents": {
+    description: "KPI et graphiques sur les adhérents du club (sexe, âge, section, ville…).",
+    cta: "Voir les statistiques",
+    color: "primary",
+  },
   "/admin": {
     description: "Synchroniser les données FFTT et gérer les accès.",
     cta: "Ouvrir l'administration",
@@ -184,6 +189,7 @@ function boardMemberHome(): RoleHomeContent {
           "Vos dossiers, le tableau du club et les présences aux entraînements.",
         items: cards([
           LAYOUT_NAV.tableauAdhesions,
+          LAYOUT_NAV.statistiquesAdherents,
           LAYOUT_NAV.presences,
           LAYOUT_NAV.creneaux,
           LAYOUT_NAV.presencesEssais,
@@ -207,6 +213,7 @@ function assistantSecretaryHome(): RoleHomeContent {
           "Consultation des dossiers du club et suivi de vos propres inscriptions.",
         items: cards([
           LAYOUT_NAV.tableauAdhesions,
+          LAYOUT_NAV.statistiquesAdherents,
           LAYOUT_NAV.validationsLicence,
           LAYOUT_NAV.nouvelleAdhesion,
           LAYOUT_NAV.mesDossiers,
@@ -239,6 +246,7 @@ function coachHome(): RoleHomeContent {
         description: "Vue d'ensemble des dossiers et vos propres inscriptions.",
         items: cards([
           LAYOUT_NAV.tableauAdhesions,
+          LAYOUT_NAV.statistiquesAdherents,
           LAYOUT_NAV.nouvelleAdhesion,
           LAYOUT_NAV.mesDossiers,
         ]),
@@ -267,6 +275,7 @@ function secretaryHome(): RoleHomeContent {
           uniqueByHref([
             LAYOUT_NAV.dossiersAValider,
             LAYOUT_NAV.tableauAdhesions,
+            LAYOUT_NAV.statistiquesAdherents,
             LAYOUT_NAV.campagnesTarifs,
             LAYOUT_NAV.apercuFormulaire,
             LAYOUT_NAV.validationsLicence,
@@ -315,6 +324,7 @@ function adminHome(): RoleHomeContent {
           uniqueByHref([
             LAYOUT_NAV.dossiersAValider,
             LAYOUT_NAV.tableauAdhesions,
+            LAYOUT_NAV.statistiquesAdherents,
             LAYOUT_NAV.campagnesTarifs,
             LAYOUT_NAV.apercuFormulaire,
             LAYOUT_NAV.validationsLicence,
