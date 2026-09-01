@@ -47,6 +47,23 @@ function readBoolean(data: DocumentData, key: string): boolean | undefined {
   return typeof value === "boolean" ? value : undefined;
 }
 
+function readSubmittedAt(data: DocumentData): string | undefined {
+  const value = data.submittedAt;
+  if (
+    value &&
+    typeof value === "object" &&
+    "toDate" in value &&
+    typeof value.toDate === "function"
+  ) {
+    const iso = value.toDate().toISOString();
+    return typeof iso === "string" && iso.length > 0 ? iso : undefined;
+  }
+  if (typeof value === "string" && value.trim().length > 0) {
+    return value.trim();
+  }
+  return undefined;
+}
+
 export function mapDocToAnalyticsRecord(data: DocumentData): AnalyticsRegistrationRecord {
   const record: AnalyticsRegistrationRecord = {
     additionalSectionIds: readAdditionalSectionIds(data),
@@ -85,6 +102,9 @@ export function mapDocToAnalyticsRecord(data: DocumentData): AnalyticsRegistrati
 
   const isMinor = readBoolean(data, "isMinor");
   if (isMinor !== undefined) record.isMinor = isMinor;
+
+  const submittedAt = readSubmittedAt(data);
+  if (submittedAt) record.submittedAt = submittedAt;
 
   return record;
 }
