@@ -41,6 +41,7 @@ describe("buildLayoutNavigation", () => {
       "/club/inscription",
       "/club/mes-inscriptions",
       "/club/adhesions-tableau",
+      "/club/statistiques-adherents",
     ]);
   });
 
@@ -56,6 +57,7 @@ describe("buildLayoutNavigation", () => {
       "/club/inscription",
       "/club/mes-inscriptions",
       "/club/adhesions-tableau",
+      "/club/statistiques-adherents",
       "/club/presences",
       "/club/creneaux",
       "/club/presences/essais",
@@ -74,6 +76,7 @@ describe("buildLayoutNavigation", () => {
       "/club/inscription",
       "/club/mes-inscriptions",
       "/club/adhesions-tableau",
+      "/club/statistiques-adherents",
       "/club/validations-licence",
     ]);
   });
@@ -92,6 +95,7 @@ describe("buildLayoutNavigation", () => {
     expect(nav.groups[0]?.label).toBe("Adhésions");
     expect(nav.groups[0]?.items.map((item) => item.href)).toEqual([
       "/club/adhesions-tableau",
+      "/club/statistiques-adherents",
       "/club/presences/essais",
       "/club/parametrage-inscription",
       "/club/inscription",
@@ -108,6 +112,7 @@ describe("buildLayoutNavigation", () => {
       "/compositions",
       "/disponibilites",
       "/club/adhesions-tableau",
+      "/club/statistiques-adherents",
       "/club/idees",
     ]);
     expect(nav.groups.map((group) => group.id)).toEqual(["championnat"]);
@@ -139,6 +144,7 @@ describe("buildLayoutNavigation", () => {
     ]);
     expect(nav.groups[1]?.items.map((item) => item.href)).toEqual([
       "/club/adhesions-tableau",
+      "/club/statistiques-adherents",
       "/club/presences",
       "/club/creneaux",
       "/club/presences/essais",

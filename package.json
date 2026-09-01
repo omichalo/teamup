@@ -43,6 +43,7 @@
     "@hookform/resolvers": "^5.2.2",
     "@mui/icons-material": "^7.3.2",
     "@mui/material": "^7.3.2",
+    "@mui/x-charts": "^8.29.3",
     "@mui/x-date-pickers": "^9.1.0",
     "@omichalo/ffttapi-node": "^0.0.9",
     "@omichalo/sqyping-mui-theme": "^0.2.8",

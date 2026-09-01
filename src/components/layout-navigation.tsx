@@ -15,6 +15,7 @@ import {
   Preview,
   RateReview,
   TableChart,
+  BarChart,
   TipsAndUpdates,
   Tune,
   VerifiedUser,
@@ -62,6 +63,11 @@ const NAV = {
     label: "Tableau des adhésions",
     href: "/club/adhesions-tableau",
     icon: <TableChart />,
+  },
+  statistiquesAdherents: {
+    label: "Statistiques adhérents",
+    href: "/club/statistiques-adherents",
+    icon: <BarChart />,
   },
   boiteIdees: {
     label: "Idées & remontées",
@@ -182,7 +188,7 @@ export function buildLayoutNavigation(
       NAV.mesDossiers,
     ];
     if (canAccessSpreadsheet) {
-      primary.push(NAV.tableauAdhesions);
+      primary.push(NAV.tableauAdhesions, NAV.statistiquesAdherents);
     }
     if (isBoardMember) {
       primary.push(NAV.presences, NAV.creneaux, NAV.presencesEssais);
@@ -208,6 +214,7 @@ export function buildLayoutNavigation(
           label: "Adhésions",
           items: [
             NAV.tableauAdhesions,
+            NAV.statistiquesAdherents,
             NAV.presencesEssais,
             NAV.campagnesTarifs,
             NAV.apercuFormulaire,
@@ -243,6 +250,7 @@ export function buildLayoutNavigation(
           label: "Adhésions",
           items: [
             NAV.tableauAdhesions,
+            NAV.statistiquesAdherents,
             NAV.presences,
             NAV.creneaux,
             NAV.presencesEssais,
@@ -263,6 +271,7 @@ export function buildLayoutNavigation(
       NAV.compositions,
       NAV.disponibilites,
       NAV.tableauAdhesions,
+      NAV.statistiquesAdherents,
       NAV.boiteIdees,
     ],
     groups: [
