@@ -25,9 +25,21 @@ import {
  * Encapsule les invariants métier qui dépendaient auparavant de plusieurs callbacks
  * éparpillés dans les composants d'étape :
  * - changement d'`adherentRole` → ajustement automatique de `representatives`
- * - changement de `sex` → reset cohérent de `firstFemaleRegistrationSqy`
+ * - changement de `sex` (SET_SEX ou PATCH_FIELDS) → reset cohérent de
+ *   `firstFemaleRegistrationSqy` (jamais `undefined` pour une femme, pour que
+ *   le RadioGroup et Zod restent alignés)
  * - hydratation depuis localStorage ou serveur sans recopier la logique côté composants
  */
+
+function applyFirstFemaleRegistrationInvariant(draft: RegistrationDraft): void {
+  if (draft.sex !== "female") {
+    draft.firstFemaleRegistrationSqy = undefined;
+    return;
+  }
+  if (draft.firstFemaleRegistrationSqy === undefined) {
+    draft.firstFemaleRegistrationSqy = false;
+  }
+}
 
 export type RegistrationDraftAction =
   | { type: "PATCH_FIELDS"; patch: Partial<RegistrationDraft> }
@@ -49,7 +61,11 @@ export function registrationDraftReducer(
       if (patch.representatives) {
         patch.representatives = normalizeRepresentatives(patch.representatives);
       }
-      return { ...state, ...patch };
+      const next: RegistrationDraft = { ...state, ...patch };
+      if ("sex" in patch) {
+        applyFirstFemaleRegistrationInvariant(next);
+      }
+      return next;
     }
 
     case "SET_ADHERENT_ROLE": {
@@ -70,11 +86,7 @@ export function registrationDraftReducer(
 
     case "SET_SEX": {
       const next: RegistrationDraft = { ...state, sex: action.sex };
-      if (action.sex !== "female") {
-        next.firstFemaleRegistrationSqy = undefined;
-      } else if (state.firstFemaleRegistrationSqy === undefined) {
-        next.firstFemaleRegistrationSqy = false;
-      }
+      applyFirstFemaleRegistrationInvariant(next);
       return next;
     }
 

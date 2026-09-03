@@ -139,7 +139,12 @@ export function RecapStep({
             ? [
                 {
                   label: "1ʳᵉ inscription féminine au club",
-                  value: draft.firstFemaleRegistrationSqy ? "Oui" : "Non",
+                  value:
+                    draft.firstFemaleRegistrationSqy === undefined
+                      ? "—"
+                      : draft.firstFemaleRegistrationSqy
+                        ? "Oui"
+                        : "Non",
                 } as RecapField,
               ]
             : []),
