@@ -8,3 +8,17 @@ export { SectionCard } from "./SectionCard";
 export type { SectionCardProps } from "./SectionCard";
 export { StepProgressBar } from "./StepProgressBar";
 export type { StepProgressBarProps } from "./StepProgressBar";
+export {
+  VirtualGrid,
+  VirtualGridSharedTooltip,
+  useVirtualGridWindow,
+  computeColumnOffsets,
+  splitPinnedColumnCount,
+  stickyLeftForPinnedIndex,
+  sumColumnWidths,
+} from "./virtual-grid";
+export type {
+  VirtualGridColumn,
+  VirtualGridProps,
+  VirtualGridTooltipState,
+} from "./virtual-grid";
