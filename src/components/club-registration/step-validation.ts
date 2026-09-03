@@ -106,6 +106,12 @@ export function validateStep(
     if (!draft.sex) {
       return invalid("Indiquez le sexe de l’adhérent.", "#sex-label");
     }
+    if (draft.sex === "female" && draft.firstFemaleRegistrationSqy === undefined) {
+      return invalid(
+        "Indiquez s’il s’agit de votre première inscription au club",
+        "#first-female-label"
+      );
+    }
     if (!draft.birthCity.trim()) {
       return invalid(
         "Indiquez la ville de naissance.",

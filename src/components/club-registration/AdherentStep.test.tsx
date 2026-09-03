@@ -117,3 +117,17 @@ describe("AdherentStep — helper e-mail adapté à l'âge", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe("AdherentStep — première inscription féminine", () => {
+  it("ne pré-coche pas Oui/Non si firstFemaleRegistrationSqy est undefined", () => {
+    setup({ sex: "female", firstFemaleRegistrationSqy: undefined });
+    expect(screen.getByRole("radio", { name: "Oui" })).not.toBeChecked();
+    expect(screen.getByRole("radio", { name: "Non" })).not.toBeChecked();
+  });
+
+  it("coche Non seulement lorsque la valeur est explicitement false", () => {
+    setup({ sex: "female", firstFemaleRegistrationSqy: false });
+    expect(screen.getByRole("radio", { name: "Non" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Oui" })).not.toBeChecked();
+  });
+});
