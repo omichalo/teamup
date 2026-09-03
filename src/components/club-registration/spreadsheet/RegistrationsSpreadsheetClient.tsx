@@ -37,8 +37,12 @@ import { useManagedQueueSummary } from "@/components/club-registration/membershi
 import { MembershipRequestDetailModal } from "../membership-requests/MembershipRequestDetailModal";
 import { SpreadsheetColumnPicker } from "./SpreadsheetColumnPicker";
 import { SpreadsheetSummaryBar } from "./SpreadsheetSummaryBar";
-import { SpreadsheetTable, SpreadsheetTableHint } from "./SpreadsheetTable";
+import {
+  SpreadsheetTableHint,
+  SpreadsheetVirtualGrid,
+} from "./SpreadsheetVirtualGrid";
 import { SpreadsheetToolbar } from "./SpreadsheetToolbar";
+import { useDebouncedValue } from "./useDebouncedValue";
 import { useRegistrationsSpreadsheet } from "./useRegistrationsSpreadsheet";
 import { useSpreadsheetColumnResize } from "./useSpreadsheetColumnResize";
 import { useSpreadsheetFilterState } from "./useSpreadsheetFilterState";
@@ -133,10 +137,13 @@ export function RegistrationsSpreadsheetClient() {
     [visibleColumnIds, columnFilters]
   );
 
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 200);
+  const debouncedColumnFilters = useDebouncedValue(columnFilters, 200);
+
   const displayedRows = useMemo(() => {
     const filtered = applySpreadsheetFilters(registrations, {
-      globalSearchQuery: searchQuery,
-      columnFilters,
+      globalSearchQuery: debouncedSearchQuery,
+      columnFilters: debouncedColumnFilters,
       visibleColumnIds,
       config,
       context: formatContext,
@@ -145,8 +152,8 @@ export function RegistrationsSpreadsheetClient() {
     return sortSpreadsheetRows(filtered, sort, config, formatContext);
   }, [
     registrations,
-    searchQuery,
-    columnFilters,
+    debouncedSearchQuery,
+    debouncedColumnFilters,
     visibleColumnIds,
     sort,
     config,
@@ -328,7 +335,7 @@ export function RegistrationsSpreadsheetClient() {
                   stats={summaryStats}
                   onApplySavedView={(viewId) => void applySavedView(viewId)}
                 />
-                <SpreadsheetTable
+                <SpreadsheetVirtualGrid
                   rows={displayedRows}
                   visibleColumnIds={visibleColumnIds}
                   sort={sort}
