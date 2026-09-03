@@ -48,4 +48,17 @@ describe("validateStep focusSelector", () => {
       expect(result.focusSelector).toBe("#was-sqy-member-last-year-label");
     }
   });
+
+  it("exige firstFemaleRegistrationSqy pour une femme à l'étape adhérent", () => {
+    const draft = createEmptyDraft();
+    draft.firstName = "Lea";
+    draft.lastName = "Dupont";
+    draft.sex = "female";
+    const result = validateStep("adherent", draft);
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.message).toMatch(/première inscription au club/i);
+      expect(result.focusSelector).toBe("#first-female-label");
+    }
+  });
 });

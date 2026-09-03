@@ -222,7 +222,13 @@ export function AdherentStep({
           </Typography>
           <RadioGroup
             aria-labelledby="first-female-label"
-            value={draft.firstFemaleRegistrationSqy ? "yes" : "no"}
+            value={
+              draft.firstFemaleRegistrationSqy === undefined
+                ? ""
+                : draft.firstFemaleRegistrationSqy
+                  ? "yes"
+                  : "no"
+            }
             onChange={(e) =>
               onPatch({ firstFemaleRegistrationSqy: e.target.value === "yes" })
             }

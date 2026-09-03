@@ -104,6 +104,35 @@ describe("registrationDraftReducer", () => {
     expect(next.firstFemaleRegistrationSqy).toBe(false);
   });
 
+  it("PATCH_FIELDS avec sex female initialise firstFemaleRegistrationSqy à false", () => {
+    const s = createEmptyDraft();
+    const next = registrationDraftReducer(s, {
+      type: "PATCH_FIELDS",
+      patch: { sex: "female", firstName: "Lea" },
+    });
+    expect(next.sex).toBe("female");
+    expect(next.firstFemaleRegistrationSqy).toBe(false);
+    expect(next.firstName).toBe("Lea");
+  });
+
+  it("PATCH_FIELDS avec sex male reset firstFemaleRegistrationSqy", () => {
+    const s = { ...createEmptyDraft(), firstFemaleRegistrationSqy: true };
+    const next = registrationDraftReducer(s, {
+      type: "PATCH_FIELDS",
+      patch: { sex: "male" },
+    });
+    expect(next.firstFemaleRegistrationSqy).toBeUndefined();
+  });
+
+  it("PATCH_FIELDS sans sex conserve firstFemaleRegistrationSqy", () => {
+    const s = { ...createEmptyDraft(), firstFemaleRegistrationSqy: true };
+    const next = registrationDraftReducer(s, {
+      type: "PATCH_FIELDS",
+      patch: { firstName: "Lea" },
+    });
+    expect(next.firstFemaleRegistrationSqy).toBe(true);
+  });
+
   it("ADD_REPRESENTATIVE ajoute jusqu'à 2", () => {
     let s = createEmptyDraft();
     s = registrationDraftReducer(s, { type: "ADD_REPRESENTATIVE" });
