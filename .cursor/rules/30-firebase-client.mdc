@@ -1,10 +1,10 @@
 ---
-description: Usage client Firebase / Firestore côté application
-alwaysApply: true
+description: À charger lors d'un changement d'accès Firebase/Firestore côté application
+alwaysApply: false
 ---
 
 # Firebase Client Usage
 
-## Firestore
-
-- Quand une collection est manipulée, tu t'assures systématiquement que les bonnes règles sont positionnées. Tu n'ouvres que le strict minimum pour que cela fonctionne
+- Quand une collection Firestore est manipulée, vérifier systématiquement les règles de sécurité correspondantes.
+- Ne donner que les accès strictement nécessaires ; ne jamais élargir une règle uniquement pour faire passer le client.
+- Préférer les helpers et patterns Firebase déjà présents dans le repo.
