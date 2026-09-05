@@ -134,7 +134,12 @@ export async function POST(req: Request) {
       return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
     }
 
-    const rate = checkRateLimit(`club-registration:${decoded.uid}`, 8, 60 * 60 * 1000);
+    const maxRegistrationSubmissions = isClubRegistrationManager(role) ? 100 : 8;
+    const rate = checkRateLimit(
+      `club-registration:${decoded.uid}`,
+      maxRegistrationSubmissions,
+      60 * 60 * 1000
+    );
     if (!rate.allowed) {
       return jsonNoStore(
         { error: "Trop de soumissions dans la période autorisée. Réessayez plus tard." },
