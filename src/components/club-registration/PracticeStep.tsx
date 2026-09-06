@@ -127,7 +127,7 @@ export function PracticeStep({ draft, onChange, canSelectClosedSlots = false }: 
       </Typography>
 
       <FormControl fullWidth required>
-        <InputLabel id="main-section-label">
+        <InputLabel id="main-section-label" shrink>
           Lieu principal d’entraînement
         </InputLabel>
         <Select
@@ -135,6 +135,7 @@ export function PracticeStep({ draft, onChange, canSelectClosedSlots = false }: 
           label="Lieu principal d’entraînement"
           name="mainSectionId"
           value={draft.mainSectionId}
+          displayEmpty
           onChange={(e) => {
             const next = e.target.value as RegistrationDraft["mainSectionId"];
             const cleaned = draft.additionalSectionIds.filter((x) => x !== next);
@@ -144,6 +145,9 @@ export function PracticeStep({ draft, onChange, canSelectClosedSlots = false }: 
             });
           }}
         >
+          <MenuItem value="" disabled>
+            <em>Sélectionner votre section principale</em>
+          </MenuItem>
           {sectionOptions.map((s) => (
             <MenuItem key={s.id} value={s.id}>
               {formatSectionPracticeLabel(config, s)}
