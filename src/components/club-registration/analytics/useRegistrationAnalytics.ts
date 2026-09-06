@@ -6,17 +6,27 @@ import {
   aggregateRegistrationAnalytics,
   filterAnalyticsRecords,
 } from "@/lib/club-registration/analytics/aggregate";
+import {
+  aggregateFinanceAnalytics,
+  aggregateOrganizationAnalytics,
+} from "@/lib/club-registration/analytics/aggregate-ops";
 import type {
   AnalyticsFilterChange,
   AnalyticsFilters,
   AnalyticsRegistrationRecord,
+  FinanceAnalyticsSummary,
+  OrganizationAnalyticsSummary,
   RegistrationAnalyticsSummary,
 } from "@/lib/club-registration/analytics/types";
 
 type AnalyticsApiResponse = {
   seasonLabel: string;
   sectionLabels: Record<string, string>;
+  slotLabels?: Record<string, string>;
+  competitionLabels?: Record<string, string>;
+  aidLabels?: Record<string, string>;
   records: AnalyticsRegistrationRecord[];
+  truncated?: boolean;
   error?: string;
 };
 
@@ -27,7 +37,11 @@ const DEFAULT_FILTERS: AnalyticsFilters = {
 export function useRegistrationAnalytics() {
   const [seasonLabel, setSeasonLabel] = useState("");
   const [sectionLabels, setSectionLabels] = useState<Record<string, string>>({});
+  const [slotLabels, setSlotLabels] = useState<Record<string, string>>({});
+  const [competitionLabels, setCompetitionLabels] = useState<Record<string, string>>({});
+  const [aidLabels, setAidLabels] = useState<Record<string, string>>({});
   const [records, setRecords] = useState<AnalyticsRegistrationRecord[]>([]);
+  const [truncated, setTruncated] = useState(false);
   const [filters, setFilters] = useState<AnalyticsFilters>(DEFAULT_FILTERS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -46,10 +60,15 @@ export function useRegistrationAnalytics() {
       }
       setSeasonLabel(json.seasonLabel);
       setSectionLabels(json.sectionLabels ?? {});
+      setSlotLabels(json.slotLabels ?? {});
+      setCompetitionLabels(json.competitionLabels ?? {});
+      setAidLabels(json.aidLabels ?? {});
       setRecords(json.records ?? []);
+      setTruncated(Boolean(json.truncated));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Impossible de charger les statistiques");
       setRecords([]);
+      setTruncated(false);
     } finally {
       setLoading(false);
     }
@@ -59,6 +78,21 @@ export function useRegistrationAnalytics() {
     void load();
   }, [load]);
 
+  const campaignRecords = useMemo(
+    () => filterAnalyticsRecords(records, { ...filters, status: "all" }),
+    [records, filters]
+  );
+
+  const campaignSummary: RegistrationAnalyticsSummary = useMemo(
+    () => aggregateRegistrationAnalytics(campaignRecords, seasonLabel),
+    [campaignRecords, seasonLabel]
+  );
+
+  const campaignOrganization: OrganizationAnalyticsSummary = useMemo(
+    () => aggregateOrganizationAnalytics(campaignRecords),
+    [campaignRecords]
+  );
+
   const filteredRecords = useMemo(
     () => filterAnalyticsRecords(records, filters),
     [records, filters]
@@ -67,6 +101,16 @@ export function useRegistrationAnalytics() {
   const summary: RegistrationAnalyticsSummary = useMemo(
     () => aggregateRegistrationAnalytics(filteredRecords, seasonLabel),
     [filteredRecords, seasonLabel]
+  );
+
+  const organization: OrganizationAnalyticsSummary = useMemo(
+    () => aggregateOrganizationAnalytics(filteredRecords),
+    [filteredRecords]
+  );
+
+  const finance: FinanceAnalyticsSummary = useMemo(
+    () => aggregateFinanceAnalytics(filteredRecords),
+    [filteredRecords]
   );
 
   const applyFilterChange = useCallback((change: AnalyticsFilterChange) => {
@@ -99,15 +143,29 @@ export function useRegistrationAnalytics() {
     }));
   }, []);
 
+  const clearStatusFilter = useCallback(() => {
+    setFilters((prev) => ({ ...prev, status: "all" }));
+  }, []);
+
   return {
     seasonLabel,
     sectionLabels,
+    slotLabels,
+    competitionLabels,
+    aidLabels,
     records,
+    campaignRecords,
+    campaignSummary,
+    campaignOrganization,
     filteredRecords,
     summary,
+    organization,
+    finance,
     filters,
     applyFilterChange,
     resetSecondaryFilters,
+    clearStatusFilter,
+    truncated,
     loading,
     error,
     reload: load,

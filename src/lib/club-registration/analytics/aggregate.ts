@@ -1,3 +1,4 @@
+import { REGISTRATION_STATUS_LABELS, REGISTRATION_STATUS_VALUES } from "@/lib/club-registration/registration-status";
 import type { AgeBracketDefinition } from "./age-brackets";
 import {
   ageBracketLabel,
@@ -6,6 +7,13 @@ import {
   resolveAgeBracketId,
 } from "./age-brackets";
 import { normalizeCity, normalizePostalCode } from "./normalize-city";
+import {
+  resolveCompetitorKey,
+  resolveHandisportKey,
+  resolveMinorKey,
+  resolveRenewalKey,
+  resolveSexKey,
+} from "./resolve-record-keys";
 import type {
   AnalyticsFilters,
   AnalyticsRegistrationRecord,
@@ -38,41 +46,24 @@ const MINOR_LABELS: Record<string, string> = {
   unknown: "Non renseigné",
 };
 
+const HANDISPORT_LABELS: Record<string, string> = {
+  leisure: "Loisirs",
+  competition: "Compétition",
+  yes: "Handisport (niveau non précisé)",
+  no: "Non",
+};
+
+const STATUS_CHART_ORDER = [...REGISTRATION_STATUS_VALUES, "unknown"];
+
+const STATUS_LABELS: Record<string, string> = {
+  ...REGISTRATION_STATUS_LABELS,
+  unknown: "Non renseigné",
+};
+
 const TOP_N = 10;
 
 function increment(bucket: CountBucket, key: string): void {
   bucket[key] = (bucket[key] ?? 0) + 1;
-}
-
-function resolveSexKey(record: AnalyticsRegistrationRecord): string {
-  return record.sex ?? "unknown";
-}
-
-function resolveRenewalKey(record: AnalyticsRegistrationRecord): string {
-  if (record.wasSqyMemberLastYear === true) return "renewal";
-  if (record.wasSqyMemberLastYear === false) return "new";
-  return "unknown";
-}
-
-function resolveHandisportKey(record: AnalyticsRegistrationRecord): string {
-  if (
-    record.mainSectionId === "handisport" ||
-    record.mainSectionId === "sport-adapte" ||
-    record.handisportPracticeLevel
-  ) {
-    return "yes";
-  }
-  return "no";
-}
-
-function resolveCompetitorKey(record: AnalyticsRegistrationRecord): string {
-  return record.wantsCompetitorExtras === true ? "yes" : "no";
-}
-
-function resolveMinorKey(record: AnalyticsRegistrationRecord): string {
-  if (record.isMinor === true) return "minor";
-  if (record.isMinor === false) return "adult";
-  return "unknown";
 }
 
 function buildTopBucket(
@@ -250,7 +241,11 @@ export const ANALYTICS_LABELS = {
   renewal: RENEWAL_LABELS,
   yesNo: YES_NO_LABELS,
   minor: MINOR_LABELS,
+  handisport: HANDISPORT_LABELS,
+  status: STATUS_LABELS,
 };
+
+export const ANALYTICS_STATUS_CHART_ORDER = STATUS_CHART_ORDER;
 
 export function ageBracketChartOrder(brackets: AgeBracketDefinition[] = DEFAULT_ANALYTICS_AGE_BRACKETS): string[] {
   return orderedAgeBracketIds(brackets);

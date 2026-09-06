@@ -59,6 +59,21 @@ describe("aggregateRegistrationAnalytics", () => {
     expect(summary.additionalSections.voisins).toBe(1);
   });
 
+  it("détaille le handisport loisirs / compétition", () => {
+    const records = [
+      baseRecord({ handisportPracticeLevel: "leisure" }),
+      baseRecord({ handisportPracticeLevel: "competition" }),
+      baseRecord({ mainSectionId: "handisport", handisportPracticeLevel: undefined }),
+      baseRecord({ handisportPracticeLevel: undefined, mainSectionId: "guyancourt" }),
+    ];
+    const summary = aggregateRegistrationAnalytics(records, "2025-2026");
+    expect(summary.handisport.leisure).toBe(1);
+    expect(summary.handisport.competition).toBe(1);
+    expect(summary.handisport.yes).toBe(1);
+    expect(summary.handisport.no).toBe(1);
+    expect(summary.status.approved).toBe(4);
+  });
+
   it("normalise les villes et regroupe le top", () => {
     const records = [
       baseRecord({ city: "GUYANCOURT" }),

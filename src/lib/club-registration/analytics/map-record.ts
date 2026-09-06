@@ -5,6 +5,7 @@ import {
   mergeFfttLicenseLookupFromMirror,
 } from "@/lib/players/map-player-to-license-lookup";
 import type { PlayerFfttMirror } from "@/lib/players/fftt-mirror";
+import { mapDocToAnalyticsOpsFields } from "./map-record-ops";
 import type { AnalyticsRegistrationRecord } from "./types";
 
 function readString(data: DocumentData, key: string): string | undefined {
@@ -37,20 +38,6 @@ function readAdditionalSectionIds(data: DocumentData): string[] {
   return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
 }
 
-function readPaymentAidTypes(data: DocumentData): string[] {
-  const aids = data.paymentAids;
-  if (!Array.isArray(aids)) return [];
-  const types = new Set<string>();
-  for (const aid of aids) {
-    if (!aid || typeof aid !== "object") continue;
-    const type = (aid as { type?: unknown }).type;
-    if (typeof type === "string" && type.trim().length > 0) {
-      types.add(type.trim());
-    }
-  }
-  return [...types];
-}
-
 function readBoolean(data: DocumentData, key: string): boolean | undefined {
   const value = data[key];
   return typeof value === "boolean" ? value : undefined;
@@ -77,9 +64,11 @@ export function mapDocToAnalyticsRecord(
   data: DocumentData,
   options?: { ffttMirror?: PlayerFfttMirror | null }
 ): AnalyticsRegistrationRecord {
+  const ops = mapDocToAnalyticsOpsFields(data);
   const record: AnalyticsRegistrationRecord = {
     additionalSectionIds: readAdditionalSectionIds(data),
-    paymentAidTypes: readPaymentAidTypes(data),
+    ...ops,
+    paymentAidTypes: (ops.paymentAids ?? []).map((aid) => aid.type),
   };
 
   const sex = readSex(data);

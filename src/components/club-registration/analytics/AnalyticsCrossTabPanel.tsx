@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import {
+  Chip,
   FormControl,
   InputLabel,
   MenuItem,
@@ -17,7 +18,11 @@ import {
   Typography,
   type SelectChangeEvent,
 } from "@mui/material";
-import { buildCrossTab, CROSS_TAB_AXIS_OPTIONS } from "@/lib/club-registration/analytics/cross-tab";
+import {
+  buildCrossTab,
+  CROSS_TAB_AXIS_OPTIONS,
+  CROSS_TAB_PRESETS,
+} from "@/lib/club-registration/analytics/cross-tab";
 import type { AnalyticsRegistrationRecord, CrossTabAxis } from "@/lib/club-registration/analytics/types";
 
 type AnalyticsCrossTabPanelProps = {
@@ -40,20 +45,47 @@ export function AnalyticsCrossTabPanel({
 }: AnalyticsCrossTabPanelProps) {
   const [rowAxis, setRowAxis] = useState<CrossTabAxis>("mainSection");
   const [colAxis, setColAxis] = useState<CrossTabAxis>("sex");
+  const [activePresetId, setActivePresetId] = useState<string | null>("section-sex");
 
   const result = buildCrossTab(records, rowAxis, colAxis, seasonLabel, sectionLabels);
   const maxCell = result.counts.flat().reduce((max, value) => Math.max(max, value), 0);
 
   const handleRowAxis = (event: SelectChangeEvent) => {
     setRowAxis(event.target.value as CrossTabAxis);
+    setActivePresetId(null);
   };
 
   const handleColAxis = (event: SelectChangeEvent) => {
     setColAxis(event.target.value as CrossTabAxis);
+    setActivePresetId(null);
+  };
+
+  const applyPreset = (presetId: string) => {
+    const preset = CROSS_TAB_PRESETS.find((item) => item.id === presetId);
+    if (!preset) return;
+    setRowAxis(preset.rowAxis);
+    setColAxis(preset.colAxis);
+    setActivePresetId(preset.id);
   };
 
   return (
     <Stack spacing={2}>
+      <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
+        <Typography variant="body2" color="text.secondary">
+          Raccourcis :
+        </Typography>
+        {CROSS_TAB_PRESETS.map((preset) => (
+          <Chip
+            key={preset.id}
+            label={preset.label}
+            size="small"
+            color={activePresetId === preset.id ? "primary" : "default"}
+            variant={activePresetId === preset.id ? "filled" : "outlined"}
+            onClick={() => applyPreset(preset.id)}
+          />
+        ))}
+      </Stack>
+
       <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
         <FormControl size="small" sx={{ minWidth: 220 }}>
           <InputLabel id="cross-row-axis">Axe lignes</InputLabel>
