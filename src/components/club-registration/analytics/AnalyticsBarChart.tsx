@@ -13,6 +13,16 @@ type AnalyticsBarChartProps = {
   height?: number;
 };
 
+/** Largeur y-axis horizontale : assez pour les libellés longs (villes, sections). */
+function horizontalYAxisWidth(labels: string[]): number {
+  const longest = labels.reduce((max, label) => Math.max(max, label.length), 0);
+  return Math.min(240, Math.max(112, Math.ceil(longest * 7.2) + 12));
+}
+
+function horizontalChartHeight(rowCount: number, minHeight: number): number {
+  return Math.max(minHeight, rowCount * 36 + 56);
+}
+
 export function AnalyticsBarChart({
   title,
   data,
@@ -37,6 +47,8 @@ export function AnalyticsBarChart({
   const horizontal = layout === "horizontal";
   const labels = data.map((item) => item.label);
   const values = data.map((item) => item.value);
+  const chartHeight = horizontal ? horizontalChartHeight(data.length, height) : height;
+  const yAxisWidth = horizontalYAxisWidth(labels);
 
   return (
     <Card variant="outlined" sx={{ height: "100%" }}>
@@ -47,16 +59,23 @@ export function AnalyticsBarChart({
         <Box sx={{ width: "100%", overflowX: "auto" }}>
           {horizontal ? (
             <BarChart
-              height={height}
+              height={chartHeight}
               layout="horizontal"
               xAxis={[{ scaleType: "linear" }]}
-              yAxis={[{ scaleType: "band", data: labels }]}
+              yAxis={[
+                {
+                  scaleType: "band",
+                  data: labels,
+                  width: yAxisWidth,
+                  tickLabelStyle: { fontSize: 12 },
+                },
+              ]}
               series={[{ data: values, color: ANALYTICS_CHART_COLORS[0] }]}
-              margin={{ left: 120, right: 16, top: 16, bottom: 40 }}
+              margin={{ left: 8, right: 16, top: 16, bottom: 40 }}
             />
           ) : (
             <BarChart
-              height={height}
+              height={chartHeight}
               xAxis={[{ scaleType: "band", data: labels }]}
               series={[{ data: values, color: ANALYTICS_CHART_COLORS[0] }]}
               margin={{ left: 40, right: 16, top: 16, bottom: 40 }}
