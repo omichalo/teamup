@@ -29,6 +29,7 @@ async function fetchRegistrationDocsInMemory(db: Firestore, limit: number) {
 export type ListRegistrationsForAnalyticsResult = {
   records: AnalyticsRegistrationRecord[];
   seasonLabelBackfillUpdated: number;
+  truncated: boolean;
 };
 
 /**
@@ -51,9 +52,12 @@ export async function listRegistrationsForAnalytics(
     snap = await fetchRegistrationDocsInMemory(db, limit);
   }
 
-  const backfill = await backfillRegistrationSeasonLabelOnDocs(db, snap.docs, seasonLabel);
+  const truncated = snap.docs.length > SPREADSHEET_SCAN_LIMIT;
+  const docs = truncated ? snap.docs.slice(0, SPREADSHEET_SCAN_LIMIT) : snap.docs;
 
-  const seasonDocs = snap.docs.filter((doc) =>
+  const backfill = await backfillRegistrationSeasonLabelOnDocs(db, docs, seasonLabel);
+
+  const seasonDocs = docs.filter((doc) =>
     registrationMatchesActiveSeason(doc.data(), seasonLabel)
   );
   const licences = seasonDocs
@@ -71,5 +75,6 @@ export async function listRegistrationsForAnalytics(
   return {
     records,
     seasonLabelBackfillUpdated: backfill.updated,
+    truncated,
   };
 }

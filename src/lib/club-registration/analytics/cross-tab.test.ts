@@ -36,4 +36,12 @@ describe("buildCrossTab", () => {
     expect(result.colLabels).toContain("Guyancourt");
     expect(result.counts.flat().reduce((sum, n) => sum + n, 0)).toBe(3);
   });
+
+  it("supporte l'axe statut", () => {
+    const result = buildCrossTab(records, "status", "sex", "2025-2026", {
+      guyancourt: "Guyancourt",
+      trappes: "Trappes",
+    });
+    expect(result.rowLabels).toContain("Validé sans paiement");
+  });
 });

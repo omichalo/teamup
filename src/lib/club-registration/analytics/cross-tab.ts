@@ -1,3 +1,4 @@
+import { REGISTRATION_STATUS_LABELS } from "@/lib/club-registration/registration-status";
 import {
   ageBracketLabel,
   DEFAULT_ANALYTICS_AGE_BRACKETS,
@@ -5,6 +6,13 @@ import {
   type AgeBracketDefinition,
 } from "./age-brackets";
 import { normalizeCity, normalizePostalCode } from "./normalize-city";
+import {
+  resolveCompetitorKey,
+  resolveHandisportKey,
+  resolveMinorKey,
+  resolveRenewalKey,
+} from "./resolve-record-keys";
+import { ANALYTICS_LABELS } from "./aggregate";
 import type { AnalyticsRegistrationRecord, CrossTabAxis, CrossTabResult } from "./types";
 
 const TOP_GEO_N = 8;
@@ -17,24 +25,27 @@ function resolveSex(record: AnalyticsRegistrationRecord): string {
 }
 
 function resolveRenewal(record: AnalyticsRegistrationRecord): string {
-  if (record.wasSqyMemberLastYear === true) return "Renouvellement";
-  if (record.wasSqyMemberLastYear === false) return "Nouveau";
-  return "Non renseigné";
+  const key = resolveRenewalKey(record);
+  return ANALYTICS_LABELS.renewal[key] ?? key;
 }
 
 function resolveHandisport(record: AnalyticsRegistrationRecord): string {
-  if (
-    record.mainSectionId === "handisport" ||
-    record.mainSectionId === "sport-adapte" ||
-    record.handisportPracticeLevel
-  ) {
-    return "Oui";
-  }
-  return "Non";
+  const key = resolveHandisportKey(record);
+  return ANALYTICS_LABELS.handisport[key] ?? key;
 }
 
 function resolveCompetitor(record: AnalyticsRegistrationRecord): string {
-  return record.wantsCompetitorExtras === true ? "Oui" : "Non";
+  return resolveCompetitorKey(record) === "yes" ? "Oui" : "Non";
+}
+
+function resolveStatus(record: AnalyticsRegistrationRecord): string {
+  if (!record.status) return "Non renseigné";
+  return REGISTRATION_STATUS_LABELS[record.status] ?? record.status;
+}
+
+function resolveMinor(record: AnalyticsRegistrationRecord): string {
+  const key = resolveMinorKey(record);
+  return ANALYTICS_LABELS.minor[key] ?? key;
 }
 
 function resolveAxisValue(
@@ -72,6 +83,10 @@ function resolveAxisValue(
       return resolveHandisport(record);
     case "competitor":
       return resolveCompetitor(record);
+    case "status":
+      return resolveStatus(record);
+    case "isMinor":
+      return resolveMinor(record);
     default:
       return "Non renseigné";
   }
@@ -155,4 +170,40 @@ export const CROSS_TAB_AXIS_OPTIONS: { value: CrossTabAxis; label: string }[] = 
   { value: "wasSqyMemberLastYear", label: "Nouveau / renouvellement" },
   { value: "handisport", label: "Handisport" },
   { value: "competitor", label: "Compétiteur" },
+  { value: "status", label: "Statut dossier" },
+  { value: "isMinor", label: "Mineur / majeur" },
+];
+
+export type CrossTabPreset = {
+  id: string;
+  label: string;
+  rowAxis: CrossTabAxis;
+  colAxis: CrossTabAxis;
+};
+
+export const CROSS_TAB_PRESETS: CrossTabPreset[] = [
+  {
+    id: "section-sex",
+    label: "Section × Sexe",
+    rowAxis: "mainSection",
+    colAxis: "sex",
+  },
+  {
+    id: "age-competitor",
+    label: "Âge × Compétiteur",
+    rowAxis: "ageBracket",
+    colAxis: "competitor",
+  },
+  {
+    id: "city-renewal",
+    label: "Ville × Nouveau",
+    rowAxis: "city",
+    colAxis: "wasSqyMemberLastYear",
+  },
+  {
+    id: "status-section",
+    label: "Statut × Section",
+    rowAxis: "status",
+    colAxis: "mainSection",
+  },
 ];
