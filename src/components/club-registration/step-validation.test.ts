@@ -61,4 +61,15 @@ describe("validateStep focusSelector", () => {
       expect(result.focusSelector).toBe("#first-female-label");
     }
   });
+
+  it("exige une section principale à l'étape pratique", () => {
+    const draft = createEmptyDraft();
+    draft.slotIds = ["voisins-mar-2030-adultes-loisirs"];
+    const result = validateStep("practice", draft);
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.message).toMatch(/section principale/i);
+      expect(result.focusSelector).toBe('[name="mainSectionId"]');
+    }
+  });
 });

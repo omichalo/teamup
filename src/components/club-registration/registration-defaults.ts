@@ -17,9 +17,11 @@ import {
  * Diffère du payload final sur trois points :
  * - `internalRulesAccepted` côté schéma exige `true` ; on expose un `rulesAccepted: boolean`
  *   pour rester contrôlable dans l'UI.
- * - `sex`, `photoConsent` et `wasSqyMemberLastYear` autorisent l'absence de réponse
- *   tant que l'utilisateur n'a pas activement choisi. RGPD oblige : le consentement à la diffusion d'images doit être
- *   un acte positif (pas de pré-cochage), et le sexe ne doit pas être imposé par défaut.
+ * - `sex`, `photoConsent`, `mainSectionId` et `wasSqyMemberLastYear` autorisent
+ *   l'absence de réponse tant que l'utilisateur n'a pas activement choisi. RGPD
+ *   oblige : le consentement à la diffusion d'images doit être un acte positif
+ *   (pas de pré-cochage), et le sexe ne doit pas être imposé par défaut. La
+ *   section principale non plus (évite de laisser « Voisins » sans s'en apercevoir).
  *   `buildPayload()` côté wizard refuse la chaîne vide avant tout POST.
  */
 export type RegistrationDraft = Omit<
@@ -28,6 +30,7 @@ export type RegistrationDraft = Omit<
   | "sex"
   | "photoConsent"
   | "wasSqyMemberLastYear"
+  | "mainSectionId"
   | "medicalCertificateDeclaration"
   | "medicalQuestionnaire"
   | "medicalVeteranPath"
@@ -41,6 +44,8 @@ export type RegistrationDraft = Omit<
   applicantNotes: string;
   sex: ClubRegistrationPayload["sex"] | "";
   photoConsent: ClubRegistrationPayload["photoConsent"] | "";
+  /** Vide tant que l'utilisateur n'a pas choisi explicitement. */
+  mainSectionId: ClubRegistrationPayload["mainSectionId"] | "";
   wasSqyMemberLastYear: boolean | undefined;
   medicalQuestionnaire: MedicalQuestionnaire;
   medicalVeteranPath: MedicalVeteranPath;
@@ -105,7 +110,7 @@ export function createEmptyDraft(): RegistrationDraft {
     postalCode: "",
     city: "",
     representatives: [],
-    mainSectionId: "voisins",
+    mainSectionId: "",
     additionalSectionIds: [],
     slotIds: [],
     schoolPickupSlotIds: [],

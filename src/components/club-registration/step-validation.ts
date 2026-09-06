@@ -239,6 +239,12 @@ export function validateStep(
   }
 
   if (stepId === "practice") {
+    if (!draft.mainSectionId) {
+      return invalid(
+        "Sélectionnez votre section principale.",
+        '[name="mainSectionId"]'
+      );
+    }
     if (draft.slotIds.length === 0) {
       return invalid("Sélectionnez au moins un créneau.", '[data-field="slotIds"]');
     }

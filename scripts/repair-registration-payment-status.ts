@@ -1,7 +1,8 @@
 #!/usr/bin/env ts-node
 
 /**
- * Aligne paymentStatus (legacy) ou rouvre les dossiers payés avec reliquat (complément dû).
+ * Aligne paymentStatus (legacy), finalise les dossiers soldés sans status paid,
+ * ou rouvre les dossiers payés avec reliquat (complément dû).
  *
  * Usage :
  *   # Staging (défaut via .env.local)
