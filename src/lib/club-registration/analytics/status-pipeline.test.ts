@@ -1,7 +1,7 @@
 import { buildStatusPipeline } from "./status-pipeline";
 
 describe("buildStatusPipeline", () => {
-  it("calcule stock et cumul vers l'approbation", () => {
+  it("fusionne payés et validés à 0 € dans l'étape Payé", () => {
     const pipeline = buildStatusPipeline({
       submitted: 10,
       in_review: 5,
@@ -13,25 +13,25 @@ describe("buildStatusPipeline", () => {
 
     expect(pipeline.mainPathTotal).toBe(75);
     expect(pipeline.rejected).toBe(5);
-    expect(pipeline.completionPct).toBe(53);
+    expect(pipeline.stages).toHaveLength(4);
+    expect(pipeline.completionPct).toBe(69);
 
     const submitted = pipeline.stages[0];
     expect(submitted?.stock).toBe(10);
     expect(submitted?.cumulativeReached).toBe(75);
 
     const paid = pipeline.stages[3];
-    expect(paid?.stock).toBe(12);
+    expect(paid?.id).toBe("paid");
+    expect(paid?.label).toBe("Payé");
+    expect(paid?.stock).toBe(52);
     expect(paid?.cumulativeReached).toBe(52);
-
-    const approved = pipeline.stages[4];
-    expect(approved?.stock).toBe(40);
-    expect(approved?.cumulativeReached).toBe(40);
+    expect(paid?.cumulativePct).toBe(69);
   });
 
   it("gère un bucket vide", () => {
     const pipeline = buildStatusPipeline({});
     expect(pipeline.total).toBe(0);
-    expect(pipeline.stages).toHaveLength(5);
+    expect(pipeline.stages).toHaveLength(4);
     expect(pipeline.completionPct).toBe(0);
   });
 });

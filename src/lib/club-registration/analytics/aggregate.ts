@@ -81,8 +81,15 @@ export function matchesAnalyticsFilters(
   record: AnalyticsRegistrationRecord,
   filters: AnalyticsFilters
 ): boolean {
-  if (filters.status !== "all" && record.status !== filters.status) {
-    return false;
+  if (filters.status !== "all") {
+    // En stats, « Payé » inclut les dossiers validés à 0 € (approved).
+    if (filters.status === "paid") {
+      if (record.status !== "paid" && record.status !== "approved") {
+        return false;
+      }
+    } else if (record.status !== filters.status) {
+      return false;
+    }
   }
   if (filters.mainSectionId && record.mainSectionId !== filters.mainSectionId) {
     return false;
