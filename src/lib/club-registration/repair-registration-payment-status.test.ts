@@ -1,6 +1,7 @@
 import {
   detectRegistrationPaymentRepairKind,
   needsRegistrationPaymentStatusRepair,
+  needsRegistrationSettlementFinalizeRepair,
   needsRegistrationSupplementReopenRepair,
 } from "./repair-registration-payment-status";
 
@@ -30,6 +31,37 @@ describe("needsRegistrationPaymentStatusRepair", () => {
       needsRegistrationPaymentStatusRepair({
         status: "payment_requested",
         paymentStatus: "pending",
+      })
+    ).toBe(false);
+  });
+
+  it("ignore paidAt avec reliquat (complément dû)", () => {
+    expect(
+      needsRegistrationPaymentStatusRepair({
+        status: "payment_requested",
+        paymentStatus: "pending",
+        paidAt: "2026-08-29T06:01:40.323Z",
+        payment: {
+          paymentMethod: "card",
+          totalAmountCents: 19_700,
+          assistanceTotalAmountCents: 0,
+          amountToPayCents: 19_700,
+          aids: [],
+          paymentInstallments: 1,
+          expectedPayments: [],
+          receivedPayments: [
+            {
+              id: "rp_1",
+              method: "card",
+              label: "Carte",
+              amountCents: 18_200,
+              receivedAt: "2026-08-29T06:01:40.323Z",
+            },
+          ],
+          paidAmountCents: 18_200,
+          remainingAmountCents: 1_500,
+          paymentStatus: "partially_paid",
+        },
       })
     ).toBe(false);
   });
@@ -67,6 +99,61 @@ describe("needsRegistrationSupplementReopenRepair", () => {
   });
 });
 
+describe("needsRegistrationSettlementFinalizeRepair", () => {
+  it("détecte un paiement soldé sans status paid", () => {
+    expect(
+      needsRegistrationSettlementFinalizeRepair({
+        status: "payment_requested",
+        paymentStatus: "paid",
+        payment: {
+          paymentMethod: "cheque",
+          totalAmountCents: 20_000,
+          assistanceTotalAmountCents: 0,
+          amountToPayCents: 20_000,
+          aids: [],
+          paymentInstallments: 1,
+          expectedPayments: [],
+          receivedPayments: [
+            {
+              id: "rp_1",
+              method: "cheque",
+              label: "Chèque",
+              amountCents: 20_000,
+              receivedAt: "2026-09-01T10:00:00.000Z",
+            },
+          ],
+          paidAmountCents: 20_000,
+          remainingAmountCents: 0,
+          paymentStatus: "paid",
+        },
+      })
+    ).toBe(true);
+  });
+
+  it("ignore un dossier déjà paid", () => {
+    expect(
+      needsRegistrationSettlementFinalizeRepair({
+        status: "paid",
+        paidAt: "2026-09-01T10:00:00.000Z",
+        paymentStatus: "paid",
+        payment: {
+          paymentMethod: "cheque",
+          totalAmountCents: 20_000,
+          assistanceTotalAmountCents: 0,
+          amountToPayCents: 20_000,
+          aids: [],
+          paymentInstallments: 1,
+          expectedPayments: [],
+          receivedPayments: [],
+          paidAmountCents: 20_000,
+          remainingAmountCents: 0,
+          paymentStatus: "paid",
+        },
+      })
+    ).toBe(false);
+  });
+});
+
 describe("detectRegistrationPaymentRepairKind", () => {
   it("priorise la réouverture complément", () => {
     expect(
@@ -97,5 +184,35 @@ describe("detectRegistrationPaymentRepairKind", () => {
         },
       })
     ).toBe("supplement_reopen");
+  });
+
+  it("détecte settlement_finalize avant legacy", () => {
+    expect(
+      detectRegistrationPaymentRepairKind({
+        status: "in_review",
+        paymentStatus: "paid",
+        payment: {
+          paymentMethod: "cheque",
+          totalAmountCents: 15_000,
+          assistanceTotalAmountCents: 0,
+          amountToPayCents: 15_000,
+          aids: [],
+          paymentInstallments: 1,
+          expectedPayments: [],
+          receivedPayments: [
+            {
+              id: "rp_1",
+              method: "cheque",
+              label: "Chèque",
+              amountCents: 15_000,
+              receivedAt: "2026-09-01T10:00:00.000Z",
+            },
+          ],
+          paidAmountCents: 15_000,
+          remainingAmountCents: 0,
+          paymentStatus: "paid",
+        },
+      })
+    ).toBe("settlement_finalize");
   });
 });
