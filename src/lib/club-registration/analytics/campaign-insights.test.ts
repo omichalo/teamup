@@ -25,7 +25,7 @@ function emptySummary(overrides: Partial<RegistrationAnalyticsSummary> = {}): Re
 }
 
 describe("buildCampaignBarometer", () => {
-  it("calcule approuvés, payés et à traiter", () => {
+  it("calcule dossiers clos (payés + à 0 €) et à traiter", () => {
     const barometer = buildCampaignBarometer(
       emptySummary({
         total: 10,
@@ -41,9 +41,11 @@ describe("buildCampaignBarometer", () => {
 
     expect(barometer.approved).toBe(4);
     expect(barometer.paid).toBe(2);
+    expect(barometer.settled).toBe(6);
     expect(barometer.actionable).toBe(4);
     expect(barometer.approvedPct).toBe(40);
     expect(barometer.paidPct).toBe(20);
+    expect(barometer.settledPct).toBe(60);
     expect(barometer.actionablePct).toBe(40);
   });
 });

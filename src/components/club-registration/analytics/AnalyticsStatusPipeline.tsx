@@ -60,7 +60,7 @@ export function AnalyticsStatusPipeline({
             </Typography>
           </Box>
           <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
-            {pipeline.completionPct} % validés sans paiement
+            {pipeline.completionPct} % payés
           </Typography>
         </Stack>
 
@@ -69,7 +69,7 @@ export function AnalyticsStatusPipeline({
             display: "grid",
             gridTemplateColumns: {
               xs: "1fr",
-              sm: "repeat(5, minmax(0, 1fr))",
+              sm: "repeat(4, minmax(0, 1fr))",
             },
             gap: { xs: 1.5, sm: 1 },
           }}

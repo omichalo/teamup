@@ -4,13 +4,15 @@ import {
 } from "@/lib/club-registration/registration-status";
 import type { CountBucket } from "./types";
 
-/** Parcours principal vers l'approbation (ordre chronologique métier). */
+/**
+ * Parcours principal affiché en stats.
+ * `paid` et `approved` (validé à 0 €) sont fusionnés en une étape « Payé ».
+ */
 export const PIPELINE_MAIN_PATH: readonly RegistrationStatus[] = [
   "submitted",
   "in_review",
   "payment_requested",
   "paid",
-  "approved",
 ] as const;
 
 export type StatusPipelineStage = {
@@ -30,7 +32,7 @@ export type StatusPipeline = {
   rejectedPct: number;
   mainPathTotal: number;
   total: number;
-  /** Part des dossiers hors refus validés sans paiement (statut approved). */
+  /** Part des dossiers hors refus clos (payés ou validés à 0 €). */
   completionPct: number;
 };
 
@@ -39,13 +41,20 @@ function pct(part: number, total: number): number {
   return Math.round((part / total) * 100);
 }
 
+function stageStock(statusBucket: CountBucket, id: RegistrationStatus): number {
+  if (id === "paid") {
+    return (statusBucket.paid ?? 0) + (statusBucket.approved ?? 0);
+  }
+  return statusBucket[id] ?? 0;
+}
+
 /**
  * Construit un parcours de campagne à partir du bucket statut.
  * Le cumul « atteint ou dépassé » donne une lecture type entonnoir même si
  * on ne dispose que du statut courant (pas de transitions historiques).
  */
 export function buildStatusPipeline(statusBucket: CountBucket): StatusPipeline {
-  const stagesStock = PIPELINE_MAIN_PATH.map((id) => statusBucket[id] ?? 0);
+  const stagesStock = PIPELINE_MAIN_PATH.map((id) => stageStock(statusBucket, id));
   const mainPathTotal = stagesStock.reduce((sum, n) => sum + n, 0);
   const rejected = statusBucket.rejected ?? 0;
   const total = mainPathTotal + rejected + (statusBucket.unknown ?? 0);
@@ -66,7 +75,7 @@ export function buildStatusPipeline(statusBucket: CountBucket): StatusPipeline {
     cumulativePct: pct(cumulativeReached[index] ?? 0, mainPathTotal),
   }));
 
-  const approved = statusBucket.approved ?? 0;
+  const settled = stageStock(statusBucket, "paid");
 
   return {
     stages,
@@ -74,6 +83,6 @@ export function buildStatusPipeline(statusBucket: CountBucket): StatusPipeline {
     rejectedPct: pct(rejected, total),
     mainPathTotal,
     total,
-    completionPct: pct(approved, mainPathTotal),
+    completionPct: pct(settled, mainPathTotal),
   };
 }

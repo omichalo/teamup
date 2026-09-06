@@ -28,6 +28,16 @@ describe("matchesAnalyticsFilters", () => {
     expect(matchesAnalyticsFilters(record, { status: "all" })).toBe(true);
   });
 
+  it("traite approved comme payé pour le filtre stats Payé", () => {
+    expect(matchesAnalyticsFilters(baseRecord({ status: "approved" }), { status: "paid" })).toBe(
+      true
+    );
+    expect(matchesAnalyticsFilters(baseRecord({ status: "paid" }), { status: "paid" })).toBe(true);
+    expect(
+      matchesAnalyticsFilters(baseRecord({ status: "payment_requested" }), { status: "paid" })
+    ).toBe(false);
+  });
+
   it("filtre par section et sexe", () => {
     const record = baseRecord({ mainSectionId: "trappes", sex: "male" });
     expect(

@@ -7,10 +7,13 @@ export type CampaignBarometer = {
   total: number;
   approved: number;
   paid: number;
+  /** Dossiers clos : payés + validés à 0 €. */
+  settled: number;
   actionable: number;
   rejected: number;
   approvedPct: number;
   paidPct: number;
+  settledPct: number;
   actionablePct: number;
 };
 
@@ -35,14 +38,18 @@ export function buildCampaignBarometer(summary: RegistrationAnalyticsSummary): C
     0
   );
 
+  const settled = paid + approved;
+
   return {
     total,
     approved,
     paid,
+    settled,
     actionable,
     rejected,
     approvedPct: pct(approved, total),
     paidPct: pct(paid, total),
+    settledPct: pct(settled, total),
     actionablePct: pct(actionable, total),
   };
 }

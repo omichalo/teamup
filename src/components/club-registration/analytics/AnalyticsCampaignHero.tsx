@@ -42,9 +42,13 @@ export function AnalyticsCampaignHero({ summary }: AnalyticsCampaignHeroProps) {
       </Grid>
       <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <HeroStat
-          label="Validés sans paiement"
-          value={`${barometer.approvedPct} %`}
-          hint={`${barometer.approved} dossier(s) à 0 €`}
+          label="Payés"
+          value={`${barometer.settledPct} %`}
+          hint={
+            barometer.approved > 0
+              ? `${barometer.settled} dossier(s) · dont ${barometer.approved} à 0 €`
+              : `${barometer.settled} dossier(s) clos`
+          }
         />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, md: 3 }}>
