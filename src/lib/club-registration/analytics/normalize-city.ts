@@ -4,19 +4,31 @@ function titleCaseSegment(segment: string): string {
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
 }
 
-/** Normalise une ville pour regroupement et affichage (casse, espaces). */
+function titleCaseWithApostrophe(segment: string): string {
+  return segment
+    .split("'")
+    .map((part) => titleCaseSegment(part))
+    .join("'");
+}
+
+/**
+ * Normalise une ville pour regroupement et affichage.
+ * Unifie casse, accents de séparateurs (espace / tiret) et apostrophes afin que
+ * « Voisins Le Bretonneux » et « Voisins-Le-Bretonneux » comptent comme une seule entrée.
+ */
 export function normalizeCity(city: string | undefined): string {
   if (!city?.trim()) return "";
   return city
     .trim()
+    .normalize("NFC")
     .toLowerCase()
-    .replace(/\s+/g, " ")
-    .split(/(\s|-)/)
-    .map((part) => {
-      if (part === " " || part === "-") return part;
-      return titleCaseSegment(part);
-    })
-    .join("");
+    .replace(/[''`´]/g, "'")
+    .replace(/[\s_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .split("-")
+    .filter(Boolean)
+    .map(titleCaseWithApostrophe)
+    .join("-");
 }
 
 /** Code postal normalisé (5 chiffres) ou chaîne vide. */

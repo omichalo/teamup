@@ -70,7 +70,7 @@ type Props = {
 };
 
 function canEstimate(draft: PricingBreakdownDraft): boolean {
-  return computeAgeAt(draft.birthDate) !== null;
+  return computeAgeAt(draft.birthDate) !== null && Boolean(draft.mainSectionId);
 }
 
 export function usePricingQuote(draft: PricingBreakdownDraft) {

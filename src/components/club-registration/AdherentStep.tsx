@@ -168,16 +168,6 @@ export function AdherentStep({
         />
       </Stack>
 
-      {draft.ffttLicenseLookup?.categorie ? (
-        <TextField
-          label="Catégorie FFTT"
-          value={draft.ffttLicenseLookup.categorie}
-          fullWidth
-          InputProps={{ readOnly: true }}
-          helperText="Issue de la licence FFTT"
-        />
-      ) : null}
-
       {draft.ffttLicenseLookup ? (
         <FfttIdentityMismatchAlert
           declaredFirstName={draft.firstName}

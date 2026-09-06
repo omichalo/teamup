@@ -7,10 +7,7 @@ import {
   addManualReceivedPayment,
   markExpectedPaymentReceived,
 } from "@/lib/club-registration/payment/payment-mutations";
-import {
-  normalizeRegistrationPayment,
-  paymentToFirestoreUpdate,
-} from "@/lib/club-registration/payment/normalize-payment";
+import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
 import {
   RECEIVED_PAYMENT_METHOD_IDS,
   RECEIVED_PAYMENT_METHOD_LABELS,
@@ -18,6 +15,7 @@ import {
 } from "@/lib/club-registration/payment-constants";
 import { normalizePaymentReference } from "@/lib/club-registration/payment/payment-reference";
 import { wouldCreateOverpayment } from "@/lib/club-registration/payment/overpayment";
+import { paymentWriteWithSettlement } from "@/lib/club-registration/payment/settlement-firestore";
 import { syncRosterAfterRegistrationChange } from "@/lib/championship/sync-after-registration";
 
 const ALLOWED_METHODS = new Set<ReceivedPaymentMethodId>(RECEIVED_PAYMENT_METHOD_IDS);
@@ -141,7 +139,7 @@ export async function receiveLicenseValidationPayment(
 
   await docRef.set(
     {
-      ...paymentToFirestoreUpdate(nextPayment),
+      ...paymentWriteWithSettlement(nextPayment),
       updatedAt: FieldValue.serverTimestamp(),
     },
     { merge: true }

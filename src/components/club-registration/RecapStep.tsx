@@ -122,10 +122,6 @@ export function RecapStep({
           ...(draft.ffttLicenseLookup
             ? ([
                 {
-                  label: "Catégorie FFTT",
-                  value: draft.ffttLicenseLookup.categorie ?? "—",
-                },
-                {
                   label: "Points licence",
                   value:
                     draft.ffttLicenseLookup.pointsLicence !== undefined &&

@@ -81,7 +81,7 @@ function buildPracticeLine(
   slotsCount: number
 ): string | null {
   const parts: string[] = [];
-  if (draft.mainSectionId && draft.mainSectionId !== "voisins") {
+  if (draft.mainSectionId) {
     parts.push(findSectionLabel(config, draft.mainSectionId));
   }
   if (slotsCount > 0) {
