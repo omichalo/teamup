@@ -1,4 +1,14 @@
 import type { RegistrationStatus } from "@/lib/club-registration/registration-status";
+import type { MedicalFollowUpKind } from "@/lib/club-registration/medical-certificate";
+import type { PaymentMethodId, PaymentStatusId } from "@/lib/club-registration/payment-constants";
+
+/** Aide anonymisée (montants + réception, sans référence nominative). */
+export type AnalyticsPaymentAid = {
+  type: string;
+  amountCents: number;
+  received: boolean;
+  pendingReceipt: boolean;
+};
 
 /** Enregistrement minimal pour statistiques (sans données personnelles identifiantes). */
 export type AnalyticsRegistrationRecord = {
@@ -13,10 +23,25 @@ export type AnalyticsRegistrationRecord = {
   wasSqyMemberLastYear?: boolean;
   handisportPracticeLevel?: string;
   wantsCompetitorExtras?: boolean;
+  /** @deprecated préférer paymentAids — conservé pour agrégats legacy. */
   paymentAidTypes?: string[];
+  paymentAids?: AnalyticsPaymentAid[];
   isMinor?: boolean;
   /** Date de soumission du dossier (ISO 8601). */
   submittedAt?: string;
+  slotIds?: string[];
+  schoolPickupSlotIds?: string[];
+  competitionIds?: string[];
+  jerseyFollowUpStatus?: string;
+  criteriumFederalRegistrationStatus?: string;
+  registrationCertificateFollowUpStatus?: string;
+  medicalFollowUpKind?: MedicalFollowUpKind;
+  ppsFollowUpStatus?: string;
+  paymentStatus?: PaymentStatusId;
+  paymentMethod?: PaymentMethodId;
+  quoteTotalCents?: number;
+  voluntaryDonationCents?: number;
+  holidayVoucherAmountCents?: number;
 };
 
 export type AnalyticsStatusFilter = RegistrationStatus | "all";
@@ -59,6 +84,40 @@ export type RegistrationAnalyticsSummary = {
   status: CountBucket;
 };
 
+export type OrganizationOpsTodo = {
+  medical: number;
+  jersey: number;
+  criterium: number;
+  certificate: number;
+  aidsPending: number;
+};
+
+export type OrganizationAnalyticsSummary = {
+  slots: CountBucket;
+  schoolPickupSlots: CountBucket;
+  competitions: CountBucket;
+  jerseyFollowUp: CountBucket;
+  criteriumFollowUp: CountBucket;
+  certificateFollowUp: CountBucket;
+  medicalFollowUp: CountBucket;
+  ppsFollowUp: CountBucket;
+  opsTodo: OrganizationOpsTodo;
+};
+
+export type FinanceAnalyticsSummary = {
+  paymentStatus: CountBucket;
+  paymentMethod: CountBucket;
+  quoteTotalCents: number;
+  donationCents: number;
+  holidayVoucherCents: number;
+  aidsDeclaredCents: number;
+  aidsReceivedCents: number;
+  aidsPendingCount: number;
+  aidsCollectableCount: number;
+  recordsWithQuote: number;
+  aidTypeCounts: CountBucket;
+};
+
 export type CrossTabAxis =
   | "sex"
   | "ageBracket"
@@ -68,7 +127,9 @@ export type CrossTabAxis =
   | "postalCode"
   | "wasSqyMemberLastYear"
   | "handisport"
-  | "competitor";
+  | "competitor"
+  | "status"
+  | "isMinor";
 
 export type CrossTabResult = {
   rowLabels: string[];

@@ -21,7 +21,7 @@ export const REGISTRATION_STATUS_LABELS: Record<RegistrationStatus, string> = {
   in_review: "En relecture",
   payment_requested: "Paiement demandé",
   paid: "Payé",
-  approved: "Approuvé",
+  approved: "Validé sans paiement",
   rejected: "Refusé",
 };
 

@@ -50,7 +50,7 @@ export const MES_INSCRIPTION_STATUS_LABEL: Record<string, string> = {
   in_review: "En cours de relecture",
   payment_requested: "Paiement demandé",
   paid: "Paiement reçu",
-  approved: "Approuvé",
+  approved: "Inscription validée",
   rejected: "Refusé",
 };
 

@@ -82,4 +82,31 @@ describe("mapDocToAnalyticsRecord", () => {
     expect(record.ffttCategorie).toBe("P");
     expect(record.wasSqyMemberLastYear).toBe(true);
   });
+
+  it("mappe créneaux, suivi et montants anonymisés", () => {
+    const record = mapDocToAnalyticsRecord({
+      slotIds: ["slot-1"],
+      schoolPickupSlotIds: ["slot-1"],
+      competitionIds: ["criterium_federal_jeunes"],
+      wantsCompetitorExtras: true,
+      jerseyFollowUpStatus: "to_do",
+      pricingQuote: { totalCents: 22000 },
+      voluntaryDonationCents: 500,
+      paymentAids: [{ type: "pass_sport", label: "Pass Sport", amountCents: 7000, received: false }],
+      paymentMethod: "card",
+      paymentStatus: "waiting_payment",
+    });
+
+    expect(record.slotIds).toEqual(["slot-1"]);
+    expect(record.schoolPickupSlotIds).toEqual(["slot-1"]);
+    expect(record.competitionIds).toEqual(["criterium_federal_jeunes"]);
+    expect(record.jerseyFollowUpStatus).toBe("to_do");
+    expect(record.criteriumFederalRegistrationStatus).toBe("to_do");
+    expect(record.quoteTotalCents).toBe(22000);
+    expect(record.voluntaryDonationCents).toBe(500);
+    expect(record.paymentMethod).toBe("card");
+    expect(record.paymentStatus).toBe("waiting_payment");
+    expect(record.paymentAids?.[0]?.pendingReceipt).toBe(true);
+    expect(record.paymentAidTypes).toEqual(["pass_sport"]);
+  });
 });

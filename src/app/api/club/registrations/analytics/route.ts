@@ -4,6 +4,7 @@ import { jsonNoStore } from "@/lib/http/cache-headers";
 import { getActiveRegistrationConfig } from "@/lib/club-registration-config/store";
 import { getEnabledSections } from "@/lib/club-registration-config/helpers";
 import { requireRegistrationAnalyticsAccess } from "@/lib/club-registration/analytics/api-auth";
+import { buildAnalyticsLabelMaps } from "@/lib/club-registration/analytics/build-label-maps";
 import { listRegistrationsForAnalytics } from "@/lib/club-registration/analytics/list-for-analytics";
 import { logAuditAction } from "@/lib/auth/audit-logger";
 
@@ -20,8 +21,9 @@ export async function GET() {
     const sectionLabels = Object.fromEntries(
       getEnabledSections(config).map((section) => [section.id, section.label])
     );
+    const { slotLabels, competitionLabels, aidLabels } = buildAnalyticsLabelMaps(config);
 
-    const { records, seasonLabelBackfillUpdated } = await listRegistrationsForAnalytics(
+    const { records, seasonLabelBackfillUpdated, truncated } = await listRegistrationsForAnalytics(
       auth.session.db,
       seasonLabel
     );
@@ -37,7 +39,11 @@ export async function GET() {
     return jsonNoStore({
       seasonLabel,
       sectionLabels,
+      slotLabels,
+      competitionLabels,
+      aidLabels,
       records,
+      truncated,
     });
   } catch (error) {
     console.error("[api/club/registrations/analytics GET]", error);
