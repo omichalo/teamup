@@ -37,6 +37,7 @@ import {
 import { LicenseValidationLineSecondaryText } from "@/components/license-validation/LicenseValidationLineSecondaryText";
 import { useLicenseValidationDetail } from "@/components/license-validation/useLicenseValidationDetail";
 import { PpsFollowUpPanel } from "@/components/club-registration/PpsFollowUpPanel";
+import { MedicalCertificateFollowUpPanel } from "@/components/club-registration/MedicalCertificateFollowUpPanel";
 
 type Props = {
   registrationId: string | null;
@@ -285,6 +286,25 @@ export function LicenseValidationLicenseDetailPanel({
           onUpdated={(next) => {
             setDetail((current) =>
               current ? { ...current, ppsFollowUp: next } : current
+            );
+          }}
+        />
+      ) : null}
+
+      {registrationId ? (
+        <MedicalCertificateFollowUpPanel
+          registrationId={registrationId}
+          medicalCertificateDeclaration={detail.medicalCertificateDeclaration}
+          medicalCertificateFollowUp={detail.medicalCertificateFollowUp}
+          onUpdated={(next) => {
+            setDetail((current) =>
+              current
+                ? {
+                    ...current,
+                    medicalCertificateFollowUp: next,
+                    medicalCertificateStatus: next.medicalCertificateStatus,
+                  }
+                : current
             );
           }}
         />
