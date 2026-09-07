@@ -96,6 +96,7 @@ export function buildRegistrationSubmitDocument(params: {
       payload.birthDate
     ),
     ppsFollowUpEvents: [],
+    medicalCertificateFollowUpEvents: [],
     criteriumFederalRegistrationStatus: initialCriteriumFederalRegistrationStatus(
       payload.competitionIds
     ),
