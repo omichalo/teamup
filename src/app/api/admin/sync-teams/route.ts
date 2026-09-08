@@ -1,42 +1,25 @@
 import { jsonNoStore } from "@/lib/http/cache-headers";
-import { cookies } from "next/headers";
-import type { NextRequest } from "next/server";
 import { syncTeams } from "@/lib/shared/sync-utils";
-import { initializeFirebaseAdmin, getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
-import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
+import { getFirestoreAdmin } from "@/lib/firebase-admin";
+import { USER_ROLES } from "@/lib/auth/roles";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
 import { logAuditAction, AUDIT_ACTIONS } from "@/lib/auth/audit-logger";
 import {
   enforceRateLimit,
   RATE_LIMIT_ADMIN_SYNC_PER_UID,
 } from "@/lib/auth/rate-limit-http";
+import { withAuth } from "@/lib/auth/api-utils";
+import type { DecodedIdToken } from "firebase-admin/auth";
 
 export const runtime = "nodejs";
 
-export async function POST(req: NextRequest) {
+export const POST = withAuth(async (req, context) => {
   try {
+    const { decoded } = context as { decoded: DecodedIdToken };
+
     if (!validateOrigin(req)) {
       return jsonNoStore(
-        { error: "Invalid origin", message: "Requête non autorisée" },
-        { status: 403 }
-      );
-    }
-
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-    if (!sessionCookie) {
-      return jsonNoStore(
-        { error: "Token d'authentification requis", message: "Cette API nécessite une authentification valide" },
-        { status: 401 }
-      );
-    }
-
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    const role = resolveRole(decoded.role as string | undefined);
-
-    if (!hasAnyRole(role, [USER_ROLES.ADMIN])) {
-      return jsonNoStore(
-        { error: "Accès refusé", message: "Cette opération est réservée aux administrateurs" },
+        { error: "Invalid origin" },
         { status: 403 }
       );
     }
@@ -50,7 +33,6 @@ export async function POST(req: NextRequest) {
 
     console.log("🔄 [app/api/admin/sync-teams] Déclenchement de la synchronisation des équipes");
 
-    await initializeFirebaseAdmin();
     const db = getFirestoreAdmin();
     const result = await syncTeams(db);
 
@@ -82,9 +64,8 @@ export async function POST(req: NextRequest) {
       {
         success: false,
         error: "Erreur lors de la synchronisation des équipes",
-        details: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 }
     );
   }
-}
+}, [USER_ROLES.ADMIN]);
