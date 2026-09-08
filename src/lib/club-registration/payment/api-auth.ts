@@ -14,11 +14,20 @@ export async function requireRegistrationManager(): Promise<
     return { ok: false, status: 401, error: "Authentification requise" };
   }
 
-  const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-  const role = resolveRole(decoded.role as string | undefined);
-  if (!hasAnyRole(role, REGISTRATION_MANAGER_ROLES)) {
-    return { ok: false, status: 403, error: "Accès refusé" };
-  }
+  try {
+    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
 
-  return { ok: true, uid: decoded.uid };
+    if (!decoded.email_verified) {
+      return { ok: false, status: 403, error: "Email non vérifié" };
+    }
+
+    const role = resolveRole(decoded.role as string | undefined);
+    if (!hasAnyRole(role, REGISTRATION_MANAGER_ROLES)) {
+      return { ok: false, status: 403, error: "Accès refusé" };
+    }
+
+    return { ok: true, uid: decoded.uid };
+  } catch {
+    return { ok: false, status: 401, error: "Session invalide ou expirée" };
+  }
 }
