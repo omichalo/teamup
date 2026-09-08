@@ -1,41 +1,15 @@
 ---
-description: Bounded contexts club, Firestore, paiements, extraction UI sans refactor forcé
-alwaysApply: true
+description: À charger pour adhésions, tarifs, présences, paiements et nouvelles capacités de gestion du club
+alwaysApply: false
 ---
 
-# Extension plateforme club & nouvelles fonctionnalités
+# Extension plateforme club
 
-Ces principes complètent les règles générales (`00`–`70`, `90`) pour tout développement qui étend TeamUp vers une gestion de club plus large (adhésions, tarifs, présences, paiements, etc.).
-
-## Contextes métier (bounded contexts)
-
-- Séparer clairement les domaines qui évoluent pour des raisons différentes : identité/rôles, référentiel FFTT/joueurs, adhésion et workflow de validation, tarification, paiement (PSP), planning/présence.
-- Ne pas mélanger dans un même module ou composant la logique « paiement / webhook », « dossier d’adhésion » et « sync FFTT » sans frontière explicite (`lib/<domaine>/`, routes API groupées par domaine).
-
-## Données Firestore
-
-- Les **nouvelles** capacités métiers utilisent de préférence des **collections ou sous-structures dédiées**, avec règles de sécurité et index pensés **dès la première livraison** (moindre privilège, pas d’ouverture large par défaut).
-- Les workflows filtrés (statut + date + équipe, etc.) : prévoir les **index composites** en même temps que les requêtes.
-
-## Paiements et webhooks
-
-- Traiter intégration PSP et webhooks comme **couche isolée** : vérification de signature, **idempotence** des événements, état métier « payé » basé sur les événements fiables, pas sur le seul retour navigateur.
-- Ne pas exposer de détails carte ou secrets dans les logs ou réponses JSON.
-
-## UI : extraction sans refactor obligatoire des écrans existants
-
-- Pour les **nouveaux parcours**, préférer **extraire** des primitives réutilisables (`components/ui/`, petits modules `lib/`) en s’inspirant du code existant, plutôt que d’imposer un refactor des pages historiques.
-- Les écrans actuels peuvent conserver leurs composants locaux ; **recâbler** vers une primitive partagée seulement si la duplication ou les bugs le justifient (**extract alongside**).
-- **Plafonds universels** (cf. `21-react-component-size.mdc`, `npm run check:file-sizes`) : tout fichier sous `src/` est soumis aux mêmes limites. La dette déjà présente est figée dans `scripts/legacy-oversized-files.json` (pas de croissance). **Interdit** de livrer un nouveau composant ou une nouvelle page au-dessus du plafond — même si un écran legacy du repo est plus gros.
-
-## Cohérence auth (inchangé mais rappel)
-
-- Toute nouvelle page protégée et sa route API associée doivent appliquer les **mêmes** ensembles de rôles (cf. `70-auth-and-roles.mdc`). Les routes `/api/admin/*` restent **ADMIN uniquement**.
-
-## Audit et conformité produit
-
-- Actions sensibles (validation de dossier, changement de tarif, traitement paiement côté serveur) : utiliser `logAuditAction` et masquer les données sensibles (cf. `60-api-security.mdc`).
-
-## Documentation produit / technique
-
-- Les choix structurants (modèle d’adhésion, fournisseur de paiement, visibilité des données) : un **ADR léger** ou une entrée dans `docs/technical/` évite les débats implicites en revue.
+- Séparer les bounded contexts qui évoluent pour des raisons différentes : identité/rôles, référentiel FFTT, adhésion, tarification, paiement, planning/présence.
+- Nouvelles capacités Firestore : structures dédiées, moindre privilège et index pensés dès la première livraison.
+- Paiements/webhooks : couche isolée, signature, idempotence, état métier dérivé d’événements fiables, aucun secret dans les logs.
+- Nouveaux parcours UI : préférer `extract alongside` et des primitives réutilisables plutôt qu’un refactor massif des écrans historiques.
+- Respecter les plafonds universels de `21-react-component-size.mdc` et ne pas augmenter la dette legacy.
+- Toute page protégée et son API doivent conserver les mêmes ensembles de rôles.
+- Choix structurants : ADR léger ou entrée dans `docs/technical/` lorsque cela évite une décision implicite.
+- Pour livrer une feature verticale, utiliser `.agents/skills/teamup-feature-slice/SKILL.md`.

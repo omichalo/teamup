@@ -6,6 +6,12 @@
         "command": ".cursor/hooks/ensure-dev-server.sh"
       }
     ],
+    "beforeShellExecution": [
+      {
+        "command": ".cursor/hooks/guard-dangerous-commands.sh",
+        "matcher": "git push|firebase deploy|npm run deploy:|npm run functions:deploy"
+      }
+    ],
     "afterShellExecution": [
       {
         "command": ".cursor/hooks/ensure-dev-server.sh",
