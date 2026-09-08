@@ -63,10 +63,7 @@ export async function POST(req: Request) {
       await adminAuth.getUserByEmail(email);
     } catch (error) {
       if (isFirebaseUserNotFoundError(error)) {
-        return jsonNoStore(
-          { error: "Utilisateur non trouvé", message: "Aucun compte n'est associé à cet email" },
-          { status: 404 }
-        );
+        return jsonNoStore({ ok: true });
       }
       console.error("[send-verification] Erreur lookup utilisateur:", error);
       return jsonNoStore(
@@ -101,10 +98,7 @@ export async function POST(req: Request) {
       const authCode = getAuthErrorCode(error);
 
       if (isFirebaseUserNotFoundError(error)) {
-        return jsonNoStore(
-          { error: "Utilisateur non trouvé", message: "Aucun compte n'est associé à cet email" },
-          { status: 404 }
-        );
+        return jsonNoStore({ ok: true });
       }
 
       if (
@@ -163,7 +157,7 @@ export async function POST(req: Request) {
 
     let statusCode = 500;
     if (errorString.includes("user-not-found") || errorString.includes("USER_NOT_FOUND")) {
-      statusCode = 404;
+      return jsonNoStore({ ok: true });
     } else if (errorString.includes("invalid-email") || errorString.includes("INVALID_EMAIL")) {
       statusCode = 400;
     } else if (errorString.includes("too-many-requests") || errorString.includes("TOO_MANY_REQUESTS")) {
