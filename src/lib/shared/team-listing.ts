@@ -1,5 +1,8 @@
-/** IDs d'épreuve FFTT changent chaque saison : on garde la génération la plus récente. */
-const EPREUVE_GENERATION_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+/** IDs d'épreuve FFTT changent chaque saison : on garde la génération la plus récente.
+ * Fenêtre courte pour garder masculin+féminin synchronisés le même week-end de sync,
+ * sans réinclure une ancienne génération re-touchée quelques jours plus tôt.
+ */
+const EPREUVE_GENERATION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
 
 export function isCurrentSeasonTeam(params: {
   listedInFftt?: boolean | null;
