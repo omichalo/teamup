@@ -99,6 +99,56 @@ describe("selectLatestEpreuveGenerations", () => {
     ).toEqual(["new-m", "new-f", "paris"]);
   });
 
+  it("drops a re-touched previous generation outside the co-sync window", () => {
+    const now = new Date("2026-09-12T04:05:00Z");
+    const threeDaysAgo = new Date("2026-09-09T04:05:00Z");
+    const teams = [
+      {
+        id: "old-m",
+        epreuveType: "championnat_equipes",
+        idEpreuve: 15954,
+        updatedAt: threeDaysAgo,
+      },
+      {
+        id: "new-m",
+        epreuveType: "championnat_equipes",
+        idEpreuve: 18368,
+        updatedAt: now,
+      },
+      {
+        id: "new-f",
+        epreuveType: "championnat_equipes",
+        idEpreuve: 18369,
+        updatedAt: now,
+      },
+    ];
+    expect(
+      selectLatestEpreuveGenerations(teams, (team) => team).map((team) => team.id)
+    ).toEqual(["new-m", "new-f"]);
+  });
+
+  it("keeps masculin and feminin of the same sync wave", () => {
+    const night = new Date("2026-09-12T04:05:00Z");
+    const earlierSameNight = new Date("2026-09-12T03:50:00Z");
+    const teams = [
+      {
+        id: "new-m",
+        epreuveType: "championnat_equipes",
+        idEpreuve: 18368,
+        updatedAt: night,
+      },
+      {
+        id: "new-f",
+        epreuveType: "championnat_equipes",
+        idEpreuve: 18369,
+        updatedAt: earlierSameNight,
+      },
+    ];
+    expect(
+      selectLatestEpreuveGenerations(teams, (team) => team).map((team) => team.id)
+    ).toEqual(["new-m", "new-f"]);
+  });
+
   it("keeps a single epreuve generation unchanged", () => {
     const teams = [
       {

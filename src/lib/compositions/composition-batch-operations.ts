@@ -4,16 +4,32 @@ import { Player } from "@/types/team-management";
 import { EquipeWithMatches } from "@/hooks/useTeamData";
 import { extractTeamNumber } from "@/lib/compositions/validators";
 import { isParisChampionship } from "@/lib/compositions/validators/team-utils";
+import {
+  classifyClubChampionshipEpreuve,
+  resolveIdEpreuveFromEquipes,
+} from "@/lib/shared/epreuve-utils";
 
 type CompositionMap = Record<string, string[]>;
 
-function idEpreuveFromTeams(teams: TeamListItem[]): number | undefined {
-  for (const equipe of teams) {
-    if (equipe.team.idEpreuve != null) {
-      return equipe.team.idEpreuve;
-    }
-  }
-  return undefined;
+interface TeamListItem {
+  team: { id: string; name?: string; idEpreuve?: number };
+}
+
+/**
+ * Clé doc compositions alignée sur disponibilités :
+ * France équipes → pas de suffixe ; Paris → 15980.
+ */
+export function idEpreuveForCompositionDocs(teams: TeamListItem[]): number | undefined {
+  const hasParis = teams.some(
+    (equipe) =>
+      classifyClubChampionshipEpreuve({ idEpreuve: equipe.team.idEpreuve }) ===
+      "championnat_paris"
+  );
+  return resolveIdEpreuveFromEquipes(
+    teams.map((equipe) => ({ team: equipe.team })),
+    "masculin",
+    hasParis ? "championnat_paris" : "championnat_equipes"
+  );
 }
 
 function compositionPayload(
@@ -44,10 +60,6 @@ interface TeamAvailabilitiesMap {
 interface ApplyAvailabilities {
   masculin?: TeamAvailabilitiesMap;
   feminin?: TeamAvailabilitiesMap;
-}
-
-interface TeamListItem {
-  team: { id: string; name?: string; idEpreuve?: number };
 }
 
 interface ResetParams {
@@ -95,7 +107,7 @@ export async function resetCompositionsBatch({
               Object.fromEntries(
                 masculineTeamIds.map<[string, string[]]>((teamId) => [teamId, []])
               ),
-              idEpreuveFromTeams(equipesByType.masculin)
+              idEpreuveForCompositionDocs(equipesByType.masculin)
             )
           )
         : Promise.resolve(),
@@ -108,7 +120,7 @@ export async function resetCompositionsBatch({
               Object.fromEntries(
                 feminineTeamIds.map<[string, string[]]>((teamId) => [teamId, []])
               ),
-              idEpreuveFromTeams(equipesByType.feminin)
+              idEpreuveForCompositionDocs(equipesByType.feminin)
             )
           )
         : Promise.resolve(),
@@ -241,7 +253,7 @@ export async function applyDefaultCompositionsBatch({
                   nextCompositions[teamId] || [],
                 ])
               ),
-              idEpreuveFromTeams(equipesByType.masculin)
+              idEpreuveForCompositionDocs(equipesByType.masculin)
             )
           )
         : Promise.resolve(),
@@ -257,7 +269,7 @@ export async function applyDefaultCompositionsBatch({
                   nextCompositions[teamId] || [],
                 ])
               ),
-              idEpreuveFromTeams(equipesByType.feminin)
+              idEpreuveForCompositionDocs(equipesByType.feminin)
             )
           )
         : Promise.resolve(),
