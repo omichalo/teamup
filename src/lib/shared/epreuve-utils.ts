@@ -89,6 +89,15 @@ export function resolveIdEpreuveFromEquipes(
   championshipType: ChampionshipGender,
   epreuveType?: EpreuveType | null
 ): number | undefined {
+  // Les docs disponibilités / compositions / sondages Discord pour le championnat
+  // par équipes sont volontairement SANS suffixe idEpreuve (rétrocompat + alignement
+  // avec getIdEpreuve). Ne jamais renvoyer 18368/15954 ici, sinon /compositions
+  // écoute un document vide (ex. aller_1_masculin_18368) alors que les réponses
+  // sont sur aller_1_masculin.
+  if (epreuveType === "championnat_equipes") {
+    return undefined;
+  }
+
   const wantParis = epreuveType === "championnat_paris";
   const wantFemale = championshipType === "feminin";
 
@@ -97,23 +106,22 @@ export function resolveIdEpreuveFromEquipes(
       idEpreuve: equipe.team.idEpreuve,
       epreuve: equipe.team.epreuve,
     });
+
     if (wantParis) {
       if (classified === "championnat_paris" && equipe.team.idEpreuve != null) {
         return equipe.team.idEpreuve;
       }
       continue;
     }
-    if (classified === "championnat_paris") {
-      continue;
-    }
-    const isFemale =
-      equipe.team.isFemale === true ||
-      equipe.matches?.some((match) => match.isFemale === true) === true;
-    if (isFemale !== wantFemale) {
-      continue;
-    }
-    if (equipe.team.idEpreuve != null) {
-      return equipe.team.idEpreuve;
+
+    // epreuveType omis : n'utiliser l'id que pour Paris (clés doc avec _15980).
+    if (classified === "championnat_paris" && equipe.team.idEpreuve != null) {
+      const isFemale =
+        equipe.team.isFemale === true ||
+        equipe.matches?.some((match) => match.isFemale === true) === true;
+      if (isFemale === wantFemale || !wantFemale) {
+        return equipe.team.idEpreuve;
+      }
     }
   }
 
