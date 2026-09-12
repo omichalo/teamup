@@ -91,14 +91,32 @@ describe("resolveIdEpreuveFromEquipes", () => {
       team: { idEpreuve: 18369, epreuve: "FED_Championnat de France par Equipes Féminin" },
       matches: [{ isFemale: true }],
     },
+    {
+      team: {
+        idEpreuve: 15980,
+        epreuve: "L08_Championnat de Paris IDF",
+        isFemale: false,
+      },
+      matches: [{ isFemale: false }],
+    },
   ];
 
-  it("picks the current France epreuve id by gender", () => {
-    expect(resolveIdEpreuveFromEquipes(equipes, "masculin", "championnat_equipes")).toBe(
-      18368
+  it("keeps France équipes doc keys without idEpreuve (align disponibilites)", () => {
+    const franceOnly = equipes.filter(
+      (equipe) => equipe.team.idEpreuve === 18368 || equipe.team.idEpreuve === 18369
     );
-    expect(resolveIdEpreuveFromEquipes(equipes, "feminin", "championnat_equipes")).toBe(
-      18369
+    expect(resolveIdEpreuveFromEquipes(franceOnly, "masculin", "championnat_equipes")).toBe(
+      undefined
+    );
+    expect(resolveIdEpreuveFromEquipes(franceOnly, "feminin", "championnat_equipes")).toBe(
+      undefined
+    );
+    expect(resolveIdEpreuveFromEquipes(franceOnly, "masculin")).toBe(undefined);
+  });
+
+  it("resolves Paris idEpreuve for Paris championship docs", () => {
+    expect(resolveIdEpreuveFromEquipes(equipes, "masculin", "championnat_paris")).toBe(
+      15980
     );
   });
 });
