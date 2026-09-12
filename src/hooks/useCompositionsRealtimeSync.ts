@@ -41,6 +41,7 @@ export function useCompositionsRealtimeSync({
   const [availabilitiesLoaded, setAvailabilitiesLoaded] = useState(false);
 
   const idEpreuve = useMemo(() => getIdEpreuve(selectedEpreuve), [selectedEpreuve]);
+  // Aligné sur /disponibilites : championnat_equipes → pas de suffixe idEpreuve.
   const masculinIdEpreuve = useMemo(
     () =>
       resolveIdEpreuveFromEquipes(equipes, "masculin", selectedEpreuve) ??
