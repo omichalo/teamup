@@ -17,7 +17,7 @@ function incrementIds(bucket: CountBucket, ids: string[] | undefined): void {
   }
 }
 
-const MEDICAL_TODO_KINDS = new Set([
+const MEDICAL_OPS_PENDING_KINDS = new Set([
   "pps_expected",
   "pps_checked_incomplete",
   "certificate_expected",
@@ -64,7 +64,7 @@ export function aggregateOrganizationAnalytics(
 
     if (record.medicalFollowUpKind) {
       increment(medicalFollowUp, record.medicalFollowUpKind);
-      if (MEDICAL_TODO_KINDS.has(record.medicalFollowUpKind)) {
+      if (MEDICAL_OPS_PENDING_KINDS.has(record.medicalFollowUpKind)) {
         opsTodo.medical += 1;
       }
     }
