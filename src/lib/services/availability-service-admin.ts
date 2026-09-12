@@ -4,10 +4,10 @@ import { ChampionshipType } from "@/types";
 import {
   AvailabilityResponse,
   DayAvailability,
-  PlayerAvailability,
 } from "@/lib/services/availability-service";
 import { getAvailabilityDocumentId } from "@/lib/availability/document-id";
 import { applyPlayerAvailabilityUpdates } from "@/lib/availability/firestore-persistence";
+import { normalizePlayersMap } from "@/lib/availability/normalize-players-map";
 import { sanitizeAvailabilityResponse } from "@/lib/availability/sanitize-response";
 
 const toDate = (value: unknown): Date => {
@@ -67,7 +67,7 @@ export class AvailabilityServiceAdmin {
         championshipType: data.championshipType,
         idEpreuve: data.idEpreuve,
         date: data.date,
-        players: (data.players as PlayerAvailability) || {},
+        players: normalizePlayersMap(data),
         createdAt: toDate(data.createdAt),
         updatedAt: toDate(data.updatedAt),
       };

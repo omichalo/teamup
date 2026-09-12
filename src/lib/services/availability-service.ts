@@ -3,6 +3,7 @@ import { getDbInstanceDirect } from "@/lib/firebase";
 import { ChampionshipType } from "@/types";
 import { getAvailabilityDocumentId } from "@/lib/availability/document-id";
 import { patchAvailabilities } from "@/lib/availability/api-client";
+import { normalizePlayersMap } from "@/lib/availability/normalize-players-map";
 import { sanitizeAvailabilityResponse } from "@/lib/availability/sanitize-response";
 
 export interface AvailabilityResponse {
@@ -59,7 +60,7 @@ export class AvailabilityService {
           championshipType: data.championshipType,
           idEpreuve: data.idEpreuve,
           date: data.date,
-          players: data.players || {},
+          players: normalizePlayersMap(data),
           createdAt:
             data.createdAt instanceof Timestamp
               ? data.createdAt.toDate()
@@ -190,7 +191,7 @@ export class AvailabilityService {
               championshipType: data.championshipType,
               idEpreuve: data.idEpreuve,
               date: data.date,
-              players: data.players || {},
+              players: normalizePlayersMap(data),
               createdAt:
                 data.createdAt instanceof Timestamp
                   ? data.createdAt.toDate()
