@@ -3,10 +3,7 @@ import {
   normalizeRegistrationPayment,
   paymentToFirestoreUpdate,
 } from "./normalize-payment";
-import {
-  isRegistrationSupplementDue,
-  resolveJerseyFollowUpForSupplement,
-} from "./registration-supplement";
+import { isRegistrationSupplementDue } from "./registration-supplement";
 import {
   recalculateRegistrationPayment,
   regenerateExpectedPayments,
@@ -65,14 +62,6 @@ export function buildPaymentSyncPatchForQuote(params: {
   if (isRegistrationSupplementDue(next)) {
     patch.status = "payment_requested";
     patch.supplementRequestedAt = FieldValue.serverTimestamp();
-    const jerseyStatus = resolveJerseyFollowUpForSupplement({
-      wantsCompetitorExtras: params.currentData.wantsCompetitorExtras,
-      wantsOptionalJersey: params.currentData.wantsOptionalJersey,
-      currentStatus: params.currentData.jerseyFollowUpStatus,
-    });
-    if (jerseyStatus) {
-      patch.jerseyFollowUpStatus = jerseyStatus;
-    }
   }
 
   return patch;

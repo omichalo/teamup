@@ -121,7 +121,7 @@ describe("buildPaymentSyncPatchForQuote", () => {
     });
   });
 
-  it("rouvre le dossier si un encaissement existe et un reliquat apparaît", () => {
+  it("rouvre le dossier si un encaissement existe et un reliquat apparaît, sans toucher au maillot", () => {
     const patch = buildPaymentSyncPatchForQuote({
       currentData: {
         status: "paid",
@@ -154,7 +154,7 @@ describe("buildPaymentSyncPatchForQuote", () => {
       paymentStatus: "partially_paid",
     });
     expect(patch.supplementRequestedAt).toBeDefined();
-    expect(patch.jerseyFollowUpStatus).toBe("prepared_awaiting_payment");
+    expect(patch.jerseyFollowUpStatus).toBeUndefined();
   });
 
   it("ne réécrit pas si le paiement est déjà aligné", () => {
