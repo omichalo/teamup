@@ -91,7 +91,7 @@ export function buildRegistrationPayloadSchema(
       ffttLicense: z
         .union([
           z.literal(""),
-          z.string().trim().regex(/^[0-9]{5,12}$/, "Numéro de licence invalide"),
+          z.string().trim().regex(/^[0-9]{4,12}$/, "Numéro de licence invalide"),
         ])
         .optional(),
       ffttLicenseLookup: ffttLicenseLookupSchema.optional(),
