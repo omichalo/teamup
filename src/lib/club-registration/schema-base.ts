@@ -54,7 +54,7 @@ export type MedicalQuestionnairePayload = z.infer<typeof medicalQuestionnaireSch
 export type MedicalVeteranPathPayload = z.infer<typeof medicalVeteranPathSchema>;
 
 export const ffttLicenseLookupSchema = z.object({
-  licence: z.string().regex(/^[0-9]{5,12}$/),
+  licence: z.string().regex(/^[0-9]{4,12}$/),
   nom: z.optional(z.string().trim().max(120).transform(normalizeLastName)),
   prenom: z.string().trim().max(120).optional(),
   isHomme: z.boolean().optional(),
