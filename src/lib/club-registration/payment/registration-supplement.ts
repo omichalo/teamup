@@ -1,9 +1,4 @@
 import type { RegistrationPayment } from "./types";
-import {
-  isJerseyRequested,
-  normalizeJerseyFollowUpStatus,
-  type JerseyFollowUpStatus,
-} from "../jersey-follow-up";
 
 type PaymentBalance = Pick<
   RegistrationPayment,
@@ -30,24 +25,3 @@ export function isRegistrationSupplementDue(payment?: PaymentBalance | null): bo
   }
   return payment.paidAmountCents > 0 && payment.remainingAmountCents > 0;
 }
-
-/** Maillot préparé en attente de paiement quand un complément apparaît. */
-export function resolveJerseyFollowUpForSupplement(params: {
-  wantsCompetitorExtras: unknown;
-  wantsOptionalJersey: unknown;
-  currentStatus: unknown;
-}): JerseyFollowUpStatus | undefined {
-  if (!isJerseyRequested(params.wantsCompetitorExtras, params.wantsOptionalJersey)) {
-    return undefined;
-  }
-  const current = normalizeJerseyFollowUpStatus(
-    params.currentStatus,
-    params.wantsCompetitorExtras,
-    params.wantsOptionalJersey
-  );
-  if (current === "given" || current === "prepared_awaiting_payment") {
-    return undefined;
-  }
-  return "prepared_awaiting_payment";
-}
-
