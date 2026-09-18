@@ -1,54 +1,16 @@
 ---
-description: Qualité, TypeScript, outils npm check, performance — fondations TeamUp
+description: Noyau qualité TeamUp — invariants universels et quality gates
 alwaysApply: true
 ---
 
-# Foundation & Quality
+# TeamUp — Core quality
 
-## Configuration et outils
-
-Pendant le développement (quand npm run dev est actif), utilise npm run check:dev (lint + check:file-sizes + type-check sans build) pour éviter les conflits avec le serveur de développement.
-Avant chaque commit sur le projet Next.js, exécute npm run check (lint + check:file-sizes + type-check + build) et corrige toutes les erreurs de build, de lint et de typage avant de t'arrêter.
-Après un npm run check, un npm run build ou un push git, le serveur de dev est relancé automatiquement via les hooks Cursor (`.cursor/hooks.json`) et `scripts/ensure-dev-server.sh`. En secours manuel : `npm run dev:ensure`. Pour désactiver l'auto-démarrage : `TEAMUP_SKIP_DEV_AUTOSTART=1`.
-Ne jamais faire de --no-verify sur les commandes git
-Toujours refuser de pousser sur git un code avec des TODO
-Une fois le code poussé sur github, vérifier que le serveur répond sur http://localhost:3000/api/health ; sinon lancer `npm run dev:ensure`.
-
-## Principes généraux
-
-Tu appliques systématiquement les principes de développement DRY et SOLID.
-
-### Qualité production
-
-- Toujours respecter l'architecture existante du projet (structure des dossiers, conventions de nommage, style de code).
-- Utiliser TypeScript de manière stricte : pas de 'any' implicite, pas de 'as any' sauf cas ultra-justifié.
-- Préserver les définitions de types existantes (types, interfaces, schemas Zod, etc.) et les améliorer plutôt que les casser.
-- Ne jamais introduire de code mort, d'imports inutilisés, de console.log permanents ou de TODO laissés sans contexte.
-- Toujours garder le code lisible, modulaire et cohérent : fonctions courtes, composants simples, pas de duplication.
-
-## TypeScript
-
-- Toujours produire du code en TypeScript (pas en JavaScript).
-- Utiliser `strict` TypeScript (pas d'`any` implicite).
-- Toujours typer les props des composants, les retours de fonctions et les paramètres importants.
-- Préférer des types précis (discriminated unions, enums, Record, etc.) plutôt que 'string'/'any' vagues.
-- Garder les types réutilisables dans un endroit cohérent (ex: 'types/', 'lib/types.ts').
-- Respecter l'ESLint/Prettier configuré dans le projet.
-- Interdire la génération de code avec erreurs de compilation.
-
-## Performance
-
-- Ne pas sur-optimiser prématurément, mais éviter les erreurs évidentes (boucles lourdes dans le rendu, re-renders inutiles).
-- Utiliser les imports dynamiques Next.js (dynamic()) pour les composants lourds côté client si besoin.
-
-## Intégration dans le projet existant
-
-- Respecter la configuration ESLint/Prettier du projet (ne pas introduire un autre formatage).
-- Toujours vérifier que le code proposé pourra passer 'npm run lint' et 'npm run build'.
-- Préserver la DX : messages d'erreurs clairs, pas de magie cachée, pas de changements non nécessaires.
-
-## Quand tu écris ou modifies du code dans ce projet
-
-- Appliquer toutes ces règles par défaut.
-- Privilégier un code clair, maintenable et cohérent avec le reste du repo plutôt qu'une solution "clever".
-- Si tu proposes une refactorisation, elle doit simplifier le projet (moins de duplication, meilleure séparation des responsabilités) sans casser le comportement existant.
+- Respecter l’architecture, les conventions et les abstractions existantes ; viser le plus petit diff sûr.
+- TypeScript strict : pas d’`any` implicite, pas de `as any` sauf justification exceptionnelle, pas de code mort ni d’imports inutilisés.
+- Ne pas laisser de `TODO`, `console.log` permanent ou secret/donnée sensible dans les logs.
+- Privilégier lisibilité, responsabilité unique et simplicité ; ne pas sur-optimiser ni refactorer hors périmètre.
+- Pendant le développement, utiliser `npm run check:dev`.
+- Avant commit/push ou fin de tâche de livraison, exécuter `npm run check` et corriger lint, tailles, types, tests et build.
+- Ne jamais utiliser `--no-verify`.
+- Après un check/build/push, le serveur de dev est maintenu par les hooks Cursor ; secours : `npm run dev:ensure`.
+- Les règles spécialisées de `.cursor/rules/` complètent ce noyau selon les fichiers et le contexte ; ne pas dupliquer leurs détails ici.

@@ -1,20 +1,13 @@
 ---
-description: React, composants, accessibilité UI
-alwaysApply: true
+description: React, composants, état et accessibilité UI
+globs: src/**/*.tsx
+alwaysApply: false
 ---
 
 # UI & State Management
 
-## React / Composants
-
-- Écrire des composants fonctionnels simples, bien typés : props claires, pas de logique métier massive dans le JSX.
-- Extraire la logique métier dans des fonctions/utilitaires ou hooks dédiés (ex: 'useXxx', fonctions dans 'lib/').
-- Respecter le principe 'single responsibility' : un composant ne fait qu'une chose (affichage / logique locale).
-- Utiliser les fragments, éviter les wrappers inutiles.
-- Utiliser React.memo, useMemo, useCallback seulement quand il y a un vrai bénéfice (liste lourde, prop stable...).
-
-## Accessibilité & UI
-
-- Utiliser du HTML sémantique : <button> pour les actions, <a> pour les liens, <label> pour les champs de formulaire, etc.
-- Fournir des 'alt' pertinents sur les images, et les attributs ARIA si nécessaire.
-- Veiller à ce que les composants soient utilisables au clavier et lisibles par un lecteur d'écran.
+- Écrire des composants fonctionnels simples et bien typés ; ne pas enfouir la logique métier dans le JSX.
+- Extraire logique métier, accès API et état réutilisable dans des fonctions, hooks ou modules dédiés.
+- Appliquer la responsabilité unique ; éviter wrappers et abstractions sans bénéfice.
+- Utiliser `React.memo`, `useMemo`, `useCallback` seulement lorsqu’un bénéfice est identifiable.
+- Utiliser HTML sémantique, labels, alt et ARIA lorsque nécessaire ; préserver navigation clavier et lecteurs d’écran.
