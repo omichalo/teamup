@@ -15,6 +15,15 @@ describe("resolveChampionshipPersonKey", () => {
     ).toBe("7876509");
   });
 
+  it("accepts a 4-digit FFTT license", () => {
+    expect(
+      resolveChampionshipPersonKey({
+        ffttLicense: "1234",
+        registrationId: "abc",
+      })
+    ).toBe("1234");
+  });
+
   it("falls back to the registration id", () => {
     expect(
       resolveChampionshipPersonKey({

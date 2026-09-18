@@ -5,7 +5,7 @@ import {
   type LicenseValidationStatus,
 } from "@/lib/license-validation/license-validation-status";
 
-const FFTT_LICENSE_RE = /^[0-9]{5,12}$/;
+const FFTT_LICENSE_RE = /^[0-9]{4,12}$/;
 
 export const LICENSE_REQUIRED_MESSAGE =
   "Le numéro de licence est obligatoire pour les statuts Traité et Validé sans pratique sportive";
@@ -27,7 +27,7 @@ export function parseOptionalFfttLicenseInput(
   if (!isValidFfttLicenseNumber(normalized)) {
     return {
       ok: false,
-      error: "Le numéro de licence doit contenir entre 5 et 12 chiffres",
+      error: "Le numéro de licence doit contenir entre 4 et 12 chiffres",
     };
   }
   return { ok: true, license: normalized };

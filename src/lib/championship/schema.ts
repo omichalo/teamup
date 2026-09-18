@@ -74,7 +74,7 @@ export const rosterParticipationPatchSchema = z
     firstName: z.string().trim().max(120).optional(),
     lastName: z.string().trim().max(120).optional(),
     sex: z.enum(["female", "male", "other", ""]).optional(),
-    ffttLicense: z.string().regex(/^[0-9]{5,12}$/).nullable().optional(),
+    ffttLicense: z.string().regex(/^[0-9]{4,12}$/).nullable().optional(),
     isWheelchair: z.boolean().optional(),
     discordMentions: z.array(z.string()).optional(),
     preferredTeams: preferredTeamsSchema.optional(),

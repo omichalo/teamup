@@ -8,7 +8,7 @@ import { createFFTTAPI } from "@/lib/shared/fftt-utils";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { findRegistrationLicenseConflicts } from "@/lib/club-registration/find-registration-license-conflicts";
 
-const LICENSE_RE = /^[0-9]{5,12}$/;
+const LICENSE_RE = /^[0-9]{4,12}$/;
 
 function stringOrUndefined(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() !== ""
