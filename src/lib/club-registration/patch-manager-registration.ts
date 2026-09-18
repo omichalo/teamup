@@ -44,7 +44,7 @@ import { syncRosterAfterRegistrationChange } from "@/lib/championship/sync-after
 
 const COLLECTION = "clubRegistrations";
 const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
-const FFTT_LICENSE_RE = /^[0-9]{5,12}$/;
+const FFTT_LICENSE_RE = /^[0-9]{4,12}$/;
 
 export async function patchManagerRegistration(
   req: Request,
