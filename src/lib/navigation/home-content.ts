@@ -100,8 +100,8 @@ const HOME_LINK_META: Record<
   },
   "/club/idees": {
     description:
-      "Proposer une évolution ou signaler un problème sur l'application.",
-    cta: "Ouvrir idées & remontées",
+      "Proposer une évolution TeamUp ou club, ou signaler un problème.",
+    cta: "Ouvrir la boîte à idées",
     color: "warning",
   },
   "/club/validations-licence": {
@@ -165,13 +165,19 @@ function intro(
 function playerHome(): RoleHomeContent {
   return intro(
     "Espace adhérent",
-    "Vos démarches d'adhésion, au même endroit.",
+    "Vos démarches d'adhésion et vos idées pour le club, au même endroit.",
     [
       {
         id: "adhesions",
         title: "Adhésions",
         description: "Créer un dossier et suivre ceux déjà transmis au club.",
         items: cards([LAYOUT_NAV.nouvelleAdhesion, LAYOUT_NAV.mesDossiers]),
+      },
+      {
+        id: "club",
+        title: "Vie du club",
+        description: "Proposer une idée ou signaler un problème.",
+        items: cards([LAYOUT_NAV.boiteIdees]),
       },
     ],
   );
@@ -197,6 +203,12 @@ function boardMemberHome(): RoleHomeContent {
           LAYOUT_NAV.mesDossiers,
         ]),
       },
+      {
+        id: "club",
+        title: "Vie du club",
+        description: "Proposer une idée ou signaler un problème.",
+        items: cards([LAYOUT_NAV.boiteIdees]),
+      },
     ],
   );
 }
@@ -218,6 +230,12 @@ function assistantSecretaryHome(): RoleHomeContent {
           LAYOUT_NAV.nouvelleAdhesion,
           LAYOUT_NAV.mesDossiers,
         ]),
+      },
+      {
+        id: "club",
+        title: "Vie du club",
+        description: "Proposer une idée ou signaler un problème.",
+        items: cards([LAYOUT_NAV.boiteIdees]),
       },
     ],
   );

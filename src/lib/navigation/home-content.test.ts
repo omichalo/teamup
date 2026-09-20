@@ -83,6 +83,7 @@ describe("buildRoleHomeContent", () => {
     const content = buildRoleHomeContent(USER_ROLES.BOARD_MEMBER);
     expect(content.sections.map((section) => section.id)).toEqual([
       "adhesions",
+      "club",
     ]);
     expect(listHomeCardHrefs(content)).toEqual([
       "/club/adhesions-tableau",
@@ -92,6 +93,7 @@ describe("buildRoleHomeContent", () => {
       "/club/presences/essais",
       "/club/inscription",
       "/club/mes-inscriptions",
+      "/club/idees",
     ]);
   });
 
@@ -99,6 +101,7 @@ describe("buildRoleHomeContent", () => {
     expect(listHomeCardHrefs(buildRoleHomeContent(USER_ROLES.PLAYER))).toEqual([
       "/club/inscription",
       "/club/mes-inscriptions",
+      "/club/idees",
     ]);
   });
 });

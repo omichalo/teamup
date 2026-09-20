@@ -12,6 +12,7 @@ export const SUGGESTION_DEFAULT_CATEGORY_LABELS: Record<
   emails: "Emails",
   compositions: "Compositions",
   joueurs: "Joueurs",
+  autre: "Autre",
 };
 
 export type SuggestionCategoryOption = {

@@ -1,12 +1,14 @@
 export const runtime = "nodejs";
 
+import { after } from "next/server";
 import { jsonNoStore } from "@/lib/http/cache-headers";
-import { resolveSuggestionSession } from "@/lib/app-suggestions/api-auth";
+import { resolveSuggestionSession, toSuggestionViewer } from "@/lib/app-suggestions/api-auth";
 import { resolveSuggestionStatusFilter } from "@/lib/app-suggestions/status";
 import {
   resolveSuggestionCategoryFilter,
   resolveSuggestionKindFilter,
   resolveSuggestionMineFilter,
+  resolveSuggestionWaitingOnFilter,
 } from "@/lib/app-suggestions/resolve-list-filters";
 import {
   suggestionCreateSchema,
@@ -37,6 +39,9 @@ export async function GET(req: Request) {
   );
   const kindFilter = resolveSuggestionKindFilter(url.searchParams.get("kind"));
   const mineOnly = resolveSuggestionMineFilter(url.searchParams.get("mine"));
+  const waitingOnFilter = resolveSuggestionWaitingOnFilter(
+    url.searchParams.get("waitingOn")
+  );
   const rawLimit = Number.parseInt(url.searchParams.get("limit") ?? "", 10);
   const pageSize = Number.isFinite(rawLimit)
     ? Math.min(Math.max(rawLimit, 1), SUGGESTIONS_PAGE_SIZE_MAX)
@@ -52,6 +57,8 @@ export async function GET(req: Request) {
       ...(mineOnly ? { submitterUid: auth.session.uid } : {}),
       pageSize,
       cursor,
+      viewer: toSuggestionViewer(auth.session),
+      waitingOnFilter,
     });
 
     return jsonNoStore(
@@ -63,6 +70,7 @@ export async function GET(req: Request) {
         },
         viewer: {
           isMaintainer: auth.session.isMaintainer,
+          isClubReferent: auth.session.isClubReferent,
         },
       },
       { status: 200 }
@@ -128,17 +136,20 @@ export async function POST(req: Request) {
 
     const created = await getSuggestionDetail(auth.session.db, id);
     if (created) {
-      void notifyMaintainersOfNewSuggestion({
-        db: auth.session.db,
-        req,
-        suggestionId: id,
-        title: created.title,
-        kind: created.kind,
-        category: created.category,
-        description: created.description,
-        descriptionFormat: created.descriptionFormat,
-        submitterUid: auth.session.uid,
-        submitterDisplayName: auth.session.displayName,
+      after(async () => {
+        await notifyMaintainersOfNewSuggestion({
+          db: auth.session.db,
+          req,
+          suggestionId: id,
+          title: created.title,
+          kind: created.kind,
+          domain: created.domain,
+          category: created.category,
+          description: created.description,
+          descriptionFormat: created.descriptionFormat,
+          submitterUid: auth.session.uid,
+          submitterDisplayName: auth.session.displayName,
+        });
       });
     }
 

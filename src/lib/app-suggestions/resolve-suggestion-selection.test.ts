@@ -7,33 +7,34 @@ describe("resolveSuggestionSelection", () => {
     hasUrlId: false,
   };
 
-  it("désélectionne quand l'idée filtrée n'est plus dans la liste", () => {
+  it("conserve une sélection hors liste (lien direct / hors filtre)", () => {
     expect(
       resolveSuggestionSelection({
         ...base,
         selectedId: "idea-3",
-        suggestionIds: [],
+        hasUrlId: true,
       })
-    ).toBe(null);
+    ).toBeUndefined();
   });
 
-  it("sélectionne la première idée sur desktop si la sélection sort des filtres", () => {
+  it("conserve aussi une sélection hors liste sans hasUrlId (détail chargé par id)", () => {
     expect(
       resolveSuggestionSelection({
         ...base,
         selectedId: "idea-3",
       })
-    ).toBe("idea-1");
+    ).toBeUndefined();
   });
 
-  it("désélectionne sur mobile si la sélection sort des filtres", () => {
+  it("conserve une sélection hors liste sur mobile", () => {
     expect(
       resolveSuggestionSelection({
         ...base,
         selectedId: "idea-3",
         isMobile: true,
+        hasUrlId: true,
       })
-    ).toBe(null);
+    ).toBeUndefined();
   });
 
   it("auto-sélectionne la première idée sur desktop sans sélection", () => {

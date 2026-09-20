@@ -36,6 +36,6 @@ describe("mergeSuggestionCategoryOptions", () => {
     expect(options.map((option) => option.value)).toEqual(
       expect.arrayContaining(["adhesions", "Paiements"])
     );
-    expect(options).toHaveLength(6);
+    expect(options).toHaveLength(7);
   });
 });

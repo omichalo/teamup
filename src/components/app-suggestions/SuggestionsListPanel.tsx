@@ -19,6 +19,7 @@ import {
 } from "@/lib/app-suggestions/status";
 import { formatSuggestionDate } from "@/components/app-suggestions/format-utils";
 import { SuggestionPriorityChip } from "@/components/app-suggestions/SuggestionPriorityChip";
+import { SuggestionVisibilityChip } from "@/components/app-suggestions/SuggestionVisibilityChip";
 import { suggestionListItemSx } from "@/components/app-suggestions/suggestions-surface-styles";
 
 type SuggestionsListPanelProps = {
@@ -110,12 +111,20 @@ export function SuggestionsListPanel({
                   >
                     {suggestion.title}
                   </Typography>
-                  <Chip
-                    size="small"
-                    label={SUGGESTION_STATUS_LABELS[suggestion.status]}
-                    color={SUGGESTION_STATUS_COLORS[suggestion.status]}
-                    sx={{ flexShrink: 0, height: 22, fontSize: "0.7rem" }}
-                  />
+                  <Stack
+                    direction="row"
+                    spacing={0.5}
+                    alignItems="center"
+                    flexShrink={0}
+                  >
+                    <SuggestionVisibilityChip visibility={suggestion.visibility} />
+                    <Chip
+                      size="small"
+                      label={SUGGESTION_STATUS_LABELS[suggestion.status]}
+                      color={SUGGESTION_STATUS_COLORS[suggestion.status]}
+                      sx={{ height: 22, fontSize: "0.7rem" }}
+                    />
+                  </Stack>
                 </Stack>
 
                 <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>

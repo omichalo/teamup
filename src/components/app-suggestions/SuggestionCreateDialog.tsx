@@ -8,15 +8,23 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControl,
+  FormControlLabel,
+  FormLabel,
+  Radio,
+  RadioGroup,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
-import type { SuggestionCategory, SuggestionKind, SuggestionPriority } from "@/lib/app-suggestions/types";
+import type {
+  SuggestionCategory,
+  SuggestionDomain,
+  SuggestionKind,
+} from "@/lib/app-suggestions/types";
 import { isValidSuggestionCategory } from "@/lib/app-suggestions/categories";
 import { stripSuggestionHtmlText } from "@/lib/app-suggestions/rich-text";
 import { SuggestionCategoryField } from "@/components/app-suggestions/SuggestionCategoryField";
-import { SuggestionPriorityField } from "@/components/app-suggestions/SuggestionPriorityField";
 import { SuggestionRichTextEditor } from "@/components/app-suggestions/rich-text/SuggestionRichTextEditor";
 import { cleanupAllDraftSuggestionImages } from "@/components/app-suggestions/rich-text/draft-image-cleanup";
 
@@ -28,8 +36,8 @@ type SuggestionCreateDialogProps = {
     title: string;
     description: string;
     kind: SuggestionKind;
+    domain: SuggestionDomain;
     category: SuggestionCategory;
-    priority: SuggestionPriority;
   }) => Promise<void>;
 };
 
@@ -44,9 +52,9 @@ const DIALOG_COPY: Record<
   }
 > = {
   improvement: {
-    title: "Nouvelle idée d'amélioration",
+    title: "Nouvelle idée",
     intro:
-      "Proposez une évolution de l'application. Vous pouvez mettre en forme le texte, ajouter des emojis et insérer des images.",
+      "Décrivez ce que vous aimeriez pouvoir faire, pourquoi c’est utile, et éventuellement comment vous l’imaginez.",
     titleLabel: "Titre de l'idée",
     titlePlaceholder: "Ex. Export Excel des adhésions",
     submitError: "Impossible de créer l'idée",
@@ -54,7 +62,7 @@ const DIALOG_COPY: Record<
   problem: {
     title: "Signaler un problème",
     intro:
-      "Décrivez le dysfonctionnement rencontré (écran, action, message d'erreur…). Des captures d'écran aident l'équipe à reproduire le cas.",
+      "Expliquez ce qui ne fonctionne pas, ce que vous essayiez de faire, le résultat attendu et celui obtenu. Une capture d’écran aide souvent.",
     titleLabel: "Résumé du problème",
     titlePlaceholder: "Ex. Le bouton Enregistrer ne répond plus",
     submitError: "Impossible d'envoyer la remontée",
@@ -69,8 +77,8 @@ export function SuggestionCreateDialog({
 }: SuggestionCreateDialogProps) {
   const [title, setTitle] = useState("");
   const [descriptionHtml, setDescriptionHtml] = useState("<p></p>");
-  const [category, setCategory] = useState("");
-  const [priority, setPriority] = useState<SuggestionPriority>("medium");
+  const [domain, setDomain] = useState<SuggestionDomain>("app");
+  const [category, setCategory] = useState("autre");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,8 +87,8 @@ export function SuggestionCreateDialog({
   const reset = () => {
     setTitle("");
     setDescriptionHtml("<p></p>");
-    setCategory("");
-    setPriority("medium");
+    setDomain("app");
+    setCategory("autre");
     setError(null);
   };
 
@@ -119,8 +127,8 @@ export function SuggestionCreateDialog({
         title,
         description: descriptionHtml,
         kind,
+        domain,
         category,
-        priority,
       });
       reset();
       onClose();
@@ -142,6 +150,31 @@ export function SuggestionCreateDialog({
             {copy.intro}
           </Typography>
 
+          <FormControl>
+            <FormLabel id="suggestion-domain-label">Concerne</FormLabel>
+            <RadioGroup
+              aria-labelledby="suggestion-domain-label"
+              row
+              value={domain}
+              onChange={(event) =>
+                setDomain(event.target.value as SuggestionDomain)
+              }
+            >
+              <FormControlLabel
+                value="app"
+                control={<Radio />}
+                label="L'application TeamUp"
+                disabled={submitting}
+              />
+              <FormControlLabel
+                value="club"
+                control={<Radio />}
+                label="La vie du club"
+                disabled={submitting}
+              />
+            </RadioGroup>
+          </FormControl>
+
           <TextField
             label={copy.titleLabel}
             placeholder={copy.titlePlaceholder}
@@ -157,13 +190,7 @@ export function SuggestionCreateDialog({
             onChange={setCategory}
             required
             disabled={submitting}
-          />
-
-          <SuggestionPriorityField
-            value={priority}
-            onChange={setPriority}
-            disabled={submitting}
-            required
+            allowCustom={false}
           />
 
           <Stack spacing={0.75}>

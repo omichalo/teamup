@@ -243,3 +243,49 @@ export function buildSuggestionCommentEmail(options: {
     subject: `Nouveau commentaire — ${options.title}`,
   };
 }
+
+/** E-mail aux mainteneurs lorsque l'auteur d'une remontée répond. */
+export function buildSuggestionAuthorReplyMaintainerEmail(options: {
+  title: string;
+  suggestionId: string;
+  appOrigin: string;
+  authorDisplayName: string | null;
+  commentExcerpt: string;
+}): { html: string; text: string; subject: string } {
+  const safeTitle = escapeHtml(options.title);
+  const author = escapeHtml(options.authorDisplayName || "L'auteur");
+  const excerpt = escapeHtml(options.commentExcerpt);
+  const action = suggestionAction(options);
+
+  const bodyHtml = [
+    emailParagraph("Bonjour,"),
+    emailParagraph(
+      `<strong>${author}</strong> a répondu sur la remontée <strong>${safeTitle}</strong>.`
+    ),
+    emailMutedParagraph(excerpt),
+  ].join("");
+
+  const html = buildSqyPingEmailLayout({
+    title: "Réponse de l'auteur",
+    preheader: `Réponse sur ${options.title}`,
+    bodyHtml,
+    appOrigin: options.appOrigin,
+    primaryAction: action,
+    fallbackLink: action.url,
+  });
+
+  const text = [
+    "Bonjour,",
+    "",
+    `${options.authorDisplayName || "L'auteur"} a répondu sur « ${options.title} ».`,
+    options.commentExcerpt,
+    "",
+    `${action.label} : ${action.url}`,
+  ].join("\n");
+
+  return {
+    html,
+    text,
+    subject: `Réponse auteur — ${options.title}`,
+  };
+}

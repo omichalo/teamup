@@ -33,3 +33,12 @@ export function resolveSuggestionCategoryFilter(
   }
   return "all";
 }
+
+export function resolveSuggestionWaitingOnFilter(
+  raw: string | null
+): "handlers" | "all" {
+  if (raw === "handlers") {
+    return "handlers";
+  }
+  return "all";
+}

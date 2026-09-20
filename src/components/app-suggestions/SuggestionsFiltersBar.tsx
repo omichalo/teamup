@@ -26,6 +26,7 @@ import {
   SUGGESTION_KIND_LABELS,
   SUGGESTION_STATUS_FILTER_LABELS,
 } from "@/lib/app-suggestions/status";
+import { SuggestionEmailPreferenceSelect } from "@/components/app-suggestions/SuggestionEmailPreferenceSelect";
 import { formatSuggestionDate } from "@/components/app-suggestions/format-utils";
 
 const STATUS_FILTER_OPTIONS = [
@@ -50,12 +51,15 @@ type SuggestionsFiltersBarProps = {
   categoryFilter: string;
   kindFilter: string;
   mineOnly: boolean;
+  waitingOnFilter: "all" | "handlers";
+  showHandlerTools: boolean;
   loading: boolean;
   lastRefreshedAt: Date | null;
   onStatusFilterChange: (value: string) => void;
   onCategoryFilterChange: (value: string) => void;
   onKindFilterChange: (value: string) => void;
   onMineOnlyChange: (value: boolean) => void;
+  onWaitingOnFilterChange: (value: "all" | "handlers") => void;
   onRefresh: () => void;
 };
 
@@ -64,12 +68,15 @@ export function SuggestionsFiltersBar({
   categoryFilter,
   kindFilter,
   mineOnly,
+  waitingOnFilter,
+  showHandlerTools,
   loading,
   lastRefreshedAt,
   onStatusFilterChange,
   onCategoryFilterChange,
   onKindFilterChange,
   onMineOnlyChange,
+  onWaitingOnFilterChange,
   onRefresh,
 }: SuggestionsFiltersBarProps) {
   const [categoryOptions, setCategoryOptions] = useState<SuggestionCategoryOption[]>(
@@ -127,12 +134,13 @@ export function SuggestionsFiltersBar({
     }
   };
 
-  const handleCategoryChange = (event: SelectChangeEvent<string>) => {
-    onCategoryFilterChange(event.target.value);
-  };
-
-  const handleKindChange = (event: SelectChangeEvent<string>) => {
-    onKindFilterChange(event.target.value);
+  const handleQueueChange = (
+    _event: MouseEvent<HTMLElement>,
+    value: "all" | "handlers" | null
+  ) => {
+    if (value !== null) {
+      onWaitingOnFilterChange(value);
+    }
   };
 
   return (
@@ -169,13 +177,36 @@ export function SuggestionsFiltersBar({
             <ToggleButton value="mine">Mes retours</ToggleButton>
           </ToggleButtonGroup>
 
+          {showHandlerTools ? (
+            <ToggleButtonGroup
+              exclusive
+              size="small"
+              value={waitingOnFilter}
+              onChange={handleQueueChange}
+              aria-label="File de traitement"
+              sx={{
+                bgcolor: "background.paper",
+                "& .MuiToggleButton-root": {
+                  px: 2,
+                  textTransform: "none",
+                  fontWeight: 500,
+                },
+              }}
+            >
+              <ToggleButton value="all">Toutes</ToggleButton>
+              <ToggleButton value="handlers">À traiter</ToggleButton>
+            </ToggleButtonGroup>
+          ) : null}
+
           <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: 170 } }}>
             <InputLabel id="suggestions-kind-filter-label">Type</InputLabel>
             <Select
               labelId="suggestions-kind-filter-label"
               label="Type"
               value={kindFilter}
-              onChange={handleKindChange}
+              onChange={(event: SelectChangeEvent<string>) =>
+                onKindFilterChange(event.target.value)
+              }
               sx={{ bgcolor: "background.paper" }}
             >
               {KIND_FILTER_OPTIONS.map((option) => (
@@ -192,7 +223,9 @@ export function SuggestionsFiltersBar({
               labelId="suggestions-category-filter-label"
               label="Catégorie"
               value={categoryFilter}
-              onChange={handleCategoryChange}
+              onChange={(event: SelectChangeEvent<string>) =>
+                onCategoryFilterChange(event.target.value)
+              }
               sx={{ bgcolor: "background.paper" }}
             >
               {categoryFilterOptions.map((option) => (
@@ -202,6 +235,8 @@ export function SuggestionsFiltersBar({
               ))}
             </Select>
           </FormControl>
+
+          <SuggestionEmailPreferenceSelect disabled={loading} />
         </Stack>
 
         <Stack direction="row" alignItems="center" spacing={1} flexShrink={0}>
