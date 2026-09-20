@@ -95,7 +95,7 @@ export function ParticipationManager({
           </Box>
         </Box>
 
-        <TableContainer component={Paper}>
+        <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
           <Table size="small">
             <TableHead>
               <TableRow>

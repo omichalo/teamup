@@ -6,6 +6,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
   TableRow,
   Tooltip,
@@ -28,6 +29,7 @@ export function ReceivedPaymentsTable({ receivedPayments, onReverse }: Props) {
   }
 
   return (
+    <TableContainer sx={{ overflowX: "auto" }}>
     <Table size="small">
       <TableHead>
         <TableRow>
@@ -83,5 +85,6 @@ export function ReceivedPaymentsTable({ receivedPayments, onReverse }: Props) {
         })}
       </TableBody>
     </Table>
+    </TableContainer>
   );
 }

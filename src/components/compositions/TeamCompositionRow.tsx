@@ -39,6 +39,10 @@ interface TeamCompositionRowProps {
   compositions: Record<string, string[]>;
   draggedPlayerId: string | null;
   dragOverTeamId: string | null;
+  selectedPlayerId?: string | null;
+  dragEnabled?: boolean;
+  onSelectPlayer?: ((playerId: string) => void) | undefined;
+  onTeamTap?: ((teamId: string) => void) | undefined;
   canDropPlayer: (playerId: string, teamId: string) => { canAssign: boolean; reason?: string };
   onDragOver: (event: React.DragEvent, teamId: string) => void;
   onDragLeave: () => void;
@@ -98,6 +102,10 @@ export function TeamCompositionRow({
   compositions,
   draggedPlayerId,
   dragOverTeamId,
+  selectedPlayerId = null,
+  dragEnabled = true,
+  onSelectPlayer,
+  onTeamTap,
   canDropPlayer,
   onDragOver,
   onDragLeave,
@@ -141,20 +149,24 @@ export function TeamCompositionRow({
 
   const validationError = teamValidationError?.reason;
   const offendingPlayerIds = teamValidationError?.offendingPlayerIds ?? [];
-  const isDragOver =
-    !matchPlayed && draggedPlayerId && dragOverTeamId === equipe.team.id;
+  const previewPlayerId = draggedPlayerId ?? selectedPlayerId;
+  const isSelectionPreview = !matchPlayed && !draggedPlayerId && Boolean(selectedPlayerId);
+  const isDragHover =
+    !matchPlayed && Boolean(draggedPlayerId) && dragOverTeamId === equipe.team.id;
+  const isDragOver = Boolean(isDragHover || isSelectionPreview);
   const dropCheck =
-    !matchPlayed && draggedPlayerId && dragOverTeamId === equipe.team.id
-      ? canDropPlayer(draggedPlayerId, equipe.team.id)
+    !matchPlayed && previewPlayerId && (isDragHover || isSelectionPreview)
+      ? canDropPlayer(previewPlayerId, equipe.team.id)
       : { canAssign: true, reason: undefined };
   const canDrop = matchPlayed ? false : dropCheck.canAssign;
-  const dragHandlers = matchPlayed
-    ? {}
-    : {
-        onDragOver: (event: React.DragEvent) => onDragOver(event, equipe.team.id),
-        onDragLeave,
-        onDrop: (event: React.DragEvent) => onDrop(event, equipe.team.id),
-      };
+  const dragHandlers =
+    matchPlayed || !dragEnabled
+      ? {}
+      : {
+          onDragOver: (event: React.DragEvent) => onDragOver(event, equipe.team.id),
+          onDragLeave,
+          onDrop: (event: React.DragEvent) => onDrop(event, equipe.team.id),
+        };
 
   const isFemaleTeam = equipe.matches.some((item) => item.isFemale === true);
   const matchInfo = formatMatchInfo(
@@ -246,11 +258,15 @@ export function TeamCompositionRow({
           onRemovePlayer={(playerId) => onRemovePlayer(equipe.team.id, playerId)}
           onPlayerDragStart={(event, playerId) => onPlayerDragStart(event, playerId)}
           onPlayerDragEnd={onPlayerDragEnd}
-          isDragOver={Boolean(isDragOver)}
+          isDragOver={isDragOver}
           canDrop={canDrop}
           dropReason={dropCheck.reason}
           draggedPlayerId={draggedPlayerId}
           dragOverTeamId={dragOverTeamId}
+          selectedPlayerId={selectedPlayerId}
+          dragEnabled={dragEnabled}
+          onSelectPlayer={onSelectPlayer}
+          onTeamTap={onTeamTap}
           matchPlayed={matchPlayed}
           selectedEpreuve={selectedEpreuve}
           maxPlayers={getMaxPlayersForTeam(equipe)}

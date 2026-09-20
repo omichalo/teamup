@@ -8,7 +8,6 @@ import {
   Box,
   Chip,
   Button,
-  Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
@@ -17,6 +16,7 @@ import {
   Checkbox,
   Alert,
 } from "@mui/material";
+import { ResponsiveDialog } from "@/components/ui/ResponsiveDialog";
 import {
   Edit as EditIcon,
   Save as SaveIcon,
@@ -165,7 +165,7 @@ export function PreferredTeamsManager({
         </CardContent>
       </Card>
 
-      <Dialog
+      <ResponsiveDialog
         open={editDialogOpen}
         onClose={handleCancel}
         maxWidth="md"
@@ -235,7 +235,7 @@ export function PreferredTeamsManager({
             {saving ? "Sauvegarde..." : "Sauvegarder"}
           </Button>
         </DialogActions>
-      </Dialog>
+      </ResponsiveDialog>
     </>
   );
 }

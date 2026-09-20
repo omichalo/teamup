@@ -13,11 +13,11 @@ import {
   ListItemText,
   Chip,
   Button,
-  Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
 } from "@mui/material";
+import { ResponsiveDialog } from "@/components/ui/ResponsiveDialog";
 import {
   Warning as WarningIcon,
   Error as ErrorIcon,
@@ -152,7 +152,7 @@ export function CompositionConflicts({
         </CardContent>
       </Card>
 
-      <Dialog
+      <ResponsiveDialog
         open={resolveDialogOpen}
         onClose={() => setResolveDialogOpen(false)}
         maxWidth="sm"
@@ -183,7 +183,7 @@ export function CompositionConflicts({
             Confirmer
           </Button>
         </DialogActions>
-      </Dialog>
+      </ResponsiveDialog>
     </>
   );
 }
