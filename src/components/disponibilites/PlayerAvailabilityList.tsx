@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import {
   Box,
-  Button,
   Card,
   CardContent,
   Chip,
@@ -13,16 +12,14 @@ import {
 } from "@mui/material";
 import {
   Accessible as AccessibleIcon,
-  Cancel,
-  CheckCircle,
   LinkOff as LinkOffIcon,
 } from "@mui/icons-material";
 import { Player } from "@/types/team-management";
 import { ChampionshipType } from "@/types";
 import { AvailabilityResponse } from "@/lib/services/availability-service";
 import { EpreuveType } from "@/lib/shared/epreuve-utils";
+import { AvailabilityResponseControls } from "@/components/disponibilites/AvailabilityResponseControls";
 import { AvailabilityStatusChip } from "@/components/disponibilites/AvailabilityStatusChip";
-
 function isPlayerRegistered(
   player: Player,
   selectedEpreuve: EpreuveType | null | undefined
@@ -108,16 +105,23 @@ export function PlayerAvailabilityList({
             }}
           >
             <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
-              <Box display="flex" alignItems="flex-start" gap={2}>
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: { xs: "column", sm: "row" },
+                  alignItems: { xs: "stretch", sm: "flex-start" },
+                  gap: { xs: 1.5, sm: 2 },
+                }}
+              >
                 <Box
                   display="flex"
-                  alignItems="center"
                   gap={1}
                   flexGrow={1}
                   minWidth={0}
                   sx={{
-                    flexDirection: { xs: "column", sm: "row" },
-                    alignItems: { xs: "flex-start", sm: "center" },
+                    flexDirection: "row",
+                    flexWrap: "wrap",
+                    alignItems: "center",
                   }}
                 >
                   <Typography
@@ -127,6 +131,7 @@ export function PlayerAvailabilityList({
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
+                      maxWidth: "100%",
                     }}
                   >
                     {player.firstName} {player.name}
@@ -254,238 +259,80 @@ export function PlayerAvailabilityList({
                   display="flex"
                   flexDirection="column"
                   gap={1}
-                  sx={{ minWidth: { xs: "100%", sm: 280 } }}
+                  sx={{
+                    width: { xs: "100%", sm: "auto" },
+                    minWidth: { xs: 0, sm: 280 },
+                    flexShrink: 0,
+                  }}
                 >
                   {isParisChampionship ? (
-                    <Box
-                      display="flex"
-                      alignItems="center"
-                      gap={1}
-                      sx={{ flexWrap: "wrap" }}
-                    >
-                      <Button
-                        variant={
-                          masculinAvailability?.available === true
-                            ? "contained"
-                            : "outlined"
+                    <AvailabilityResponseControls
+                      availability={masculinAvailability}
+                      isCommentExpanded={
+                        Boolean(isExpanded && expandedPlayer?.type === "masculin")
+                      }
+                      onYes={() =>
+                        onAvailabilityChange(player.id, "masculin", true)
+                      }
+                      onNo={() =>
+                        onAvailabilityChange(player.id, "masculin", false)
+                      }
+                      onToggleComment={() =>
+                        setExpandedPlayer(
+                          isExpanded && expandedPlayer?.type === "masculin"
+                            ? null
+                            : { id: player.id, type: "masculin" }
+                        )
+                      }
+                    />
+                  ) : (
+                    <>
+                      <AvailabilityResponseControls
+                        label="Masculin:"
+                        availability={masculinAvailability}
+                        isCommentExpanded={
+                          Boolean(
+                            isExpanded && expandedPlayer?.type === "masculin"
+                          )
                         }
-                        color="success"
-                        size="small"
-                        onClick={() =>
+                        onYes={() =>
                           onAvailabilityChange(player.id, "masculin", true)
                         }
-                        sx={{ minWidth: 70, flexGrow: { xs: 1, sm: 0 } }}
-                      >
-                        <CheckCircle fontSize="small" sx={{ mr: 0.5 }} />
-                        Oui
-                      </Button>
-                      <Button
-                        variant={
-                          masculinAvailability?.available === false
-                            ? "contained"
-                            : "outlined"
-                        }
-                        color="error"
-                        size="small"
-                        onClick={() =>
+                        onNo={() =>
                           onAvailabilityChange(player.id, "masculin", false)
                         }
-                        sx={{ minWidth: 70, flexGrow: { xs: 1, sm: 0 } }}
-                      >
-                        <Cancel fontSize="small" sx={{ mr: 0.5 }} />
-                        Non
-                      </Button>
-                      <Button
-                        size="small"
-                        onClick={() =>
+                        onToggleComment={() =>
                           setExpandedPlayer(
                             isExpanded && expandedPlayer?.type === "masculin"
                               ? null
                               : { id: player.id, type: "masculin" }
                           )
                         }
-                        sx={{
-                          minWidth: 40,
-                          position: masculinAvailability?.comment
-                            ? "relative"
-                            : undefined,
-                          ...(masculinAvailability?.comment
-                            ? {
-                                "&::after": {
-                                  content: "''",
-                                  position: "absolute",
-                                  top: 4,
-                                  right: 6,
-                                  width: 6,
-                                  height: 6,
-                                  borderRadius: "50%",
-                                  bgcolor: "info.main",
-                                },
-                              }
-                            : {}),
-                        }}
-                      >
-                        💬
-                      </Button>
-                    </Box>
-                  ) : (
-                    <>
-                      <Box
-                        display="flex"
-                        alignItems="center"
-                        gap={1}
-                        sx={{ flexWrap: "wrap" }}
-                      >
-                        <Typography
-                          variant="caption"
-                          sx={{ minWidth: 80, fontWeight: "medium" }}
-                        >
-                          Masculin:
-                        </Typography>
-                        <Button
-                          variant={
-                            masculinAvailability?.available === true
-                              ? "contained"
-                              : "outlined"
-                          }
-                          color="success"
-                          size="small"
-                          onClick={() =>
-                            onAvailabilityChange(player.id, "masculin", true)
-                          }
-                          sx={{ minWidth: 70, flexGrow: { xs: 1, sm: 0 } }}
-                        >
-                          <CheckCircle fontSize="small" sx={{ mr: 0.5 }} />
-                          Oui
-                        </Button>
-                        <Button
-                          variant={
-                            masculinAvailability?.available === false
-                              ? "contained"
-                              : "outlined"
-                          }
-                          color="error"
-                          size="small"
-                          onClick={() =>
-                            onAvailabilityChange(player.id, "masculin", false)
-                          }
-                          sx={{ minWidth: 70, flexGrow: { xs: 1, sm: 0 } }}
-                        >
-                          <Cancel fontSize="small" sx={{ mr: 0.5 }} />
-                          Non
-                        </Button>
-                        <Button
-                          size="small"
-                          onClick={() =>
-                            setExpandedPlayer(
-                              isExpanded && expandedPlayer?.type === "masculin"
-                                ? null
-                                : { id: player.id, type: "masculin" }
-                            )
-                          }
-                          sx={{
-                            minWidth: 40,
-                            position: masculinAvailability?.comment
-                              ? "relative"
-                              : undefined,
-                            ...(masculinAvailability?.comment
-                              ? {
-                                  "&::after": {
-                                    content: "''",
-                                    position: "absolute",
-                                    top: 4,
-                                    right: 6,
-                                    width: 6,
-                                    height: 6,
-                                    borderRadius: "50%",
-                                    bgcolor: "info.main",
-                                  },
-                                }
-                              : {}),
-                          }}
-                        >
-                          💬
-                        </Button>
-                      </Box>
+                      />
 
                       {isFemale && (
-                        <Box
-                          display="flex"
-                          alignItems="center"
-                          gap={1}
-                          sx={{ flexWrap: "wrap" }}
-                        >
-                          <Typography
-                            variant="caption"
-                            sx={{ minWidth: 80, fontWeight: "medium" }}
-                          >
-                            Féminin:
-                          </Typography>
-                          <Button
-                            variant={
-                              femininAvailability?.available === true
-                                ? "contained"
-                                : "outlined"
-                            }
-                            color="success"
-                            size="small"
-                            onClick={() =>
-                              onAvailabilityChange(player.id, "feminin", true)
-                            }
-                            sx={{ minWidth: 70, flexGrow: { xs: 1, sm: 0 } }}
-                          >
-                            <CheckCircle fontSize="small" sx={{ mr: 0.5 }} />
-                            Oui
-                          </Button>
-                          <Button
-                            variant={
-                              femininAvailability?.available === false
-                                ? "contained"
-                                : "outlined"
-                            }
-                            color="error"
-                            size="small"
-                            onClick={() =>
-                              onAvailabilityChange(player.id, "feminin", false)
-                            }
-                            sx={{ minWidth: 70, flexGrow: { xs: 1, sm: 0 } }}
-                          >
-                            <Cancel fontSize="small" sx={{ mr: 0.5 }} />
-                            Non
-                          </Button>
-                          <Button
-                            size="small"
-                            onClick={() =>
-                              setExpandedPlayer(
-                                isExpanded && expandedPlayer?.type === "feminin"
-                                  ? null
-                                  : { id: player.id, type: "feminin" }
-                              )
-                            }
-                            sx={{
-                              minWidth: 40,
-                              position: femininAvailability?.comment
-                                ? "relative"
-                                : undefined,
-                              ...(femininAvailability?.comment
-                                ? {
-                                    "&::after": {
-                                      content: "''",
-                                      position: "absolute",
-                                      top: 4,
-                                      right: 6,
-                                      width: 6,
-                                      height: 6,
-                                      borderRadius: "50%",
-                                      bgcolor: "info.main",
-                                    },
-                                  }
-                                : {}),
-                            }}
-                          >
-                            💬
-                          </Button>
-                        </Box>
+                        <AvailabilityResponseControls
+                          label="Féminin:"
+                          availability={femininAvailability}
+                          isCommentExpanded={
+                            Boolean(
+                              isExpanded && expandedPlayer?.type === "feminin"
+                            )
+                          }
+                          onYes={() =>
+                            onAvailabilityChange(player.id, "feminin", true)
+                          }
+                          onNo={() =>
+                            onAvailabilityChange(player.id, "feminin", false)
+                          }
+                          onToggleComment={() =>
+                            setExpandedPlayer(
+                              isExpanded && expandedPlayer?.type === "feminin"
+                                ? null
+                                : { id: player.id, type: "feminin" }
+                            )
+                          }
+                        />
                       )}
                     </>
                   )}

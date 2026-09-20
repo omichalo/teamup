@@ -8,34 +8,37 @@ import {
   Typography,
   Chip,
   Divider,
-  Tooltip,
 } from "@mui/material";
-import { DragIndicator, Accessible as AccessibleIcon } from "@mui/icons-material";
 import type { Player } from "@/types/team-management";
 import type { EquipeWithMatches } from "@/hooks/useTeamData";
 import type { EpreuveType } from "@/lib/shared/epreuve-utils";
+import { TeamCompositionAssignedPlayer } from "./TeamCompositionAssignedPlayer";
 
 export interface TeamCompositionCardProps {
   equipe: EquipeWithMatches;
   players: Player[];
   onRemovePlayer: (playerId: string) => void;
-  onPlayerDragStart?: (event: React.DragEvent, playerId: string) => void;
-  onPlayerDragEnd?: (event: React.DragEvent) => void;
-  onDragOver?: (event: React.DragEvent) => void;
-  onDragLeave?: () => void;
-  onDrop?: (event: React.DragEvent) => void;
+  onPlayerDragStart?: ((event: React.DragEvent, playerId: string) => void) | undefined;
+  onPlayerDragEnd?: ((event: React.DragEvent) => void) | undefined;
+  onDragOver?: ((event: React.DragEvent) => void) | undefined;
+  onDragLeave?: (() => void) | undefined;
+  onDrop?: ((event: React.DragEvent) => void) | undefined;
   isDragOver?: boolean;
   canDrop?: boolean;
   dropReason?: string | undefined;
   draggedPlayerId?: string | null;
   dragOverTeamId?: string | null;
+  selectedPlayerId?: string | null;
+  dragEnabled?: boolean;
+  onSelectPlayer?: ((playerId: string) => void) | undefined;
+  onTeamTap?: ((teamId: string) => void) | undefined;
   matchPlayed?: boolean;
   showMatchStatus?: boolean;
-  additionalHeader?: React.ReactNode;
+  additionalHeader?: React.ReactNode | undefined;
   maxPlayers?: number;
   completionThreshold?: number;
-  renderPlayerIndicators?: (player: Player) => React.ReactNode;
-  renderPlayerSecondary?: (player: Player) => React.ReactNode;
+  renderPlayerIndicators?: ((player: Player) => React.ReactNode) | undefined;
+  renderPlayerSecondary?: ((player: Player) => React.ReactNode) | undefined;
   selectedEpreuve?: EpreuveType | null;
 }
 
@@ -55,6 +58,10 @@ export const TeamCompositionCard: React.FC<TeamCompositionCardProps> = ({
   dropReason,
   draggedPlayerId,
   dragOverTeamId,
+  selectedPlayerId = null,
+  dragEnabled = true,
+  onSelectPlayer,
+  onTeamTap,
   matchPlayed = false,
   showMatchStatus = true,
   additionalHeader,
@@ -66,29 +73,19 @@ export const TeamCompositionCard: React.FC<TeamCompositionCardProps> = ({
 }) => {
   const teamPlayersCount = players.length;
   const completionThreshold =
-    completionThresholdProp !== undefined
-      ? completionThresholdProp
-      : maxPlayers;
+    completionThresholdProp !== undefined ? completionThresholdProp : maxPlayers;
+  const previewPlayerId = draggedPlayerId ?? selectedPlayerId;
   const cardClassName =
-    isDragOver && draggedPlayerId
+    isDragOver && previewPlayerId
       ? canDrop
         ? "droppable--over"
         : "droppable--blocked"
       : undefined;
-
-  // Vérifier si c'est le championnat de Paris via selectedEpreuve
   const isParisChampionship = selectedEpreuve === "championnat_paris";
+  const selectionMode = Boolean(selectedPlayerId);
 
-  // Trier les joueurs par classement descendant (points décroissants) et les grouper par 3
   const groupedPlayers = useMemo(() => {
-    // Trier par points décroissants (les meilleurs en premier)
-    const sortedPlayers = [...players].sort((a, b) => {
-      const pointsA = a.points ?? 0;
-      const pointsB = b.points ?? 0;
-      return pointsB - pointsA; // Décroissant
-    });
-
-    // Grouper par 3 si c'est le championnat de Paris
+    const sortedPlayers = [...players].sort((a, b) => (b.points ?? 0) - (a.points ?? 0));
     if (isParisChampionship) {
       const groups: Player[][] = [];
       for (let i = 0; i < sortedPlayers.length; i += 3) {
@@ -96,36 +93,43 @@ export const TeamCompositionCard: React.FC<TeamCompositionCardProps> = ({
       }
       return groups;
     }
-
-    // Sinon, retourner un seul groupe avec tous les joueurs
     return [sortedPlayers];
   }, [players, isParisChampionship]);
+
+  const activePreview =
+    dragOverTeamId === equipe.team.id && previewPlayerId
+      ? canDrop
+        ? "grab"
+        : "not-allowed"
+      : selectionMode
+        ? "pointer"
+        : undefined;
 
   return (
     <Card
       elevation={0}
       {...(cardClassName ? { className: cardClassName } : {})}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
+      onDragOver={dragEnabled ? onDragOver : undefined}
+      onDragLeave={dragEnabled ? onDragLeave : undefined}
+      onDrop={dragEnabled ? onDrop : undefined}
+      onClick={
+        selectedPlayerId && onTeamTap && !matchPlayed
+          ? () => onTeamTap(equipe.team.id)
+          : undefined
+      }
       sx={{
         position: "relative",
-        cursor:
-          dragOverTeamId === equipe.team.id && draggedPlayerId
-            ? canDrop
-              ? "grab"
-              : "not-allowed"
-            : undefined,
+        cursor: activePreview,
         border: "2px dashed",
         borderColor: matchPlayed
           ? "info.main"
           : teamPlayersCount >= completionThreshold
-          ? "success.main"
-          : isDragOver
-          ? canDrop
-            ? "primary.main"
-            : "error.main"
-          : "divider",
+            ? "success.main"
+            : isDragOver
+              ? canDrop
+                ? "primary.main"
+                : "error.main"
+              : "divider",
         opacity: isDragOver && !canDrop ? 0.6 : 1,
         transition: "opacity 0.2s ease-in-out, border-color 0.2s ease-in-out",
         backgroundColor: matchPlayed
@@ -136,12 +140,12 @@ export const TeamCompositionCard: React.FC<TeamCompositionCardProps> = ({
           borderColor: matchPlayed
             ? "info.main"
             : teamPlayersCount >= completionThreshold
-            ? "success.main"
-            : isDragOver
-            ? canDrop
-              ? "primary.main"
-              : "error.main"
-            : "primary.main",
+              ? "success.main"
+              : isDragOver
+                ? canDrop
+                  ? "primary.main"
+                  : "error.main"
+                : "primary.main",
           backgroundColor: matchPlayed
             ? "action.disabledBackground"
             : "action.hover",
@@ -159,34 +163,18 @@ export const TeamCompositionCard: React.FC<TeamCompositionCardProps> = ({
             gap: 1,
           }}
         >
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1,
-              flexWrap: "wrap",
-            }}
-          >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
             <Typography variant="h6">{equipe.team.name}</Typography>
             {showMatchStatus && matchPlayed && (
-              <Chip
-                label="Match joué"
-                size="small"
-                color="info"
-                variant="filled"
-              />
+              <Chip label="Match joué" size="small" color="info" variant="filled" />
             )}
             {additionalHeader}
           </Box>
           <Chip
             label={`${teamPlayersCount}/${maxPlayers} joueurs`}
             size="small"
-            color={
-              teamPlayersCount >= completionThreshold ? "success" : "default"
-            }
-            variant={
-              teamPlayersCount >= completionThreshold ? "filled" : "outlined"
-            }
+            color={teamPlayersCount >= completionThreshold ? "success" : "default"}
+            variant={teamPlayersCount >= completionThreshold ? "filled" : "outlined"}
           />
         </Box>
 
@@ -232,13 +220,11 @@ export const TeamCompositionCard: React.FC<TeamCompositionCardProps> = ({
           <Typography
             variant="body2"
             color="text.secondary"
-            sx={{
-              py: 2,
-              textAlign: "center",
-              fontStyle: "italic",
-            }}
+            sx={{ py: 2, textAlign: "center", fontStyle: "italic" }}
           >
-            Déposez des joueurs ici
+            {selectionMode
+              ? "Tapez ici pour assigner le joueur sélectionné"
+              : "Déposez des joueurs ici"}
           </Typography>
         ) : (
           <Box
@@ -277,130 +263,24 @@ export const TeamCompositionCard: React.FC<TeamCompositionCardProps> = ({
                       size="small"
                       color="primary"
                       variant="outlined"
-                      sx={{
-                        fontWeight: 600,
-                        fontSize: "0.75rem",
-                      }}
+                      sx={{ fontWeight: 600, fontSize: "0.75rem" }}
                     />
                   </Box>
                 )}
                 {group.map((player) => (
-                  <Box
+                  <TeamCompositionAssignedPlayer
                     key={player.id}
-                    draggable={!matchPlayed}
-                    onDragStart={
-                      !matchPlayed && onPlayerDragStart
-                        ? (event) => onPlayerDragStart(event, player.id)
-                        : undefined
-                    }
-                    onDragEnd={
-                      !matchPlayed && onPlayerDragEnd
-                        ? (event) => onPlayerDragEnd(event)
-                        : undefined
-                    }
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 0.5,
-                      p: 1,
-                      border: "1px solid",
-                      borderColor: "divider",
-                      borderRadius: 1,
-                      position: "relative",
-                      cursor: matchPlayed ? "default" : "grab",
-                      backgroundColor: "background.paper",
-                      "&:hover": {
-                        backgroundColor: matchPlayed
-                          ? "background.paper"
-                          : "action.hover",
-                        borderColor: matchPlayed ? "divider" : "primary.main",
-                        boxShadow: matchPlayed ? "none" : 1,
-                      },
-                      "&:active": {
-                        cursor: matchPlayed ? "default" : "grabbing",
-                        opacity: matchPlayed ? 1 : 0.7,
-                      },
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        display: "flex",
-                        flexDirection: "column",
-                        flex: 1,
-                        minWidth: 0,
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 0.5,
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <DragIndicator
-                          fontSize="small"
-                          color="disabled"
-                          sx={{ cursor: matchPlayed ? "default" : "grab" }}
-                        />
-                        <Typography
-                          variant="body2"
-                          component="span"
-                          sx={{ fontWeight: 600 }}
-                        >
-                          {player.firstName} {player.name}
-                        </Typography>
-                        {player.isWheelchair && (
-                          <Tooltip title="Joueur en fauteuil">
-                            <AccessibleIcon
-                              fontSize="small"
-                              sx={{ color: "primary.main", ml: 0.5 }}
-                            />
-                          </Tooltip>
-                        )}
-                        {renderPlayerIndicators?.(player)}
-                      </Box>
-                      <Typography variant="caption" color="text.secondary">
-                        {renderPlayerSecondary
-                          ? renderPlayerSecondary(player)
-                          : `${
-                              player.points !== undefined && player.points !== null
-                                ? player.points
-                                : "?"
-                            } points`}
-                      </Typography>
-                    </Box>
-                    {!matchPlayed && (
-                      <Chip
-                        label="×"
-                        size="small"
-                        color="default"
-                        data-chip="remove"
-                        draggable={false}
-                        onDragStart={(event) => {
-                          event.stopPropagation();
-                          event.preventDefault();
-                        }}
-                        onMouseDown={(event) => {
-                          event.stopPropagation();
-                        }}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onRemovePlayer(player.id);
-                        }}
-                        sx={{
-                          cursor: "pointer",
-                          minWidth: 24,
-                          height: 24,
-                          fontWeight: 700,
-                          "&:hover": {
-                            backgroundColor: "error.main",
-                            color: "error.contrastText",
-                          },
-                        }}
-                      />
-                    )}
-                  </Box>
+                    player={player}
+                    matchPlayed={matchPlayed}
+                    dragEnabled={dragEnabled}
+                    isSelected={selectedPlayerId === player.id}
+                    onPlayerDragStart={onPlayerDragStart}
+                    onPlayerDragEnd={onPlayerDragEnd}
+                    onSelectPlayer={onSelectPlayer}
+                    onRemovePlayer={onRemovePlayer}
+                    renderPlayerIndicators={renderPlayerIndicators}
+                    renderPlayerSecondary={renderPlayerSecondary}
+                  />
                 ))}
               </Box>
             ))}

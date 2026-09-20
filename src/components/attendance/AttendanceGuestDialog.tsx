@@ -3,13 +3,13 @@
 import { useState } from "react";
 import {
   Button,
-  Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   Stack,
   TextField,
 } from "@mui/material";
+import { ResponsiveDialog } from "@/components/ui/ResponsiveDialog";
 
 type Props = {
   open: boolean;
@@ -55,7 +55,7 @@ export function AttendanceGuestDialog({ open, onClose, onSubmit }: Props) {
   const canSubmit = firstName.trim() && lastName.trim() && phone.trim().length >= 8;
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+    <ResponsiveDialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>Ajouter un essai</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
@@ -100,6 +100,6 @@ export function AttendanceGuestDialog({ open, onClose, onSubmit }: Props) {
           Pointer présent
         </Button>
       </DialogActions>
-    </Dialog>
+    </ResponsiveDialog>
   );
 }

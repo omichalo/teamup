@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { usePlayerAssignmentSelection } from "@/hooks/usePlayerAssignmentSelection";
 import { usePlayerDrag } from "@/hooks/usePlayerDrag";
 import { CompositionDefaultsService } from "@/lib/services/composition-defaults-service";
 import { EpreuveType, isParisEpreuve, resolveIdEpreuveFromEquipes } from "@/lib/shared/epreuve-utils";
@@ -309,9 +310,18 @@ export function useDefaultCompositionAssignments({
     },
   });
 
+  const selection = usePlayerAssignmentSelection({
+    canDropPlayer,
+    onAssign: assignPlayerToTeam,
+    onInvalidAssign: (validation) => {
+      setDefaultCompositionMessage(validation.reason || "Composition invalide.");
+    },
+  });
+
   return {
     canDropPlayer,
     handleRemoveDefaultPlayer,
     ...drag,
+    ...selection,
   };
 }

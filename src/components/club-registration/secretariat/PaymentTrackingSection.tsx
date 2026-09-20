@@ -11,6 +11,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
   TableRow,
   Tooltip,
@@ -186,6 +187,7 @@ export function PaymentTrackingSection({
           <Typography variant="subtitle2" fontWeight={600}>
             Règlement prévu
           </Typography>
+          <TableContainer sx={{ overflowX: "auto" }}>
           <Table size="small">
             <TableHead>
               <TableRow>
@@ -251,6 +253,7 @@ export function PaymentTrackingSection({
               })}
             </TableBody>
           </Table>
+          </TableContainer>
           <Typography variant="caption" color="text.secondary">
             « Prévu » est le plan d&apos;origine ; « Reçu » reprend l&apos;encaissement
             réellement enregistré. Le solde restant ci-dessus fait foi.

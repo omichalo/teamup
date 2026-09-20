@@ -24,9 +24,12 @@ interface AvailablePlayerListItemProps {
   player: Player;
   burnedTeam: number | null | undefined;
   draggedPlayerId: string | null;
+  selectedPlayerId?: string | null;
+  dragEnabled?: boolean;
   discordStatus: "none" | "invalid" | "valid";
   onDragStart: (event: React.DragEvent, playerId: string) => void;
   onDragEnd: () => void;
+  onSelectPlayer?: (playerId: string) => void;
   showEligibilityChips?: boolean;
 }
 
@@ -34,13 +37,17 @@ export function AvailablePlayerListItem({
   player,
   burnedTeam,
   draggedPlayerId,
+  selectedPlayerId = null,
+  dragEnabled = true,
   discordStatus,
   onDragStart,
   onDragEnd,
+  onSelectPlayer,
   showEligibilityChips = false,
 }: AvailablePlayerListItemProps) {
   const isForeign = player.nationality === "ETR";
   const isEuropean = player.nationality === "C";
+  const isSelected = selectedPlayerId === player.id;
   const hasLicenseAlert = (player.championshipAlerts ?? []).some(
     (code) =>
       code === "fftt_sqy_unlicensed" ||
@@ -52,41 +59,48 @@ export function AvailablePlayerListItem({
   return (
     <ListItem disablePadding sx={{ mb: 1 }} secondaryAction={null}>
       <ListItemButton
-        draggable
-        onDragStart={(event) => onDragStart(event, player.id)}
-        onDragEnd={onDragEnd}
+        draggable={dragEnabled}
+        onDragStart={
+          dragEnabled ? (event) => onDragStart(event, player.id) : undefined
+        }
+        onDragEnd={dragEnabled ? onDragEnd : undefined}
+        onClick={() => onSelectPlayer?.(player.id)}
+        selected={isSelected}
         sx={{
-          cursor: "grab",
+          cursor: dragEnabled ? "grab" : "pointer",
           border: "1px solid",
-          borderColor: "divider",
+          borderColor: isSelected ? "primary.main" : "divider",
           borderRadius: 1,
-          backgroundColor: "background.paper",
+          backgroundColor: isSelected ? "action.selected" : "background.paper",
+          boxShadow: isSelected ? 1 : "none",
           "&:hover": {
             backgroundColor: "action.hover",
             borderColor: "primary.main",
             boxShadow: 1,
-            cursor: "grab",
+            cursor: dragEnabled ? "grab" : "pointer",
           },
           "&:active": {
-            cursor: "grabbing",
+            cursor: dragEnabled ? "grabbing" : "pointer",
             opacity: 0.6,
           },
         }}
       >
-        <IconButton
-          edge="start"
-          size="small"
-          sx={{
-            mr: 1,
-            color: "text.secondary",
-            cursor: draggedPlayerId === player.id ? "grabbing" : "grab",
-            "&:hover": { cursor: "grab" },
-            "&:active": { cursor: "grabbing" },
-          }}
-          disabled
-        >
-          <DragIndicator fontSize="small" />
-        </IconButton>
+        {dragEnabled ? (
+          <IconButton
+            edge="start"
+            size="small"
+            sx={{
+              mr: 1,
+              color: "text.secondary",
+              cursor: draggedPlayerId === player.id ? "grabbing" : "grab",
+              "&:hover": { cursor: "grab" },
+              "&:active": { cursor: "grabbing" },
+            }}
+            disabled
+          >
+            <DragIndicator fontSize="small" />
+          </IconButton>
+        ) : null}
         <ListItemText
           primary={
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
@@ -100,10 +114,22 @@ export function AvailablePlayerListItem({
                 </Tooltip>
               )}
               {isEuropean && (
-                <Chip label="EUR" size="small" color="info" variant="outlined" sx={{ height: 20, fontSize: "0.7rem" }} />
+                <Chip
+                  label="EUR"
+                  size="small"
+                  color="info"
+                  variant="outlined"
+                  sx={{ height: 20, fontSize: "0.7rem" }}
+                />
               )}
               {isForeign && (
-                <Chip label="ETR" size="small" color="warning" variant="outlined" sx={{ height: 20, fontSize: "0.7rem" }} />
+                <Chip
+                  label="ETR"
+                  size="small"
+                  color="warning"
+                  variant="outlined"
+                  sx={{ height: 20, fontSize: "0.7rem" }}
+                />
               )}
               {burnedTeam !== undefined && burnedTeam !== null && (
                 <Chip
@@ -136,14 +162,14 @@ export function AvailablePlayerListItem({
                 !player.isActive &&
                 !player.isTemporary &&
                 !hasLicenseAlert && (
-                <Chip
-                  label="Sans licence"
-                  size="small"
-                  color="default"
-                  variant="outlined"
-                  sx={{ height: 20, fontSize: "0.7rem" }}
-                />
-              )}
+                  <Chip
+                    label="Sans licence"
+                    size="small"
+                    color="default"
+                    variant="outlined"
+                    sx={{ height: 20, fontSize: "0.7rem" }}
+                  />
+                )}
               {discordStatus === "none" && (
                 <Tooltip title="Aucun login Discord configuré">
                   <Chip

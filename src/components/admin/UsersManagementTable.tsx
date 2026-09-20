@@ -14,6 +14,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
   TableRow,
   Typography,
@@ -49,6 +50,7 @@ export function UsersManagementTable({
   getCoachStatusColor,
 }: UsersManagementTableProps) {
   return (
+    <TableContainer sx={{ overflowX: "auto" }}>
     <Table>
       <TableHead>
         <TableRow sx={{ backgroundColor: "action.hover" }}>
@@ -223,5 +225,6 @@ export function UsersManagementTable({
         })}
       </TableBody>
     </Table>
+    </TableContainer>
   );
 }

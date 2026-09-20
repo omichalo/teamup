@@ -36,6 +36,7 @@ import {
 import { useManagedQueueSummary } from "@/components/club-registration/membership-requests/useManagedQueueSummary";
 import { MembershipRequestDetailModal } from "../membership-requests/MembershipRequestDetailModal";
 import { SpreadsheetColumnPicker } from "./SpreadsheetColumnPicker";
+import { SpreadsheetMobileNotice } from "./SpreadsheetMobileNotice";
 import { SpreadsheetSummaryBar } from "./SpreadsheetSummaryBar";
 import {
   SpreadsheetTableHint,
@@ -260,6 +261,11 @@ export function RegistrationsSpreadsheetClient() {
         />
 
         {error ? <Alert severity="error">{error}</Alert> : null}
+
+        <SpreadsheetMobileNotice
+          queueHref={treatQueueHref}
+          showQueueLink={canTreatDossiers}
+        />
 
         <SectionCard
           contentSx={{

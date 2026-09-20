@@ -43,12 +43,16 @@ export const AvailablePlayersPanel: React.FC<AvailablePlayersPanelProps> = ({
   return (
     <Paper
       sx={{
-        position: "sticky",
-        top: 20,
-        alignSelf: "flex-start",
-        minWidth: containerProps?.minWidth ?? 300,
-        maxWidth: containerProps?.maxWidth ?? 350,
-        maxHeight: "calc(100vh - 100px)",
+        width: { xs: "100%", md: "auto" },
+        position: { xs: "static", md: "sticky" },
+        top: { md: 20 },
+        alignSelf: { md: "flex-start" },
+        minWidth: { xs: "auto", md: containerProps?.minWidth ?? 300 },
+        maxWidth: { xs: "none", md: containerProps?.maxWidth ?? 350 },
+        maxHeight: {
+          xs: "min(42vh, 360px)",
+          md: "calc(100vh - 100px)",
+        },
         overflow: "auto",
       }}
     >
@@ -75,9 +79,7 @@ export const AvailablePlayersPanel: React.FC<AvailablePlayersPanelProps> = ({
           sx={{ mb: actions ? 1.5 : 2 }}
         />
 
-        {actions && (
-          <Box sx={{ mb: 2 }}>{actions}</Box>
-        )}
+        {actions && <Box sx={{ mb: 2 }}>{actions}</Box>}
 
         {showEmptyState ? (
           <Typography variant="body2" color="text.secondary">
@@ -90,9 +92,7 @@ export const AvailablePlayersPanel: React.FC<AvailablePlayersPanelProps> = ({
         ) : (
           <List dense disablePadding>
             {filteredPlayers.map((player) => (
-              <React.Fragment key={player.id}>
-                {renderPlayerItem(player)}
-              </React.Fragment>
+              <React.Fragment key={player.id}>{renderPlayerItem(player)}</React.Fragment>
             ))}
           </List>
         )}
@@ -100,5 +100,3 @@ export const AvailablePlayersPanel: React.FC<AvailablePlayersPanelProps> = ({
     </Paper>
   );
 };
-
-

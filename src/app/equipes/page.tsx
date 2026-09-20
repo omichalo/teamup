@@ -9,7 +9,6 @@ import {
   Chip,
   Tabs,
   Tab,
-  Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
@@ -22,6 +21,7 @@ import {
 import { SportsTennis } from "@mui/icons-material";
 import { useTeamData } from "@/hooks/useTeamData";
 import { AuthGuard } from "@/components/AuthGuard";
+import { ResponsiveDialog } from "@/components/ui/ResponsiveDialog";
 import { USER_ROLES } from "@/lib/auth/roles";
 import { useAuth } from "@/hooks/useAuth";
 import { useTeamManagementStore } from "@/stores/teamManagementStore";
@@ -594,7 +594,7 @@ export default function EquipesPage() {
         )}
 
         {/* Dialog de modification du lieu d'une équipe */}
-        <Dialog
+        <ResponsiveDialog
           open={editingTeamLocation !== null}
           onClose={() => {
             if (!updatingLocation) {
@@ -661,10 +661,10 @@ export default function EquipesPage() {
                 : "Enregistrer"}
             </Button>
           </DialogActions>
-        </Dialog>
+        </ResponsiveDialog>
 
         {/* Dialog de modification du canal Discord d'une équipe */}
-        <Dialog
+        <ResponsiveDialog
           open={editingTeamDiscordChannel !== null}
           onClose={() => {
             if (!updatingDiscordChannel) {
@@ -783,7 +783,7 @@ export default function EquipesPage() {
                 : "Enregistrer"}
             </Button>
           </DialogActions>
-        </Dialog>
+        </ResponsiveDialog>
       </Box>
     </AuthGuard>
   );

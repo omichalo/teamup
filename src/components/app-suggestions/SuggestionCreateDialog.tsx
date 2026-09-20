@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import {
   Alert,
   Button,
-  Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
@@ -17,6 +16,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { ResponsiveDialog } from "@/components/ui/ResponsiveDialog";
 import type {
   SuggestionCategory,
   SuggestionDomain,
@@ -142,7 +142,7 @@ export function SuggestionCreateDialog({
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="md">
+    <ResponsiveDialog open={open} onClose={handleClose} fullWidth maxWidth="md">
       <DialogTitle>{copy.title}</DialogTitle>
       <DialogContent>
         <Stack spacing={2.5} sx={{ mt: 1 }}>
@@ -220,6 +220,6 @@ export function SuggestionCreateDialog({
           Envoyer
         </Button>
       </DialogActions>
-    </Dialog>
+    </ResponsiveDialog>
   );
 }

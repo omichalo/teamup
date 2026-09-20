@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import {
   Alert,
   Button,
-  Dialog,
   DialogActions,
   DialogContent,
   DialogContentText,
@@ -13,6 +12,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { ResponsiveDialog } from "@/components/ui/ResponsiveDialog";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import {
   getRegistrationDeleteConfirmationPhrase,
@@ -99,7 +99,7 @@ export function DeleteRegistrationDialog({
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
+    <ResponsiveDialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
       <DialogTitle>
         {step === "warning" ? "Supprimer ce dossier ?" : "Confirmation de suppression"}
       </DialogTitle>
@@ -180,6 +180,6 @@ export function DeleteRegistrationDialog({
           </Button>
         )}
       </DialogActions>
-    </Dialog>
+    </ResponsiveDialog>
   );
 }

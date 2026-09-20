@@ -7,6 +7,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
   TableRow,
   Tooltip,
@@ -79,6 +80,7 @@ export function CompositionsTable({ matches }: CompositionsTableProps) {
   }
 
   return (
+    <TableContainer sx={{ overflowX: "auto" }}>
     <Table size="small" stickyHeader sx={{ "& .MuiTableCell-root": { fontSize: "0.8125rem" } }}>
       <TableHead>
         <TableRow sx={{ bgcolor: "grey.100" }}>
@@ -160,5 +162,6 @@ export function CompositionsTable({ matches }: CompositionsTableProps) {
         ))}
       </TableBody>
     </Table>
+    </TableContainer>
   );
 }

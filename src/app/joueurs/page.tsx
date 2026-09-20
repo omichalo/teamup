@@ -15,7 +15,6 @@ import {
   Tabs,
   Tab,
   Button,
-  Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
@@ -30,6 +29,7 @@ import {
 import { Player } from "@/types/team-management";
 import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
 import { AuthGuard } from "@/components/AuthGuard";
+import { ResponsiveDialog } from "@/components/ui/ResponsiveDialog";
 import { useTeamData } from "@/hooks/useTeamData";
 import { useDiscordMembers } from "@/hooks/useDiscordMembers";
 import { USER_ROLES } from "@/lib/auth/roles";
@@ -628,7 +628,7 @@ export default function JoueursPage() {
         </TabPanel>
 
         {/* Dialog de création de joueur temporaire */}
-        <Dialog
+        <ResponsiveDialog
           open={createDialogOpen}
           onClose={() => {
             if (!creating) {
@@ -801,10 +801,10 @@ export default function JoueursPage() {
               {creating ? "Création..." : "Créer"}
             </Button>
           </DialogActions>
-        </Dialog>
+        </ResponsiveDialog>
 
         {/* Dialog d'édition de joueur temporaire */}
-        <Dialog
+        <ResponsiveDialog
           open={editDialogOpen}
           onClose={() => !updating && setEditDialogOpen(false)}
           maxWidth="sm"
@@ -984,7 +984,7 @@ export default function JoueursPage() {
               {updating ? "Mise à jour..." : "Enregistrer"}
             </Button>
           </DialogActions>
-        </Dialog>
+        </ResponsiveDialog>
       </Box>
     </AuthGuard>
   );

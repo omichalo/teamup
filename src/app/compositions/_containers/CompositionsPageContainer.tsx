@@ -40,7 +40,7 @@ import {
 } from "@/components/compositions/CompositionRulesHelp";
 import { CompositionsView } from "@/components/compositions/views/CompositionsView";
 import { usePhasePreselect } from "@/hooks/usePhasePreselect";
-import { useCompositionAssignments } from "@/hooks/useCompositionAssignments";
+import { useDailyCompositionAssignmentUi } from "@/hooks/useDailyCompositionAssignmentUi";
 import { useCompositionsConfirmationDialog } from "@/hooks/useCompositionsConfirmationDialog";
 import { useCompositionsRealtimeSync } from "@/hooks/useCompositionsRealtimeSync";
 import { useCompositionsStaticData } from "@/hooks/useCompositionsStaticData";
@@ -50,7 +50,6 @@ import {
   CompositionsResendDialog,
   type ConfirmResendDialogState,
 } from "@/components/compositions/dialogs/CompositionsResendDialog";
-import { AvailablePlayerListItem } from "@/components/compositions/AvailablePlayerListItem";
 import { CompositionsFiltersCard } from "@/components/compositions/CompositionsFiltersCard";
 import { SelectionPromptCard } from "@/components/compositions/SelectionPromptCard";
 import { CompositionsHeader } from "@/components/compositions/CompositionsHeader";
@@ -881,12 +880,16 @@ export function CompositionsPageContainer() {
           compositions={compositions}
           draggedPlayerId={draggedPlayerId}
           dragOverTeamId={dragOverTeamId}
+          selectedPlayerId={selectedPlayerId}
+          dragEnabled={dragEnabled}
           canDropPlayer={canDropPlayer}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           onPlayerDragStart={handleDragStart}
           onPlayerDragEnd={handleDragEnd}
+          onSelectPlayer={selectPlayer}
+          onTeamTap={assignSelectedPlayerToTeam}
           getMaxPlayersForTeam={getMaxPlayersForTeam}
           getMatchForTeam={getMatchForTeam}
           formatMatchInfo={formatMatchInfo}
@@ -1136,52 +1139,30 @@ export function CompositionsPageContainer() {
     handleDrop,
     canDropPlayer,
     handleRemovePlayer,
-  } = useCompositionAssignments({
+    selectedPlayerId,
+    selectionFeedback,
+    selectPlayer,
+    clearSelection,
+    clearSelectionFeedback,
+    assignSelectedPlayerToTeam,
+    dragEnabled,
+    renderAvailablePlayerItem,
+    selectionPlayerLabel,
+  } = useDailyCompositionAssignmentUi({
     players,
     equipes,
     filteredEquipes,
     compositions,
     selectedPhase,
     selectedJournee,
+    selectedEpreuve,
     tabValue,
     compositionService,
     getMaxPlayersForTeam,
     setCompositions,
     setDefaultCompositions,
+    getDiscordStatus,
   });
-
-  const renderAvailablePlayerItem = useCallback(
-    (player: Player) => {
-      const phase = selectedPhase || "aller";
-      const championshipType = tabValue === 0 ? "masculin" : "feminin";
-      const isParis = isParisEpreuve(selectedEpreuve);
-      const burnedTeam = isParis
-        ? player.highestTeamNumberByPhaseParis?.[phase]
-        : championshipType === "masculin"
-        ? player.highestMasculineTeamNumberByPhase?.[phase]
-        : player.highestFeminineTeamNumberByPhase?.[phase];
-
-      return (
-        <AvailablePlayerListItem
-          player={player}
-          burnedTeam={burnedTeam}
-          draggedPlayerId={draggedPlayerId}
-          discordStatus={getDiscordStatus(player)}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        />
-      );
-    },
-    [
-      draggedPlayerId,
-      getDiscordStatus,
-      handleDragEnd,
-      handleDragStart,
-      selectedEpreuve,
-      selectedPhase,
-      tabValue,
-    ]
-  );
 
   const runResetCompositions = useCallback(async () => {
     if (
@@ -1367,6 +1348,10 @@ export function CompositionsPageContainer() {
           showFemalePicker={!isParisEpreuve(selectedEpreuve)}
           tabValue={tabValue}
           onTabChange={handleTabChange}
+          selectionPlayerLabel={selectionPlayerLabel}
+          onClearSelection={clearSelection}
+          selectionFeedback={selectionFeedback}
+          onClearSelectionFeedback={clearSelectionFeedback}
           availablePlayersPanel={
             <AvailablePlayersSection
               subtitle={availablePlayersSubtitle}

@@ -34,7 +34,7 @@ export function AnalyticsGeoTable({ title, bucket }: AnalyticsGeoTableProps) {
           Aucune donnée.
         </Typography>
       ) : (
-        <TableContainer>
+        <TableContainer sx={{ overflowX: "auto" }}>
           <Table size="small">
             <TableHead>
               <TableRow>

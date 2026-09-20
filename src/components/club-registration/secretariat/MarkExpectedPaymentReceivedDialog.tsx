@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import {
   Button,
-  Dialog,
   DialogActions,
   DialogContent,
   DialogContentText,
@@ -13,6 +12,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import { ResponsiveDialog } from "@/components/ui/ResponsiveDialog";
 import type { ExpectedPayment } from "@/lib/club-registration/payment/types";
 import {
   centsToEurosInput,
@@ -90,7 +90,7 @@ export function MarkExpectedPaymentReceivedDialog({
   };
 
   return (
-    <Dialog
+    <ResponsiveDialog
       open={open}
       onClose={submitting ? undefined : onClose}
       fullWidth
@@ -160,6 +160,6 @@ export function MarkExpectedPaymentReceivedDialog({
           Confirmer
         </Button>
       </DialogActions>
-    </Dialog>
+    </ResponsiveDialog>
   );
 }

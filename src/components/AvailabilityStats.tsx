@@ -119,7 +119,7 @@ export function AvailabilityStats({ stats, players }: AvailabilityStatsProps) {
           Détail par joueur
         </Typography>
 
-        <TableContainer component={Paper}>
+        <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
           <Table size="small">
             <TableHead>
               <TableRow>
