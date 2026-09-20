@@ -7,6 +7,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
   TableRow,
   Typography,
@@ -113,6 +114,7 @@ export function PaymentDeclaredAidsTable({ registrationId, aids, onAidsChange }:
         Cochez « Aide reçue » ici : la case se met à jour tout de suite, sans recharger
         le dossier. Un message confirme l&apos;enregistrement.
       </Typography>
+      <TableContainer sx={{ overflowX: "auto" }}>
       <Table size="small">
         <TableHead>
           <TableRow>
@@ -142,6 +144,7 @@ export function PaymentDeclaredAidsTable({ registrationId, aids, onAidsChange }:
           ))}
         </TableBody>
       </Table>
+      </TableContainer>
       {feedback ? (
         <Snackbar
           open

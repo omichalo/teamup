@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { EquipeWithMatches } from "@/hooks/useTeamData";
+import { usePlayerAssignmentSelection } from "@/hooks/usePlayerAssignmentSelection";
 import { usePlayerDrag } from "@/hooks/usePlayerDrag";
 import {
   JOURNEE_CONCERNEE_PAR_REGLE,
@@ -88,8 +89,8 @@ export function useCompositionAssignments({
           ? "feminin"
           : "masculin"
         : tabValue === 0
-        ? "masculin"
-        : "feminin";
+          ? "masculin"
+          : "feminin";
 
       return {
         championshipType,
@@ -275,9 +276,15 @@ export function useCompositionAssignments({
     onDrop: handlePlayerDrop,
   });
 
+  const selection = usePlayerAssignmentSelection({
+    canDropPlayer,
+    onAssign: handlePlayerDrop,
+  });
+
   return {
     canDropPlayer,
     handleRemovePlayer,
     ...drag,
+    ...selection,
   };
 }

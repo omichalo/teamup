@@ -71,7 +71,7 @@ export const CompositionRulesHelp: React.FC<CompositionRulesHelpProps> = ({
           <AlertTitle>{title}</AlertTitle>
           <Box>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              Rappel des règles appliquées lors du drag & drop.
+              Rappel des règles appliquées lors du glisser-déposer (ordinateur) ou de la sélection puis équipe (mobile).
             </Typography>
             <List dense={dense} disablePadding>
               {rules.map((rule) => (

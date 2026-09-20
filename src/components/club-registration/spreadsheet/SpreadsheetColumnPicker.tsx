@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import {
   Button,
   Checkbox,
-  Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
@@ -16,6 +15,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { ResponsiveDialog } from "@/components/ui/ResponsiveDialog";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import SearchIcon from "@mui/icons-material/Search";
 import {
@@ -84,7 +84,7 @@ export function SpreadsheetColumnPicker({
   }));
 
   return (
-    <Dialog
+    <ResponsiveDialog
       open={open}
       onClose={onClose}
       maxWidth="sm"
@@ -221,6 +221,6 @@ export function SpreadsheetColumnPicker({
           Enregistrer
         </Button>
       </DialogActions>
-    </Dialog>
+    </ResponsiveDialog>
   );
 }

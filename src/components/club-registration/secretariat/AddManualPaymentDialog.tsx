@@ -5,7 +5,6 @@ import {
   Alert,
   Button,
   Checkbox,
-  Dialog,
   DialogActions,
   DialogContent,
   DialogContentText,
@@ -15,6 +14,7 @@ import {
   Stack,
   TextField,
 } from "@mui/material";
+import { ResponsiveDialog } from "@/components/ui/ResponsiveDialog";
 import {
   RECEIVED_PAYMENT_METHOD_IDS,
   RECEIVED_PAYMENT_METHOD_LABELS,
@@ -129,7 +129,7 @@ export function AddManualPaymentDialog({
     method === "cheque" || method === "holiday_vouchers";
 
   return (
-    <Dialog
+    <ResponsiveDialog
       open={open}
       onClose={submitting ? undefined : onClose}
       fullWidth
@@ -233,6 +233,6 @@ export function AddManualPaymentDialog({
           Enregistrer
         </Button>
       </DialogActions>
-    </Dialog>
+    </ResponsiveDialog>
   );
 }

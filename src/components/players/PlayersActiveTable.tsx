@@ -125,7 +125,7 @@ export function PlayersActiveTable({
   onToggleWheelchair,
 }: PlayersActiveTableProps) {
   return (
-    <TableContainer component={Paper}>
+    <TableContainer component={Paper} sx={{ overflowX: "auto" }}>
       <Table>
         <TableHead>
           <TableRow>

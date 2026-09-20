@@ -114,7 +114,7 @@ export function AnalyticsCrossTabPanel({
           Aucune donnée pour ce filtre.
         </Typography>
       ) : (
-        <TableContainer component={Paper} variant="outlined">
+        <TableContainer component={Paper} variant="outlined" sx={{ overflowX: "auto" }}>
           <Table size="small">
             <TableHead>
               <TableRow>

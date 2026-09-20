@@ -8,6 +8,7 @@ export { SectionCard } from "./SectionCard";
 export type { SectionCardProps } from "./SectionCard";
 export { StepProgressBar } from "./StepProgressBar";
 export type { StepProgressBarProps } from "./StepProgressBar";
+export { ResponsiveDialog } from "./ResponsiveDialog";
 export {
   VirtualGrid,
   VirtualGridSharedTooltip,

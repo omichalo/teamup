@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import {
   Button,
   CircularProgress,
-  Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
@@ -12,6 +11,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { ResponsiveDialog } from "@/components/ui/ResponsiveDialog";
 import { readJsonResponse } from "@/lib/http/read-json-response";
 import type { AttendanceMemberSearchHit } from "@/lib/attendance/types";
 import { AttendanceAlertChips } from "./AttendanceAlertChips";
@@ -86,7 +86,7 @@ export function AttendanceSearchDialog({ open, slotId, onClose, onPick }: Props)
   }
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+    <ResponsiveDialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>Chercher un adhérent</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
@@ -137,6 +137,6 @@ export function AttendanceSearchDialog({ open, slotId, onClose, onPick }: Props)
       <DialogActions>
         <Button onClick={onClose}>Fermer</Button>
       </DialogActions>
-    </Dialog>
+    </ResponsiveDialog>
   );
 }

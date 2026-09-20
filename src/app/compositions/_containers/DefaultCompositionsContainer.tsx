@@ -9,17 +9,11 @@ import {
   Button,
   Alert,
   CircularProgress,
-  Chip,
   FormControlLabel,
   Switch,
-  Tooltip,
   Card,
   CardContent,
 } from "@mui/material";
-import {
-  AlternateEmail,
-  Warning,
-} from "@mui/icons-material";
 import { AuthGuard } from "@/components/AuthGuard";
 import { USER_ROLES } from "@/lib/auth/roles";
 import { useTeamData, type EquipeWithMatches } from "@/hooks/useTeamData";
@@ -40,19 +34,20 @@ import {
 } from "@/lib/compositions/championship-utils";
 import { divisionIndicatesPhase2 } from "@/lib/shared/fftt-utils";
 import type { Player } from "@/types/team-management";
-import { ChampionshipStatusChips } from "@/components/championship/ChampionshipStatusChips";
 import { AvailablePlayersPanel } from "@/components/compositions/AvailablePlayersPanel";
 import { AvailablePlayerListItem } from "@/components/compositions/AvailablePlayerListItem";
-import { TeamCompositionCard } from "@/components/compositions/TeamCompositionCard";
 import { CompositionsSummary } from "@/components/compositions/CompositionsSummary";
 import { CompositionRulesHelp, type CompositionRuleItem } from "@/components/compositions/CompositionRulesHelp";
+import { CompositionsWorkspace } from "@/components/compositions/CompositionsWorkspace";
+import { formatPlayerSelectionLabel } from "@/components/compositions/CompositionSelectionBar";
+import { DefaultCompositionTeamCard } from "@/components/compositions/DefaultCompositionTeamCard";
 import { usePhasePreselect } from "@/hooks/usePhasePreselect";
 import { useJourneesData } from "@/hooks/useJourneesData";
 import { useDefaultCompositions } from "@/hooks/useDefaultCompositions";
 import { useDefaultCompositionAssignments } from "@/hooks/useDefaultCompositionAssignments";
+import { useCompositionDragEnabled } from "@/hooks/useCompositionDragEnabled";
 import { EpreuveSelect } from "@/components/compositions/Filters/EpreuveSelect";
 import { PhaseSelect } from "@/components/compositions/Filters/PhaseSelect";
-import { TeamPicker } from "@/components/compositions/Filters/TeamPicker";
 import { TabPanel } from "@/components/compositions/Filters/TabPanel";
 import { DefaultCompositionsView } from "@/components/compositions/views/DefaultCompositionsView";
 
@@ -300,6 +295,8 @@ export function DefaultCompositionsContainer() {
     getMaxPlayersForTeam,
   ]);
 
+  const dragEnabled = useCompositionDragEnabled();
+
   const {
     draggedPlayerId,
     dragOverTeamId,
@@ -310,6 +307,12 @@ export function DefaultCompositionsContainer() {
     handleDrop,
     canDropPlayer,
     handleRemoveDefaultPlayer,
+    selectedPlayerId,
+    selectPlayer,
+    clearSelection,
+    assignSelectedPlayerToTeam,
+    selectionFeedback,
+    clearSelectionFeedback,
   } = useDefaultCompositionAssignments({
     players,
     equipes,
@@ -548,91 +551,179 @@ export function DefaultCompositionsContainer() {
                 </Alert>
               )}
 
-              <TeamPicker
-                value={currentTabIndex}
-                onChange={handleTabChange}
-                showFemale={!isParisEpreuve(selectedEpreuve)}
-              />
-
-              <Box sx={{ display: "flex", gap: 2, position: "relative" }}>
-                <AvailablePlayersPanel
-                  title="Joueurs"
-                  subtitle={availablePlayersSubtitle}
-                  searchQuery={searchQuery}
-                  onSearchChange={setSearchQuery}
-                  totalCount={availablePlayersWithoutAssignment.length}
-                  filteredPlayers={filteredAvailablePlayersWithoutAssignment}
-                  emptyMessage="Aucun joueur disponible"
-                  noResultMessage={(query) => `Aucun joueur trouvé pour “${query}”`}
-                  renderPlayerItem={(player) => {
-                    const phase = (selectedPhase || "aller") as "aller" | "retour";
-                    const burnedTeam =
-                      defaultCompositionTab === "masculin"
-                        ? player.highestMasculineTeamNumberByPhase?.[phase]
-                        : player.highestFeminineTeamNumberByPhase?.[phase];
-                    return (
-                      <AvailablePlayerListItem
-                        player={player}
-                        burnedTeam={burnedTeam}
-                        draggedPlayerId={draggedPlayerId}
-                        discordStatus={getDiscordStatus(player)}
-                        onDragStart={handleDragStart}
-                        onDragEnd={handleDragEnd}
-                        showEligibilityChips
-                      />
-                    );
-                  }}
-                  actions={
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={includeAllPlayers}
-                          onChange={(event) =>
-                            setIncludeAllPlayers(event.target.checked)
-                          }
-                          size="small"
+              <CompositionsWorkspace
+                canShowContent={true}
+                showFemalePicker={!isParisEpreuve(selectedEpreuve)}
+                tabValue={currentTabIndex}
+                onTabChange={handleTabChange}
+                selectionPlayerLabel={formatPlayerSelectionLabel(
+                  players,
+                  selectedPlayerId
+                )}
+                onClearSelection={clearSelection}
+                selectionFeedback={selectionFeedback}
+                onClearSelectionFeedback={clearSelectionFeedback}
+                availablePlayersPanel={
+                  <AvailablePlayersPanel
+                    title="Joueurs"
+                    subtitle={availablePlayersSubtitle}
+                    searchQuery={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    totalCount={availablePlayersWithoutAssignment.length}
+                    filteredPlayers={filteredAvailablePlayersWithoutAssignment}
+                    emptyMessage="Aucun joueur disponible"
+                    noResultMessage={(query) =>
+                      `Aucun joueur trouvé pour “${query}”`
+                    }
+                    renderPlayerItem={(player) => {
+                      const phase = (selectedPhase || "aller") as
+                        | "aller"
+                        | "retour";
+                      const burnedTeam =
+                        defaultCompositionTab === "masculin"
+                          ? player.highestMasculineTeamNumberByPhase?.[phase]
+                          : player.highestFeminineTeamNumberByPhase?.[phase];
+                      return (
+                        <AvailablePlayerListItem
+                          player={player}
+                          burnedTeam={burnedTeam}
+                          draggedPlayerId={draggedPlayerId}
+                          selectedPlayerId={selectedPlayerId}
+                          dragEnabled={dragEnabled}
+                          discordStatus={getDiscordStatus(player)}
+                          onDragStart={handleDragStart}
+                          onDragEnd={handleDragEnd}
+                          onSelectPlayer={selectPlayer}
+                          showEligibilityChips
                         />
-                      }
-                      label="Afficher tous les joueurs (hors championnat et sans licence)"
-                    />
-                  }
-                />
-
-                <Box sx={{ flex: 1 }}>
-                  <CompositionsSummary
-                    totalTeams={compositionSummary.totalTeams}
-                    completedTeams={compositionSummary.completedTeams}
-                    incompleteTeams={compositionSummary.incompleteTeams}
-                  invalidTeams={compositionSummary.invalidTeams}
-                    matchesPlayed={0}
-                    showMatchesPlayed={false}
-                    percentage={compositionSummary.percentage}
-                    title="Bilan des compositions par défaut"
+                      );
+                    }}
+                    actions={
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={includeAllPlayers}
+                            onChange={(event) =>
+                              setIncludeAllPlayers(event.target.checked)
+                            }
+                            size="small"
+                          />
+                        }
+                        label="Afficher tous les joueurs (hors championnat et sans licence)"
+                      />
+                    }
                   />
+                }
+                summaryTabs={
+                  <>
+                    <CompositionsSummary
+                      totalTeams={compositionSummary.totalTeams}
+                      completedTeams={compositionSummary.completedTeams}
+                      incompleteTeams={compositionSummary.incompleteTeams}
+                      invalidTeams={compositionSummary.invalidTeams}
+                      matchesPlayed={0}
+                      showMatchesPlayed={false}
+                      percentage={compositionSummary.percentage}
+                      title="Bilan des compositions par défaut"
+                    />
 
-                  <TabPanel
-                    value={currentTabIndex}
-                    index={0}
-                    baseId="default-compositions"
-                  >
-                    {(() => {
-                      // Pour le championnat de Paris, afficher toutes les équipes (masculin + féminin)
-                      const equipesToDisplay =
-                        isParisEpreuve(selectedEpreuve)
-                          ? [...equipesByType.masculin, ...equipesByType.feminin]
+                    <TabPanel
+                      value={currentTabIndex}
+                      index={0}
+                      baseId="default-compositions"
+                    >
+                      {(() => {
+                        const equipesToDisplay = isParisEpreuve(selectedEpreuve)
+                          ? [
+                              ...equipesByType.masculin,
+                              ...equipesByType.feminin,
+                            ]
                           : equipesByType.masculin;
 
-                      if (equipesToDisplay.length === 0) {
-                        return (
-                          <Typography variant="body2" color="text.secondary">
-                            {isParisEpreuve(selectedEpreuve)
-                              ? "Aucune équipe"
-                              : "Aucune équipe masculine"}
-                          </Typography>
-                        );
-                      }
+                        if (equipesToDisplay.length === 0) {
+                          return (
+                            <Typography variant="body2" color="text.secondary">
+                              {isParisEpreuve(selectedEpreuve)
+                                ? "Aucune équipe"
+                                : "Aucune équipe masculine"}
+                            </Typography>
+                          );
+                        }
 
-                      return (
+                        return (
+                          <Box
+                            sx={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 2,
+                            }}
+                          >
+                            {equipesToDisplay.map((equipe) => {
+                              const championshipTypeForTeam = isParisEpreuve(
+                                selectedEpreuve
+                              )
+                                ? "masculin"
+                                : equipe.matches.some(
+                                      (match) => match.isFemale === true
+                                    )
+                                  ? "feminin"
+                                  : "masculin";
+                              const assignments =
+                                defaultCompositions[championshipTypeForTeam][
+                                  equipe.team.id
+                                ] || [];
+                              const teamPlayers = assignments
+                                .map((playerId) =>
+                                  players.find((p) => p.id === playerId)
+                                )
+                                .filter((p): p is Player => p !== undefined);
+
+                              return (
+                                <DefaultCompositionTeamCard
+                                  key={equipe.team.id}
+                                  equipe={equipe}
+                                  teamPlayers={teamPlayers}
+                                  validationError={
+                                    defaultCompositionErrors[equipe.team.id]
+                                  }
+                                  selectedPhase={selectedPhase}
+                                  draggedPlayerId={draggedPlayerId}
+                                  dragOverTeamId={dragOverTeamId}
+                                  selectedPlayerId={selectedPlayerId}
+                                  dragEnabled={dragEnabled}
+                                  canDropPlayer={canDropPlayer}
+                                  onDragStart={handleDragStart}
+                                  onDragEnd={handleDragEnd}
+                                  onDragOver={handleDragOver}
+                                  onDragLeave={handleDragLeave}
+                                  onDrop={handleDrop}
+                                  onSelectPlayer={selectPlayer}
+                                  onTeamTap={assignSelectedPlayerToTeam}
+                                  onRemovePlayer={handleRemoveDefaultPlayer}
+                                  getMaxPlayersForTeam={getMaxPlayersForTeam}
+                                  completionThreshold={
+                                    MIN_PLAYERS_FOR_DEFAULT_COMPLETION
+                                  }
+                                  burnoutKind="masculin"
+                                  getDiscordStatus={getDiscordStatus}
+                                />
+                              );
+                            })}
+                          </Box>
+                        );
+                      })()}
+                    </TabPanel>
+
+                    <TabPanel
+                      value={currentTabIndex}
+                      index={1}
+                      baseId="default-compositions"
+                    >
+                      {equipesByType.feminin.length === 0 ? (
+                        <Typography variant="body2" color="text.secondary">
+                          Aucune équipe féminine
+                        </Typography>
+                      ) : (
                         <Box
                           sx={{
                             display: "flex",
@@ -640,414 +731,53 @@ export function DefaultCompositionsContainer() {
                             gap: 2,
                           }}
                         >
-                          {equipesToDisplay.map((equipe) => {
-                          // Pour le championnat de Paris, utiliser "masculin" comme type par défaut (mixte)
-                          const championshipTypeForTeam =
-                            isParisEpreuve(selectedEpreuve)
-                              ? "masculin"
-                              : equipe.matches.some((match) => match.isFemale === true)
-                                ? "feminin"
-                                : "masculin";
-                          const assignments =
-                            defaultCompositions[championshipTypeForTeam][equipe.team.id] || [];
-                          const teamPlayers = assignments
-                            .map((playerId) => players.find((p) => p.id === playerId))
-                            .filter((p): p is Player => p !== undefined);
+                          {equipesByType.feminin.map((equipe) => {
+                            const assignments =
+                              defaultCompositions.feminin[equipe.team.id] ||
+                              [];
+                            const teamPlayers = assignments
+                              .map((playerId) =>
+                                players.find((p) => p.id === playerId)
+                              )
+                              .filter((p): p is Player => p !== undefined);
 
-                          const isDragOver =
-                            draggedPlayerId && dragOverTeamId === equipe.team.id;
-                          const dropCheck =
-                            draggedPlayerId && dragOverTeamId === equipe.team.id
-                              ? canDropPlayer(draggedPlayerId, equipe.team.id)
-                              : {
-                                  canAssign: true,
-                                  reason: undefined,
-                                  simulatedPlayers: teamPlayers,
-                                };
-                          const canDrop = dropCheck.canAssign;
-                          const validationError =
-                            defaultCompositionErrors[equipe.team.id];
-
-                          return (
-                            <Box key={equipe.team.id}>
-                              <TeamCompositionCard
+                            return (
+                              <DefaultCompositionTeamCard
+                                key={equipe.team.id}
                                 equipe={equipe}
-                                players={teamPlayers}
-                                onRemovePlayer={(playerId) =>
-                                  handleRemoveDefaultPlayer(
-                                    equipe.team.id,
-                                    playerId
-                                  )
+                                teamPlayers={teamPlayers}
+                                validationError={
+                                  defaultCompositionErrors[equipe.team.id]
                                 }
-                                onPlayerDragStart={(event, playerId) =>
-                                  handleDragStart(event, playerId)
-                                }
-                                onPlayerDragEnd={handleDragEnd}
-                                onDragOver={(event) =>
-                                  handleDragOver(event, equipe.team.id)
-                                }
-                                onDragLeave={handleDragLeave}
-                                onDrop={(event) =>
-                                  handleDrop(event, equipe.team.id)
-                                }
-                                isDragOver={Boolean(isDragOver)}
-                                canDrop={canDrop}
-                                dropReason={dropCheck.reason}
+                                selectedPhase={selectedPhase}
                                 draggedPlayerId={draggedPlayerId}
                                 dragOverTeamId={dragOverTeamId}
-                                matchPlayed={false}
-                                showMatchStatus={false}
-                                selectedEpreuve={null}
-                                additionalHeader={
-                                  validationError ? (
-                                    <Chip
-                                      label="Invalide"
-                                      size="small"
-                                      color="error"
-                                      variant="filled"
-                                    />
-                                  ) : undefined
-                                }
-                                maxPlayers={getMaxPlayersForTeam(equipe)}
-                            completionThreshold={
-                              MIN_PLAYERS_FOR_DEFAULT_COMPLETION
-                            }
-                                renderPlayerIndicators={(player) => {
-                                  const phase = (selectedPhase ||
-                                    "aller") as "aller" | "retour";
-                                  // Utiliser les bonnes propriétés selon le championnat
-                                  const isParis = isParisChampionship(equipe);
-                                  const burnedTeam = isParis
-                                    ? player.highestTeamNumberByPhaseParis?.[phase]
-                                    : player.highestMasculineTeamNumberByPhase?.[
-                                        phase
-                                      ];
-                                  return (
-                                    <>
-                                      <ChampionshipStatusChips player={player} />
-                                      {player.nationality === "C" && (
-                                        <Chip
-                                          label="EUR"
-                                          size="small"
-                                          color="info"
-                                          variant="outlined"
-                                          sx={{
-                                            height: 18,
-                                            fontSize: "0.65rem",
-                                          }}
-                                        />
-                                      )}
-                                      {player.nationality === "ETR" && (
-                                        <Chip
-                                          label="ETR"
-                                          size="small"
-                                          color="warning"
-                                          variant="outlined"
-                                          sx={{
-                                            height: 18,
-                                            fontSize: "0.65rem",
-                                          }}
-                                        />
-                                      )}
-                                      {burnedTeam !== undefined &&
-                                        burnedTeam !== null && (
-                                          <Chip
-                                            label={`Brûlé Éq. ${burnedTeam}`}
-                                            size="small"
-                                            color="error"
-                                            variant="outlined"
-                                            sx={{
-                                              height: 18,
-                                              fontSize: "0.65rem",
-                                            }}
-                                          />
-                                        )}
-                                      {player.isTemporary && (
-                                        <Chip
-                                          label="Temporaire"
-                                          size="small"
-                                          color="error"
-                                          variant="outlined"
-                                          sx={{
-                                            height: 18,
-                                            fontSize: "0.65rem",
-                                          }}
-                                        />
-                                      )}
-                                      {(() => {
-                                        const discordStatus = getDiscordStatus(player);
-                                        if (discordStatus === "none") {
-                                          return (
-                                            <Tooltip title="Aucun login Discord configuré">
-                                              <Chip
-                                                icon={<AlternateEmail fontSize="small" />}
-                                                label="Pas Discord"
-                                                size="small"
-                                                color="default"
-                                                variant="outlined"
-                                                sx={{
-                                                  height: 18,
-                                                  fontSize: "0.65rem",
-                                                }}
-                                              />
-                                            </Tooltip>
-                                          );
-                                        }
-                                        if (discordStatus === "invalid") {
-                                          return (
-                                            <Tooltip title="Au moins un login Discord n'existe plus sur le serveur">
-                                              <Chip
-                                                icon={<Warning fontSize="small" />}
-                                                label="Discord invalide"
-                                                size="small"
-                                                color="warning"
-                                                variant="outlined"
-                                                sx={{
-                                                  height: 18,
-                                                  fontSize: "0.65rem",
-                                                }}
-                                              />
-                                            </Tooltip>
-                                          );
-                                        }
-                                        return null;
-                                      })()}
-                                    </>
-                                  );
-                                }}
-                                renderPlayerSecondary={(player) =>
-                                  player.points !== undefined &&
-                                  player.points !== null
-                                    ? `${player.points} points`
-                                    : "Points non disponibles"
-                                }
-                              />
-                              {validationError && (
-                                <Typography
-                                  variant="caption"
-                                  color="error"
-                                  sx={{ mt: 1, display: "block" }}
-                                >
-                                  {validationError}
-                                </Typography>
-                              )}
-                            </Box>
-                          );
-                        })}
-                      </Box>
-                      );
-                    })()}
-                  </TabPanel>
-
-                  <TabPanel
-                    value={currentTabIndex}
-                    index={1}
-                    baseId="default-compositions"
-                  >
-                    {equipesByType.feminin.length === 0 ? (
-                      <Typography variant="body2" color="text.secondary">
-                        Aucune équipe féminine
-                      </Typography>
-                    ) : (
-                      <Box
-                        sx={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 2,
-                        }}
-                      >
-                        {equipesByType.feminin.map((equipe) => {
-                          const assignments =
-                            defaultCompositions.feminin[equipe.team.id] || [];
-                          const teamPlayers = assignments
-                            .map((playerId) => players.find((p) => p.id === playerId))
-                            .filter((p): p is Player => p !== undefined);
-
-                          const isDragOver =
-                            draggedPlayerId && dragOverTeamId === equipe.team.id;
-                          const dropCheck =
-                            draggedPlayerId && dragOverTeamId === equipe.team.id
-                              ? canDropPlayer(draggedPlayerId, equipe.team.id)
-                              : {
-                                  canAssign: true,
-                                  reason: undefined,
-                                  simulatedPlayers: teamPlayers,
-                                };
-                          const canDrop = dropCheck.canAssign;
-                          const validationError =
-                            defaultCompositionErrors[equipe.team.id];
-
-                          return (
-                            <Box key={equipe.team.id}>
-                              <TeamCompositionCard
-                                equipe={equipe}
-                                players={teamPlayers}
-                                onRemovePlayer={(playerId) =>
-                                  handleRemoveDefaultPlayer(
-                                    equipe.team.id,
-                                    playerId
-                                  )
-                                }
-                                onPlayerDragStart={(event, playerId) =>
-                                  handleDragStart(event, playerId)
-                                }
-                                onPlayerDragEnd={handleDragEnd}
-                                onDragOver={(event) =>
-                                  handleDragOver(event, equipe.team.id)
-                                }
+                                selectedPlayerId={selectedPlayerId}
+                                dragEnabled={dragEnabled}
+                                canDropPlayer={canDropPlayer}
+                                onDragStart={handleDragStart}
+                                onDragEnd={handleDragEnd}
+                                onDragOver={handleDragOver}
                                 onDragLeave={handleDragLeave}
-                                onDrop={(event) =>
-                                  handleDrop(event, equipe.team.id)
+                                onDrop={handleDrop}
+                                onSelectPlayer={selectPlayer}
+                                onTeamTap={assignSelectedPlayerToTeam}
+                                onRemovePlayer={handleRemoveDefaultPlayer}
+                                getMaxPlayersForTeam={getMaxPlayersForTeam}
+                                completionThreshold={
+                                  MIN_PLAYERS_FOR_DEFAULT_COMPLETION
                                 }
-                                isDragOver={Boolean(isDragOver)}
-                                canDrop={canDrop}
-                                dropReason={dropCheck.reason}
-                                draggedPlayerId={draggedPlayerId}
-                                dragOverTeamId={dragOverTeamId}
-                                matchPlayed={false}
-                                showMatchStatus={false}
-                                selectedEpreuve={null}
-                                additionalHeader={
-                                  validationError ? (
-                                    <Chip
-                                      label="Invalide"
-                                      size="small"
-                                      color="error"
-                                      variant="filled"
-                                    />
-                                  ) : undefined
-                                }
-                                maxPlayers={getMaxPlayersForTeam(equipe)}
-                            completionThreshold={
-                              MIN_PLAYERS_FOR_DEFAULT_COMPLETION
-                            }
-                                renderPlayerIndicators={(player) => {
-                                  const phase = (selectedPhase ||
-                                    "aller") as "aller" | "retour";
-                                  // Utiliser les bonnes propriétés selon le championnat
-                                  const isParis = isParisChampionship(equipe);
-                                  const burnedTeam = isParis
-                                    ? player.highestTeamNumberByPhaseParis?.[phase]
-                                    : player.highestFeminineTeamNumberByPhase?.[
-                                        phase
-                                      ];
-                                  return (
-                                    <>
-                                      <ChampionshipStatusChips player={player} />
-                                      {player.nationality === "C" && (
-                                        <Chip
-                                          label="EUR"
-                                          size="small"
-                                          color="info"
-                                          variant="outlined"
-                                          sx={{
-                                            height: 18,
-                                            fontSize: "0.65rem",
-                                          }}
-                                        />
-                                      )}
-                                      {player.nationality === "ETR" && (
-                                        <Chip
-                                          label="ETR"
-                                          size="small"
-                                          color="warning"
-                                          variant="outlined"
-                                          sx={{
-                                            height: 18,
-                                            fontSize: "0.65rem",
-                                          }}
-                                        />
-                                      )}
-                                      {burnedTeam !== undefined &&
-                                        burnedTeam !== null && (
-                                          <Chip
-                                            label={`Brûlé Éq. ${burnedTeam}`}
-                                            size="small"
-                                            color="error"
-                                            variant="outlined"
-                                            sx={{
-                                              height: 18,
-                                              fontSize: "0.65rem",
-                                            }}
-                                          />
-                                        )}
-                                      {player.isTemporary && (
-                                        <Chip
-                                          label="Temporaire"
-                                          size="small"
-                                          color="error"
-                                          variant="outlined"
-                                          sx={{
-                                            height: 18,
-                                            fontSize: "0.65rem",
-                                          }}
-                                        />
-                                      )}
-                                      {(() => {
-                                        const discordStatus = getDiscordStatus(player);
-                                        if (discordStatus === "none") {
-                                          return (
-                                            <Tooltip title="Aucun login Discord configuré">
-                                              <Chip
-                                                icon={<AlternateEmail fontSize="small" />}
-                                                label="Pas Discord"
-                                                size="small"
-                                                color="default"
-                                                variant="outlined"
-                                                sx={{
-                                                  height: 18,
-                                                  fontSize: "0.65rem",
-                                                }}
-                                              />
-                                            </Tooltip>
-                                          );
-                                        }
-                                        if (discordStatus === "invalid") {
-                                          return (
-                                            <Tooltip title="Au moins un login Discord n'existe plus sur le serveur">
-                                              <Chip
-                                                icon={<Warning fontSize="small" />}
-                                                label="Discord invalide"
-                                                size="small"
-                                                color="warning"
-                                                variant="outlined"
-                                                sx={{
-                                                  height: 18,
-                                                  fontSize: "0.65rem",
-                                                }}
-                                              />
-                                            </Tooltip>
-                                          );
-                                        }
-                                        return null;
-                                      })()}
-                                    </>
-                                  );
-                                }}
-                                renderPlayerSecondary={(player) =>
-                                  player.points !== undefined &&
-                                  player.points !== null
-                                    ? `${player.points} points`
-                                    : "Points non disponibles"
-                                }
+                                burnoutKind="feminin"
+                                getDiscordStatus={getDiscordStatus}
                               />
-                              {validationError && (
-                                <Typography
-                                  variant="caption"
-                                  color="error"
-                                  sx={{ mt: 1, display: "block" }}
-                                >
-                                  {validationError}
-                                </Typography>
-                              )}
-                            </Box>
-                          );
-                        })}
-                      </Box>
-                    )}
-                  </TabPanel>
-                </Box>
-              </Box>
+                            );
+                          })}
+                        </Box>
+                      )}
+                    </TabPanel>
+                  </>
+                }
+              />
             </>
           )}
         </Box>
