@@ -114,4 +114,6 @@ export const AUDIT_ACTIONS = {
   CHAMPIONSHIP_ROSTER_RECALCULATED: "championship.roster.recalculated",
   CHAMPIONSHIP_ROSTER_UPDATED: "championship.roster.updated",
   CHAMPIONSHIP_ROSTER_DELETED: "championship.roster.deleted",
+  CHAMPIONSHIP_UNREGISTERED_PLAY_PAYMENT_UPDATED:
+    "championship.unregistered_play.payment_updated",
 } as const;

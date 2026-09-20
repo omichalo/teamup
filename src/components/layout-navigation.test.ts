@@ -82,6 +82,7 @@ describe("buildLayoutNavigation", () => {
       "/club/adhesions-tableau",
       "/club/statistiques-adherents",
       "/club/validations-licence",
+      "/club/matchs-hors-inscription",
       "/club/idees",
     ]);
   });
@@ -105,6 +106,7 @@ describe("buildLayoutNavigation", () => {
       "/club/parametrage-inscription",
       "/club/inscription",
       "/club/validations-licence",
+      "/club/matchs-hors-inscription",
     ]);
   });
 
@@ -125,6 +127,7 @@ describe("buildLayoutNavigation", () => {
       "/joueurs",
       "/equipes",
       "/compositions/defaults",
+      "/club/matchs-hors-inscription",
     ]);
   });
 
@@ -156,6 +159,7 @@ describe("buildLayoutNavigation", () => {
       "/club/parametrage-inscription",
       "/club/inscription",
       "/club/validations-licence",
+      "/club/matchs-hors-inscription",
     ]);
   });
 });
