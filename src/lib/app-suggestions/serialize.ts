@@ -1,6 +1,11 @@
 import type { Timestamp } from "firebase-admin/firestore";
 import { getSuggestionDescriptionExcerpt } from "@/lib/app-suggestions/rich-text";
 import { resolveStoredSuggestionPriority } from "@/lib/app-suggestions/priority-fields";
+import {
+  resolveSuggestionDomain,
+  resolveSuggestionVisibility,
+} from "@/lib/app-suggestions/visibility";
+import { defaultWaitingOnForStatus } from "@/lib/app-suggestions/waiting-on";
 import type {
   AppSuggestionComment,
   AppSuggestionCommentRecord,
@@ -10,6 +15,7 @@ import type {
   SuggestionKind,
   SuggestionStatusHistoryEntry,
   SuggestionStatusHistoryRecord,
+  SuggestionWaitingOn,
 } from "@/lib/app-suggestions/types";
 
 function timestampToIso(value: Timestamp | null | undefined): string | null {
@@ -49,12 +55,27 @@ function resolveSuggestionKind(value: SuggestionKind | undefined): SuggestionKin
   return value === "problem" ? "problem" : "improvement";
 }
 
+function resolveWaitingOn(
+  data: AppSuggestionRecord
+): SuggestionWaitingOn {
+  if (
+    data.waitingOn === "none" ||
+    data.waitingOn === "author" ||
+    data.waitingOn === "handlers"
+  ) {
+    return data.waitingOn;
+  }
+  return defaultWaitingOnForStatus(data.status);
+}
+
 export function serializeSuggestionSummary(
   id: string,
   data: AppSuggestionRecord,
-  commentCount: number
+  commentCount: number,
+  options?: { includeInternalFields?: boolean }
 ): AppSuggestionSummary {
   const descriptionFormat = resolveDescriptionFormat(data.descriptionFormat);
+  const includeInternal = options?.includeInternalFields === true;
   return {
     id,
     title: data.title,
@@ -65,16 +86,24 @@ export function serializeSuggestionSummary(
       descriptionFormat
     ),
     kind: resolveSuggestionKind(data.kind),
+    domain: resolveSuggestionDomain(data.domain),
+    visibility: resolveSuggestionVisibility(data.visibility),
+    waitingOn: resolveWaitingOn(data),
     category: data.category,
     priority: resolveStoredSuggestionPriority(data.priority),
     status: data.status,
     submitterUid: data.submitterUid,
     submitterDisplayName: data.submitterDisplayName,
     maintainerNote: data.maintainerNote,
-    githubIssueUrl: data.githubIssueUrl,
+    githubIssueUrl: includeInternal ? data.githubIssueUrl : null,
     commentCount,
+    supportCount: typeof data.supportCount === "number" ? data.supportCount : 0,
     createdAt: timestampToIso(data.createdAt) ?? new Date(0).toISOString(),
     updatedAt: timestampToIso(data.updatedAt) ?? new Date(0).toISOString(),
+    lastActivityAt:
+      timestampToIso(data.lastActivityAt) ??
+      timestampToIso(data.updatedAt) ??
+      timestampToIso(data.createdAt),
     statusUpdatedAt: timestampToIso(data.statusUpdatedAt),
   };
 }
@@ -90,5 +119,6 @@ export function serializeSuggestionComment(
     body: data.body,
     bodyFormat: data.bodyFormat === "html" ? "html" : "plain",
     createdAt: timestampToIso(data.createdAt) ?? new Date(0).toISOString(),
+    hidden: Boolean(data.hiddenAt),
   };
 }

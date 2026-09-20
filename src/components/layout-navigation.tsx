@@ -70,7 +70,7 @@ const NAV = {
     icon: <BarChart />,
   },
   boiteIdees: {
-    label: "Idées & remontées",
+    label: "Boîte à idées",
     href: "/club/idees",
     icon: <TipsAndUpdates />,
   },
@@ -196,6 +196,7 @@ export function buildLayoutNavigation(
     if (isAssistantSecretary) {
       primary.push(NAV.validationsLicence);
     }
+    primary.push(NAV.boiteIdees);
     return { primary, groups: [] };
   }
 

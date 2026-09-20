@@ -1,11 +1,28 @@
 import type { Timestamp } from "firebase-admin/firestore";
 import type { SuggestionRichTextFormat } from "@/lib/app-suggestions/rich-text";
 
-export const SUGGESTION_SCHEMA_VERSION = 1 as const;
+export const SUGGESTION_SCHEMA_VERSION = 2 as const;
 
 export const SUGGESTION_KINDS = ["improvement", "problem"] as const;
 
 export type SuggestionKind = (typeof SUGGESTION_KINDS)[number];
+
+export const SUGGESTION_DOMAINS = ["app", "club"] as const;
+
+export type SuggestionDomain = (typeof SUGGESTION_DOMAINS)[number];
+
+export const SUGGESTION_VISIBILITIES = [
+  "public",
+  "private",
+  "legacy_staff",
+  "hidden",
+] as const;
+
+export type SuggestionVisibility = (typeof SUGGESTION_VISIBILITIES)[number];
+
+export const SUGGESTION_WAITING_ON = ["none", "author", "handlers"] as const;
+
+export type SuggestionWaitingOn = (typeof SUGGESTION_WAITING_ON)[number];
 
 export const SUGGESTION_DEFAULT_CATEGORIES = [
   "adhesions",
@@ -13,6 +30,7 @@ export const SUGGESTION_DEFAULT_CATEGORIES = [
   "emails",
   "compositions",
   "joueurs",
+  "autre",
 ] as const;
 
 /** Valeur stockée en base : slug par défaut ou libellé personnalisé. */
@@ -53,11 +71,14 @@ export interface SuggestionStatusHistoryEntry {
 export type SuggestionDescriptionFormat = SuggestionRichTextFormat;
 
 export interface AppSuggestionRecord {
-  schemaVersion: typeof SUGGESTION_SCHEMA_VERSION;
+  schemaVersion: number;
   title: string;
   description: string;
   descriptionFormat?: SuggestionDescriptionFormat;
   kind?: SuggestionKind;
+  domain?: SuggestionDomain;
+  visibility?: SuggestionVisibility;
+  waitingOn?: SuggestionWaitingOn;
   category: SuggestionCategory;
   priority: SuggestionPriority;
   /** Tri Firestore (3 = haute, 2 = moyenne, 1 = basse). */
@@ -68,12 +89,16 @@ export interface AppSuggestionRecord {
   maintainerNote: string | null;
   githubIssueUrl: string | null;
   commentCount?: number;
+  supportCount?: number;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  lastActivityAt?: Timestamp;
   statusUpdatedAt: Timestamp | null;
   statusUpdatedBy: string | null;
   statusUpdatedByDisplayName?: string | null;
   statusHistory?: SuggestionStatusHistoryRecord[];
+  hiddenAt?: Timestamp | null;
+  hiddenByUid?: string | null;
 }
 
 export interface AppSuggestionCommentRecord {
@@ -82,6 +107,8 @@ export interface AppSuggestionCommentRecord {
   body: string;
   bodyFormat?: SuggestionRichTextFormat;
   createdAt: Timestamp;
+  hiddenAt?: Timestamp | null;
+  hiddenByUid?: string | null;
 }
 
 export interface AppSuggestionSummary {
@@ -91,6 +118,9 @@ export interface AppSuggestionSummary {
   descriptionFormat: SuggestionDescriptionFormat;
   descriptionExcerpt: string;
   kind: SuggestionKind;
+  domain: SuggestionDomain;
+  visibility: SuggestionVisibility;
+  waitingOn: SuggestionWaitingOn;
   category: SuggestionCategory;
   priority: SuggestionPriority;
   status: SuggestionStatus;
@@ -99,8 +129,10 @@ export interface AppSuggestionSummary {
   maintainerNote: string | null;
   githubIssueUrl: string | null;
   commentCount: number;
+  supportCount: number;
   createdAt: string;
   updatedAt: string;
+  lastActivityAt: string | null;
   statusUpdatedAt: string | null;
 }
 
@@ -117,4 +149,5 @@ export interface AppSuggestionComment {
   body: string;
   bodyFormat: SuggestionRichTextFormat;
   createdAt: string;
+  hidden: boolean;
 }

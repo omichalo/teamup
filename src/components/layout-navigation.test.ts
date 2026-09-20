@@ -21,11 +21,13 @@ describe("buildLayoutNavigation", () => {
       "/joueur",
       "/club/inscription",
       "/club/mes-inscriptions",
+      "/club/idees",
     ]);
     expect(nav.primary.map((item) => item.label)).toEqual([
       "Accueil",
       "Nouvelle adhésion",
       "Mes dossiers",
+      "Boîte à idées",
     ]);
     expect(nav.groups).toHaveLength(0);
   });
@@ -42,6 +44,7 @@ describe("buildLayoutNavigation", () => {
       "/club/mes-inscriptions",
       "/club/adhesions-tableau",
       "/club/statistiques-adherents",
+      "/club/idees",
     ]);
   });
 
@@ -61,6 +64,7 @@ describe("buildLayoutNavigation", () => {
       "/club/presences",
       "/club/creneaux",
       "/club/presences/essais",
+      "/club/idees",
     ]);
   });
 
@@ -78,6 +82,7 @@ describe("buildLayoutNavigation", () => {
       "/club/adhesions-tableau",
       "/club/statistiques-adherents",
       "/club/validations-licence",
+      "/club/idees",
     ]);
   });
 

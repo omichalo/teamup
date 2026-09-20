@@ -1,15 +1,20 @@
 import type { Firestore } from "firebase-admin/firestore";
 import type {
   SuggestionCategory,
+  SuggestionDomain,
   SuggestionKind,
   SuggestionStatus,
 } from "@/lib/app-suggestions/types";
 import { getSuggestionDescriptionExcerpt } from "@/lib/app-suggestions/rich-text";
 import {
+  getSuggestionEmailPreference,
   getUserEmailByUid,
-  listAppMaintainerEmails,
+  listHandlerEmailsForDomain,
 } from "@/lib/app-suggestions/user-email";
+import { allowsSuggestionEmail } from "@/lib/app-suggestions/email-preferences";
+import { resolveSuggestionDomain } from "@/lib/app-suggestions/visibility";
 import {
+  buildSuggestionAuthorReplyMaintainerEmail,
   buildSuggestionCommentEmail,
   buildSuggestionCreatedMaintainerEmail,
   buildSuggestionMaintainerNoteEmail,
@@ -46,20 +51,29 @@ export async function notifyMaintainersOfNewSuggestion(params: {
   title: string;
   category: SuggestionCategory;
   kind: SuggestionKind;
+  domain?: SuggestionDomain;
   description: string;
   descriptionFormat?: "html" | "plain";
   submitterUid: string;
   submitterDisplayName: string | null;
 }): Promise<void> {
-  const appOrigin = getAppBaseUrl(params.req);
-  const maintainerEmails = await listAppMaintainerEmails(params.db);
-  if (maintainerEmails.length === 0) {
+  const domain = resolveSuggestionDomain(params.domain);
+  const emailKind = params.kind === "problem" ? "problem" : "improvement";
+
+  // Les idées (improvement) n'envoient pas d'e-mail immédiat aux handlers.
+  if (emailKind === "improvement") {
     return;
   }
 
-  const submitterEmail = await getUserEmailByUid(params.submitterUid);
-  const submitterEmailLower = submitterEmail?.toLowerCase() ?? null;
+  const handlerEmails = await listHandlerEmailsForDomain(params.db, domain, {
+    excludeUid: params.submitterUid,
+    emailKind,
+  });
+  if (handlerEmails.length === 0) {
+    return;
+  }
 
+  const appOrigin = getAppBaseUrl(params.req);
   const mail = buildSuggestionCreatedMaintainerEmail({
     title: params.title,
     suggestionId: params.suggestionId,
@@ -74,25 +88,20 @@ export async function notifyMaintainersOfNewSuggestion(params: {
   });
 
   await Promise.all(
-    maintainerEmails
-      .filter(
-        (email) =>
-          submitterEmailLower === null ||
-          email.toLowerCase() !== submitterEmailLower
-      )
-      .map((to) =>
-        sendSuggestionMail({
-          to,
-          subject: mail.subject,
-          html: mail.html,
-          text: mail.text,
-          logContext: "notifyMaintainersOfNewSuggestion",
-        })
-      )
+    handlerEmails.map((to) =>
+      sendSuggestionMail({
+        to,
+        subject: mail.subject,
+        html: mail.html,
+        text: mail.text,
+        logContext: "notifyMaintainersOfNewSuggestion",
+      })
+    )
   );
 }
 
 export async function notifyAuthorOfMaintainerUpdate(params: {
+  db: Firestore;
   req: Request;
   submitterUid: string;
   title: string;
@@ -105,6 +114,14 @@ export async function notifyAuthorOfMaintainerUpdate(params: {
   maintainerUid: string;
 }): Promise<void> {
   if (params.maintainerUid === params.submitterUid) {
+    return;
+  }
+
+  const preference = await getSuggestionEmailPreference(
+    params.db,
+    params.submitterUid
+  );
+  if (!allowsSuggestionEmail(preference, "status")) {
     return;
   }
 
@@ -161,6 +178,7 @@ export async function notifyAuthorOfMaintainerUpdate(params: {
 }
 
 export async function notifyAuthorOfNewComment(params: {
+  db: Firestore;
   req: Request;
   submitterUid: string;
   authorUid: string;
@@ -171,6 +189,14 @@ export async function notifyAuthorOfNewComment(params: {
   commentBodyFormat?: "html" | "plain";
 }): Promise<void> {
   if (params.authorUid === params.submitterUid) {
+    return;
+  }
+
+  const preference = await getSuggestionEmailPreference(
+    params.db,
+    params.submitterUid
+  );
+  if (!allowsSuggestionEmail(preference, "comment")) {
     return;
   }
 
@@ -198,4 +224,55 @@ export async function notifyAuthorOfNewComment(params: {
     text: mail.text,
     logContext: "notifyAuthorOfNewComment",
   });
+}
+
+/** Informe les handlers lorsqu'un auteur répond sur sa propre remontée. */
+export async function notifyMaintainersOfAuthorReply(params: {
+  db: Firestore;
+  req: Request;
+  submitterUid: string;
+  authorUid: string;
+  title: string;
+  suggestionId: string;
+  domain?: SuggestionDomain;
+  authorDisplayName: string | null;
+  commentBody: string;
+  commentBodyFormat?: "html" | "plain";
+}): Promise<void> {
+  if (params.authorUid !== params.submitterUid) {
+    return;
+  }
+
+  const domain = resolveSuggestionDomain(params.domain);
+  const handlerEmails = await listHandlerEmailsForDomain(params.db, domain, {
+    excludeUid: params.authorUid,
+    emailKind: "comment",
+  });
+  if (handlerEmails.length === 0) {
+    return;
+  }
+
+  const appOrigin = getAppBaseUrl(params.req);
+  const mail = buildSuggestionAuthorReplyMaintainerEmail({
+    title: params.title,
+    suggestionId: params.suggestionId,
+    appOrigin,
+    authorDisplayName: params.authorDisplayName,
+    commentExcerpt: getSuggestionDescriptionExcerpt(
+      params.commentBody,
+      params.commentBodyFormat === "html" ? "html" : "plain"
+    ),
+  });
+
+  await Promise.all(
+    handlerEmails.map((to) =>
+      sendSuggestionMail({
+        to,
+        subject: mail.subject,
+        html: mail.html,
+        text: mail.text,
+        logContext: "notifyMaintainersOfAuthorReply",
+      })
+    )
+  );
 }

@@ -50,6 +50,7 @@ export function SuggestionsClient() {
     suggestions,
     pageInfo,
     isMaintainer,
+    isClubReferent,
     loading: listLoading,
     error: listError,
     statusFilter,
@@ -60,6 +61,8 @@ export function SuggestionsClient() {
     setKindFilter,
     mineOnly,
     setMineOnly,
+    waitingOnFilter,
+    setWaitingOnFilter,
     lastRefreshedAt,
     loadSuggestions,
   } = useSuggestionsList();
@@ -81,6 +84,33 @@ export function SuggestionsClient() {
   const [createOpen, setCreateOpen] = useState(false);
   const [createKind, setCreateKind] = useState<SuggestionKind>("improvement");
   const mobileDetailRef = useRef<HTMLDivElement>(null);
+
+  const moderateSuggestion = useCallback(
+    async (action: "hide" | "unhide") => {
+      if (!selectedId) {
+        return;
+      }
+      const response = await fetch(`/api/club/suggestions/${selectedId}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope: "moderate", action }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(
+          typeof payload.error === "string"
+            ? payload.error
+            : "Impossible de modérer"
+        );
+      }
+      if (payload.suggestion) {
+        setDetail(payload.suggestion);
+      }
+      await loadSuggestions();
+    },
+    [loadSuggestions, selectedId, setDetail]
+  );
 
   const openCreateDialog = (kind: SuggestionKind) => {
     setCreateKind(kind);
@@ -218,31 +248,34 @@ export function SuggestionsClient() {
       categoryFilter={categoryFilter}
       kindFilter={kindFilter}
       mineOnly={mineOnly}
+      waitingOnFilter={waitingOnFilter}
+      showHandlerTools={isMaintainer || isClubReferent}
       loading={listLoading}
       lastRefreshedAt={lastRefreshedAt}
       onStatusFilterChange={setStatusFilter}
       onCategoryFilterChange={setCategoryFilter}
       onKindFilterChange={setKindFilter}
       onMineOnlyChange={setMineOnly}
+      onWaitingOnFilterChange={setWaitingOnFilter}
       onRefresh={() => void loadSuggestions()}
     />
   );
 
-  const selectedInList =
-    selectedId !== null &&
-    suggestions.some((suggestion) => suggestion.id === selectedId);
-
   const detailPanel = (
     <SuggestionDetailPanel
-      detail={selectedInList ? detail : null}
-      loading={detailLoading && selectedId !== null && selectedInList}
+      detail={selectedId ? detail : null}
+      loading={detailLoading && selectedId !== null}
       error={detailError}
       isMaintainer={viewer.isMaintainer || isMaintainer}
+      canTriage={viewer.canTriage === true}
+      canModerate={viewer.canModerate === true}
+      canSeeInternal={viewer.canSeeInternal === true}
       canEditContent={viewer.canEditContent}
       viewerUid={user?.id ?? null}
       onAddComment={handleAddComment}
       onPatchAuthor={handlePatchAuthor}
       onPatchMaintainer={handlePatchMaintainer}
+      onModerate={moderateSuggestion}
     />
   );
 
@@ -266,8 +299,8 @@ export function SuggestionsClient() {
       <Stack spacing={3}>
         <PageHeader
           eyebrow="Club"
-          title="Idées & remontées"
-          subtitle="Proposez des évolutions ou signalez un problème sur l'application. Tout le staff peut commenter ; les mainteneurs pilotent le triage."
+          title="Boîte à idées"
+          subtitle="Proposez des évolutions TeamUp ou pour la vie du club, ou signalez un problème."
           actions={
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
               <Button

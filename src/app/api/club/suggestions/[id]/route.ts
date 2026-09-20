@@ -1,21 +1,33 @@
 export const runtime = "nodejs";
 
+import { after } from "next/server";
 import { jsonNoStore } from "@/lib/http/cache-headers";
-import { resolveSuggestionSession } from "@/lib/app-suggestions/api-auth";
 import {
-  canEditSuggestionContent,
-  canManageSuggestionTriage,
-} from "@/lib/app-suggestions/access";
+  resolveSuggestionSession,
+  toSuggestionViewer,
+} from "@/lib/app-suggestions/api-auth";
+import { canEditSuggestionContent } from "@/lib/app-suggestions/access";
+import {
+  canModerateSuggestion,
+  canSeeInternalFields,
+  canTriageSuggestion,
+  resolveSuggestionDomain,
+} from "@/lib/app-suggestions/visibility";
 import { isAuthorEditableStatus } from "@/lib/app-suggestions/status";
 import {
   suggestionAuthorPatchSchema,
   suggestionMaintainerPatchSchema,
+  suggestionModerateSchema,
 } from "@/lib/app-suggestions/schema";
 import {
   getSuggestionDetail,
   patchSuggestionAsAuthor,
   patchSuggestionAsMaintainer,
 } from "@/lib/app-suggestions/store";
+import {
+  setSuggestionCommentHidden,
+  setSuggestionHidden,
+} from "@/lib/app-suggestions/moderation-store";
 import { notifyAuthorOfMaintainerUpdate } from "@/lib/app-suggestions/dispatch-suggestion-notifications";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
 import { logAuditAction, AUDIT_ACTIONS } from "@/lib/auth/audit-logger";
@@ -30,18 +42,22 @@ export async function GET(_req: Request, context: RouteContext) {
   }
 
   const { id } = await context.params;
+  const viewer = toSuggestionViewer(auth.session);
 
   try {
-    const suggestion = await getSuggestionDetail(auth.session.db, id);
+    const suggestion = await getSuggestionDetail(auth.session.db, id, viewer);
     if (!suggestion) {
       return jsonNoStore({ error: "Idée introuvable" }, { status: 404 });
     }
+
+    const domain = resolveSuggestionDomain(suggestion.domain);
 
     return jsonNoStore(
       {
         suggestion,
         viewer: {
           isMaintainer: auth.session.isMaintainer,
+          isClubReferent: auth.session.isClubReferent,
           canEditContent: canEditSuggestionContent(
             auth.session.role,
             suggestion.submitterUid,
@@ -49,6 +65,9 @@ export async function GET(_req: Request, context: RouteContext) {
             suggestion.status,
             auth.session.isMaintainer
           ),
+          canTriage: canTriageSuggestion(viewer, domain),
+          canModerate: canModerateSuggestion(viewer, domain),
+          canSeeInternal: canSeeInternalFields(viewer),
         },
       },
       { status: 200 }
@@ -62,7 +81,7 @@ export async function GET(_req: Request, context: RouteContext) {
   }
 }
 
-/** PATCH /api/club/suggestions/[id] — mise à jour auteur ou mainteneur. */
+/** PATCH /api/club/suggestions/[id] — auteur, triage ou modération. */
 export async function PATCH(req: Request, context: RouteContext) {
   if (!validateOrigin(req)) {
     return jsonNoStore({ error: "Invalid origin" }, { status: 403 });
@@ -74,6 +93,7 @@ export async function PATCH(req: Request, context: RouteContext) {
   }
 
   const { id } = await context.params;
+  const viewer = toSuggestionViewer(auth.session);
 
   let body: unknown;
   try {
@@ -88,13 +108,60 @@ export async function PATCH(req: Request, context: RouteContext) {
       : undefined;
 
   try {
-    const existing = await getSuggestionDetail(auth.session.db, id);
+    const existing = await getSuggestionDetail(auth.session.db, id, viewer);
     if (!existing) {
       return jsonNoStore({ error: "Idée introuvable" }, { status: 404 });
     }
 
-    if (scope === "maintainer") {
-      if (!canManageSuggestionTriage(auth.session.isMaintainer)) {
+    const domain = resolveSuggestionDomain(existing.domain);
+
+    if (scope === "moderate") {
+      if (!canModerateSuggestion(viewer, domain)) {
+        return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
+      }
+
+      const payload =
+        typeof body === "object" && body !== null ? { ...body } : {};
+      delete (payload as { scope?: string }).scope;
+
+      const parsed = suggestionModerateSchema.safeParse(payload);
+      if (!parsed.success) {
+        return jsonNoStore(
+          {
+            error: "Données invalides",
+            details: parsed.error.flatten().fieldErrors,
+          },
+          { status: 400 }
+        );
+      }
+
+      if (
+        parsed.data.action === "hide" ||
+        parsed.data.action === "unhide"
+      ) {
+        await setSuggestionHidden(
+          auth.session.db,
+          id,
+          parsed.data.action === "hide",
+          auth.session.uid
+        );
+      } else {
+        if (!parsed.data.commentId) {
+          return jsonNoStore(
+            { error: "Identifiant de commentaire requis" },
+            { status: 400 }
+          );
+        }
+        await setSuggestionCommentHidden(
+          auth.session.db,
+          id,
+          parsed.data.commentId,
+          parsed.data.action === "hide_comment",
+          auth.session.uid
+        );
+      }
+    } else if (scope === "maintainer") {
+      if (!canTriageSuggestion(viewer, domain)) {
         return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
       }
 
@@ -113,15 +180,15 @@ export async function PATCH(req: Request, context: RouteContext) {
         );
       }
 
-      await patchSuggestionAsMaintainer(
-        auth.session.db,
-        id,
-        parsed.data,
-        {
-          uid: auth.session.uid,
-          displayName: auth.session.displayName,
-        }
-      );
+      const triagePatch = { ...parsed.data };
+      if (!canSeeInternalFields(viewer)) {
+        delete triagePatch.githubIssueUrl;
+      }
+
+      await patchSuggestionAsMaintainer(auth.session.db, id, triagePatch, {
+        uid: auth.session.uid,
+        displayName: auth.session.displayName,
+      });
     } else {
       if (
         !canEditSuggestionContent(
@@ -165,24 +232,27 @@ export async function PATCH(req: Request, context: RouteContext) {
       );
     }
 
-    const suggestion = await getSuggestionDetail(auth.session.db, id);
+    const suggestion = await getSuggestionDetail(auth.session.db, id, viewer);
 
     if (!suggestion) {
       return jsonNoStore({ error: "Idée introuvable" }, { status: 404 });
     }
 
     if (scope === "maintainer") {
-      void notifyAuthorOfMaintainerUpdate({
-        req,
-        submitterUid: existing.submitterUid,
-        title: suggestion.title,
-        suggestionId: id,
-        previousStatus: existing.status,
-        newStatus: suggestion.status,
-        previousMaintainerNote: existing.maintainerNote,
-        newMaintainerNote: suggestion.maintainerNote,
-        maintainerDisplayName: auth.session.displayName,
-        maintainerUid: auth.session.uid,
+      after(async () => {
+        await notifyAuthorOfMaintainerUpdate({
+          db: auth.session.db,
+          req,
+          submitterUid: existing.submitterUid,
+          title: suggestion.title,
+          suggestionId: id,
+          previousStatus: existing.status,
+          newStatus: suggestion.status,
+          previousMaintainerNote: existing.maintainerNote,
+          newMaintainerNote: suggestion.maintainerNote,
+          maintainerDisplayName: auth.session.displayName,
+          maintainerUid: auth.session.uid,
+        });
       });
     }
 

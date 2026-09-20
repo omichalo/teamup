@@ -14,7 +14,7 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { OpenInNew as OpenInNewIcon } from "@mui/icons-material";
-import type { AppSuggestionDetail, SuggestionCategory, SuggestionPriority } from "@/lib/app-suggestions/types";
+import type { AppSuggestionDetail, SuggestionCategory } from "@/lib/app-suggestions/types";
 import {
   formatSuggestionCategoryLabel,
   SUGGESTION_KIND_COLORS,
@@ -26,7 +26,7 @@ import {
 import { isValidSuggestionCategory } from "@/lib/app-suggestions/categories";
 import { SuggestionCategoryField } from "@/components/app-suggestions/SuggestionCategoryField";
 import { SuggestionPriorityChip } from "@/components/app-suggestions/SuggestionPriorityChip";
-import { SuggestionPriorityField } from "@/components/app-suggestions/SuggestionPriorityField";
+import { SuggestionVisibilityChip } from "@/components/app-suggestions/SuggestionVisibilityChip";
 import { formatSuggestionDate } from "@/components/app-suggestions/format-utils";
 import { SuggestionDetailEmptyState } from "@/components/app-suggestions/SuggestionDetailEmptyState";
 import { SuggestionDetailCommentsSection } from "@/components/app-suggestions/SuggestionDetailCommentsSection";
@@ -36,6 +36,7 @@ import { SuggestionMaintainerTriageSection } from "@/components/app-suggestions/
 import { SuggestionStatusHistorySection } from "@/components/app-suggestions/SuggestionStatusHistorySection";
 import { SuggestionRichTextEditor } from "@/components/app-suggestions/rich-text/SuggestionRichTextEditor";
 import { SuggestionRichTextContent } from "@/components/app-suggestions/rich-text/SuggestionRichTextContent";
+import { SuggestionSupportButton } from "@/components/app-suggestions/SuggestionSupportButton";
 import { stripSuggestionHtmlText } from "@/lib/app-suggestions/rich-text";
 
 type SuggestionDetailPanelProps = {
@@ -43,6 +44,9 @@ type SuggestionDetailPanelProps = {
   loading: boolean;
   error: string | null;
   isMaintainer: boolean;
+  canTriage?: boolean;
+  canModerate?: boolean;
+  canSeeInternal?: boolean;
   canEditContent: boolean;
   viewerUid: string | null;
   onAddComment: (body: string) => Promise<void>;
@@ -51,17 +55,18 @@ type SuggestionDetailPanelProps = {
       title: string;
       description: string;
       category: SuggestionCategory;
-      priority: SuggestionPriority;
     }>
   ) => Promise<void>;
   onPatchMaintainer: (
     patch: Partial<{
       status: AppSuggestionDetail["status"];
       priority: AppSuggestionDetail["priority"];
+      waitingOn: AppSuggestionDetail["waitingOn"];
       maintainerNote: string | null;
       githubIssueUrl: string | null;
     }>
   ) => Promise<void>;
+  onModerate?: (action: "hide" | "unhide") => Promise<void>;
 };
 
 export function SuggestionDetailPanel({
@@ -69,17 +74,20 @@ export function SuggestionDetailPanel({
   loading,
   error,
   isMaintainer,
+  canTriage = false,
+  canModerate = false,
+  canSeeInternal = false,
   canEditContent,
   viewerUid,
   onAddComment,
   onPatchAuthor,
   onPatchMaintainer,
+  onModerate,
 }: SuggestionDetailPanelProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDescriptionHtml, setEditDescriptionHtml] = useState("<p></p>");
   const [editCategory, setEditCategory] = useState("");
-  const [editPriority, setEditPriority] = useState<SuggestionPriority>("medium");
   const [authorSubmitting, setAuthorSubmitting] = useState(false);
   const [authorError, setAuthorError] = useState<string | null>(null);
   const [authorSuccess, setAuthorSuccess] = useState<string | null>(null);
@@ -92,7 +100,6 @@ export function SuggestionDetailPanel({
     setEditTitle(detail.title);
     setEditDescriptionHtml(detail.description || "<p></p>");
     setEditCategory(detail.category);
-    setEditPriority(detail.priority);
   }, [detail, isEditing]);
 
   useEffect(() => {
@@ -132,7 +139,6 @@ export function SuggestionDetailPanel({
         title: editTitle,
         description: editDescriptionHtml,
         category: editCategory,
-        priority: editPriority,
       });
       setIsEditing(false);
       setAuthorSuccess("Modifications enregistrées.");
@@ -156,7 +162,6 @@ export function SuggestionDetailPanel({
     setEditTitle(detail.title);
     setEditDescriptionHtml(referenceHtml);
     setEditCategory(detail.category);
-    setEditPriority(detail.priority);
     setAuthorError(null);
     setIsEditing(false);
     void cleanupDraftSuggestionImages(draftHtml, referenceHtml).catch(() => undefined);
@@ -204,6 +209,7 @@ export function SuggestionDetailPanel({
                 Modifier
               </Button>
             ) : null}
+            <SuggestionVisibilityChip visibility={detail.visibility} />
             <Chip
               label={SUGGESTION_STATUS_LABELS[detail.status]}
               color={SUGGESTION_STATUS_COLORS[detail.status]}
@@ -218,12 +224,7 @@ export function SuggestionDetailPanel({
               onChange={setEditCategory}
               required
               disabled={authorSubmitting}
-            />
-            <SuggestionPriorityField
-              value={editPriority}
-              onChange={setEditPriority}
-              disabled={authorSubmitting}
-              required
+              allowCustom={false}
             />
           </>
         ) : (
@@ -250,8 +251,8 @@ export function SuggestionDetailPanel({
       {isEditing ? (
         <Stack spacing={1.5}>
           <Alert severity="info">
-            Modifiez le titre, la catégorie, la priorité ou la description puis
-            cliquez sur « Enregistrer ». « Annuler » restaure la version affichée.
+            Modifiez le titre, la catégorie ou la description puis cliquez sur
+            « Enregistrer ». « Annuler » restaure la version affichée.
           </Alert>
           <Typography variant="subtitle2" fontWeight={600}>
             Description
@@ -314,7 +315,14 @@ export function SuggestionDetailPanel({
         </Alert>
       ) : null}
 
-      {detail.githubIssueUrl ? (
+      <SuggestionSupportButton
+        suggestionId={detail.id}
+        kind={detail.kind}
+        visibility={detail.visibility}
+        supportCount={detail.supportCount}
+      />
+
+      {detail.githubIssueUrl && canSeeInternal ? (
         <Link
           href={detail.githubIssueUrl}
           target="_blank"
@@ -343,9 +351,28 @@ export function SuggestionDetailPanel({
         statusUpdatedByDisplayName={detail.statusUpdatedByDisplayName}
       />
 
-      {isMaintainer ? (
+      {canModerate && onModerate ? (
+        <Stack direction="row" spacing={1}>
+          <Button
+            variant="outlined"
+            color={detail.visibility === "hidden" ? "success" : "warning"}
+            onClick={() =>
+              void onModerate(
+                detail.visibility === "hidden" ? "unhide" : "hide"
+              )
+            }
+          >
+            {detail.visibility === "hidden"
+              ? "Réafficher la remontée"
+              : "Masquer la remontée"}
+          </Button>
+        </Stack>
+      ) : null}
+
+      {canTriage || isMaintainer ? (
         <SuggestionMaintainerTriageSection
           detail={detail}
+          canSeeInternal={canSeeInternal || isMaintainer}
           onPatchMaintainer={onPatchMaintainer}
         />
       ) : null}

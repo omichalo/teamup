@@ -6,8 +6,8 @@ import type {
   AppSuggestionDetail,
   AppSuggestionSummary,
   SuggestionCategory,
+  SuggestionDomain,
   SuggestionKind,
-  SuggestionPriority,
 } from "@/lib/app-suggestions/types";
 
 export type SuggestionsPageInfo = {
@@ -18,14 +18,18 @@ export type SuggestionsPageInfo = {
 type SuggestionsListResponse = {
   suggestions: AppSuggestionSummary[];
   pageInfo: SuggestionsPageInfo;
-  viewer: { isMaintainer: boolean };
+  viewer: { isMaintainer: boolean; isClubReferent?: boolean };
 };
 
 type SuggestionDetailResponse = {
   suggestion: AppSuggestionDetail;
   viewer: {
     isMaintainer: boolean;
+    isClubReferent?: boolean;
     canEditContent: boolean;
+    canTriage?: boolean;
+    canModerate?: boolean;
+    canSeeInternal?: boolean;
   };
 };
 
@@ -36,12 +40,16 @@ export function useSuggestionsList() {
     nextCursor: null,
   });
   const [isMaintainer, setIsMaintainer] = useState(false);
+  const [isClubReferent, setIsClubReferent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("open");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [kindFilter, setKindFilter] = useState<string>("all");
   const [mineOnly, setMineOnly] = useState(false);
+  const [waitingOnFilter, setWaitingOnFilter] = useState<"all" | "handlers">(
+    "all"
+  );
   const [lastRefreshedAt, setLastRefreshedAt] = useState<Date | null>(null);
 
   const loadSuggestions = useCallback(
@@ -62,6 +70,9 @@ export function useSuggestionsList() {
         }
         if (mineOnly) {
           params.set("mine", "1");
+        }
+        if (waitingOnFilter !== "all") {
+          params.set("waitingOn", waitingOnFilter);
         }
         if (options?.cursor) {
           params.set("cursor", options.cursor);
@@ -85,6 +96,7 @@ export function useSuggestionsList() {
         );
         setPageInfo(payload.pageInfo);
         setIsMaintainer(payload.viewer.isMaintainer);
+        setIsClubReferent(payload.viewer.isClubReferent === true);
         setLastRefreshedAt(new Date());
       } catch (loadError) {
         setError(
@@ -96,13 +108,14 @@ export function useSuggestionsList() {
         setLoading(false);
       }
     },
-    [categoryFilter, kindFilter, mineOnly, statusFilter]
+    [categoryFilter, kindFilter, mineOnly, statusFilter, waitingOnFilter]
   );
 
   return {
     suggestions,
     pageInfo,
     isMaintainer,
+    isClubReferent,
     loading,
     error,
     statusFilter,
@@ -113,6 +126,8 @@ export function useSuggestionsList() {
     setKindFilter,
     mineOnly,
     setMineOnly,
+    waitingOnFilter,
+    setWaitingOnFilter,
     lastRefreshedAt,
     loadSuggestions,
     setSuggestions,
@@ -123,7 +138,11 @@ export function useSuggestionDetail() {
   const [detail, setDetail] = useState<AppSuggestionDetail | null>(null);
   const [viewer, setViewer] = useState({
     isMaintainer: false,
+    isClubReferent: false,
     canEditContent: false,
+    canTriage: false,
+    canModerate: false,
+    canSeeInternal: false,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -155,7 +174,14 @@ export function useSuggestionDetail() {
       }
 
       setDetail(payload.suggestion);
-      setViewer(payload.viewer);
+      setViewer({
+        isMaintainer: payload.viewer.isMaintainer,
+        isClubReferent: payload.viewer.isClubReferent === true,
+        canEditContent: payload.viewer.canEditContent,
+        canTriage: payload.viewer.canTriage === true,
+        canModerate: payload.viewer.canModerate === true,
+        canSeeInternal: payload.viewer.canSeeInternal === true,
+      });
     } catch (loadError) {
       if (requestSeq !== detailRequestRef.current) {
         return;
@@ -180,8 +206,8 @@ export function useSuggestionDetail() {
       title: string;
       description: string;
       kind: SuggestionKind;
+      domain: SuggestionDomain;
       category: SuggestionCategory;
-      priority: SuggestionPriority;
     }) => {
       const response = await fetch("/api/club/suggestions", {
         method: "POST",
@@ -228,7 +254,6 @@ export function useSuggestionDetail() {
         title: string;
         description: string;
         category: SuggestionCategory;
-        priority: SuggestionPriority;
       }>
     ) => {
       const response = await fetch(`/api/club/suggestions/${id}`, {
@@ -257,6 +282,7 @@ export function useSuggestionDetail() {
       patch: Partial<{
         status: AppSuggestionDetail["status"];
         priority: AppSuggestionDetail["priority"];
+        waitingOn: AppSuggestionDetail["waitingOn"];
         maintainerNote: string | null;
         githubIssueUrl: string | null;
       }>

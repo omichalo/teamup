@@ -12,16 +12,24 @@ import {
   Typography,
 } from "@mui/material";
 import type { AppSuggestionDetail } from "@/lib/app-suggestions/types";
-import { SUGGESTION_STATUSES } from "@/lib/app-suggestions/types";
+import { SUGGESTION_STATUSES, SUGGESTION_WAITING_ON } from "@/lib/app-suggestions/types";
 import { SUGGESTION_STATUS_LABELS } from "@/lib/app-suggestions/status";
 import { SuggestionPriorityField } from "@/components/app-suggestions/SuggestionPriorityField";
 
+const WAITING_ON_LABELS: Record<AppSuggestionDetail["waitingOn"], string> = {
+  none: "Aucune action attendue",
+  author: "En attente de l'auteur",
+  handlers: "En attente de l'équipe",
+};
+
 type Props = {
   detail: AppSuggestionDetail;
+  canSeeInternal?: boolean;
   onPatchMaintainer: (
     patch: Partial<{
       status: AppSuggestionDetail["status"];
       priority: AppSuggestionDetail["priority"];
+      waitingOn: AppSuggestionDetail["waitingOn"];
       maintainerNote: string | null;
       githubIssueUrl: string | null;
     }>
@@ -30,12 +38,15 @@ type Props = {
 
 export function SuggestionMaintainerTriageSection({
   detail,
+  canSeeInternal = false,
   onPatchMaintainer,
 }: Props) {
   const [maintainerNote, setMaintainerNote] = useState("");
   const [githubIssueUrl, setGithubIssueUrl] = useState("");
   const [status, setStatus] = useState<AppSuggestionDetail["status"]>("received");
   const [priority, setPriority] = useState<AppSuggestionDetail["priority"]>("medium");
+  const [waitingOn, setWaitingOn] =
+    useState<AppSuggestionDetail["waitingOn"]>("handlers");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -45,6 +56,7 @@ export function SuggestionMaintainerTriageSection({
     setGithubIssueUrl(detail.githubIssueUrl ?? "");
     setStatus(detail.status);
     setPriority(detail.priority);
+    setWaitingOn(detail.waitingOn);
     setError(null);
     setSuccess(null);
   }, [detail]);
@@ -57,8 +69,14 @@ export function SuggestionMaintainerTriageSection({
       await onPatchMaintainer({
         status,
         priority,
+        waitingOn,
         maintainerNote: maintainerNote.trim().length > 0 ? maintainerNote : null,
-        githubIssueUrl: githubIssueUrl.trim().length > 0 ? githubIssueUrl : null,
+        ...(canSeeInternal
+          ? {
+              githubIssueUrl:
+                githubIssueUrl.trim().length > 0 ? githubIssueUrl : null,
+            }
+          : {}),
       });
       setSuccess("Mise à jour enregistrée.");
     } catch (submitError) {
@@ -77,7 +95,7 @@ export function SuggestionMaintainerTriageSection({
       <Divider />
       <Stack spacing={1.5}>
         <Typography variant="h6" component="h3">
-          Triage mainteneur
+          Traitement
         </Typography>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
           <TextField
@@ -102,19 +120,36 @@ export function SuggestionMaintainerTriageSection({
           />
         </Stack>
         <TextField
-          label="Note officielle (équipe technique)"
+          select
+          label="Action attendue"
+          value={waitingOn}
+          onChange={(event) =>
+            setWaitingOn(event.target.value as AppSuggestionDetail["waitingOn"])
+          }
+          fullWidth
+        >
+          {SUGGESTION_WAITING_ON.map((value) => (
+            <MenuItem key={value} value={value}>
+              {WAITING_ON_LABELS[value]}
+            </MenuItem>
+          ))}
+        </TextField>
+        <TextField
+          label="Note officielle"
           value={maintainerNote}
           onChange={(event) => setMaintainerNote(event.target.value)}
           multiline
           minRows={3}
           fullWidth
         />
-        <TextField
-          label="Lien GitHub (optionnel)"
-          value={githubIssueUrl}
-          onChange={(event) => setGithubIssueUrl(event.target.value)}
-          fullWidth
-        />
+        {canSeeInternal ? (
+          <TextField
+            label="Lien GitHub (interne)"
+            value={githubIssueUrl}
+            onChange={(event) => setGithubIssueUrl(event.target.value)}
+            fullWidth
+          />
+        ) : null}
         {error ? <Alert severity="error">{error}</Alert> : null}
         {success ? <Alert severity="success">{success}</Alert> : null}
         <Box>
@@ -123,7 +158,7 @@ export function SuggestionMaintainerTriageSection({
             onClick={() => void handleSubmit()}
             disabled={submitting}
           >
-            Enregistrer le triage
+            Enregistrer le traitement
           </Button>
         </Box>
       </Stack>
