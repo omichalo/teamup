@@ -109,6 +109,12 @@ const HOME_LINK_META: Record<
     cta: "Ouvrir l'espace licences",
     color: "success",
   },
+  "/club/matchs-hors-inscription": {
+    description:
+      "Suivre les joueurs ayant joué en championnat sans option dossier, et l'encaissement complémentaire.",
+    cta: "Ouvrir le suivi",
+    color: "warning",
+  },
   "/club/presences": {
     description: "Pointer les présences d'entraînement et consulter les taux.",
     cta: "Ouvrir le pointage",
@@ -227,6 +233,7 @@ function assistantSecretaryHome(): RoleHomeContent {
           LAYOUT_NAV.tableauAdhesions,
           LAYOUT_NAV.statistiquesAdherents,
           LAYOUT_NAV.validationsLicence,
+          LAYOUT_NAV.matchsHorsInscription,
           LAYOUT_NAV.nouvelleAdhesion,
           LAYOUT_NAV.mesDossiers,
         ]),
@@ -256,6 +263,7 @@ function coachHome(): RoleHomeContent {
           LAYOUT_NAV.joueurs,
           LAYOUT_NAV.equipes,
           LAYOUT_NAV.modelesComposition,
+          LAYOUT_NAV.matchsHorsInscription,
         ]),
       },
       {
@@ -297,6 +305,7 @@ function secretaryHome(): RoleHomeContent {
             LAYOUT_NAV.campagnesTarifs,
             LAYOUT_NAV.apercuFormulaire,
             LAYOUT_NAV.validationsLicence,
+            LAYOUT_NAV.matchsHorsInscription,
             LAYOUT_NAV.mesDossiers,
           ]),
         ),
@@ -346,6 +355,7 @@ function adminHome(): RoleHomeContent {
             LAYOUT_NAV.campagnesTarifs,
             LAYOUT_NAV.apercuFormulaire,
             LAYOUT_NAV.validationsLicence,
+            LAYOUT_NAV.matchsHorsInscription,
             LAYOUT_NAV.mesDossiers,
           ]),
         ),
