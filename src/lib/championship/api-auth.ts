@@ -3,6 +3,7 @@ import { adminAuth } from "@/lib/firebase-admin";
 import { resolveRole, type UserRole } from "@/lib/auth/roles";
 import {
   canAccessChampionshipRoster,
+  canAccessUnregisteredPlayFollowUp,
   canRecalculateChampionshipRoster,
 } from "./access";
 
@@ -32,4 +33,8 @@ export function requireChampionshipRosterActor(): Promise<ChampionshipActor> {
 
 export function requireChampionshipRecalculateActor(): Promise<ChampionshipActor> {
   return requireActor(canRecalculateChampionshipRoster);
+}
+
+export function requireUnregisteredPlayFollowUpActor(): Promise<ChampionshipActor> {
+  return requireActor(canAccessUnregisteredPlayFollowUp);
 }

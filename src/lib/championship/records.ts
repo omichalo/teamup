@@ -1,3 +1,5 @@
+import type { UnregisteredPlayPaymentStatus } from "./unregistered-play-follow-up";
+
 /**
  * Types métier du roster saisonnier, sans Zod.
  * Cloud Functions (TS 4.9) compile le graphe de sync et ne peut pas parser Zod v4.
@@ -65,6 +67,10 @@ export type ChampionshipPlayerRecord = {
   masculineMatchesByTeamByPhase?: MatchesByTeamByPhase | undefined;
   feminineMatchesByTeamByPhase?: MatchesByTeamByPhase | undefined;
   matchesByTeamByPhaseParis?: MatchesByTeamByPhase | undefined;
+  /** Suivi paiement si a joué sans `championnat_equipe` au dossier. */
+  unregisteredEquipePaymentStatus?: UnregisteredPlayPaymentStatus | undefined;
+  /** Suivi paiement si a joué sans `championnat_paris` au dossier. */
+  unregisteredParisPaymentStatus?: UnregisteredPlayPaymentStatus | undefined;
 };
 
 export type PlayerClubProfileRecord = {

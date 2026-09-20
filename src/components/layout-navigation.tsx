@@ -20,6 +20,7 @@ import {
   Tune,
   VerifiedUser,
   ViewWeek,
+  WarningAmber,
 } from "@mui/icons-material";
 
 export interface LayoutNavigationItem {
@@ -111,6 +112,11 @@ const NAV = {
     href: "/club/validations-licence",
     icon: <VerifiedUser />,
   },
+  matchsHorsInscription: {
+    label: "Matchs hors inscription",
+    href: "/club/matchs-hors-inscription",
+    icon: <WarningAmber />,
+  },
   presences: {
     label: "Présences",
     href: "/club/presences",
@@ -194,7 +200,7 @@ export function buildLayoutNavigation(
       primary.push(NAV.presences, NAV.creneaux, NAV.presencesEssais);
     }
     if (isAssistantSecretary) {
-      primary.push(NAV.validationsLicence);
+      primary.push(NAV.validationsLicence, NAV.matchsHorsInscription);
     }
     primary.push(NAV.boiteIdees);
     return { primary, groups: [] };
@@ -220,6 +226,7 @@ export function buildLayoutNavigation(
             NAV.campagnesTarifs,
             NAV.apercuFormulaire,
             NAV.validationsLicence,
+            NAV.matchsHorsInscription,
           ],
         },
       ],
@@ -258,6 +265,7 @@ export function buildLayoutNavigation(
             NAV.campagnesTarifs,
             NAV.apercuFormulaire,
             NAV.validationsLicence,
+            NAV.matchsHorsInscription,
           ],
         },
       ],
@@ -279,7 +287,12 @@ export function buildLayoutNavigation(
       {
         id: "championnat",
         label: "Championnat",
-        items: [NAV.joueurs, NAV.equipes, NAV.modelesComposition],
+        items: [
+          NAV.joueurs,
+          NAV.equipes,
+          NAV.modelesComposition,
+          NAV.matchsHorsInscription,
+        ],
       },
     ],
   };
