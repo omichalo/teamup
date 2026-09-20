@@ -1,14 +1,21 @@
 export const runtime = "nodejs";
 
+import { after } from "next/server";
 import { jsonNoStore } from "@/lib/http/cache-headers";
-import { resolveSuggestionSession } from "@/lib/app-suggestions/api-auth";
-import { canCommentOnSuggestions } from "@/lib/app-suggestions/access";
+import {
+  resolveSuggestionSession,
+  toSuggestionViewer,
+} from "@/lib/app-suggestions/api-auth";
+import { canCommentOnSuggestion } from "@/lib/app-suggestions/visibility";
 import { suggestionCommentCreateSchema } from "@/lib/app-suggestions/schema";
 import {
   addSuggestionComment,
   getSuggestionDetail,
 } from "@/lib/app-suggestions/store";
-import { notifyAuthorOfNewComment } from "@/lib/app-suggestions/dispatch-suggestion-notifications";
+import {
+  notifyAuthorOfNewComment,
+  notifyMaintainersOfAuthorReply,
+} from "@/lib/app-suggestions/dispatch-suggestion-notifications";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
 import { checkRateLimit } from "@/lib/auth/rate-limit";
 import { logAuditAction, AUDIT_ACTIONS } from "@/lib/auth/audit-logger";
@@ -26,10 +33,7 @@ export async function POST(req: Request, context: RouteContext) {
     return jsonNoStore({ error: auth.error }, { status: auth.status });
   }
 
-  if (!canCommentOnSuggestions(auth.session.role)) {
-    return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
-  }
-
+  const viewer = toSuggestionViewer(auth.session);
   const { id } = await context.params;
 
   const rateLimitResult = checkRateLimit(
@@ -60,6 +64,21 @@ export async function POST(req: Request, context: RouteContext) {
   }
 
   try {
+    const existing = await getSuggestionDetail(auth.session.db, id, viewer);
+    if (!existing) {
+      return jsonNoStore({ error: "Idée introuvable" }, { status: 404 });
+    }
+
+    if (
+      !canCommentOnSuggestion(viewer, {
+        submitterUid: existing.submitterUid,
+        domain: existing.domain,
+        visibility: existing.visibility,
+      })
+    ) {
+      return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
+    }
+
     const commentId = await addSuggestionComment(
       auth.session.db,
       id,
@@ -74,18 +93,26 @@ export async function POST(req: Request, context: RouteContext) {
       return jsonNoStore({ error: "Idée introuvable" }, { status: 404 });
     }
 
-    const suggestion = await getSuggestionDetail(auth.session.db, id);
+    const suggestion = await getSuggestionDetail(auth.session.db, id, viewer);
 
     if (suggestion) {
-      void notifyAuthorOfNewComment({
+      const notifyParams = {
         req,
+        db: auth.session.db,
         submitterUid: suggestion.submitterUid,
         authorUid: auth.session.uid,
         title: suggestion.title,
         suggestionId: id,
+        domain: suggestion.domain,
         authorDisplayName: auth.session.displayName,
         commentBody: parsed.data.body,
-        commentBodyFormat: "html",
+        commentBodyFormat: "html" as const,
+      };
+      after(async () => {
+        await Promise.all([
+          notifyAuthorOfNewComment(notifyParams),
+          notifyMaintainersOfAuthorReply(notifyParams),
+        ]);
       });
     }
 

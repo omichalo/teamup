@@ -22,6 +22,8 @@ type SuggestionCategoryFieldProps = {
   disabled?: boolean;
   required?: boolean;
   autoFocus?: boolean;
+  /** Si false, seules les catégories de la liste sont acceptées (Cat1). */
+  allowCustom?: boolean;
 };
 
 type CategoryOption = SuggestionCategoryOption & {
@@ -36,6 +38,7 @@ export function SuggestionCategoryField({
   disabled = false,
   required = false,
   autoFocus = false,
+  allowCustom = true,
 }: SuggestionCategoryFieldProps) {
   const [options, setOptions] = useState<CategoryOption[]>(
     listDefaultSuggestionCategoryOptions()
@@ -94,6 +97,10 @@ export function SuggestionCategoryField({
     params: FilterOptionsState<CategoryOption>
   ) => {
     const filtered = filter(categoryOptions, params);
+    if (!allowCustom) {
+      return filtered;
+    }
+
     const inputValue = params.inputValue.trim();
 
     if (
@@ -118,12 +125,15 @@ export function SuggestionCategoryField({
 
   return (
     <Autocomplete
-      freeSolo
+      freeSolo={allowCustom}
       options={options}
       loading={loading}
       value={selectedValue}
       onChange={(_event, newValue) => {
         if (typeof newValue === "string") {
+          if (!allowCustom) {
+            return;
+          }
           const normalized = normalizeSuggestionCategory(newValue);
           onChange(isValidSuggestionCategory(normalized) ? normalized : "");
           return;
@@ -162,7 +172,11 @@ export function SuggestionCategoryField({
             {...restParams}
             size={size ?? "medium"}
             label="Catégorie"
-            placeholder="Sélectionnez ou saisissez une catégorie"
+            placeholder={
+              allowCustom
+                ? "Sélectionnez ou saisissez une catégorie"
+                : "Sélectionnez une catégorie"
+            }
             required={required}
             autoFocus={autoFocus}
             // @ts-expect-error InputLabelProps types mismatch from Autocomplete

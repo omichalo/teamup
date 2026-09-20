@@ -8,6 +8,9 @@ export type ResolveSuggestionSelectionInput = {
 /**
  * Aligne la sélection avec la liste filtrée courante.
  * Retourne `null` pour désélectionner, un id pour sélectionner, ou `undefined` si inchangé.
+ *
+ * Une sélection absente de la liste (lien direct, hors filtre) est conservée :
+ * le détail est chargé par id, indépendamment de la page filtrée.
  */
 export function resolveSuggestionSelection(
   input: ResolveSuggestionSelectionInput
@@ -18,10 +21,7 @@ export function resolveSuggestionSelection(
     selectedId !== null && suggestionIds.includes(selectedId);
 
   if (selectedId && !selectedInList) {
-    if (!isMobile && suggestionIds.length > 0) {
-      return suggestionIds[0];
-    }
-    return null;
+    return undefined;
   }
 
   if (!isMobile && !selectedId && suggestionIds.length > 0 && !hasUrlId) {

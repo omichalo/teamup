@@ -7,24 +7,24 @@ import {
 import { USER_ROLES } from "@/lib/auth/roles";
 
 describe("app-suggestions access", () => {
-  it("allows staff roles except player", () => {
+  it("allows all connected roles including players", () => {
+    expect(canAccessAppSuggestions(USER_ROLES.PLAYER)).toBe(true);
     expect(canAccessAppSuggestions(USER_ROLES.COACH)).toBe(true);
     expect(canAccessAppSuggestions(USER_ROLES.SECRETARY)).toBe(true);
     expect(canAccessAppSuggestions(USER_ROLES.ADMIN)).toBe(true);
-    expect(canAccessAppSuggestions(USER_ROLES.PLAYER)).toBe(false);
-    expect(canAccessAppSuggestions(USER_ROLES.BOARD_MEMBER)).toBe(false);
-    expect(canAccessAppSuggestions(USER_ROLES.ASSISTANT_SECRETARY)).toBe(false);
+    expect(canAccessAppSuggestions(USER_ROLES.BOARD_MEMBER)).toBe(true);
+    expect(canAccessAppSuggestions(USER_ROLES.ASSISTANT_SECRETARY)).toBe(true);
   });
 
-  it("allows comments for staff only", () => {
+  it("allows comments for accessible roles", () => {
     expect(canCommentOnSuggestions(USER_ROLES.COACH)).toBe(true);
-    expect(canCommentOnSuggestions(USER_ROLES.PLAYER)).toBe(false);
+    expect(canCommentOnSuggestions(USER_ROLES.PLAYER)).toBe(true);
   });
 
   it("allows author edits only while status is open", () => {
     expect(
       canEditSuggestionContent(
-        USER_ROLES.SECRETARY,
+        USER_ROLES.PLAYER,
         "uid-a",
         "uid-a",
         "received",
@@ -33,7 +33,7 @@ describe("app-suggestions access", () => {
     ).toBe(true);
     expect(
       canEditSuggestionContent(
-        USER_ROLES.SECRETARY,
+        USER_ROLES.PLAYER,
         "uid-a",
         "uid-a",
         "planned",
@@ -51,7 +51,7 @@ describe("app-suggestions access", () => {
     ).toBe(false);
   });
 
-  it("allows maintainers to manage triage", () => {
+  it("allows maintainers to manage triage flag", () => {
     expect(canManageSuggestionTriage(true)).toBe(true);
     expect(canManageSuggestionTriage(false)).toBe(false);
   });

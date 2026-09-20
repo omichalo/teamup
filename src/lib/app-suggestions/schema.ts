@@ -12,9 +12,11 @@ import {
   normalizeSuggestionCategory,
 } from "@/lib/app-suggestions/categories";
 import {
+  SUGGESTION_DOMAINS,
   SUGGESTION_KINDS,
   SUGGESTION_PRIORITIES,
   SUGGESTION_STATUSES,
+  SUGGESTION_WAITING_ON,
 } from "@/lib/app-suggestions/types";
 
 const titleSchema = z
@@ -83,13 +85,14 @@ const maintainerNoteSchema = z
   .nullable();
 
 const kindSchema = z.enum(SUGGESTION_KINDS);
+const domainSchema = z.enum(SUGGESTION_DOMAINS);
 
 export const suggestionCreateSchema = z.object({
   title: titleSchema,
   description: richDescriptionSchema,
   kind: kindSchema,
-  category: categorySchema,
-  priority: z.enum(SUGGESTION_PRIORITIES).default("medium"),
+  domain: domainSchema.default("app"),
+  category: categorySchema.default("autre"),
 });
 
 export type SuggestionCreateInput = z.infer<typeof suggestionCreateSchema>;
@@ -99,14 +102,12 @@ export const suggestionAuthorPatchSchema = z
     title: titleSchema.optional(),
     description: richDescriptionSchema.optional(),
     category: categorySchema.optional(),
-    priority: z.enum(SUGGESTION_PRIORITIES).optional(),
   })
   .refine(
     (value) =>
       value.title !== undefined ||
       value.description !== undefined ||
-      value.category !== undefined ||
-      value.priority !== undefined,
+      value.category !== undefined,
     { message: "Aucune modification fournie" }
   );
 
@@ -118,6 +119,7 @@ export const suggestionMaintainerPatchSchema = z
   .object({
     status: z.enum(SUGGESTION_STATUSES).optional(),
     priority: z.enum(SUGGESTION_PRIORITIES).optional(),
+    waitingOn: z.enum(SUGGESTION_WAITING_ON).optional(),
     maintainerNote: maintainerNoteSchema.optional(),
     githubIssueUrl: githubIssueUrlSchema.optional(),
   })
@@ -125,6 +127,7 @@ export const suggestionMaintainerPatchSchema = z
     (value) =>
       value.status !== undefined ||
       value.priority !== undefined ||
+      value.waitingOn !== undefined ||
       value.maintainerNote !== undefined ||
       value.githubIssueUrl !== undefined,
     { message: "Aucune modification fournie" }
@@ -133,6 +136,14 @@ export const suggestionMaintainerPatchSchema = z
 export type SuggestionMaintainerPatchInput = z.infer<
   typeof suggestionMaintainerPatchSchema
 >;
+
+export const suggestionModerateSchema = z.object({
+  action: z.enum(["hide", "unhide", "hide_comment", "unhide_comment"]),
+  commentId: z.string().min(1).optional(),
+  reason: z.string().trim().max(500).optional(),
+});
+
+export type SuggestionModerateInput = z.infer<typeof suggestionModerateSchema>;
 
 export const suggestionCommentCreateSchema = z.object({
   body: richCommentBodySchema,
