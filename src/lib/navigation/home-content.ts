@@ -111,7 +111,7 @@ const HOME_LINK_META: Record<
   },
   "/club/matchs-hors-inscription": {
     description:
-      "Suivre les joueurs ayant joué en championnat sans option dossier, et l'encaissement complémentaire.",
+      "Suivre les joueurs ayant joué sans option dossier, et ceux qui ont payé sans avoir encore joué.",
     cta: "Ouvrir le suivi",
     color: "warning",
   },

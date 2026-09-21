@@ -4,54 +4,47 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Box,
-  Chip,
   CircularProgress,
   Paper,
-  Stack,
   Tab,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Tabs,
-  ToggleButton,
-  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import { PageHeader } from "@/components/ui";
 import type { UnregisteredPlayListItem } from "@/lib/championship/list-unregistered-play";
+import type { PaidChampionshipNotPlayedItem } from "@/lib/championship/paid-championship-not-played";
 import {
   UNREGISTERED_PLAY_COMPETITION_LABELS,
   UNREGISTERED_PLAY_FEE_EUR,
-  UNREGISTERED_PLAY_PAYMENT_STATUS_LABELS,
-  UNREGISTERED_PLAY_PAYMENT_STATUS_VALUES,
   type UnregisteredPlayCompetition,
   type UnregisteredPlayPaymentStatus,
 } from "@/lib/championship/unregistered-play-follow-up";
+import { PaidChampionshipNotPlayedTable } from "./PaidChampionshipNotPlayedTable";
+import { UnregisteredPlayFollowUpTable } from "./UnregisteredPlayFollowUpTable";
+
+type FollowUpMode = "played_without_option" | "paid_without_play";
 
 type ListResponse = {
   seasonLabel: string;
   items: UnregisteredPlayListItem[];
+  paidWithoutPlay?: PaidChampionshipNotPlayedItem[];
 };
 
-function dossierSummary(item: UnregisteredPlayListItem): string {
-  if (!item.registrationId) return "Aucun dossier";
-  const comps =
-    item.dossierCompetitionIds.length > 0
-      ? item.dossierCompetitionIds.join(", ")
-      : "sans compétition championnat";
-  const status = item.registrationStatus ?? "—";
-  return `${status} · ${comps}`;
-}
+const MODE_LABELS: Record<FollowUpMode, string> = {
+  played_without_option: "A joué sans option",
+  paid_without_play: "Payé sans avoir joué",
+};
 
 export function UnregisteredPlayFollowUpContainer() {
   const [seasonLabel, setSeasonLabel] = useState<string>("");
   const [items, setItems] = useState<UnregisteredPlayListItem[]>([]);
+  const [paidWithoutPlay, setPaidWithoutPlay] = useState<
+    PaidChampionshipNotPlayedItem[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [savingKey, setSavingKey] = useState<string | null>(null);
+  const [mode, setMode] = useState<FollowUpMode>("played_without_option");
   const [tab, setTab] = useState<UnregisteredPlayCompetition>("equipe");
 
   const load = useCallback(async () => {
@@ -67,6 +60,7 @@ export function UnregisteredPlayFollowUpContainer() {
       }
       setSeasonLabel(data.seasonLabel);
       setItems(data.items);
+      setPaidWithoutPlay(data.paidWithoutPlay ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur de chargement");
     } finally {
@@ -78,17 +72,34 @@ export function UnregisteredPlayFollowUpContainer() {
     void load();
   }, [load]);
 
-  const filtered = useMemo(
+  const filteredPlayed = useMemo(
     () => items.filter((item) => item.competition === tab),
     [items, tab]
   );
 
-  const counts = useMemo(
+  const filteredPaid = useMemo(
+    () => paidWithoutPlay.filter((item) => item.competition === tab),
+    [paidWithoutPlay, tab]
+  );
+
+  const filtered =
+    mode === "played_without_option" ? filteredPlayed : filteredPaid;
+
+  const counts = useMemo(() => {
+    const source =
+      mode === "played_without_option" ? items : paidWithoutPlay;
+    return {
+      equipe: source.filter((i) => i.competition === "equipe").length,
+      paris: source.filter((i) => i.competition === "paris").length,
+    };
+  }, [items, mode, paidWithoutPlay]);
+
+  const modeCounts = useMemo(
     () => ({
-      equipe: items.filter((i) => i.competition === "equipe").length,
-      paris: items.filter((i) => i.competition === "paris").length,
+      played_without_option: items.length,
+      paid_without_play: paidWithoutPlay.length,
     }),
-    [items]
+    [items.length, paidWithoutPlay.length]
   );
 
   const updateStatus = useCallback(
@@ -136,20 +147,36 @@ export function UnregisteredPlayFollowUpContainer() {
   return (
     <Box sx={{ py: 3 }}>
       <PageHeader
-        title="Matchs hors inscription"
+        title="Suivi championnat"
         subtitle={
           seasonLabel
-            ? `Saison ${seasonLabel} — joueurs ayant joué sans option championnat au dossier`
-            : "Joueurs ayant joué sans option championnat au dossier"
+            ? `Saison ${seasonLabel} — joueurs hors option ou option payée sans match`
+            : "Joueurs hors option ou option payée sans match"
         }
         marginBottom={2}
       />
 
+      <Paper variant="outlined" sx={{ mb: 2 }}>
+        <Tabs
+          value={mode}
+          onChange={(_, value: FollowUpMode) => setMode(value)}
+          variant="fullWidth"
+        >
+          <Tab
+            value="played_without_option"
+            label={`${MODE_LABELS.played_without_option} (${modeCounts.played_without_option})`}
+          />
+          <Tab
+            value="paid_without_play"
+            label={`${MODE_LABELS.paid_without_play} (${modeCounts.paid_without_play})`}
+          />
+        </Tabs>
+      </Paper>
+
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Saisir le suivi d’encaissement complémentaire (
-        {UNREGISTERED_PLAY_FEE_EUR.equipe}&nbsp;€ équipes /{" "}
-        {UNREGISTERED_PLAY_FEE_EUR.paris}&nbsp;€ Paris) : pas de paiement, demandé
-        ou payé.
+        {mode === "played_without_option"
+          ? `Saisir le suivi d’encaissement complémentaire (${UNREGISTERED_PLAY_FEE_EUR.equipe}\u00a0€ équipes / ${UNREGISTERED_PLAY_FEE_EUR.paris}\u00a0€ Paris) : pas de paiement, demandé ou payé.`
+          : "Joueurs dont le dossier inclut l’option championnat (payée ou approuvée) et qui n’ont pas encore joué de match dans cette compétition."}
       </Typography>
 
       {error && (
@@ -184,69 +211,16 @@ export function UnregisteredPlayFollowUpContainer() {
           Aucun joueur concerné pour{" "}
           {UNREGISTERED_PLAY_COMPETITION_LABELS[tab].toLowerCase()}.
         </Alert>
+      ) : mode === "played_without_option" ? (
+        <UnregisteredPlayFollowUpTable
+          items={filteredPlayed}
+          savingKey={savingKey}
+          onUpdateStatus={(item, paymentStatus) => {
+            void updateStatus(item, paymentStatus);
+          }}
+        />
       ) : (
-        <TableContainer component={Paper} variant="outlined">
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Joueur</TableCell>
-                <TableCell>Licence</TableCell>
-                <TableCell>Dossier</TableCell>
-                <TableCell>Suivi paiement</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filtered.map((item) => {
-                const rowKey = `${item.personKey}:${item.competition}`;
-                const saving = savingKey === rowKey;
-                return (
-                  <TableRow key={rowKey} hover>
-                    <TableCell>
-                      <Stack spacing={0.5}>
-                        <Typography fontWeight={600}>
-                          {item.displayName}
-                        </Typography>
-                        {item.coachIncluded && (
-                          <Chip
-                            size="small"
-                            label="Ajout coach"
-                            variant="outlined"
-                          />
-                        )}
-                      </Stack>
-                    </TableCell>
-                    <TableCell>{item.ffttLicense ?? "—"}</TableCell>
-                    <TableCell>
-                      <Typography variant="body2" color="text.secondary">
-                        {dossierSummary(item)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <ToggleButtonGroup
-                        exclusive
-                        size="small"
-                        color="primary"
-                        disabled={saving}
-                        value={item.paymentStatus}
-                        onChange={(_, value: UnregisteredPlayPaymentStatus | null) => {
-                          if (!value) return;
-                          void updateStatus(item, value);
-                        }}
-                        aria-label={`Suivi paiement ${item.displayName}`}
-                      >
-                        {UNREGISTERED_PLAY_PAYMENT_STATUS_VALUES.map((status) => (
-                          <ToggleButton key={status} value={status}>
-                            {UNREGISTERED_PLAY_PAYMENT_STATUS_LABELS[status]}
-                          </ToggleButton>
-                        ))}
-                      </ToggleButtonGroup>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        <PaidChampionshipNotPlayedTable items={filteredPaid} />
       )}
     </Box>
   );

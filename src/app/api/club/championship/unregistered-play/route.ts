@@ -4,7 +4,7 @@ import { jsonNoStore } from "@/lib/http/cache-headers";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { getActiveRegistrationConfig } from "@/lib/club-registration-config/store";
 import { requireUnregisteredPlayFollowUpActor } from "@/lib/championship/api-auth";
-import { listUnregisteredPlayFollowUps } from "@/lib/championship/list-unregistered-play";
+import { listChampionshipSecretariatFollowUps } from "@/lib/championship/list-unregistered-play";
 
 export async function GET() {
   try {
@@ -15,8 +15,13 @@ export async function GET() {
     const config = await getActiveRegistrationConfig();
     const seasonLabel = config.meta.seasonLabel;
     const db = getFirestoreAdmin();
-    const items = await listUnregisteredPlayFollowUps(db, seasonLabel);
-    return jsonNoStore({ seasonLabel, items });
+    const { playedWithoutOption, paidWithoutPlay } =
+      await listChampionshipSecretariatFollowUps(db, seasonLabel);
+    return jsonNoStore({
+      seasonLabel,
+      items: playedWithoutOption,
+      paidWithoutPlay,
+    });
   } catch (error) {
     console.error("[api/club/championship/unregistered-play GET]", error);
     return jsonNoStore(
