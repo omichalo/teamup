@@ -1,4 +1,5 @@
 import { currentClubLicenseFields } from "@/lib/players/current-club-license";
+import { effectiveLicensePresence } from "./effective-license-presence";
 import { resolveLicensePresence } from "./license-presence";
 import type {
   ChampionshipAlertCode,
@@ -151,10 +152,13 @@ export function mergePlayersWithChampionshipRoster(
     if (entry.ffttLicense) {
       mergedIds.add(entry.ffttLicense);
     }
-    if (isHiddenOtherClubPresence(entry.licensePresence)) {
+    const licensePresence = licensePresenceForRosterEntry(player, entry);
+    if (isHiddenOtherClubPresence(licensePresence)) {
       continue;
     }
-    result.push(withCurrentClubLicense(applyRosterToPlayer(player, entry)));
+    result.push(
+      withCurrentClubLicense(applyRosterToPlayer(player, entry, licensePresence))
+    );
   }
 
   for (const entry of roster) {
@@ -164,11 +168,13 @@ export function mergePlayersWithChampionshipRoster(
     if (entry.ffttLicense && mergedIds.has(entry.ffttLicense)) {
       continue;
     }
-    if (isHiddenOtherClubPresence(entry.licensePresence)) {
+    const empty = emptyPlayer(entry.id);
+    const licensePresence = licensePresenceForRosterEntry(empty, entry);
+    if (isHiddenOtherClubPresence(licensePresence)) {
       continue;
     }
     result.push(
-      withCurrentClubLicense(applyRosterToPlayer(emptyPlayer(entry.id), entry))
+      withCurrentClubLicense(applyRosterToPlayer(empty, entry, licensePresence))
     );
     mergedIds.add(entry.id);
   }
@@ -176,9 +182,40 @@ export function mergePlayersWithChampionshipRoster(
   return result;
 }
 
-function applyRosterToPlayer(
+function licensePresenceForRosterEntry(
   player: Player,
   entry: ChampionshipRosterView
+): LicensePresence {
+  const listedInClub =
+    player.listedInClub === true
+      ? true
+      : player.listedInClub === false
+        ? false
+        : null;
+  const hasMirrorSignal =
+    listedInClub !== null ||
+    Boolean(player.license) ||
+    Boolean(player.typeLicence) ||
+    Boolean(player.nomClub ?? player.club);
+
+  return effectiveLicensePresence(
+    entry.licensePresence,
+    hasMirrorSignal
+      ? {
+          ffttLicense: entry.ffttLicense || player.license,
+          listedInClub,
+          typeLicence: player.typeLicence || null,
+          licenseValidationStatus: entry.licenseValidationStatus,
+          playerNomClub: player.nomClub ?? player.club ?? null,
+        }
+      : null
+  );
+}
+
+function applyRosterToPlayer(
+  player: Player,
+  entry: ChampionshipRosterView,
+  licensePresence: LicensePresence
 ): Player {
   const gender =
     entry.sex === "female" ? "F" : entry.sex === "male" ? "M" : player.gender;
@@ -198,7 +235,10 @@ function applyRosterToPlayer(
       championnat: entry.championnat,
       championnatParis: entry.championnatParis,
     },
-    championshipAlerts: alertsFromRoster(entry),
+    championshipAlerts: alertsFromRoster({
+      paymentStatus: entry.paymentStatus,
+      licensePresence,
+    }),
     championshipPersonKey: entry.personKey || entry.id,
     listedInClub: player.listedInClub === true,
     hasPlayedAtLeastOneMatch: entry.hasPlayedAtLeastOneMatch === true,

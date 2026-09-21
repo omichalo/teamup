@@ -10,7 +10,7 @@ export const CHAMPIONSHIP_ROSTER_ROLES = [
 export const CHAMPIONSHIP_RECALCULATE_ROLES = [USER_ROLES.ADMIN] as const;
 
 /**
- * Suivi matchs hors inscription dossier + statut paiement.
+ * Suivi secrétariat championnat : hors option dossier + option payée sans match.
  * Secrétariat (encaissement) + coach / admin (effectif).
  */
 export const UNREGISTERED_PLAY_FOLLOW_UP_ROLES = [
