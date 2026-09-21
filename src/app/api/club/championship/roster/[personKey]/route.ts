@@ -6,6 +6,7 @@ import { validateOrigin } from "@/lib/auth/csrf-utils";
 import { AUDIT_ACTIONS, logAuditAction } from "@/lib/auth/audit-logger";
 import { getActiveRegistrationConfig } from "@/lib/club-registration-config/store";
 import { requireChampionshipRosterActor } from "@/lib/championship/api-auth";
+import { effectiveLicensePresence } from "@/lib/championship/effective-license-presence";
 import { rosterParticipationPatchSchema } from "@/lib/championship/schema";
 import {
   getChampionshipPlayer,
@@ -15,6 +16,7 @@ import {
   deleteChampionshipPlayer,
 } from "@/lib/championship/store";
 import { digitsLicense, resolveChampionshipPersonKey } from "@/lib/championship/person-key";
+import { loadRosterPlayerMirror } from "@/lib/players/fftt-mirror";
 
 type RouteContext = { params: Promise<{ personKey: string }> };
 
@@ -66,6 +68,30 @@ export async function PATCH(req: Request, context: RouteContext) {
       (championnat || championnatParis) &&
       !(existing?.includedFromDossier ?? false);
 
+    const mirror = await loadRosterPlayerMirror(db, nextLicense);
+    const licensePresence = effectiveLicensePresence(
+      existing?.licensePresence,
+      mirror
+        ? {
+            ffttLicense: nextLicense,
+            listedInClub: mirror.listedInClub,
+            typeLicence: mirror.typeLicence,
+            licenseValidationStatus:
+              existing?.licenseValidationStatus ?? null,
+            playerNomClub: mirror.nomClub,
+          }
+        : nextLicense
+          ? {
+              ffttLicense: nextLicense,
+              listedInClub: null,
+              typeLicence: null,
+              licenseValidationStatus:
+                existing?.licenseValidationStatus ?? null,
+              playerNomClub: null,
+            }
+          : null
+    );
+
     await upsertChampionshipPlayer(db, {
       personKey: resolvedKey,
       seasonLabel,
@@ -81,7 +107,7 @@ export async function PATCH(req: Request, context: RouteContext) {
       championnatParis,
       paymentStatus: existing?.paymentStatus ?? null,
       registrationStatus: existing?.registrationStatus ?? null,
-      licensePresence: existing?.licensePresence ?? "unknown",
+      licensePresence,
       licenseValidationStatus: existing?.licenseValidationStatus ?? null,
       preferredTeams: patch.preferredTeams ??
         existing?.preferredTeams ?? { masculine: [], feminine: [] },
