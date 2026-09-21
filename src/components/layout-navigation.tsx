@@ -113,7 +113,7 @@ const NAV = {
     icon: <VerifiedUser />,
   },
   matchsHorsInscription: {
-    label: "Matchs hors inscription",
+    label: "Suivi championnat",
     href: "/club/matchs-hors-inscription",
     icon: <WarningAmber />,
   },
