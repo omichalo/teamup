@@ -172,6 +172,30 @@ describe("mergePlayersWithChampionshipRoster", () => {
     );
     expect(onRoster[0].isActive).toBe(false);
     expect(onRoster[0].typeLicence).toBe("");
+    expect(onRoster[0].championshipAlerts).toEqual(["fftt_sqy_unlicensed"]);
+  });
+
+  it("does not show Hors liste FFTT when the FFTT mirror lists the player", () => {
+    const merged = mergePlayersWithChampionshipRoster(
+      [
+        player({
+          id: "7889833",
+          name: "LUCAS",
+          firstName: "Enzo",
+          listedInClub: true,
+          typeLicence: "P",
+        }),
+      ],
+      [
+        roster({
+          id: "7889833",
+          personKey: "7889833",
+          licensePresence: "unknown",
+          ffttLicense: "7889833",
+        }),
+      ]
+    );
+    expect(merged[0].championshipAlerts ?? []).not.toContain("not_in_club_list");
   });
 
   it("does not keep last-season burnout from the FFTT player mirror", () => {
