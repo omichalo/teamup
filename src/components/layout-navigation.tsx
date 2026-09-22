@@ -238,7 +238,6 @@ export function buildLayoutNavigation(
       primary: [
         NAV.accueilStaff,
         NAV.dossiersAValider,
-        NAV.compositions,
         NAV.boiteIdees,
         NAV.administration,
       ],
@@ -250,6 +249,7 @@ export function buildLayoutNavigation(
             NAV.joueurs,
             NAV.equipes,
             NAV.disponibilites,
+            NAV.compositions,
             NAV.modelesComposition,
           ],
         },
@@ -277,7 +277,6 @@ export function buildLayoutNavigation(
       NAV.accueilStaff,
       NAV.presences,
       NAV.creneaux,
-      NAV.compositions,
       NAV.disponibilites,
       NAV.tableauAdhesions,
       NAV.statistiquesAdherents,
@@ -290,6 +289,7 @@ export function buildLayoutNavigation(
         items: [
           NAV.joueurs,
           NAV.equipes,
+          NAV.compositions,
           NAV.modelesComposition,
           NAV.matchsHorsInscription,
         ],

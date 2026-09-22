@@ -1,16 +1,28 @@
 "use client";
 
-import { Box, Button, Chip, Stack, Typography } from "@mui/material";
+import { Box, Button, Chip, IconButton, Stack, Typography } from "@mui/material";
+import PersonRemoveOutlined from "@mui/icons-material/PersonRemoveOutlined";
 import type { AttendanceRosterPerson } from "@/lib/attendance/types";
 import { ATTENDANCE_ALERT_LABELS } from "@/lib/attendance/constants";
 
 type Props = {
   person: AttendanceRosterPerson;
   busy: boolean;
+  disabled?: boolean;
   onToggle: () => void;
+  onRemoveFromSlot?: (() => void) | undefined;
 };
 
-export function AttendancePlayerCard({ person, busy, onToggle }: Props) {
+export function AttendancePlayerCard({
+  person,
+  busy,
+  disabled = false,
+  onToggle,
+  onRemoveFromSlot,
+}: Props) {
+  const canRemove =
+    person.kind === "enrolled" && Boolean(person.registrationId) && onRemoveFromSlot;
+
   return (
     <Box
       sx={{
@@ -47,11 +59,22 @@ export function AttendancePlayerCard({ person, busy, onToggle }: Props) {
           </Stack>
         ) : null}
       </Stack>
+      {canRemove ? (
+        <IconButton
+          aria-label={`Retirer ${person.displayName} du créneau`}
+          onClick={onRemoveFromSlot}
+          disabled={busy || disabled}
+          color="default"
+          sx={{ minWidth: 48, minHeight: 48 }}
+        >
+          <PersonRemoveOutlined />
+        </IconButton>
+      ) : null}
       <Button
         variant={person.present ? "contained" : "outlined"}
         color={person.present ? "success" : "primary"}
         onClick={onToggle}
-        disabled={busy}
+        disabled={busy || disabled}
         sx={{ minHeight: 56, minWidth: 120, fontWeight: 700 }}
       >
         {person.present ? "Présent" : "Pointer"}
