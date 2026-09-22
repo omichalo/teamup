@@ -16,6 +16,7 @@ import {
 } from "@/lib/attendance/constants";
 import { attendanceLeadCreateSchema } from "@/lib/attendance/schema";
 import { findSlotOption } from "@/lib/attendance/slots-for-date";
+import { enrichLeadsWithVisits } from "@/lib/attendance/lead-visits";
 import { createLeadWithGuestMark, getSlotCancellation, listLeads } from "@/lib/attendance/store";
 
 function isLeadStatus(value: string | null): value is AttendanceLeadStatus {
@@ -36,8 +37,10 @@ export async function GET(req: Request) {
   const status = isLeadStatus(statusParam) ? statusParam : undefined;
 
   try {
+    const config = await getActiveRegistrationConfig();
     const leads = await listLeads(auth.session.db, status);
-    return jsonNoStore({ leads });
+    const enriched = await enrichLeadsWithVisits(auth.session.db, config, leads);
+    return jsonNoStore({ leads: enriched });
   } catch (error) {
     console.error("[api/club/attendance/leads GET]", error);
     return jsonNoStore(

@@ -74,6 +74,10 @@ export function AttendanceStatsPanel({ date, slotId }: Props) {
         Séance : {stats.presentEnrolled}/{stats.enrolled} inscrits · {stats.walkin} hors
         créneau · {stats.guest} essai{stats.guest > 1 ? "s" : ""}
       </Typography>
+      <Typography variant="body2" color="text.secondary">
+        Dénominateur : séances de ce créneau où un pointage a eu lieu (depuis
+        l&apos;inscription du joueur).
+      </Typography>
       {stats.players.map((player) => {
         const percent = player.rate == null ? 0 : Math.round(player.rate * 100);
         return (

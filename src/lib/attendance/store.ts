@@ -247,6 +247,17 @@ export async function listLeads(
   return snap.docs.map((doc) => mapLeadDoc(doc.id, doc.data()));
 }
 
+export async function getLeadData(
+  db: Firestore,
+  leadId: string
+): Promise<AttendanceLead | null> {
+  const snap = await db.collection(ATTENDANCE_LEADS_COLLECTION).doc(leadId).get();
+  if (!snap.exists) {
+    return null;
+  }
+  return mapLeadDoc(leadId, snap.data() ?? {});
+}
+
 export async function patchLeadStatus(
   db: Firestore,
   leadId: string,
@@ -313,6 +324,41 @@ export async function addSlotToRegistration(
   });
 
   return { slotAdded: true };
+}
+
+export async function removeSlotFromRegistration(
+  db: Firestore,
+  params: {
+    date: string;
+    slotId: string;
+    registrationId: string;
+  }
+): Promise<{ slotRemoved: boolean }> {
+  const regRef = db.collection(REGISTRATIONS_COLLECTION).doc(params.registrationId);
+  const markId = buildAttendanceMarkId({
+    date: params.date,
+    slotId: params.slotId,
+    kind: "enrolled",
+    registrationId: params.registrationId,
+  });
+
+  await db.runTransaction(async (tx) => {
+    const registration = await tx.get(regRef);
+    if (!registration.exists) {
+      throw new Error("Dossier introuvable");
+    }
+    const data = registration.data() ?? {};
+    if (data.status === "rejected") {
+      throw new Error("Dossier refusé");
+    }
+    tx.update(regRef, { slotIds: FieldValue.arrayRemove(params.slotId) });
+    // Retire le pointage du jour s'il existe ; l'historique des autres dates est conservé.
+    if (markId) {
+      tx.delete(db.collection(ATTENDANCE_MARKS_COLLECTION).doc(markId));
+    }
+  });
+
+  return { slotRemoved: true };
 }
 
 export async function getSlotCancellation(

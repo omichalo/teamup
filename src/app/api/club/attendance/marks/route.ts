@@ -16,6 +16,7 @@ import { displayNameFromParts } from "@/lib/attendance/roster";
 import { buildAttendanceMarkId } from "@/lib/attendance/mark-id";
 import {
   deleteAttendanceMark,
+  getLeadData,
   getRegistrationData,
   getSlotCancellation,
   upsertAttendanceMark,
@@ -71,7 +72,17 @@ export async function PUT(req: Request) {
     }
 
     let displayName = "Présent";
-    if (body.kind !== "guest" && body.registrationId) {
+    if (body.kind === "guest") {
+      if (!body.leadId) {
+        return jsonNoStore({ error: "Essai requis" }, { status: 400 });
+      }
+      const lead = await getLeadData(auth.session.db, body.leadId);
+      if (!lead) {
+        return jsonNoStore({ error: "Essai introuvable" }, { status: 404 });
+      }
+      displayName =
+        displayNameFromParts(lead.firstName, lead.lastName) || body.leadId;
+    } else if (body.registrationId) {
       const data = await getRegistrationData(auth.session.db, body.registrationId);
       if (!data || isRejectedRegistration(data)) {
         return jsonNoStore({ error: "Dossier introuvable" }, { status: 404 });

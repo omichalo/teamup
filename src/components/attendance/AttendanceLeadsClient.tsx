@@ -3,8 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
-  Button,
-  Chip,
   Container,
   MenuItem,
   Stack,
@@ -18,10 +16,11 @@ import {
   ATTENDANCE_LEAD_STATUS_LABELS,
   type AttendanceLeadStatus,
 } from "@/lib/attendance/constants";
-import type { AttendanceLead } from "@/lib/attendance/types";
+import type { AttendanceLeadListItem } from "@/lib/attendance/types";
+import { AttendanceLeadCard } from "./AttendanceLeadCard";
 
 export function AttendanceLeadsClient() {
-  const [leads, setLeads] = useState<AttendanceLead[]>([]);
+  const [leads, setLeads] = useState<AttendanceLeadListItem[]>([]);
   const [status, setStatus] = useState<AttendanceLeadStatus | "all">("open");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +33,10 @@ export function AttendanceLeadsClient() {
       const params = new URLSearchParams();
       if (status !== "all") params.set("status", status);
       const res = await fetch(`/api/club/attendance/leads?${params.toString()}`);
-      const json = await readJsonResponse<{ leads?: AttendanceLead[]; error?: string }>(res);
+      const json = await readJsonResponse<{
+        leads?: AttendanceLeadListItem[];
+        error?: string;
+      }>(res);
       if (!res.ok) throw new Error(json.error ?? "Impossible de charger les essais");
       setLeads(json.leads ?? []);
     } catch (err) {
@@ -92,38 +94,12 @@ export function AttendanceLeadsClient() {
         {error ? <Alert severity="error">{error}</Alert> : null}
         {loading ? <Alert severity="info">Chargement…</Alert> : null}
         {leads.map((lead) => (
-          <Stack
+          <AttendanceLeadCard
             key={lead.id}
-            spacing={1}
-            sx={{ p: 2, border: 1, borderColor: "divider", borderRadius: 2 }}
-          >
-            <Stack direction="row" justifyContent="space-between" gap={1} flexWrap="wrap">
-              <Typography variant="h6">
-                {lead.firstName} {lead.lastName}
-              </Typography>
-              <Chip label={ATTENDANCE_LEAD_STATUS_LABELS[lead.status]} />
-            </Stack>
-            <Typography color="text.secondary">
-              {lead.phone}
-              {lead.email ? ` · ${lead.email}` : ""}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Séance du {lead.sourceDate} · créneau {lead.sourceSlotId}
-            </Typography>
-            <Stack direction="row" gap={1} flexWrap="wrap">
-              {ATTENDANCE_LEAD_STATUSES.filter((value) => value !== lead.status).map((value) => (
-                <Button
-                  key={value}
-                  size="small"
-                  variant="outlined"
-                  disabled={busyId === lead.id}
-                  onClick={() => void patchStatus(lead.id, value)}
-                >
-                  {ATTENDANCE_LEAD_STATUS_LABELS[value]}
-                </Button>
-              ))}
-            </Stack>
-          </Stack>
+            lead={lead}
+            busy={busyId === lead.id}
+            onPatchStatus={(id, next) => void patchStatus(id, next)}
+          />
         ))}
         {!loading && leads.length === 0 ? (
           <Typography color="text.secondary">Aucun essai dans ce filtre.</Typography>
