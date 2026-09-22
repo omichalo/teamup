@@ -12,6 +12,7 @@ type Props = {
   busyKey: string | null;
   disabled?: boolean;
   onToggle: (person: AttendanceRosterPerson) => void;
+  onRemoveFromSlot?: ((person: AttendanceRosterPerson) => void) | undefined;
   emptyLabel: string;
 };
 
@@ -23,6 +24,7 @@ export function AttendanceRoster({
   busyKey,
   disabled = false,
   onToggle,
+  onRemoveFromSlot,
   emptyLabel,
 }: Props) {
   const needle = filter.trim().toLowerCase();
@@ -52,7 +54,13 @@ export function AttendanceRoster({
             key={person.personKey}
             person={person}
             busy={disabled || busyKey === person.personKey}
+            disabled={disabled}
             onToggle={() => onToggle(person)}
+            onRemoveFromSlot={
+              onRemoveFromSlot && person.kind === "enrolled"
+                ? () => onRemoveFromSlot(person)
+                : undefined
+            }
           />
         ))
       )}

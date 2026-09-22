@@ -110,13 +110,12 @@ describe("buildLayoutNavigation", () => {
     ]);
   });
 
-  it("prioritizes compositions and disponibilites for coach", () => {
+  it("prioritizes disponibilites for coach and keeps compositions in championnat", () => {
     const nav = buildLayoutNavigation(base);
     expect(nav.primary.map((item) => item.href)).toEqual([
       "/",
       "/club/presences",
       "/club/creneaux",
-      "/compositions",
       "/disponibilites",
       "/club/adhesions-tableau",
       "/club/statistiques-adherents",
@@ -126,6 +125,7 @@ describe("buildLayoutNavigation", () => {
     expect(nav.groups[0]?.items.map((item) => item.href)).toEqual([
       "/joueurs",
       "/equipes",
+      "/compositions",
       "/compositions/defaults",
       "/club/matchs-hors-inscription",
     ]);
@@ -136,7 +136,6 @@ describe("buildLayoutNavigation", () => {
     expect(nav.primary.map((item) => item.href)).toEqual([
       "/",
       "/club/demandes-adhesion",
-      "/compositions",
       "/club/idees",
       "/admin",
     ]);
@@ -148,6 +147,7 @@ describe("buildLayoutNavigation", () => {
       "/joueurs",
       "/equipes",
       "/disponibilites",
+      "/compositions",
       "/compositions/defaults",
     ]);
     expect(nav.groups[1]?.items.map((item) => item.href)).toEqual([

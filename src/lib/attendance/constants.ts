@@ -28,6 +28,11 @@ export const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
 export const MEMBER_SEARCH_LIMIT = 20;
 export const MEMBER_SEARCH_SCAN_LIMIT = 500;
 export const LEADS_PAGE_SIZE_DEFAULT = 50;
+export const LEAD_SEARCH_LIMIT = 20;
+export const LEAD_SEARCH_SCAN_LIMIT = 300;
+export const LEAD_RECENTS_LIMIT = 8;
+/** Statuts proposés pour réutilisation côté pointage coach. */
+export const LEAD_REUSE_STATUSES = ["open", "contacted"] as const;
 
 export const ATTENDANCE_LEAD_STATUS_LABELS: Record<AttendanceLeadStatus, string> = {
   open: "À relancer",

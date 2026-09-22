@@ -98,6 +98,31 @@ export type AttendanceMemberSearchHit = {
   alerts: AttendanceAlert[];
 };
 
+/** Essai réutilisable au pointage (champs limités pour le coach). */
+export type AttendanceLeadSearchHit = {
+  leadId: string;
+  firstName: string;
+  lastName: string;
+  displayName: string;
+  phone: string;
+  alreadyPresent: boolean;
+  visitCount: number;
+  lastVisitDate?: string | undefined;
+};
+
+/** Passage d'essai (pour la file bureau). */
+export type AttendanceLeadVisit = {
+  date: string;
+  slotId: string;
+  slotLabel: string;
+};
+
+/** Lead enrichi pour la file « Essais à relancer ». */
+export type AttendanceLeadListItem = AttendanceLead & {
+  visitCount: number;
+  visits: AttendanceLeadVisit[];
+};
+
 export type AttendancePlayerStat = {
   registrationId: string;
   displayName: string;

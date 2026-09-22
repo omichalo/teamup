@@ -2,6 +2,9 @@ import { attendanceAlertsFromRegistration } from "./alerts";
 import { buildAttendanceMarkId } from "./mark-id";
 import { buildSessionPayload } from "./roster";
 import { registrationMatchesQuery } from "./search-members";
+import { leadMatchesQuery, maskLeadPhone } from "./search-leads";
+import { formatAttendanceSlotDisplay } from "./slot-display";
+import { getDefaultRegistrationConfig } from "@/lib/club-registration-config/default-config";
 import { buildSlotStats, buildAttendanceExportCsv } from "./stats";
 import {
   countIsoWeekdayOccurrences,
@@ -79,6 +82,27 @@ describe("attendance mark id", () => {
     expect(buildAttendanceMarkId({ ...base, kind: "walkin" })).toBe(
       buildAttendanceMarkId({ ...base, kind: "enrolled" })
     );
+  });
+
+  it("réutilise le même leadId sur des dates différentes", () => {
+    const leadId = "lead-armand";
+    const slotId = "voisins-mer-1400-jeunes-loisirs";
+    expect(
+      buildAttendanceMarkId({
+        date: "2026-09-09",
+        slotId,
+        kind: "guest",
+        leadId,
+      })
+    ).toBe(`2026-09-09__${slotId}__guest_${leadId}`);
+    expect(
+      buildAttendanceMarkId({
+        date: "2026-09-16",
+        slotId,
+        kind: "guest",
+        leadId,
+      })
+    ).toBe(`2026-09-16__${slotId}__guest_${leadId}`);
   });
 });
 
@@ -213,9 +237,8 @@ describe("attendance calendar / stats", () => {
         },
       ],
     });
-    expect(stats.players[0]?.expectedCount).toBe(
-      countIsoWeekdayOccurrences("2026-08-06", "2026-08-20", 4)
-    );
+    // 2 dates avec pointage (13 et 20), même si submittedAt est plus tôt.
+    expect(stats.players[0]?.expectedCount).toBe(2);
     expect(stats.players[0]?.presentCount).toBe(1);
     expect(stats.walkin).toBe(1);
   });
@@ -251,11 +274,73 @@ describe("attendance calendar / stats", () => {
           markedAt: "x",
           markedByUid: "c",
         },
+        {
+          id: "m2",
+          date: "2026-08-20",
+          slotId: "slot-a",
+          siteId: "voisins",
+          seasonLabel: "2025-2026",
+          sessionId: "s",
+          kind: "enrolled",
+          registrationId: "reg-1",
+          displayName: "Alain Dupont",
+          markedAt: "x",
+          markedByUid: "c",
+        },
       ],
     });
-    const base = countIsoWeekdayOccurrences("2026-08-06", "2026-08-20", 4);
-    expect(stats.players[0]?.expectedCount).toBe(base - 1);
-    expect(stats.players[0]?.presentCount).toBe(0);
+    expect(stats.players[0]?.expectedCount).toBe(1);
+    expect(stats.players[0]?.presentCount).toBe(1);
+  });
+
+  it("ignore les séances sans aucun pointage", () => {
+    const stats = buildSlotStats({
+      date: "2026-09-22",
+      slotId: "slot-a",
+      weekday: 2,
+      seasonLabel: "2026-2027",
+      registrations: [
+        {
+          id: "reg-1",
+          data: {
+            firstName: "Anatole",
+            lastName: "Taburet",
+            submittedAt: "2026-08-01T10:00:00.000Z",
+          },
+        },
+      ],
+      marks: [
+        {
+          id: "m1",
+          date: "2026-09-08",
+          slotId: "slot-a",
+          siteId: "guy",
+          seasonLabel: "2026-2027",
+          sessionId: "s",
+          kind: "enrolled",
+          registrationId: "reg-1",
+          displayName: "Anatole Taburet",
+          markedAt: "x",
+          markedByUid: "c",
+        },
+        {
+          id: "m2",
+          date: "2026-09-22",
+          slotId: "slot-a",
+          siteId: "guy",
+          seasonLabel: "2026-2027",
+          sessionId: "s",
+          kind: "enrolled",
+          registrationId: "reg-1",
+          displayName: "Anatole Taburet",
+          markedAt: "x",
+          markedByUid: "c",
+        },
+      ],
+    });
+    // 15/09 n'a aucun mark → pas dans le dénominateur (2, pas 3).
+    expect(stats.players[0]?.expectedCount).toBe(2);
+    expect(stats.players[0]?.presentCount).toBe(2);
   });
 });
 
@@ -314,6 +399,30 @@ describe("attendance search / export", () => {
   it("matche un nom sans accent", () => {
     expect(registrationMatchesQuery("Béatrice", "Martin", "bea mar")).toBe(true);
     expect(registrationMatchesQuery("Alain", "Dupont", "z")).toBe(false);
+  });
+
+  it("matche un essai par nom ou téléphone", () => {
+    expect(leadMatchesQuery("Armand", "De Montleau", "0612345678", "arm mont")).toBe(
+      true
+    );
+    expect(leadMatchesQuery("Armand", "De Montleau", "0612345678", "123456")).toBe(
+      true
+    );
+    expect(leadMatchesQuery("Armand", "De Montleau", "0612345678", "zz")).toBe(false);
+  });
+
+  it("masque le téléphone d'un essai", () => {
+    expect(maskLeadPhone("06 12 34 56 78")).toBe("06***78");
+  });
+
+  it("affiche un créneau lisible sans l'id technique", () => {
+    const config = getDefaultRegistrationConfig();
+    const slotId = config.sites.flatMap((site) => site.slots).find((slot) => slot.enabled)?.id;
+    expect(slotId).toBeTruthy();
+    const label = formatAttendanceSlotDisplay(config, slotId!);
+    expect(label).not.toContain(slotId!);
+    expect(label).toMatch(/·/);
+    expect(formatAttendanceSlotDisplay(config, "slot-inexistant")).toBe("Créneau inconnu");
   });
 
   it("exporte un CSV", () => {

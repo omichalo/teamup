@@ -23,7 +23,7 @@ import {
   readAttendanceDateParam,
 } from "@/lib/attendance/urls";
 import { formatMinutesAsLabel } from "@/lib/club-registration-config/slot-schedule";
-import type { AttendanceMemberSearchHit, AttendanceRosterPerson } from "@/lib/attendance/types";
+import type { AttendanceLeadSearchHit, AttendanceMemberSearchHit, AttendanceRosterPerson } from "@/lib/attendance/types";
 import { resolveRole } from "@/lib/auth/roles";
 import { useAttendanceSession } from "./useAttendanceSession";
 import { AttendanceRoster } from "./AttendanceRoster";
@@ -32,6 +32,7 @@ import { AttendanceGuestDialog } from "./AttendanceGuestDialog";
 import { AttendanceStatsPanel } from "./AttendanceStatsPanel";
 import { AttendanceSessionDock, AttendanceSessionDockSpacer } from "./AttendanceSessionDock";
 import { AttendanceCancellationConfirmDialog } from "./AttendanceCancellationConfirmDialog";
+import { AttendanceRemoveFromSlotDialog } from "./AttendanceRemoveFromSlotDialog";
 
 export function AttendanceSessionClient() {
   const router = useRouter();
@@ -46,6 +47,9 @@ export function AttendanceSessionClient() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [restoreOpen, setRestoreOpen] = useState(false);
   const [restoreBusy, setRestoreBusy] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<AttendanceRosterPerson | null>(null);
+  const [removeBusy, setRemoveBusy] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
   const { session, loading, error, busyKey, reload, togglePresent } = useAttendanceSession(
     date,
@@ -106,7 +110,7 @@ export function AttendanceSessionClient() {
     }
   }
 
-  async function handleGuest(payload: {
+  async function handleGuestCreate(payload: {
     firstName: string;
     lastName: string;
     phone: string;
@@ -129,6 +133,59 @@ export function AttendanceSessionClient() {
       const message = err instanceof Error ? err.message : "Impossible d'enregistrer l'essai";
       setActionError(message);
       throw err;
+    }
+  }
+
+  async function handleGuestReuse(lead: AttendanceLeadSearchHit) {
+    if (!slotId || cancelled) return;
+    setActionError(null);
+    try {
+      const res = await fetch("/api/club/attendance/marks", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date,
+          slotId,
+          kind: "guest",
+          leadId: lead.leadId,
+        }),
+      });
+      const json = await readJsonResponse<{ error?: string }>(res);
+      if (!res.ok) {
+        throw new Error(json.error ?? "Impossible de pointer l'essai");
+      }
+      await reload();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Impossible de pointer l'essai";
+      setActionError(message);
+      throw err;
+    }
+  }
+
+  async function confirmRemoveFromSlot() {
+    if (!slotId || !removeTarget?.registrationId || cancelled) return;
+    setRemoveBusy(true);
+    setRemoveError(null);
+    try {
+      const res = await fetch("/api/club/attendance/remove-slot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date,
+          slotId,
+          registrationId: removeTarget.registrationId,
+        }),
+      });
+      const json = await readJsonResponse<{ error?: string }>(res);
+      if (!res.ok) {
+        throw new Error(json.error ?? "Impossible de retirer du créneau");
+      }
+      setRemoveTarget(null);
+      await reload();
+    } catch (err) {
+      setRemoveError(err instanceof Error ? err.message : "Erreur");
+    } finally {
+      setRemoveBusy(false);
     }
   }
 
@@ -164,6 +221,11 @@ export function AttendanceSessionClient() {
       ...(person.registrationId ? { registrationId: person.registrationId } : {}),
       ...(person.leadId ? { leadId: person.leadId } : {}),
     });
+  }
+
+  function requestRemoveFromSlot(person: AttendanceRosterPerson) {
+    setRemoveError(null);
+    setRemoveTarget(person);
   }
 
   if (!slotId) {
@@ -242,6 +304,7 @@ export function AttendanceSessionClient() {
             busyKey={busyKey}
             disabled={cancelled}
             onToggle={onToggle}
+            onRemoveFromSlot={cancelled ? undefined : requestRemoveFromSlot}
             emptyLabel="Tout le monde est pointé, ou aucun inscrit."
           />
           <AttendanceRoster
@@ -251,6 +314,7 @@ export function AttendanceSessionClient() {
             busyKey={busyKey}
             disabled={cancelled}
             onToggle={onToggle}
+            onRemoveFromSlot={cancelled ? undefined : requestRemoveFromSlot}
             emptyLabel="Personne n'est encore pointé."
           />
           <AttendanceRoster
@@ -291,8 +355,22 @@ export function AttendanceSessionClient() {
       />
       <AttendanceGuestDialog
         open={guestOpen}
+        date={date}
+        slotId={slotId}
         onClose={() => setGuestOpen(false)}
-        onSubmit={handleGuest}
+        onCreate={handleGuestCreate}
+        onReuse={handleGuestReuse}
+      />
+      <AttendanceRemoveFromSlotDialog
+        open={Boolean(removeTarget)}
+        playerName={removeTarget?.displayName ?? ""}
+        slotLabel={session?.slot.label}
+        busy={removeBusy}
+        error={removeError}
+        onCancel={() => {
+          if (!removeBusy) setRemoveTarget(null);
+        }}
+        onConfirm={() => void confirmRemoveFromSlot()}
       />
       <AttendanceCancellationConfirmDialog
         open={restoreOpen}
