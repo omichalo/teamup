@@ -1,16 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  Alert,
-  Box,
-  CircularProgress,
-  LinearProgress,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Alert, Box, CircularProgress, Stack, Typography } from "@mui/material";
 import { readJsonResponse } from "@/lib/http/read-json-response";
 import type { AttendanceSlotStats } from "@/lib/attendance/types";
+import { AttendancePlayersRateList } from "./AttendancePlayersRateList";
 
 type Props = {
   date: string;
@@ -78,25 +72,7 @@ export function AttendanceStatsPanel({ date, slotId }: Props) {
         Dénominateur : séances de ce créneau où un pointage a eu lieu (depuis
         l&apos;inscription du joueur).
       </Typography>
-      {stats.players.map((player) => {
-        const percent = player.rate == null ? 0 : Math.round(player.rate * 100);
-        return (
-          <Box key={player.registrationId}>
-            <Stack direction="row" justifyContent="space-between">
-              <Typography>{player.displayName}</Typography>
-              <Typography color="text.secondary">
-                {player.presentCount}/{player.expectedCount}
-                {player.rate != null ? ` · ${percent} %` : ""}
-              </Typography>
-            </Stack>
-            <LinearProgress
-              variant="determinate"
-              value={Math.min(100, percent)}
-              sx={{ height: 10, borderRadius: 1, mt: 0.5 }}
-            />
-          </Box>
-        );
-      })}
+      <AttendancePlayersRateList players={stats.players} />
     </Stack>
   );
 }
