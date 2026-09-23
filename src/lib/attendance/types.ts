@@ -140,3 +140,37 @@ export type AttendanceSlotStats = {
   guest: number;
   players: AttendancePlayerStat[];
 };
+
+/** Agrégat d'une séance pointée (évolution temporelle). */
+export type AttendanceSessionPoint = {
+  date: string;
+  enrolled: number;
+  walkin: number;
+  guest: number;
+  total: number;
+};
+
+export type AttendanceSlotAnalyticsKpis = {
+  pointedSessionCount: number;
+  cancelledSessionCount: number;
+  avgPresentEnrolled: number | null;
+  avgPresentTotal: number | null;
+  peakTotal: number | null;
+  peakDate: string | null;
+  seasonWalkinTotal: number;
+  seasonGuestTotal: number;
+  avgPlayerRate: number | null;
+  /** Moyenne présents totaux / capacité sur séances pointées ; null si pas de capacité. */
+  avgOccupancyVsCapacity: number | null;
+  capacity: number | null;
+  enrolledCount: number;
+};
+
+export type AttendanceSlotAnalytics = {
+  date: string;
+  slotId: string;
+  seasonLabel: string;
+  kpis: AttendanceSlotAnalyticsKpis;
+  sessions: AttendanceSessionPoint[];
+  players: AttendancePlayerStat[];
+};
