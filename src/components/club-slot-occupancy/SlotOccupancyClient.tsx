@@ -11,7 +11,7 @@ import {
   type OccupancyStatusFilter,
 } from "@/lib/club-slot-occupancy/filter-groups";
 import type { SlotOccupancySummary } from "@/lib/club-slot-occupancy/types";
-import { SlotOccupancyEnrolledDrawer } from "./SlotOccupancyEnrolledDrawer";
+import { SlotOccupancyDetailDrawer } from "./SlotOccupancyDetailDrawer";
 import { SlotOccupancyFilters } from "./SlotOccupancyFilters";
 import { SlotOccupancySiteGroupCard } from "./SlotOccupancySiteGroupCard";
 import { useSlotOccupancy } from "./useSlotOccupancy";
@@ -90,8 +90,8 @@ export function SlotOccupancyClient() {
         title="Remplissage des créneaux"
         subtitle={
           seasonLabel
-            ? `Effectifs ${seasonLabel} : taux de remplissage et liste des inscrits.`
-            : "Taux de remplissage et liste des inscrits."
+            ? `Effectifs ${seasonLabel} : remplissage, présences et évolution par créneau.`
+            : "Remplissage, présences et évolution par créneau."
         }
         marginBottom={3}
       />
@@ -136,7 +136,7 @@ export function SlotOccupancyClient() {
           )}
         </Stack>
       )}
-      <SlotOccupancyEnrolledDrawer
+      <SlotOccupancyDetailDrawer
         slot={selected}
         onClose={() => setSelected(null)}
         canManageEnrollments={canManageEnrollments}

@@ -5,7 +5,7 @@ import { registrationMatchesQuery } from "./search-members";
 import { leadMatchesQuery, maskLeadPhone } from "./search-leads";
 import { formatAttendanceSlotDisplay } from "./slot-display";
 import { getDefaultRegistrationConfig } from "@/lib/club-registration-config/default-config";
-import { buildSlotStats, buildAttendanceExportCsv } from "./stats";
+import { buildSlotAnalytics, buildSlotStats, buildAttendanceExportCsv } from "./stats";
 import {
   countIsoWeekdayOccurrences,
   isoWeekdayFromYmd,
@@ -341,6 +341,173 @@ describe("attendance calendar / stats", () => {
     // 15/09 n'a aucun mark → pas dans le dénominateur (2, pas 3).
     expect(stats.players[0]?.expectedCount).toBe(2);
     expect(stats.players[0]?.presentCount).toBe(2);
+  });
+
+  it("agrège les séances et KPI pour un créneau (analytics)", () => {
+    const analytics = buildSlotAnalytics({
+      date: "2026-08-20",
+      slotId: "slot-a",
+      weekday: 4,
+      seasonLabel: "2025-2026",
+      capacity: 20,
+      registrations: [
+        {
+          id: "reg-1",
+          data: {
+            firstName: "Alain",
+            lastName: "Dupont",
+            submittedAt: "2026-08-06T10:00:00.000Z",
+          },
+        },
+        {
+          id: "reg-2",
+          data: {
+            firstName: "Béatrice",
+            lastName: "Martin",
+            submittedAt: "2026-08-06T10:00:00.000Z",
+          },
+        },
+      ],
+      marks: [
+        {
+          id: "m1",
+          date: "2026-08-13",
+          slotId: "slot-a",
+          siteId: "voisins",
+          seasonLabel: "2025-2026",
+          sessionId: "s",
+          kind: "enrolled",
+          registrationId: "reg-1",
+          displayName: "Alain Dupont",
+          markedAt: "x",
+          markedByUid: "c",
+        },
+        {
+          id: "m2",
+          date: "2026-08-13",
+          slotId: "slot-a",
+          siteId: "voisins",
+          seasonLabel: "2025-2026",
+          sessionId: "s",
+          kind: "guest",
+          leadId: "lead-1",
+          displayName: "Essai",
+          markedAt: "x",
+          markedByUid: "c",
+        },
+        {
+          id: "m3",
+          date: "2026-08-20",
+          slotId: "slot-a",
+          siteId: "voisins",
+          seasonLabel: "2025-2026",
+          sessionId: "s",
+          kind: "enrolled",
+          registrationId: "reg-1",
+          displayName: "Alain Dupont",
+          markedAt: "x",
+          markedByUid: "c",
+        },
+        {
+          id: "m4",
+          date: "2026-08-20",
+          slotId: "slot-a",
+          siteId: "voisins",
+          seasonLabel: "2025-2026",
+          sessionId: "s",
+          kind: "enrolled",
+          registrationId: "reg-2",
+          displayName: "Béatrice Martin",
+          markedAt: "x",
+          markedByUid: "c",
+        },
+        {
+          id: "m5",
+          date: "2026-08-20",
+          slotId: "slot-a",
+          siteId: "voisins",
+          seasonLabel: "2025-2026",
+          sessionId: "s",
+          kind: "walkin",
+          registrationId: "reg-3",
+          displayName: "Walk In",
+          markedAt: "x",
+          markedByUid: "c",
+        },
+      ],
+    });
+
+    expect(analytics.sessions).toEqual([
+      { date: "2026-08-13", enrolled: 1, walkin: 0, guest: 1, total: 2 },
+      { date: "2026-08-20", enrolled: 2, walkin: 1, guest: 0, total: 3 },
+    ]);
+    expect(analytics.kpis.pointedSessionCount).toBe(2);
+    expect(analytics.kpis.cancelledSessionCount).toBe(0);
+    expect(analytics.kpis.avgPresentEnrolled).toBe(1.5);
+    expect(analytics.kpis.avgPresentTotal).toBe(2.5);
+    expect(analytics.kpis.peakTotal).toBe(3);
+    expect(analytics.kpis.peakDate).toBe("2026-08-20");
+    expect(analytics.kpis.seasonWalkinTotal).toBe(1);
+    expect(analytics.kpis.seasonGuestTotal).toBe(1);
+    expect(analytics.kpis.capacity).toBe(20);
+    expect(analytics.kpis.avgOccupancyVsCapacity).toBe(2.5 / 20);
+    expect(analytics.kpis.enrolledCount).toBe(2);
+    expect(analytics.players).toHaveLength(2);
+    expect(analytics.players.find((p) => p.registrationId === "reg-1")?.presentCount).toBe(2);
+  });
+
+  it("exclut les séances annulées des analytics et compte les annulations", () => {
+    const analytics = buildSlotAnalytics({
+      date: "2026-08-20",
+      slotId: "slot-a",
+      weekday: 4,
+      seasonLabel: "2025-2026",
+      cancelledDates: new Set(["2026-08-13"]),
+      registrations: [
+        {
+          id: "reg-1",
+          data: {
+            firstName: "Alain",
+            lastName: "Dupont",
+            submittedAt: "2026-08-06T10:00:00.000Z",
+          },
+        },
+      ],
+      marks: [
+        {
+          id: "m1",
+          date: "2026-08-13",
+          slotId: "slot-a",
+          siteId: "voisins",
+          seasonLabel: "2025-2026",
+          sessionId: "s",
+          kind: "enrolled",
+          registrationId: "reg-1",
+          displayName: "Alain Dupont",
+          markedAt: "x",
+          markedByUid: "c",
+        },
+        {
+          id: "m2",
+          date: "2026-08-20",
+          slotId: "slot-a",
+          siteId: "voisins",
+          seasonLabel: "2025-2026",
+          sessionId: "s",
+          kind: "enrolled",
+          registrationId: "reg-1",
+          displayName: "Alain Dupont",
+          markedAt: "x",
+          markedByUid: "c",
+        },
+      ],
+    });
+    expect(analytics.sessions).toHaveLength(1);
+    expect(analytics.sessions[0]?.date).toBe("2026-08-20");
+    expect(analytics.kpis.cancelledSessionCount).toBe(1);
+    expect(analytics.kpis.avgOccupancyVsCapacity).toBeNull();
+    expect(analytics.players[0]?.presentCount).toBe(1);
+    expect(analytics.players[0]?.expectedCount).toBe(1);
   });
 });
 
