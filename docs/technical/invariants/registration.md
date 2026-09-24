@@ -6,17 +6,18 @@
 |-------|--------|
 | Statuts : `submitted`, `in_review`, `payment_requested`, `paid`, `approved`, `rejected` | `src/lib/club-registration/registration-status.ts` |
 | Actionnable secrétariat : submitted / in_review / payment_requested | idem + tests analytics |
-| Managers (validation / paiement / suppression) : `admin`, `secretary` | `registration-access.ts` + tests |
+| Managers (validation / paiement / suppression / reverse / aides reçues) : `admin`, `secretary` | `registration-access.ts`, `payment/api-auth.ts` + tests |
 | Lecture tableau : managers + `assistant_secretary`, `board_member`, `coach` | idem |
 | Propriétaire : `submitterUid` ; plusieurs dossiers par uid autorisés | `firestore.rules` commentaires + match |
 | Idempotence soumission via `clubRegistrationSubmissionAttempts` (Admin SDK) | rules `read,write: false` |
+| Mutations métier via API Admin SDK (pas de write client SDK sur les parcours UI) | composants `fetch /api/club/registration*` |
+| Update client Firestore interdit si `status` ∈ `paid` \| `approved` (défense en profondeur) | `firestore.rules` (PR #506) |
 
 ## À valider
 
 | Question | Observation code |
 |----------|------------------|
-| L’owner peut-il encore mettre à jour un dossier `paid` côté client ? | Rules : update owner tant que `status != approved` |
-| Matrice exacte des transitions secrétariat (statut × action) | Routes API club/registration — à formaliser |
+| Matrice exacte des transitions secrétariat (statut × action) | Routes API club/registration — reporté (item audit) |
 
 ## Tests
 
