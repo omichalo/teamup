@@ -249,7 +249,8 @@ service cloud.firestore {
     //            (listes secrétariat via API / Admin SDK)
     // - create : owner se déclare comme submitterUid, schemaVersion strict ;
     //            le suivi Critérium fédéral / maillot / attestation n’est pas saisissable côté client
-    // - update : owner uniquement, tant que status != 'approved' ;
+    // - update : owner uniquement, tant que status n’est pas 'paid' ni 'approved' ;
+    //            (défense en profondeur : l’app passe par l’API / Admin SDK, qui ignore ces rules)
     //            les suivis secrétariat (critérium, maillot, attestation) sont figés (écrits via Admin SDK)
     // - delete : interdit côté client (l'admin gère via Admin SDK)
     match /clubRegistrations/{registrationId} {
@@ -265,7 +266,7 @@ service cloud.firestore {
       allow update: if isAuthenticated()
                     && resource.data.submitterUid == request.auth.uid
                     && request.resource.data.submitterUid == request.auth.uid
-                    && resource.data.get('status', 'draft') != 'approved'
+                    && !(resource.data.get('status', 'draft') in ['paid', 'approved'])
                     && request.resource.data.get('criteriumFederalRegistrationStatus', '')
                        == resource.data.get('criteriumFederalRegistrationStatus', '')
                     && request.resource.data.get('jerseyFollowUpStatus', '')
