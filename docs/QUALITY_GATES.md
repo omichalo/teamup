@@ -62,11 +62,13 @@ npm run emulators:smoke
 
 ## Règles Cursor et skills projet
 
-- **Règles modulaires** : `.cursor/rules/*.mdc` contiennent le détail des standards (frontmatter `alwaysApply: true` sauf `99-legacy`). C’est la **source de vérité**.
-- **`.cursorrules` (racine)** : court pointeur vers `.cursor/rules/` — ne pas y réintroduire de longues copies ; modifier les `.mdc` concernés.
-- **Extension club / nouvelles features** : `.cursor/rules/80-club-platform-extension.mdc` regroupe les principes pour bounded contexts, Firestore, paiements, extraction UI (**sans** imposer le refactor des écrans existants).
-- **Taille fichiers React/Next** : `.cursor/rules/21-react-component-size.mdc` + `npm run check:file-sizes` (universel sur `src/`, manifeste `scripts/legacy-oversized-files.json`).
-- **Skill projet** : `.cursor/skills/teamup-feature-slice/SKILL.md` — checklist pour une livraison verticale (API, rôles, Firestore, qualité). À invoquer ou à associer aux agents Cursor lors du développement des parcours adhésion, présences, tarifs, etc.
+- **Carte agents** : [`AGENTS.md`](../AGENTS.md) (autonomie assistée, flux Git, pointeurs).
+- **Règles modulaires** : `.cursor/rules/*.mdc` — source de vérité. Toujours chargées : fondations, API sécurité, auth, extension club, PR, opérations sensibles (`91-sensitive-ops`). Les rules Next/UI/Firebase/taille sont **scoped par globs**.
+- **`.cursorrules` (racine)** : court pointeur — ne pas y dupliquer le détail.
+- **Invariants métier** : [`docs/technical/invariants/`](./technical/invariants/).
+- **Taille fichiers React/Next** : `.cursor/rules/21-react-component-size.mdc` + `npm run check:file-sizes`.
+- **Skills** : `teamup-feature-slice`, `pr-staging`, `post-deploy-smoke`, `invariants-check`, `agent-review-sensitive` sous `.cursor/skills/`.
+- **Contexte** : [`.cursorignore`](../.cursorignore) exclut secrets, service accounts et bruits de build du contexte agent.
 
 ## Quality Gates CI
 
@@ -80,9 +82,21 @@ La CI GitHub Actions exécute automatiquement:
 5. **TODO Check**: Vérifie qu'il n'y a pas de TODO dans le code
 6. **Security Audit**: Audit npm des dépendances (`continue-on-error` — signal sans bloquer le merge)
 
+Workflow séparé **Security Scan** (TruffleHog, Gitleaks, npm audit) sur PR/push `staging` et `main` : [.github/workflows/security-scan.yml](../.github/workflows/security-scan.yml).
+
+**Branch protection** : merges sur `staging`/`main` uniquement via PR avec le check CI **Lint, Type-check and Build** (voir [docs/SECURITY.md](./SECURITY.md#protection-des-branches-et-scans-ci)).
+
 Le déploiement App Hosting (staging / prod) est déclenché par Firebase au merge sur `staging` ou `main` (option C). La CI GitHub ne déploie pas l’application.
 
 Voir [.github/workflows/ci.yml](../.github/workflows/ci.yml) et [docs/APP_HOSTING_STAGING_SETUP.md](./APP_HOSTING_STAGING_SETUP.md).
+
+### Smoke post-staging (lecture seule)
+
+```bash
+npm run smoke:staging
+```
+
+Vérifie `GET /api/health` sur l’URL App Hosting staging (pas de mutation). Détail : skill `.cursor/skills/post-deploy-smoke/`.
 
 ## Checklist avant PR
 
@@ -120,9 +134,9 @@ npm run test:watch
 
 ## Intégration continue
 
-Les quality gates sont automatiquement exécutés:
-- Sur chaque Pull Request
-- Sur chaque push sur `main`
+Les quality gates sont automatiquement exécutés :
+- Sur chaque Pull Request vers `staging` ou `main`
+- Sur chaque push sur `staging` ou `main`
 
 Voir [.github/workflows/ci.yml](../.github/workflows/ci.yml) pour la configuration complète.
 
