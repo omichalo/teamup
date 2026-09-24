@@ -1,6 +1,6 @@
 import { SQYPING_EMAIL_APP_NAME } from "@/lib/email/brand";
 import * as nodemailer from "nodemailer";
-import type { Attachment } from "nodemailer/lib/mailer";
+import type { Attachment } from "nodemailer";
 
 export interface MailOptions {
   to: string | string[];
