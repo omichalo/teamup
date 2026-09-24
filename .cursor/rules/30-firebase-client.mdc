@@ -1,6 +1,7 @@
 ---
 description: Usage client Firebase / Firestore côté application
-alwaysApply: true
+globs: src/lib/firebase*.ts,src/lib/firebase/**/*,src/lib/client/**/*
+alwaysApply: false
 ---
 
 # Firebase Client Usage

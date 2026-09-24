@@ -1,6 +1,7 @@
 ---
 description: Patterns Firebase Cloud Functions
-alwaysApply: true
+globs: functions/**/*
+alwaysApply: false
 ---
 
 # Firebase Cloud Functions
