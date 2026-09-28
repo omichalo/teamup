@@ -53,6 +53,9 @@ Le PDF facture Stripe (même une fois payé) peut encore afficher « montant dû
 
 ### Négatives
 - Dépendance `pdfkit` + polices TTF (Noto Sans) à tracer pour le build standalone.
+- Les AFM / `standard-fonts` de PDFKit (Helvetica par défaut) doivent être inclus
+  dans l’artefact App Hosting (`outputFileTracingIncludes` + `prepare-standalone.mjs`),
+  sinon facture/reçu renvoient 500 en prod.
 - Deux CTA à maintenir sur Mes dossiers.
 - Compteur Firestore à maintenir (une écriture transactionnelle à la 1ʳᵉ génération).
 
