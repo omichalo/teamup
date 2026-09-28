@@ -13,6 +13,7 @@ import {
   Box,
 } from "@mui/material";
 import DownloadIcon from "@mui/icons-material/Download";
+import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
 import { MEDICAL_CERTIFICATE_STATUS_LABELS } from "@/lib/club-registration/medical-certificate";
 import { MesInscriptionPayOnlineButton } from "@/components/club-registration/MesInscriptionPayOnlineButton";
@@ -28,18 +29,27 @@ import {
   type MesInscriptionSummary,
 } from "@/components/club-registration/mes-inscriptions-shared";
 import { resolveMesInscriptionStatusPresentation } from "@/lib/club-registration/mes-inscription-supplement-display";
+import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
 
 type Props = {
   registration: MesInscriptionSummary;
   highlighted?: boolean;
-  invoiceLoadingId: string | null;
+  documentLoadingId: string | null;
   onOpenInvoice: (registrationId: string) => void;
+  onDownloadReceipt: (registrationId: string) => void;
   onPaymentError: (message: string | null) => void;
 };
 
 export const MesInscriptionRegistrationCard = forwardRef<HTMLDivElement, Props>(
   function MesInscriptionRegistrationCard(
-    { registration: r, highlighted = false, invoiceLoadingId, onOpenInvoice, onPaymentError },
+    {
+      registration: r,
+      highlighted = false,
+      documentLoadingId,
+      onOpenInvoice,
+      onDownloadReceipt,
+      onPaymentError,
+    },
     ref
   ) {
     const statusPresentation = resolveMesInscriptionStatusPresentation(
@@ -47,6 +57,14 @@ export const MesInscriptionRegistrationCard = forwardRef<HTMLDivElement, Props>(
       MES_INSCRIPTION_STATUS_LABEL,
       MES_INSCRIPTION_STATUS_COLOR
     );
+    const payment = normalizeRegistrationPayment(
+      r as unknown as Record<string, unknown>
+    );
+    const receiptPartial =
+      Boolean(r.receiptAvailable) &&
+      payment != null &&
+      payment.remainingAmountCents > 0;
+    const busy = documentLoadingId === r.id;
 
     return (
       <Card
@@ -151,27 +169,48 @@ export const MesInscriptionRegistrationCard = forwardRef<HTMLDivElement, Props>(
             sx={{ width: { xs: "100%", sm: "auto" } }}
           >
             <MesInscriptionPayOnlineButton registration={r} onError={onPaymentError} />
+            {r.receiptAvailable ? (
+              <Button
+                size="small"
+                variant="contained"
+                color="secondary"
+                startIcon={
+                  busy ? (
+                    <CircularProgress size={16} color="inherit" />
+                  ) : (
+                    <ReceiptLongIcon fontSize="small" />
+                  )
+                }
+                disabled={busy}
+                onClick={() => onDownloadReceipt(r.id)}
+                sx={{ alignSelf: { xs: "stretch", sm: "auto" }, flexShrink: 0 }}
+              >
+                {receiptPartial
+                  ? "Télécharger le reçu (partiel)"
+                  : "Télécharger le reçu"}
+              </Button>
+            ) : null}
             {isMesInscriptionPaid(r) && r.invoiceAvailable ? (
               <Button
                 size="small"
                 variant="outlined"
                 color="secondary"
                 startIcon={
-                  invoiceLoadingId === r.id ? (
+                  busy ? (
                     <CircularProgress size={16} color="inherit" />
                   ) : (
                     <DownloadIcon fontSize="small" />
                   )
                 }
-                disabled={invoiceLoadingId === r.id}
+                disabled={busy}
                 onClick={() => onOpenInvoice(r.id)}
                 sx={{ alignSelf: { xs: "stretch", sm: "auto" }, flexShrink: 0 }}
               >
-                Télécharger la facture
+                Voir la facture
               </Button>
-            ) : isMesInscriptionPaid(r) ? (
+            ) : isMesInscriptionPaid(r) && !r.receiptAvailable ? (
               <Typography variant="caption" color="text.secondary">
-                Facture en cours de publication…
+                Justificatifs en cours de publication…
               </Typography>
             ) : null}
           </Stack>

@@ -18,6 +18,7 @@ export type PaymentConfirmedEmailContent = {
   appOrigin: string;
   source: PaymentConfirmedSource;
   invoiceAvailable?: boolean;
+  receiptAvailable?: boolean;
 };
 
 export function buildPaymentConfirmedEmail(
@@ -30,6 +31,7 @@ export function buildPaymentConfirmedEmail(
     appOrigin,
     source,
     invoiceAvailable = false,
+    receiptAvailable = true,
   } = options;
 
   const safeName = escapeHtml(adherentName);
@@ -41,11 +43,24 @@ export function buildPaymentConfirmedEmail(
       ? "Votre règlement en ligne via Stripe a bien été pris en compte."
       : "Le secrétariat du club a enregistré la réception de votre règlement.";
 
-  const invoiceLine = invoiceAvailable
-    ? emailParagraph(
-        `Votre <strong>facture</strong> est disponible depuis votre espace adhérent (<em>Télécharger la facture</em> sur le dossier concerné).`
-      )
-    : "";
+  const documentsLine = (() => {
+    if (receiptAvailable && invoiceAvailable) {
+      return emailParagraph(
+        `Votre <strong>reçu</strong> (preuve de paiement) et votre <strong>facture</strong> (détail tarifaire) sont disponibles depuis votre espace adhérent.`
+      );
+    }
+    if (receiptAvailable) {
+      return emailParagraph(
+        `Votre <strong>reçu</strong> (preuve de paiement) est disponible depuis votre espace adhérent (<em>Télécharger le reçu</em>).`
+      );
+    }
+    if (invoiceAvailable) {
+      return emailParagraph(
+        `Votre <strong>facture</strong> est disponible depuis votre espace adhérent.`
+      );
+    }
+    return "";
+  })();
 
   const bodyHtml = [
     emailParagraph("Bonjour,"),
@@ -55,7 +70,7 @@ export function buildPaymentConfirmedEmail(
     emailParagraph(
       "Votre dossier est à jour côté règlement. Le secrétariat pourra encore finaliser les formalités administratives restantes le cas échéant (licence, certificat médical, etc.)."
     ),
-    invoiceLine,
+    documentsLine,
     emailMutedParagraph(
       "Conservez cet e-mail comme justificatif de la confirmation de paiement côté club."
     ),
@@ -87,9 +102,13 @@ export function buildPaymentConfirmedEmail(
     sourceLine,
     `Montant enregistré : ${formattedAmount} pour ${adherentName}.`,
     "Votre dossier est à jour côté règlement.",
-    ...(invoiceAvailable
-      ? ["", "Votre facture est disponible depuis votre espace adhérent."]
-      : []),
+    ...(receiptAvailable && invoiceAvailable
+      ? ["", "Votre reçu et votre facture sont disponibles depuis votre espace adhérent."]
+      : receiptAvailable
+        ? ["", "Votre reçu est disponible depuis votre espace adhérent."]
+        : invoiceAvailable
+          ? ["", "Votre facture est disponible depuis votre espace adhérent."]
+          : []),
     "",
     `Voir mon dossier : ${mesInscriptionsUrl}`,
     "",

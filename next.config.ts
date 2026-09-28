@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
   },
   // Artefact Docker / App Hosting : serveur Node autonome avec `node server.js`.
   output: "standalone",
+  serverExternalPackages: ["pdfkit"],
   // Identifiant unique par build pour invalider le cache navigateur/CDN entre déploiements.
   generateBuildId: async () => `build-${Date.now()}`,
   // Désactivé par défaut : limite l’exposition du source client en prod. Réactiver ponctuellement
