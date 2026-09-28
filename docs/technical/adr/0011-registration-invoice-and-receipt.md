@@ -22,13 +22,19 @@ Le PDF facture Stripe (même une fois payé) peut encore afficher « montant dû
    - totaux facturé / encaissé / reste dû ;
    - statut **Soldé** ou **Partiellement payé**.
 
-3. **Facture Stripe** : conservée quand un `stripeInvoiceId` existe ou peut être généré (Checkout ou hors bande). Pour une facture **payée**, préférer la **page hébergée** Stripe (libellé « Facture payée ») plutôt que le seul PDF trompeur.
+3. **Facture TeamUp (PDF)** : détail tarifaire généré côté serveur (même pipeline PDFKit),
+   indépendamment de Stripe. Disponible dès qu’un devis/montant existe et qu’un
+   encaissement est engagé (soldé ou partiel).
 
-4. **Disponibilité**
+4. **Stripe** : les factures Checkout restent en place côté PSP ; elles ne constituent
+   plus le document « facture » proposé à l’adhérent / secrétariat dans TeamUp.
+
+5. **Disponibilité UI**
    - Reçu : dès qu’il existe au moins un encaissement actif (`paidAmountCents > 0`).
-   - Facture : dossier soldé / facture Stripe déjà liée (comportement existant enrichi).
+   - Facture : détail tarifaire disponible (voir point 3).
+   - CTAs sur **Mes dossiers** et sur le **suivi paiement secrétariat**.
 
-5. **Pas de nouvelle collection Firestore** au départ : documents dérivés du dossier `clubRegistrations`.
+6. **Pas de nouvelle collection Firestore** au départ : documents dérivés du dossier `clubRegistrations`.
 
 ## Conséquences
 

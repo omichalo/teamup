@@ -21,6 +21,7 @@ import { ADHERENT_PAYMENT_EMAIL_LANDING_ALERT, ADHERENT_PAYMENT_PENDING_ALERT, A
 import { canSelfServiceCheckout } from "@/lib/club-registration/self-service-checkout";
 import { resolveMesInscriptionSupplementDue } from "@/lib/club-registration/mes-inscription-supplement-display";
 import { MesInscriptionRegistrationCard } from "@/components/club-registration/MesInscriptionRegistrationCard";
+import { downloadRegistrationPaymentPdf } from "@/components/club-registration/download-registration-payment-pdf";
 import {
   isMesInscriptionPaid,
   type MesInscriptionSummary,
@@ -131,18 +132,10 @@ export function MesInscriptionsClient() {
     setDocumentLoadingId(registrationId);
     setDocumentError(null);
     try {
-      const res = await fetch(
-        `/api/club/registration/${encodeURIComponent(registrationId)}/invoice`,
-        { credentials: "include" }
-      );
-      const json = (await res.json()) as { url?: string; error?: string };
-      if (!res.ok || !json.url) {
-        throw new Error(json.error ?? "Facture indisponible pour le moment.");
-      }
-      window.open(json.url, "_blank", "noopener,noreferrer");
+      await downloadRegistrationPaymentPdf(registrationId, "invoice");
     } catch (err) {
       setDocumentError(
-        err instanceof Error ? err.message : "Impossible d’ouvrir la facture."
+        err instanceof Error ? err.message : "Impossible de télécharger la facture."
       );
     } finally {
       setDocumentLoadingId(null);
@@ -153,23 +146,7 @@ export function MesInscriptionsClient() {
     setDocumentLoadingId(registrationId);
     setDocumentError(null);
     try {
-      const res = await fetch(
-        `/api/club/registration/${encodeURIComponent(registrationId)}/payment-receipt`,
-        { credentials: "include" }
-      );
-      if (!res.ok) {
-        const json = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(json?.error ?? "Reçu indisponible pour le moment.");
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `recu-adhesion-${registrationId}.pdf`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
+      await downloadRegistrationPaymentPdf(registrationId, "payment-receipt");
     } catch (err) {
       setDocumentError(
         err instanceof Error ? err.message : "Impossible de télécharger le reçu."

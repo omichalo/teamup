@@ -190,7 +190,7 @@ export const MesInscriptionRegistrationCard = forwardRef<HTMLDivElement, Props>(
                   : "Télécharger le reçu"}
               </Button>
             ) : null}
-            {isMesInscriptionPaid(r) && r.invoiceAvailable ? (
+            {r.invoiceAvailable ? (
               <Button
                 size="small"
                 variant="outlined"
@@ -206,7 +206,7 @@ export const MesInscriptionRegistrationCard = forwardRef<HTMLDivElement, Props>(
                 onClick={() => onOpenInvoice(r.id)}
                 sx={{ alignSelf: { xs: "stretch", sm: "auto" }, flexShrink: 0 }}
               >
-                Voir la facture
+                Télécharger la facture
               </Button>
             ) : isMesInscriptionPaid(r) && !r.receiptAvailable ? (
               <Typography variant="caption" color="text.secondary">

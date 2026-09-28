@@ -1,7 +1,7 @@
 import { RECEIVED_PAYMENT_METHOD_LABELS } from "@/lib/club-registration/payment-constants";
 import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
 import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
-import { parseStoredPriceQuote } from "@/lib/pricing/parse-stored-quote";
+import { resolveRegistrationInvoiceLines } from "./build-invoice-view-model";
 import type { PaymentReceiptViewModel } from "./types";
 
 const dateFormatter = new Intl.DateTimeFormat("fr-FR", {
@@ -26,23 +26,6 @@ function resolveSeasonLabel(data: Record<string, unknown>): string | null {
     return data.season.trim();
   }
   return null;
-}
-
-function resolveInvoicedTotalCents(
-  data: Record<string, unknown>,
-  quoteTotalCents: number | null
-): number {
-  if (quoteTotalCents != null && quoteTotalCents > 0) {
-    return quoteTotalCents;
-  }
-  const payment = normalizeRegistrationPayment(data);
-  if (payment && payment.amountToPayCents > 0) {
-    return payment.amountToPayCents;
-  }
-  if (typeof data.paymentAmountCents === "number" && data.paymentAmountCents > 0) {
-    return data.paymentAmountCents;
-  }
-  return 0;
 }
 
 /**
@@ -70,13 +53,8 @@ export function buildPaymentReceiptViewModel(
     return null;
   }
 
-  const quote = parseStoredPriceQuote(data.pricingQuote);
-  const quoteLines =
-    quote?.lines
-      .filter((line) => line.kind !== "info")
-      .map((line) => ({ label: line.label, amountCents: line.amountCents })) ?? [];
-
-  const invoicedTotalCents = resolveInvoicedTotalCents(data, quote?.totalCents ?? null);
+  const { lines: quoteLines, totalCents: invoicedTotalCents } =
+    resolveRegistrationInvoiceLines(data);
   const paidTotalCents =
     payment?.paidAmountCents ??
     activePayments.reduce((sum, line) => sum + line.amountCents, 0) ??

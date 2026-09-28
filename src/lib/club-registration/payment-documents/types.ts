@@ -33,6 +33,17 @@ export type PaymentReceiptViewModel = {
   remainingCents: number;
 };
 
+export type PaymentInvoiceViewModel = {
+  registrationId: string;
+  clubName: string;
+  title: string;
+  adherentName: string;
+  seasonLabel: string | null;
+  issuedAtLabel: string;
+  quoteLines: PaymentDocumentLine[];
+  invoicedTotalCents: number;
+};
+
 export type PaymentDocumentsAvailability = {
   invoiceAvailable: boolean;
   receiptAvailable: boolean;
