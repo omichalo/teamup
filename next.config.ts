@@ -11,6 +11,21 @@ const nextConfig: NextConfig = {
   // Artefact Docker / App Hosting : serveur Node autonome avec `node server.js`.
   output: "standalone",
   serverExternalPackages: ["pdfkit"],
+  // PDFKit charge Helvetica.* + AFM au runtime même avec TTF custom.
+  outputFileTracingIncludes: {
+    "/api/club/registration/[id]/invoice": [
+      "./public/fonts/payment-receipt/**/*",
+      "./public/sqyping-logo.png",
+      "./node_modules/pdfkit/js/data/**/*",
+      "./node_modules/pdfkit/js/standard-fonts/**/*",
+    ],
+    "/api/club/registration/[id]/payment-receipt": [
+      "./public/fonts/payment-receipt/**/*",
+      "./public/sqyping-logo.png",
+      "./node_modules/pdfkit/js/data/**/*",
+      "./node_modules/pdfkit/js/standard-fonts/**/*",
+    ],
+  },
   // Identifiant unique par build pour invalider le cache navigateur/CDN entre déploiements.
   generateBuildId: async () => `build-${Date.now()}`,
   // Désactivé par défaut : limite l’exposition du source client en prod. Réactiver ponctuellement
