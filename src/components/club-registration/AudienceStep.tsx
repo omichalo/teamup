@@ -17,6 +17,7 @@ import {
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import dayjs, { type Dayjs } from "dayjs";
 import { isMinorAt } from "@/lib/club-registration/age";
+import { isValidFfttLicenseNumber } from "@/lib/fftt/license-number";
 import { buildApplyFfttIdentityPatch, runFfttLicenseLookupFlow } from "@/lib/club-registration/fftt-license-lookup-flow";
 import {
   normalizeFFTTLicenseInput,
@@ -67,7 +68,7 @@ export function AudienceStep({
   const minor = isMinorAt(draft.birthDate);
   const minorMismatch = minor && draft.adherentRole === "self";
   const normalizedLicense = normalizeFFTTLicenseInput(draft.ffttLicense ?? "");
-  const canLookupLicense = normalizedLicense.length >= 5;
+  const canLookupLicense = isValidFfttLicenseNumber(normalizedLicense);
 
   const handleLicenseChange = (e: ChangeEvent<HTMLInputElement>) => {
     onPatch({

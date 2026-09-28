@@ -1,4 +1,4 @@
-const FFTT_LICENSE_RE = /^[0-9]{4,12}$/;
+import { FFTT_LICENSE_RE } from "@/lib/fftt/license-number";
 const REGISTRATION_KEY_PREFIX = "reg_";
 const TEMPORARY_KEY_PREFIX = "tmp_";
 

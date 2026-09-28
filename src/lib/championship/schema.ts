@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { FFTT_LICENSE_RE } from "@/lib/fftt/license-number";
 import { LICENSE_PRESENCE_VALUES } from "./records";
 
 export { LICENSE_PRESENCE_VALUES } from "./records";
@@ -74,7 +75,7 @@ export const rosterParticipationPatchSchema = z
     firstName: z.string().trim().max(120).optional(),
     lastName: z.string().trim().max(120).optional(),
     sex: z.enum(["female", "male", "other", ""]).optional(),
-    ffttLicense: z.string().regex(/^[0-9]{4,12}$/).nullable().optional(),
+    ffttLicense: z.string().regex(FFTT_LICENSE_RE).nullable().optional(),
     isWheelchair: z.boolean().optional(),
     discordMentions: z.array(z.string()).optional(),
     preferredTeams: preferredTeamsSchema.optional(),

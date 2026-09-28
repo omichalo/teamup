@@ -11,6 +11,7 @@ import {
   Typography,
 } from "@mui/material";
 import { isAtLeast65ForClubSeason } from "@/lib/club-registration/season-age";
+import { isValidFfttLicenseNumber } from "@/lib/fftt/license-number";
 import { MEDICAL_QUESTIONNAIRE_SUMMARY_LABELS } from "@/lib/club-registration/medical-declaration-labels";
 import {
   buildApplyFfttIdentityPatch,
@@ -135,7 +136,7 @@ export function RegistrationFfttFields({
     useState<RegistrationLicenseUsageSummary>(EMPTY_LICENSE_USAGE);
 
   const normalizedLicense = normalizeFFTTLicenseInput(ffttLicense);
-  const canLookupLicense = normalizedLicense.length >= 5;
+  const canLookupLicense = isValidFfttLicenseNumber(normalizedLicense);
 
   const handleLicenseChange = (value: string) => {
     onPatch({

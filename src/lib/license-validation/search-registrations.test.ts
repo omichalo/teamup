@@ -33,6 +33,13 @@ describe("registrationMatchesLicenseValidationSearch", () => {
     expect(registrationMatchesLicenseValidationSearch(baseItem(), "4567")).toBe(true);
   });
 
+  it("matches a four-digit licence even when the query contains spaces", () => {
+    const item = baseItem({ ffttLicense: "7885" });
+    expect(registrationMatchesLicenseValidationSearch(item, "7885")).toBe(true);
+    expect(registrationMatchesLicenseValidationSearch(item, "78 85")).toBe(true);
+    expect(registrationMatchesLicenseValidationSearch(item, "7886")).toBe(false);
+  });
+
   it("returns true for short queries", () => {
     expect(registrationMatchesLicenseValidationSearch(baseItem(), "j")).toBe(true);
   });
