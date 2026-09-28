@@ -108,7 +108,6 @@ jobs:
 
       - name: Run npm audit
         run: npm audit --audit-level=moderate
-        continue-on-error: true
 
       - name: Comment PR if vulnerabilities found
         if: github.event_name == 'pull_request' && failure()

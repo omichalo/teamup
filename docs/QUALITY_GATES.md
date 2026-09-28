@@ -78,7 +78,7 @@ La CI GitHub Actions exécute automatiquement:
 3. **Tests**: `npm test -- --ci` (Jest, sans collecte de coverage — rapidité ; seuils coverage pour `npm run test:coverage` en local ou job dédié si besoin)
 4. **Build**: Compile l'application Next.js (**inclut ESLint** comme ci-dessus, doublon acceptable pour une détection précoce dans les logs de job)
 5. **TODO Check**: Vérifie qu'il n'y a pas de TODO dans le code
-6. **Security Audit**: Audit npm des dépendances (`continue-on-error` — signal sans bloquer le merge)
+6. **Security Audit**: Audit npm des dépendances (`npm audit --audit-level=moderate`) — **bloquant** sur échec (job CI `Security Audit` et workflow security-scan)
 
 Le déploiement App Hosting (staging / prod) est déclenché par Firebase au merge sur `staging` ou `main` (option C). La CI GitHub ne déploie pas l’application.
 
