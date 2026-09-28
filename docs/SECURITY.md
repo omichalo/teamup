@@ -265,3 +265,12 @@ git secrets --add 'api[_-]?key\s*=\s*.+'
    git push origin --force --tags
    ```
 
+## Firestore — dossiers d’inscription (`clubRegistrations`)
+
+Défense en profondeur (l’application passe par les routes API / Admin SDK, qui **ignorent** ces rules) :
+
+- **Create** client : owner uniquement (`submitterUid == auth.uid`), sans champs de suivi secrétariat.
+- **Update** client : owner uniquement, **interdit** si `status` est `paid` ou `approved`.
+- **Delete** client : interdit.
+- Listes secrétariat et mutations métier (paiement, complément, validation) : **API + Admin SDK** uniquement.
+
