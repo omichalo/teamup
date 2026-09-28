@@ -4,14 +4,25 @@ import {
   requiresFfttLicenseNumber,
   type LicenseValidationStatus,
 } from "@/lib/license-validation/license-validation-status";
+import {
+  FFTT_LICENSE_FORMAT_MESSAGE,
+  isValidFfttLicenseNumber,
+} from "@/lib/fftt/license-number";
 
-const FFTT_LICENSE_RE = /^[0-9]{4,12}$/;
+export { isValidFfttLicenseNumber } from "@/lib/fftt/license-number";
 
 export const LICENSE_REQUIRED_MESSAGE =
   "Le numéro de licence est obligatoire pour les statuts Traité et Validé sans pratique sportive";
 
-export function isValidFfttLicenseNumber(value: string): boolean {
-  return FFTT_LICENSE_RE.test(value);
+export function getLicenseValidationInputError(
+  value: string,
+  status: LicenseValidationStatus
+): string | null {
+  const license = value.trim();
+  if (!license) {
+    return requiresFfttLicenseNumber(status) ? LICENSE_REQUIRED_MESSAGE : null;
+  }
+  return isValidFfttLicenseNumber(license) ? null : FFTT_LICENSE_FORMAT_MESSAGE;
 }
 
 export function parseOptionalFfttLicenseInput(
@@ -27,7 +38,7 @@ export function parseOptionalFfttLicenseInput(
   if (!isValidFfttLicenseNumber(normalized)) {
     return {
       ok: false,
-      error: "Le numéro de licence doit contenir entre 4 et 12 chiffres",
+      error: FFTT_LICENSE_FORMAT_MESSAGE,
     };
   }
   return { ok: true, license: normalized };
