@@ -202,7 +202,7 @@ describe("buildPaymentInstructionsEmail", () => {
 });
 
 describe("buildPaymentConfirmedEmail", () => {
-  it("mentionne la facture pour un paiement Stripe", () => {
+  it("mentionne le reçu et la facture pour un paiement Stripe", () => {
     const { html, text } = buildPaymentConfirmedEmail({
       adherentName: "Marie Dupont",
       amountCents: 15000,
@@ -210,17 +210,20 @@ describe("buildPaymentConfirmedEmail", () => {
       appOrigin: APP_ORIGIN,
       source: "stripe",
       invoiceAvailable: true,
+      receiptAvailable: true,
     });
 
     expect(html).toContain("Stripe");
+    expect(html).toContain("reçu");
     expect(html).toContain("facture");
     expect(html).toContain("150,00");
     expect(html).toContain(SQYPING_SECRETARIAT_EMAIL);
+    expect(text).toContain("reçu");
     expect(text).toContain("facture");
     expect(text).toContain(SQYPING_SECRETARIAT_EMAIL);
   });
 
-  it("adapte le message pour un encaissement secrétariat", () => {
+  it("mentionne le reçu pour un encaissement secrétariat", () => {
     const { html } = buildPaymentConfirmedEmail({
       adherentName: "Paul Martin",
       amountCents: 8000,
@@ -230,6 +233,7 @@ describe("buildPaymentConfirmedEmail", () => {
     });
 
     expect(html).toContain("secrétariat");
+    expect(html).toContain("reçu");
     expect(html).not.toContain("facture");
   });
 });

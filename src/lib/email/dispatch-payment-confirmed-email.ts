@@ -1,5 +1,6 @@
 import type { DocumentData } from "firebase-admin/firestore";
 import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
+import { resolvePaymentDocumentsAvailability } from "@/lib/club-registration/payment-documents";
 import { resolveRegistrationPaymentRecipientEmails } from "@/lib/club-registration/resolve-registration-contact-email";
 import { getSqyPingLogoAttachment } from "@/lib/email/logo-attachment";
 import {
@@ -38,8 +39,9 @@ export async function dispatchPaymentConfirmedEmail(params: {
       typeof params.data.firstName === "string" ? params.data.firstName : undefined,
       typeof params.data.lastName === "string" ? params.data.lastName : undefined
     ) || "adhérent";
-  const invoiceAvailable =
-    typeof params.data.stripeInvoiceId === "string" && params.data.stripeInvoiceId.length > 0;
+  const documents = resolvePaymentDocumentsAvailability(
+    params.data as Record<string, unknown>
+  );
 
   const mail = buildPaymentConfirmedEmail({
     adherentName,
@@ -47,7 +49,8 @@ export async function dispatchPaymentConfirmedEmail(params: {
     registrationId: params.registrationId,
     appOrigin: resolveEmailAppOrigin(params.req),
     source: params.source,
-    invoiceAvailable,
+    invoiceAvailable: documents.invoiceAvailable,
+    receiptAvailable: documents.receiptAvailable,
   });
 
   await sendMail({

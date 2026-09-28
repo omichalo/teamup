@@ -80,6 +80,17 @@ describe("createPaidOutOfBandInvoice", () => {
 
     expect(result).toEqual({ invoiceId: "in_paid" });
     expect(global.fetch).toHaveBeenCalledTimes(7);
+
+    const invoiceCreateCall = (global.fetch as jest.Mock).mock.calls.find(
+      ([url]: [RequestInfo]) =>
+        String(url).endsWith("/v1/invoices") &&
+        !String(url).includes("/finalize") &&
+        !String(url).includes("/pay")
+    );
+    expect(invoiceCreateCall).toBeDefined();
+    const body = String(invoiceCreateCall?.[1]?.body ?? "");
+    expect(body).toContain("collection_method=send_invoice");
+    expect(body).toContain("days_until_due=30");
   });
 
   it("applique plusieurs coupons de remise", async () => {
@@ -113,13 +124,26 @@ describe("createPaidOutOfBandInvoice", () => {
 });
 
 describe("pickInvoiceDownloadUrl", () => {
-  it("préfère le PDF Stripe", () => {
+  it("préfère le PDF Stripe tant que la facture n'est pas payée", () => {
     expect(
       pickInvoiceDownloadUrl({
         invoicePdf: "https://pay.stripe.com/pdf",
         hostedInvoiceUrl: "https://invoice.stripe.com/i",
+        status: "open",
+        paid: false,
       })
     ).toBe("https://pay.stripe.com/pdf");
+  });
+
+  it("préfère la page hébergée lorsque la facture est payée", () => {
+    expect(
+      pickInvoiceDownloadUrl({
+        invoicePdf: "https://pay.stripe.com/pdf",
+        hostedInvoiceUrl: "https://invoice.stripe.com/i",
+        status: "paid",
+        paid: true,
+      })
+    ).toBe("https://invoice.stripe.com/i");
   });
 
   it("retombe sur la page hébergée", () => {
@@ -127,6 +151,8 @@ describe("pickInvoiceDownloadUrl", () => {
       pickInvoiceDownloadUrl({
         invoicePdf: null,
         hostedInvoiceUrl: "https://invoice.stripe.com/i",
+        status: "open",
+        paid: false,
       })
     ).toBe("https://invoice.stripe.com/i");
   });

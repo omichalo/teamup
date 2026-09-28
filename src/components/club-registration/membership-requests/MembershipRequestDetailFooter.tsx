@@ -1,5 +1,6 @@
 "use client";
 
+import { Stack } from "@mui/material";
 import { SecretariatPaymentNotesSection } from "../secretariat/SecretariatPaymentNotesSection";
 import { isRegistrationPaymentSettled } from "@/lib/club-registration/resolve-settled-request-payment";
 import { resolveOnlinePayableCents } from "@/lib/club-registration/payment/resolve-remaining-payable";
@@ -35,7 +36,7 @@ export function MembershipRequestDetailFooter({
   if (!selected || !form) return null;
 
   return (
-    <>
+    <Stack spacing={2}>
       <SecretariatPaymentNotesSection
         amountEuros={form.amountEuros}
         reviewNotes={form.reviewNotes}
@@ -86,6 +87,6 @@ export function MembershipRequestDetailFooter({
           }}
         />
       ) : null}
-    </>
+    </Stack>
   );
 }
