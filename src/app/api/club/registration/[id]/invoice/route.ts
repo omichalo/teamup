@@ -8,6 +8,7 @@ import { canAccessClubRegistration } from "@/lib/club-registration/registration-
 import {
   buildPaymentInvoicePdf,
   buildPaymentInvoiceViewModel,
+  ensurePaymentDocumentNumber,
   isInvoiceDocumentAvailable,
 } from "@/lib/club-registration/payment-documents";
 
@@ -53,7 +54,14 @@ export async function GET(
       );
     }
 
-    const viewModel = buildPaymentInvoiceViewModel(id, data);
+    const documentNumber = await ensurePaymentDocumentNumber({
+      db,
+      registrationId: id,
+      data,
+      kind: "invoice",
+    });
+
+    const viewModel = buildPaymentInvoiceViewModel(id, data, { documentNumber });
     if (!viewModel) {
       return jsonNoStore(
         { error: "Impossible de constituer la facture." },
@@ -62,7 +70,7 @@ export async function GET(
     }
 
     const pdf = await buildPaymentInvoicePdf(viewModel);
-    const fileName = `facture-adhesion-${id}.pdf`;
+    const fileName = `${documentNumber}.pdf`;
 
     return new Response(new Uint8Array(pdf), {
       status: 200,

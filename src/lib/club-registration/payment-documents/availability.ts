@@ -19,19 +19,45 @@ function canBuildInvoiceDocument(data: Record<string, unknown>): boolean {
   return totalCents > 0 || lines.length > 0;
 }
 
-/**
- * Facture TeamUp : dès qu'un détail tarifaire existe et qu'un paiement
- * est engagé (soldé, partiel, ou facture Stripe déjà liée).
- */
-export function isInvoiceDocumentAvailable(data: Record<string, unknown>): boolean {
-  if (!canBuildInvoiceDocument(data)) {
+function isPaymentPhaseStarted(data: Record<string, unknown>): boolean {
+  if (
+    data.status === "payment_requested" ||
+    data.status === "paid" ||
+    isRegistrationPaidRecord(data) ||
+    hasStripeInvoiceId(data) ||
+    hasActiveReceivedPayments(data)
+  ) {
+    return true;
+  }
+
+  const paymentStatus =
+    typeof data.paymentStatus === "string" ? data.paymentStatus : null;
+  if (
+    paymentStatus === "waiting_payment" ||
+    paymentStatus === "partially_paid" ||
+    paymentStatus === "paid" ||
+    paymentStatus === "complete"
+  ) {
+    return true;
+  }
+
+  const payment = normalizeRegistrationPayment(data);
+  if (!payment) {
     return false;
   }
   return (
-    hasStripeInvoiceId(data) ||
-    isRegistrationPaidRecord(data) ||
-    hasActiveReceivedPayments(data)
+    payment.paymentStatus === "waiting_payment" ||
+    payment.paymentStatus === "partially_paid" ||
+    payment.paymentStatus === "paid"
   );
+}
+
+/**
+ * Facture TeamUp : dès qu'un détail tarifaire existe et que le paiement
+ * est demandé / engagé (avant même le 1er encaissement).
+ */
+export function isInvoiceDocumentAvailable(data: Record<string, unknown>): boolean {
+  return canBuildInvoiceDocument(data) && isPaymentPhaseStarted(data);
 }
 
 /** Reçu TeamUp : dès qu’un encaissement actif existe (y compris partiel). */

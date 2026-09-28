@@ -56,7 +56,7 @@ export function resolveRegistrationInvoiceLines(
 export function buildPaymentInvoiceViewModel(
   registrationId: string,
   data: Record<string, unknown>,
-  options?: { clubName?: string; now?: Date }
+  options: { documentNumber: string; clubName?: string; now?: Date }
 ): PaymentInvoiceViewModel | null {
   const { lines, totalCents } = resolveRegistrationInvoiceLines(data);
   if (totalCents <= 0 && lines.length === 0) {
@@ -71,11 +71,12 @@ export function buildPaymentInvoiceViewModel(
 
   return {
     registrationId,
-    clubName: options?.clubName ?? "SQY Ping",
+    documentNumber: options.documentNumber,
+    clubName: options.clubName ?? "SQY Ping",
     title: "Facture",
     adherentName,
     seasonLabel: resolveSeasonLabel(data),
-    issuedAtLabel: dateFormatter.format(options?.now ?? new Date()),
+    issuedAtLabel: dateFormatter.format(options.now ?? new Date()),
     quoteLines: lines,
     invoicedTotalCents: totalCents,
   };

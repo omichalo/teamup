@@ -19,6 +19,8 @@ export type PaymentReceiptPaymentLine = {
 
 export type PaymentReceiptViewModel = {
   registrationId: string;
+  /** N° séquentiel stable (ex. REC-2026-2027-00042). */
+  documentNumber: string;
   clubName: string;
   title: string;
   settlementLabel: "Soldé" | "Partiellement payé";
@@ -35,6 +37,8 @@ export type PaymentReceiptViewModel = {
 
 export type PaymentInvoiceViewModel = {
   registrationId: string;
+  /** N° séquentiel stable (ex. FAC-2026-2027-00042). */
+  documentNumber: string;
   clubName: string;
   title: string;
   adherentName: string;

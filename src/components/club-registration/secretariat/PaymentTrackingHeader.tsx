@@ -61,7 +61,8 @@ export function PaymentTrackingHeader({
           (payment.amountToPayCents > 0 || payment.totalAmountCents > 0) &&
           (payment.paidAmountCents > 0 ||
             payment.paymentStatus === "paid" ||
-            payment.paymentStatus === "partially_paid")
+            payment.paymentStatus === "partially_paid" ||
+            payment.paymentStatus === "waiting_payment")
         }
         receiptAvailable={
           payment.paidAmountCents > 0 &&

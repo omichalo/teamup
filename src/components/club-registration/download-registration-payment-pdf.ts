@@ -16,6 +16,33 @@ const DOCUMENT_META: Record<
   },
 };
 
+/** Extrait le filename du header Content-Disposition si présent. */
+export function resolveDownloadFileName(
+  contentDisposition: string | null,
+  fallback: string
+): string {
+  if (!contentDisposition) {
+    return fallback;
+  }
+  const utf8Match = /filename\*=UTF-8''([^;]+)/i.exec(contentDisposition);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1].trim());
+    } catch {
+      // fallback below
+    }
+  }
+  const plainMatch = /filename="([^"]+)"/i.exec(contentDisposition);
+  if (plainMatch?.[1]) {
+    return plainMatch[1].trim();
+  }
+  const bareMatch = /filename=([^;]+)/i.exec(contentDisposition);
+  if (bareMatch?.[1]) {
+    return bareMatch[1].trim().replace(/^"|"$/g, "");
+  }
+  return fallback;
+}
+
 /** Télécharge un PDF facture/reçu depuis l’API club registration. */
 export async function downloadRegistrationPaymentPdf(
   registrationId: string,
@@ -34,7 +61,10 @@ export async function downloadRegistrationPaymentPdf(
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `${meta.filePrefix}-${registrationId}.pdf`;
+  anchor.download = resolveDownloadFileName(
+    res.headers.get("Content-Disposition"),
+    `${meta.filePrefix}-${registrationId}.pdf`
+  );
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();

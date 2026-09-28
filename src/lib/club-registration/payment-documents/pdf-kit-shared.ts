@@ -44,9 +44,12 @@ export type PaymentDocHeaderParams = {
   documentTitle: string;
   documentNumber: string;
   issuedAtLabel: string;
+  /** Réservé aux factures à payer ; omis sur les justificatifs post-paiement. */
   dueAtLabel?: string | null;
   statusLabel?: string | null;
   statusColor?: string;
+  /** Libellé du bloc destinataire (ex. « Adhérent »). */
+  partyLabel?: string;
   billToName: string;
   billToExtraLines?: string[];
 };
@@ -62,6 +65,45 @@ function drawHorizontalRule(doc: PDFKit.PDFDocument, y: number, color = "#D8DCE8
     .restore();
 }
 
+/** Pastille de statut (Soldé / Partiellement payé). */
+export function drawPaymentDocStatusBadge(
+  doc: PDFKit.PDFDocument,
+  x: number,
+  y: number,
+  label: string,
+  color: string
+): number {
+  const fontSize = 9;
+  const padX = 10;
+  const padY = 5;
+  doc.font(PAYMENT_DOC_FONT_BOLD).fontSize(fontSize);
+  const width = doc.widthOfString(label) + padX * 2;
+  const height = fontSize + padY * 2;
+  const background =
+    color.toUpperCase() === "#1B7F3A"
+      ? "#E7F6EE"
+      : color.toUpperCase() === "#B07000"
+        ? "#FFF3E0"
+        : "#EEF1F7";
+
+  doc.save().roundedRect(x, y, width, height, 4).fillColor(background).fill().restore();
+  doc
+    .save()
+    .lineWidth(0.9)
+    .strokeColor(color)
+    .roundedRect(x, y, width, height, 4)
+    .stroke()
+    .restore();
+  doc
+    .font(PAYMENT_DOC_FONT_BOLD)
+    .fontSize(fontSize)
+    .fillColor(color)
+    .text(label, x + padX, y + padY, { lineBreak: false });
+
+  return y + height;
+}
+
+
 /** En-tête pro : logo, identité club, titre document, destinataire. */
 export function drawPaymentDocHeader(
   doc: PDFKit.PDFDocument,
@@ -70,7 +112,8 @@ export function drawPaymentDocHeader(
   const identity = CLUB_PAYMENT_DOCUMENT_IDENTITY;
   const leftX = PAYMENT_DOC_PAGE_MARGIN;
   const rightX = PAYMENT_DOC_PAGE_MARGIN + PAYMENT_DOC_CONTENT_WIDTH;
-  let y = PAYMENT_DOC_PAGE_MARGIN;
+  const metaTop = PAYMENT_DOC_PAGE_MARGIN;
+  let y = metaTop;
 
   const logoPath = resolvePaymentDocLogoPath();
   if (fs.existsSync(logoPath)) {
@@ -88,13 +131,13 @@ export function drawPaymentDocHeader(
     .fillColor("#525871")
     .text(identity.addressLines.join("\n"), leftX + 60, y + 20, {
       width: 250,
-      lineGap: 1,
+      lineGap: 2,
     });
-  doc.text(`${identity.phone}  ·  ${identity.email}`, leftX + 60, doc.y + 1, {
+  doc.text(`${identity.phone}  ·  ${identity.email}`, leftX + 60, doc.y + 3, {
     width: 250,
   });
+  const leftBottom = doc.y;
 
-  const metaTop = y;
   doc
     .font(PAYMENT_DOC_FONT_BOLD)
     .fontSize(18)
@@ -121,41 +164,45 @@ export function drawPaymentDocHeader(
       align: "right",
     });
   }
+  const rightBottom = doc.y;
 
-  y = Math.max(doc.y, metaTop + 70) + 12;
+  // Respiration sous le bloc contact / méta avant le trait (évite le collé email ↔ règle).
+  y = Math.max(leftBottom, rightBottom) + 18;
   drawHorizontalRule(doc, y, identity.primaryColor);
-  y += 14;
+  y += 16;
 
   if (params.statusLabel) {
-    doc
-      .font(PAYMENT_DOC_FONT_BOLD)
-      .fontSize(11)
-      .fillColor(params.statusColor ?? identity.secondaryColor)
-      .text(params.statusLabel, leftX, y);
-    y = doc.y + 10;
+    y =
+      drawPaymentDocStatusBadge(
+        doc,
+        leftX,
+        y,
+        params.statusLabel,
+        params.statusColor ?? identity.secondaryColor
+      ) + 12;
   }
 
   doc
     .font(PAYMENT_DOC_FONT_BOLD)
     .fontSize(9)
     .fillColor("#525871")
-    .text("Facturer à", leftX, y);
+    .text(params.partyLabel ?? "Adhérent", leftX, y);
   doc
     .font(PAYMENT_DOC_FONT_BOLD)
     .fontSize(11)
     .fillColor("#1f2233")
     .text(params.billToName, leftX, y + 12);
-  let billY = doc.y + 2;
+  let billY = doc.y + 3;
   for (const line of params.billToExtraLines ?? []) {
     doc
       .font(PAYMENT_DOC_FONT_REGULAR)
       .fontSize(9)
       .fillColor("#525871")
       .text(line, leftX, billY);
-    billY = doc.y + 1;
+    billY = doc.y + 2;
   }
 
-  return billY + 14;
+  return billY + 16;
 }
 
 /** Tableau lignes : description + quantité + montant. */
@@ -277,13 +324,4 @@ export function drawPaymentDocFooter(doc: PDFKit.PDFDocument, note: string): voi
     );
 
   doc.page.margins.bottom = previousBottomMargin;
-}
-
-/** Numéro document stable et lisible à partir de l'id Firestore. */
-export function buildPaymentDocumentNumber(
-  prefix: "FAC" | "REC",
-  registrationId: string
-): string {
-  const compact = registrationId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 10).toUpperCase();
-  return `${prefix}-${compact}`;
 }

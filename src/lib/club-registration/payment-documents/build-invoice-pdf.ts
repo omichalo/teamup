@@ -1,6 +1,5 @@
 import {
   assertPaymentDocFontsExist,
-  buildPaymentDocumentNumber,
   drawPaymentDocFooter,
   drawPaymentDocHeader,
   drawPaymentDocLinesTable,
@@ -23,7 +22,7 @@ export async function buildPaymentInvoicePdf(
       info: {
         Title: viewModel.title,
         Author: viewModel.clubName,
-        Subject: `Facture adhésion ${viewModel.registrationId}`,
+        Subject: `Facture ${viewModel.documentNumber}`,
       },
     });
     registerPaymentDocFonts(doc);
@@ -40,9 +39,9 @@ export async function buildPaymentInvoicePdf(
       ];
       let y = drawPaymentDocHeader(doc, {
         documentTitle: "Facture",
-        documentNumber: buildPaymentDocumentNumber("FAC", viewModel.registrationId),
+        documentNumber: viewModel.documentNumber,
         issuedAtLabel: viewModel.issuedAtLabel,
-        dueAtLabel: viewModel.issuedAtLabel,
+        partyLabel: "Adhérent",
         billToName: viewModel.adherentName,
         billToExtraLines: billToExtra,
       });

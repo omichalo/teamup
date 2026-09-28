@@ -8,6 +8,7 @@ import { canAccessClubRegistration } from "@/lib/club-registration/registration-
 import {
   buildPaymentReceiptPdf,
   buildPaymentReceiptViewModel,
+  ensurePaymentDocumentNumber,
   isReceiptDocumentAvailable,
 } from "@/lib/club-registration/payment-documents";
 
@@ -54,7 +55,14 @@ export async function GET(
       );
     }
 
-    const viewModel = buildPaymentReceiptViewModel(id, data);
+    const documentNumber = await ensurePaymentDocumentNumber({
+      db,
+      registrationId: id,
+      data,
+      kind: "receipt",
+    });
+
+    const viewModel = buildPaymentReceiptViewModel(id, data, { documentNumber });
     if (!viewModel) {
       return jsonNoStore(
         { error: "Impossible de constituer le reçu." },
@@ -63,7 +71,7 @@ export async function GET(
     }
 
     const pdf = await buildPaymentReceiptPdf(viewModel);
-    const fileName = `recu-adhesion-${id}.pdf`;
+    const fileName = `${documentNumber}.pdf`;
 
     return new Response(new Uint8Array(pdf), {
       status: 200,

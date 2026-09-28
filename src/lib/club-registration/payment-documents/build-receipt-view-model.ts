@@ -35,7 +35,7 @@ function resolveSeasonLabel(data: Record<string, unknown>): string | null {
 export function buildPaymentReceiptViewModel(
   registrationId: string,
   data: Record<string, unknown>,
-  options?: { clubName?: string; now?: Date }
+  options: { documentNumber: string; clubName?: string; now?: Date }
 ): PaymentReceiptViewModel | null {
   const payment = normalizeRegistrationPayment(data);
   const activePayments = (payment?.receivedPayments ?? []).filter(
@@ -94,18 +94,19 @@ export function buildPaymentReceiptViewModel(
             receivedAt:
               typeof data.paidAt === "string"
                 ? data.paidAt
-                : (options?.now ?? new Date()).toISOString(),
+                : (options.now ?? new Date()).toISOString(),
             receivedAtLabel: formatDateLabel(
               typeof data.paidAt === "string"
                 ? data.paidAt
-                : (options?.now ?? new Date()).toISOString()
+                : (options.now ?? new Date()).toISOString()
             ),
           },
         ];
 
   return {
     registrationId,
-    clubName: options?.clubName ?? "SQY Ping",
+    documentNumber: options.documentNumber,
+    clubName: options.clubName ?? "SQY Ping",
     title: isFullySettled
       ? "Reçu de paiement — adhésion"
       : "Attestation d'encaissement partiel — adhésion",
@@ -113,7 +114,7 @@ export function buildPaymentReceiptViewModel(
     isFullySettled,
     adherentName,
     seasonLabel: resolveSeasonLabel(data),
-    issuedAtLabel: dateFormatter.format(options?.now ?? new Date()),
+    issuedAtLabel: dateFormatter.format(options.now ?? new Date()),
     quoteLines,
     invoicedTotalCents,
     payments,

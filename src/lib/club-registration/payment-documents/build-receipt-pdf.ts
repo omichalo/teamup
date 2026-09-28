@@ -2,7 +2,6 @@ import { formatCentsAsEuros } from "@/lib/pricing/format";
 import { CLUB_PAYMENT_DOCUMENT_IDENTITY } from "./club-document-identity";
 import {
   assertPaymentDocFontsExist,
-  buildPaymentDocumentNumber,
   drawPaymentDocFooter,
   drawPaymentDocHeader,
   drawPaymentDocKeyValueBlock,
@@ -55,7 +54,7 @@ export async function buildPaymentReceiptPdf(
       info: {
         Title: viewModel.title,
         Author: viewModel.clubName,
-        Subject: `Reçu adhésion ${viewModel.registrationId}`,
+        Subject: `Reçu ${viewModel.documentNumber}`,
       },
     });
     registerPaymentDocFonts(doc);
@@ -72,10 +71,11 @@ export async function buildPaymentReceiptPdf(
       ];
       let y = drawPaymentDocHeader(doc, {
         documentTitle: viewModel.isFullySettled ? "Reçu" : "Attestation",
-        documentNumber: buildPaymentDocumentNumber("REC", viewModel.registrationId),
+        documentNumber: viewModel.documentNumber,
         issuedAtLabel: viewModel.issuedAtLabel,
         statusLabel: viewModel.settlementLabel,
         statusColor: viewModel.isFullySettled ? "#1B7F3A" : "#B07000",
+        partyLabel: "Adhérent",
         billToName: viewModel.adherentName,
         billToExtraLines: billToExtra,
       });

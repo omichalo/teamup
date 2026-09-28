@@ -83,6 +83,48 @@ describe("payment documents availability", () => {
       receiptAvailable: true,
     });
   });
+
+  it("expose la facture dès paiement demandé, sans encaissement", () => {
+    const data = {
+      status: "payment_requested",
+      paymentStatus: "waiting_payment",
+      pricingQuote: {
+        catalogVersion: "v1",
+        segmentLabel: "Adulte",
+        subtotalCents: 20_000,
+        totalCents: 20_000,
+        warnings: [],
+        requiresAdminReview: false,
+        lines: [
+          {
+            id: "membership",
+            kind: "membership",
+            label: "Adhésion club",
+            amountCents: 20_000,
+            source: "catalog",
+          },
+        ],
+      },
+      payment: {
+        paymentMethod: "cheque",
+        totalAmountCents: 20_000,
+        assistanceTotalAmountCents: 0,
+        amountToPayCents: 20_000,
+        aids: [],
+        paymentInstallments: 1,
+        expectedPayments: [],
+        receivedPayments: [],
+        paidAmountCents: 0,
+        remainingAmountCents: 20_000,
+        paymentStatus: "waiting_payment",
+      },
+    };
+
+    expect(resolvePaymentDocumentsAvailability(data)).toEqual({
+      invoiceAvailable: true,
+      receiptAvailable: false,
+    });
+  });
 });
 
 describe("buildPaymentReceiptViewModel", () => {
@@ -140,10 +182,11 @@ describe("buildPaymentReceiptViewModel", () => {
           paymentStatus: "partially_paid",
         },
       },
-      { now: new Date("2026-09-28T12:00:00.000Z") }
+      { documentNumber: "REC-2026-2027-00001", now: new Date("2026-09-28T12:00:00.000Z") }
     );
 
     expect(vm).not.toBeNull();
+    expect(vm?.documentNumber).toBe("REC-2026-2027-00001");
     expect(vm?.settlementLabel).toBe("Partiellement payé");
     expect(vm?.quoteLines).toHaveLength(2);
     expect(vm?.paidTotalCents).toBe(10_000);
@@ -153,22 +196,26 @@ describe("buildPaymentReceiptViewModel", () => {
 
   it("retourne null sans encaissement ni statut payé", () => {
     expect(
-      buildPaymentReceiptViewModel("reg_1", {
-        status: "submitted",
-        payment: {
-          paymentMethod: "card",
-          totalAmountCents: 20_000,
-          assistanceTotalAmountCents: 0,
-          amountToPayCents: 20_000,
-          aids: [],
-          paymentInstallments: 1,
-          expectedPayments: [],
-          receivedPayments: [],
-          paidAmountCents: 0,
-          remainingAmountCents: 20_000,
-          paymentStatus: "waiting_payment",
+      buildPaymentReceiptViewModel(
+        "reg_1",
+        {
+          status: "submitted",
+          payment: {
+            paymentMethod: "card",
+            totalAmountCents: 20_000,
+            assistanceTotalAmountCents: 0,
+            amountToPayCents: 20_000,
+            aids: [],
+            paymentInstallments: 1,
+            expectedPayments: [],
+            receivedPayments: [],
+            paidAmountCents: 0,
+            remainingAmountCents: 20_000,
+            paymentStatus: "waiting_payment",
+          },
         },
-      })
+        { documentNumber: "REC-2026-2027-00099" }
+      )
     ).toBeNull();
   });
 
@@ -203,7 +250,7 @@ describe("buildPaymentReceiptViewModel", () => {
           paymentStatus: "paid",
         },
       },
-      { now: new Date("2026-09-28T12:00:00.000Z") }
+      { documentNumber: "REC-2026-2027-00002", now: new Date("2026-09-28T12:00:00.000Z") }
     );
     expect(vm).not.toBeNull();
     const pdf = await buildPaymentReceiptPdf(vm!);
@@ -214,58 +261,63 @@ describe("buildPaymentReceiptViewModel", () => {
 
 describe("buildPaymentInvoiceViewModel", () => {
   it("construit une facture depuis le devis même en paiement partiel", () => {
-    const vm = buildPaymentInvoiceViewModel("reg_inv", {
-      firstName: "Ada",
-      lastName: "Lovelace",
-      seasonLabel: "2026-2027",
-      paymentStatus: "partially_paid",
-      pricingQuote: {
-        catalogVersion: "v1",
-        segmentLabel: "Adulte",
-        subtotalCents: 20_000,
-        totalCents: 20_000,
-        warnings: [],
-        requiresAdminReview: false,
-        lines: [
-          {
-            id: "membership",
-            kind: "membership",
-            label: "Adhésion club",
-            amountCents: 16_000,
-            source: "catalog",
-          },
-          {
-            id: "fftt_license",
-            kind: "fftt_license",
-            label: "Licence FFTT",
-            amountCents: 4_000,
-            source: "catalog",
-          },
-        ],
-      },
-      payment: {
-        paymentMethod: "cheque",
-        totalAmountCents: 20_000,
-        assistanceTotalAmountCents: 0,
-        amountToPayCents: 20_000,
-        aids: [],
-        paymentInstallments: 2,
-        expectedPayments: [],
-        receivedPayments: [
-          {
-            id: "p1",
-            method: "cheque",
-            label: "Chèque 1/2",
-            amountCents: 10_000,
-            receivedAt: "2026-09-01T10:00:00.000Z",
-          },
-        ],
-        paidAmountCents: 10_000,
-        remainingAmountCents: 10_000,
+    const vm = buildPaymentInvoiceViewModel(
+      "reg_inv",
+      {
+        firstName: "Ada",
+        lastName: "Lovelace",
+        seasonLabel: "2026-2027",
         paymentStatus: "partially_paid",
+        pricingQuote: {
+          catalogVersion: "v1",
+          segmentLabel: "Adulte",
+          subtotalCents: 20_000,
+          totalCents: 20_000,
+          warnings: [],
+          requiresAdminReview: false,
+          lines: [
+            {
+              id: "membership",
+              kind: "membership",
+              label: "Adhésion club",
+              amountCents: 16_000,
+              source: "catalog",
+            },
+            {
+              id: "fftt_license",
+              kind: "fftt_license",
+              label: "Licence FFTT",
+              amountCents: 4_000,
+              source: "catalog",
+            },
+          ],
+        },
+        payment: {
+          paymentMethod: "cheque",
+          totalAmountCents: 20_000,
+          assistanceTotalAmountCents: 0,
+          amountToPayCents: 20_000,
+          aids: [],
+          paymentInstallments: 2,
+          expectedPayments: [],
+          receivedPayments: [
+            {
+              id: "p1",
+              method: "cheque",
+              label: "Chèque 1/2",
+              amountCents: 10_000,
+              receivedAt: "2026-09-01T10:00:00.000Z",
+            },
+          ],
+          paidAmountCents: 10_000,
+          remainingAmountCents: 10_000,
+          paymentStatus: "partially_paid",
+        },
       },
-    });
+      { documentNumber: "FAC-2026-2027-00001" }
+    );
 
+    expect(vm?.documentNumber).toBe("FAC-2026-2027-00001");
     expect(vm?.quoteLines).toHaveLength(2);
     expect(vm?.invoicedTotalCents).toBe(20_000);
     expect(isInvoiceDocumentAvailable({
@@ -312,33 +364,37 @@ describe("buildPaymentInvoiceViewModel", () => {
   });
 
   it("génère un PDF facture non vide", async () => {
-    const vm = buildPaymentInvoiceViewModel("reg_inv_pdf", {
-      firstName: "Ada",
-      lastName: "Lovelace",
-      status: "paid",
-      paymentAmountCents: 12_000,
-      payment: {
-        paymentMethod: "cheque",
-        totalAmountCents: 12_000,
-        assistanceTotalAmountCents: 0,
-        amountToPayCents: 12_000,
-        aids: [],
-        paymentInstallments: 1,
-        expectedPayments: [],
-        receivedPayments: [
-          {
-            id: "p1",
-            method: "cheque",
-            label: "Chèque",
-            amountCents: 12_000,
-            receivedAt: "2026-09-01T10:00:00.000Z",
-          },
-        ],
-        paidAmountCents: 12_000,
-        remainingAmountCents: 0,
-        paymentStatus: "paid",
+    const vm = buildPaymentInvoiceViewModel(
+      "reg_inv_pdf",
+      {
+        firstName: "Ada",
+        lastName: "Lovelace",
+        status: "paid",
+        paymentAmountCents: 12_000,
+        payment: {
+          paymentMethod: "cheque",
+          totalAmountCents: 12_000,
+          assistanceTotalAmountCents: 0,
+          amountToPayCents: 12_000,
+          aids: [],
+          paymentInstallments: 1,
+          expectedPayments: [],
+          receivedPayments: [
+            {
+              id: "p1",
+              method: "cheque",
+              label: "Chèque",
+              amountCents: 12_000,
+              receivedAt: "2026-09-01T10:00:00.000Z",
+            },
+          ],
+          paidAmountCents: 12_000,
+          remainingAmountCents: 0,
+          paymentStatus: "paid",
+        },
       },
-    });
+      { documentNumber: "FAC-2026-2027-00003" }
+    );
     expect(vm).not.toBeNull();
     const pdf = await buildPaymentInvoicePdf(vm!);
     expect(pdf.byteLength).toBeGreaterThan(500);
