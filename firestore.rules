@@ -250,7 +250,8 @@ service cloud.firestore {
     // - create : owner se déclare comme submitterUid, schemaVersion strict ;
     //            le suivi Critérium fédéral / maillot / attestation n’est pas saisissable côté client
     // - update : owner uniquement, tant que status != 'approved' ;
-    //            les suivis secrétariat (critérium, maillot, attestation) sont figés (écrits via Admin SDK)
+    //            les suivis secrétariat (critérium, maillot, attestation) sont figés (écrits via Admin SDK) ;
+    //            les n° facture/reçu TeamUp sont figés (écrits via Admin SDK)
     // - delete : interdit côté client (l'admin gère via Admin SDK)
     match /clubRegistrations/{registrationId} {
       allow get: if isAuthenticated()
@@ -261,7 +262,13 @@ service cloud.firestore {
       allow create: if isAuthenticated()
                     && request.resource.data.submitterUid == request.auth.uid
                     && request.resource.data.schemaVersion == 1
-                    && !request.resource.data.keys().hasAny(['criteriumFederalRegistrationStatus', 'jerseyFollowUpStatus', 'registrationCertificateFollowUpStatus']);
+                    && !request.resource.data.keys().hasAny([
+                      'criteriumFederalRegistrationStatus',
+                      'jerseyFollowUpStatus',
+                      'registrationCertificateFollowUpStatus',
+                      'teamupInvoiceNumber',
+                      'teamupReceiptNumber',
+                    ]);
       allow update: if isAuthenticated()
                     && resource.data.submitterUid == request.auth.uid
                     && request.resource.data.submitterUid == request.auth.uid
@@ -271,8 +278,19 @@ service cloud.firestore {
                     && request.resource.data.get('jerseyFollowUpStatus', '')
                        == resource.data.get('jerseyFollowUpStatus', '')
                     && request.resource.data.get('registrationCertificateFollowUpStatus', '')
-                       == resource.data.get('registrationCertificateFollowUpStatus', '');
+                       == resource.data.get('registrationCertificateFollowUpStatus', '')
+                    && request.resource.data.get('teamupInvoiceNumber', '')
+                       == resource.data.get('teamupInvoiceNumber', '')
+                    && request.resource.data.get('teamupReceiptNumber', '')
+                       == resource.data.get('teamupReceiptNumber', '');
       allow delete: if false;
+    }
+
+    // ============================================
+    // Compteurs n° facture/reçu TeamUp (Admin SDK uniquement)
+    // ============================================
+    match /clubPaymentDocumentCounters/{seasonKey} {
+      allow read, write: if false;
     }
 
     // ============================================

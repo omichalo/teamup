@@ -17,6 +17,7 @@ export type MesInscriptionSummary = {
   paymentStatus?: string;
   payment?: Record<string, unknown>;
   invoiceAvailable?: boolean;
+  receiptAvailable?: boolean;
   submittedAt?: string | null;
 };
 

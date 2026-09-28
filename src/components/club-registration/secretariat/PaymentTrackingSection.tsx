@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import {
   Alert,
-  Box,
   Button,
   Chip,
   Divider,
@@ -35,6 +34,7 @@ import {
   canShowRequestRemainingCardButton,
   RequestRemainingCardButton,
 } from "./RequestRemainingCardButton";
+import { PaymentTrackingHeader } from "./PaymentTrackingHeader";
 
 type Props = {
   registrationId: string;
@@ -122,37 +122,13 @@ export function PaymentTrackingSection({
 
   return (
     <Stack spacing={2}>
-      <Typography variant="subtitle1" fontWeight={700}>
-        Suivi du paiement
-      </Typography>
-
-      {actionError ? (
-        <Alert severity="error" onClose={() => setActionError(null)}>
-          {actionError}
-        </Alert>
-      ) : null}
-
-      <Alert severity="info" variant="outlined">
-        <Typography variant="body2" component="div">
-          Ici vous <strong>noter ce qui est réellement encaissé</strong> (chèque, virement,
-          espèces, prélèvement externe…). Survolez chaque bouton ou lien « Marquer reçu » pour
-          une courte explication.
-        </Typography>
-      </Alert>
-
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-          gap: 1,
-        }}
-      >
-        {summaryRows.map((row) => (
-          <Typography key={row.label} variant="body2">
-            <strong>{row.label} :</strong> {row.value}
-          </Typography>
-        ))}
-      </Box>
+      <PaymentTrackingHeader
+        registrationId={registrationId}
+        payment={payment}
+        summaryRows={summaryRows}
+        actionError={actionError}
+        onClearError={() => setActionError(null)}
+      />
 
       {payment.paymentNote ? (
         <Alert severity="info" variant="outlined">

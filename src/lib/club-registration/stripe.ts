@@ -196,12 +196,17 @@ export async function createLegacySingleLineCheckoutSession(params: {
 export type StripeInvoiceLinks = {
   hostedInvoiceUrl: string | null;
   invoicePdf: string | null;
+  /** Statut Stripe (`draft` | `open` | `paid` | …). */
+  status: string | null;
+  paid: boolean;
 };
 
 type StripeInvoice = {
   id: string;
   hosted_invoice_url?: string | null;
   invoice_pdf?: string | null;
+  status?: string | null;
+  paid?: boolean;
   error?: { message?: string };
 };
 
@@ -304,6 +309,8 @@ export async function retrieveStripeInvoiceLinks(
   const json = (await response.json()) as {
     hosted_invoice_url?: string | null;
     invoice_pdf?: string | null;
+    status?: string | null;
+    paid?: boolean;
     error?: { message?: string };
   };
 
@@ -314,6 +321,8 @@ export async function retrieveStripeInvoiceLinks(
   return {
     hostedInvoiceUrl: json.hosted_invoice_url ?? null,
     invoicePdf: json.invoice_pdf ?? null,
+    status: json.status ?? null,
+    paid: json.paid === true || json.status === "paid",
   };
 }
 
@@ -357,6 +366,8 @@ export async function createPaidOutOfBandInvoice(
   invoiceBody.set("customer", customerId);
   invoiceBody.set("description", params.invoiceDescription);
   invoiceBody.set("collection_method", "send_invoice");
+  // Obligatoire avec send_invoice ; la facture est ensuite marquée payée hors bande.
+  invoiceBody.set("days_until_due", "30");
   invoiceBody.set("auto_advance", "false");
   invoiceBody.set("metadata[registrationId]", params.registrationId);
   (params.discountCouponIds ?? []).forEach((couponId, index) => {
@@ -379,8 +390,15 @@ export async function createPaidOutOfBandInvoice(
   return { invoiceId: paidInvoice.id };
 }
 
-/** URL à ouvrir côté adhérent : PDF si disponible, sinon page hébergée Stripe. */
+/**
+ * URL facture Stripe pour l’adhérent.
+ * Si la facture est payée, préférer la page hébergée (« Facture payée ») :
+ * le PDF Stripe peut encore afficher « montant dû / Payer en ligne ».
+ */
 export function pickInvoiceDownloadUrl(links: StripeInvoiceLinks): string | null {
+  if (links.paid) {
+    return links.hostedInvoiceUrl ?? links.invoicePdf ?? null;
+  }
   return links.invoicePdf ?? links.hostedInvoiceUrl ?? null;
 }
 

@@ -4,7 +4,7 @@ import { normalizePpsFollowUpStatus } from "@/lib/club-registration/pps-follow-u
 import { normalizeCriteriumFederalRegistrationStatus } from "@/lib/club-registration/criterium-federal-follow-up";
 import { normalizeJerseyFollowUpStatus } from "@/lib/club-registration/jersey-follow-up";
 import { normalizeRegistrationCertificateFollowUpStatus } from "@/lib/club-registration/registration-certificate-follow-up";
-import { hasPaymentProofAvailable } from "@/lib/club-registration/payment-proof";
+import { resolvePaymentDocumentsAvailability } from "@/lib/club-registration/payment-documents";
 import {
   ACTIONABLE_REGISTRATION_STATUSES,
   type ManagedListStatusFilter,
@@ -51,6 +51,7 @@ export const LIST_FIELDS = [
   "payment",
   "paymentAids",
   "pricingQuote",
+  "stripeInvoiceId",
 ] as const;
 
 export type RegistrationListSummary = Record<string, unknown> & { id: string };
@@ -106,7 +107,9 @@ export function mapRegistrationDocToSummary(
   summary.paymentRequestedAt =
     data.paymentRequestedAt?.toDate?.()?.toISOString?.() ?? null;
   summary.paidAt = data.paidAt?.toDate?.()?.toISOString?.() ?? null;
-  summary.invoiceAvailable = hasPaymentProofAvailable(data);
+  const documents = resolvePaymentDocumentsAvailability(data);
+  summary.invoiceAvailable = documents.invoiceAvailable;
+  summary.receiptAvailable = documents.receiptAvailable;
   return { summary, submittedAtMs };
 }
 

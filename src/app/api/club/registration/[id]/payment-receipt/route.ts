@@ -6,17 +6,18 @@ import { adminAuth, getFirestoreAdmin } from "@/lib/firebase-admin";
 import { resolveRole } from "@/lib/auth/roles";
 import { canAccessClubRegistration } from "@/lib/club-registration/registration-access";
 import {
-  buildPaymentInvoicePdf,
-  buildPaymentInvoiceViewModel,
+  buildPaymentReceiptPdf,
+  buildPaymentReceiptViewModel,
   ensurePaymentDocumentNumber,
-  isInvoiceDocumentAvailable,
+  isReceiptDocumentAvailable,
 } from "@/lib/club-registration/payment-documents";
 
 const COLLECTION = "clubRegistrations";
 
 /**
- * GET /api/club/registration/[id]/invoice
- * Facture PDF TeamUp (détail tarifaire) — admin, secrétariat, ou soumettant.
+ * GET /api/club/registration/[id]/payment-receipt
+ * PDF justificatif d'encaissement (CB, hors CB, partiel).
+ * Accès : admin, secrétariat, ou soumettant du dossier.
  */
 export async function GET(
   _req: Request,
@@ -47,9 +48,9 @@ export async function GET(
       return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
     }
 
-    if (!isInvoiceDocumentAvailable(data)) {
+    if (!isReceiptDocumentAvailable(data)) {
       return jsonNoStore(
-        { error: "La facture n'est pas encore disponible pour ce dossier." },
+        { error: "Aucun encaissement à attester pour ce dossier." },
         { status: 404 }
       );
     }
@@ -58,18 +59,18 @@ export async function GET(
       db,
       registrationId: id,
       data,
-      kind: "invoice",
+      kind: "receipt",
     });
 
-    const viewModel = buildPaymentInvoiceViewModel(id, data, { documentNumber });
+    const viewModel = buildPaymentReceiptViewModel(id, data, { documentNumber });
     if (!viewModel) {
       return jsonNoStore(
-        { error: "Impossible de constituer la facture." },
+        { error: "Impossible de constituer le reçu." },
         { status: 404 }
       );
     }
 
-    const pdf = await buildPaymentInvoicePdf(viewModel);
+    const pdf = await buildPaymentReceiptPdf(viewModel);
     const fileName = `${documentNumber}.pdf`;
 
     return new Response(new Uint8Array(pdf), {
@@ -83,9 +84,9 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("[api/club/registration/invoice]", error);
+    console.error("[api/club/registration/payment-receipt]", error);
     return jsonNoStore(
-      { error: "Impossible de générer la facture" },
+      { error: "Impossible de générer le reçu" },
       { status: 500 }
     );
   }

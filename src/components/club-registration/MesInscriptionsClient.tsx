@@ -21,6 +21,7 @@ import { ADHERENT_PAYMENT_EMAIL_LANDING_ALERT, ADHERENT_PAYMENT_PENDING_ALERT, A
 import { canSelfServiceCheckout } from "@/lib/club-registration/self-service-checkout";
 import { resolveMesInscriptionSupplementDue } from "@/lib/club-registration/mes-inscription-supplement-display";
 import { MesInscriptionRegistrationCard } from "@/components/club-registration/MesInscriptionRegistrationCard";
+import { downloadRegistrationPaymentPdf } from "@/components/club-registration/download-registration-payment-pdf";
 import {
   isMesInscriptionPaid,
   type MesInscriptionSummary,
@@ -40,8 +41,8 @@ export function MesInscriptionsClient() {
   const [loading, setLoading] = useState(true);
   const [registrations, setRegistrations] = useState<MesInscriptionSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [invoiceError, setInvoiceError] = useState<string | null>(null);
-  const [invoiceLoadingId, setInvoiceLoadingId] = useState<string | null>(null);
+  const [documentError, setDocumentError] = useState<string | null>(null);
+  const [documentLoadingId, setDocumentLoadingId] = useState<string | null>(null);
   const highlightCardRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -128,24 +129,30 @@ export function MesInscriptionsClient() {
   );
 
   const openInvoice = async (registrationId: string) => {
-    setInvoiceLoadingId(registrationId);
-    setInvoiceError(null);
+    setDocumentLoadingId(registrationId);
+    setDocumentError(null);
     try {
-      const res = await fetch(
-        `/api/club/registration/${encodeURIComponent(registrationId)}/invoice`,
-        { credentials: "include" }
-      );
-      const json = (await res.json()) as { url?: string; error?: string };
-      if (!res.ok || !json.url) {
-        throw new Error(json.error ?? "Facture indisponible pour le moment.");
-      }
-      window.open(json.url, "_blank", "noopener,noreferrer");
+      await downloadRegistrationPaymentPdf(registrationId, "invoice");
     } catch (err) {
-      setInvoiceError(
-        err instanceof Error ? err.message : "Impossible d’ouvrir la facture."
+      setDocumentError(
+        err instanceof Error ? err.message : "Impossible de télécharger la facture."
       );
     } finally {
-      setInvoiceLoadingId(null);
+      setDocumentLoadingId(null);
+    }
+  };
+
+  const downloadReceipt = async (registrationId: string) => {
+    setDocumentLoadingId(registrationId);
+    setDocumentError(null);
+    try {
+      await downloadRegistrationPaymentPdf(registrationId, "payment-receipt");
+    } catch (err) {
+      setDocumentError(
+        err instanceof Error ? err.message : "Impossible de télécharger le reçu."
+      );
+    } finally {
+      setDocumentLoadingId(null);
     }
   };
 
@@ -191,13 +198,14 @@ export function MesInscriptionsClient() {
             </strong>
             .{" "}
             {paymentJustCompleted.invoiceAvailable ||
+            paymentJustCompleted.receiptAvailable ||
             isMesInscriptionPaid(paymentJustCompleted) ? (
               <>
-                Votre facture Stripe est disponible ci-dessous (
-                <em>Télécharger la facture</em>).
+                Votre <em>reçu</em> et, le cas échéant, votre <em>facture</em> sont
+                disponibles ci-dessous.
               </>
             ) : (
-              <>La facture apparaîtra d’ici quelques instants sur cette page.</>
+              <>Les justificatifs apparaîtront d’ici quelques instants sur cette page.</>
             )}
           </Alert>
         ) : null}
@@ -226,9 +234,9 @@ export function MesInscriptionsClient() {
         ) : null}
 
         {error ? <Alert severity="error">{error}</Alert> : null}
-        {invoiceError ? (
-          <Alert severity="error" onClose={() => setInvoiceError(null)}>
-            {invoiceError}
+        {documentError ? (
+          <Alert severity="error" onClose={() => setDocumentError(null)}>
+            {documentError}
           </Alert>
         ) : null}
 
@@ -253,8 +261,9 @@ export function MesInscriptionsClient() {
                 ref={r.id === highlightRegistrationId ? highlightCardRef : undefined}
                 registration={r}
                 highlighted={r.id === highlightRegistrationId}
-                invoiceLoadingId={invoiceLoadingId}
+                documentLoadingId={documentLoadingId}
                 onOpenInvoice={openInvoice}
+                onDownloadReceipt={downloadReceipt}
                 onPaymentError={setError}
               />
             ))}
