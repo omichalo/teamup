@@ -1,4 +1,5 @@
 import type { LicenseValidationListItem } from "@/lib/license-validation/map-registration";
+import { isValidFfttLicenseNumber } from "@/lib/fftt/license-number";
 
 export function registrationMatchesLicenseValidationSearch(
   item: LicenseValidationListItem,
@@ -10,7 +11,7 @@ export function registrationMatchesLicenseValidationSearch(
   }
 
   const licenseDigits = q.replace(/\D/g, "");
-  if (licenseDigits.length >= 5) {
+  if (isValidFfttLicenseNumber(licenseDigits)) {
     const storedLicense = (item.ffttLicense ?? "").replace(/\D/g, "");
     if (storedLicense.includes(licenseDigits)) {
       return true;

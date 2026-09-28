@@ -1,4 +1,5 @@
 import { FieldValue, type Firestore } from "firebase-admin/firestore";
+import { FFTT_LICENSE_RE } from "@/lib/fftt/license-number";
 import { jsonNoStore } from "@/lib/http/cache-headers";
 import { adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, resolveRole, USER_ROLES } from "@/lib/auth/roles";
@@ -44,7 +45,6 @@ import { syncRosterAfterRegistrationChange } from "@/lib/championship/sync-after
 
 const COLLECTION = "clubRegistrations";
 const MANAGER_ROLES = [USER_ROLES.ADMIN, USER_ROLES.SECRETARY] as const;
-const FFTT_LICENSE_RE = /^[0-9]{4,12}$/;
 
 export async function patchManagerRegistration(
   req: Request,

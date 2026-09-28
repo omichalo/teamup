@@ -137,6 +137,21 @@ describe("resolveLicenseValidationPatchFields", () => {
     });
   });
 
+  it("accepts a four-digit licence for both final statuses", () => {
+    for (const status of ["done", "validated_without_sport"] as const) {
+      expect(resolveLicenseValidationPatchFields({
+        ...BASE_RESOLVE,
+        bodyLicense: "7885",
+        hasLicense: true,
+        bodyStatus: status,
+        hasStatus: true,
+      })).toEqual({
+        ok: true,
+        fields: { ffttLicense: "7885", licenseValidationStatus: status },
+      });
+    }
+  });
+
   it("reprend la licence déjà connue si le champ est vide", () => {
     expect(
       resolveLicenseValidationPatchFields({

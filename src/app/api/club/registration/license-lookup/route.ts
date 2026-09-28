@@ -1,6 +1,7 @@
 export const runtime = "nodejs";
 
 import { jsonNoStore } from "@/lib/http/cache-headers";
+import { FFTT_LICENSE_RE } from "@/lib/fftt/license-number";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
 import { getClientIp } from "@/lib/auth/request-ip";
 import { enforceRateLimit } from "@/lib/auth/rate-limit-http";
@@ -8,7 +9,6 @@ import { createFFTTAPI } from "@/lib/shared/fftt-utils";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { findRegistrationLicenseConflicts } from "@/lib/club-registration/find-registration-license-conflicts";
 
-const LICENSE_RE = /^[0-9]{4,12}$/;
 
 function stringOrUndefined(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() !== ""
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
         ? body.excludeRegistrationId.trim()
         : null;
 
-    if (!LICENSE_RE.test(licence)) {
+    if (!FFTT_LICENSE_RE.test(licence)) {
       return jsonNoStore(
         { error: "Numéro de licence invalide" },
         { status: 400 }

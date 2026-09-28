@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { FFTT_LICENSE_RE } from "@/lib/fftt/license-number";
 import { normalizeLastName } from "@/lib/shared/person-name-format";
 import { isValidFrenchPhoneSurface, normalizeFrenchPhoneInput } from "./phone-fr";
 
@@ -54,7 +55,7 @@ export type MedicalQuestionnairePayload = z.infer<typeof medicalQuestionnaireSch
 export type MedicalVeteranPathPayload = z.infer<typeof medicalVeteranPathSchema>;
 
 export const ffttLicenseLookupSchema = z.object({
-  licence: z.string().regex(/^[0-9]{4,12}$/),
+  licence: z.string().regex(FFTT_LICENSE_RE),
   nom: z.optional(z.string().trim().max(120).transform(normalizeLastName)),
   prenom: z.string().trim().max(120).optional(),
   isHomme: z.boolean().optional(),

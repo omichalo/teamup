@@ -21,7 +21,7 @@ import {
   requiresFfttLicenseNumber,
   type LicenseValidationStatus,
 } from "@/lib/license-validation/license-validation-status";
-import { LICENSE_REQUIRED_MESSAGE } from "@/lib/license-validation/resolve-license-validation-patch";
+import { getLicenseValidationInputError } from "@/lib/license-validation/resolve-license-validation-patch";
 import {
   formatRegistrationAddress,
   type LicenseValidationDetail,
@@ -89,8 +89,9 @@ export function LicenseValidationLicenseDetailPanel({
     if (!registrationId) {
       return;
     }
-    if (requiresFfttLicenseNumber(licenseValidationStatus) && ffttLicense.trim().length < 5) {
-      setSaveError(LICENSE_REQUIRED_MESSAGE);
+    const validationError = getLicenseValidationInputError(ffttLicense, licenseValidationStatus);
+    if (validationError) {
+      setSaveError(validationError);
       return;
     }
     setSaving(true);

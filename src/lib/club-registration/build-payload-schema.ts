@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { FFTT_LICENSE_RE } from "@/lib/fftt/license-number";
 import {
   getAllSlotIds,
   getEnabledCompetitionIds,
@@ -91,7 +92,7 @@ export function buildRegistrationPayloadSchema(
       ffttLicense: z
         .union([
           z.literal(""),
-          z.string().trim().regex(/^[0-9]{4,12}$/, "Numéro de licence invalide"),
+          z.string().trim().regex(FFTT_LICENSE_RE, "Numéro de licence invalide"),
         ])
         .optional(),
       ffttLicenseLookup: ffttLicenseLookupSchema.optional(),
