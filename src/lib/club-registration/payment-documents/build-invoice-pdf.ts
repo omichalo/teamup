@@ -1,10 +1,9 @@
 import {
   assertPaymentDocFontsExist,
-  drawPaymentDocAmountRow,
-  drawPaymentDocKeyValue,
-  drawPaymentDocSectionTitle,
-  PAYMENT_DOC_FONT_BOLD,
-  PAYMENT_DOC_FONT_REGULAR,
+  buildPaymentDocumentNumber,
+  drawPaymentDocFooter,
+  drawPaymentDocHeader,
+  drawPaymentDocLinesTable,
   PAYMENT_DOC_PAGE_MARGIN,
   registerPaymentDocFonts,
 } from "./pdf-kit-shared";
@@ -35,46 +34,36 @@ export async function buildPaymentInvoicePdf(
     doc.on("error", reject);
 
     try {
-      doc
-        .font(PAYMENT_DOC_FONT_BOLD)
-        .fontSize(18)
-        .fillColor("#0B3A6E")
-        .text(viewModel.clubName);
-      doc.moveDown(0.3);
-      doc
-        .font(PAYMENT_DOC_FONT_BOLD)
-        .fontSize(14)
-        .fillColor("#111111")
-        .text(viewModel.title);
-      doc.moveDown(0.8);
-
-      let y = doc.y;
-      y = drawPaymentDocKeyValue(doc, "Adhérent :", viewModel.adherentName, y);
-      if (viewModel.seasonLabel) {
-        y = drawPaymentDocKeyValue(doc, "Saison :", viewModel.seasonLabel, y);
-      }
-      y = drawPaymentDocKeyValue(doc, "Référence dossier :", viewModel.registrationId, y);
-      y = drawPaymentDocKeyValue(doc, "Émise le :", viewModel.issuedAtLabel, y);
-      doc.y = y + 10;
-
-      doc.y = drawPaymentDocSectionTitle(doc, "Détail", doc.y);
-      for (const line of viewModel.quoteLines) {
-        drawPaymentDocAmountRow(doc, line.label, line.amountCents);
-      }
-      drawPaymentDocAmountRow(doc, "Total", viewModel.invoicedTotalCents, {
-        bold: true,
+      const billToExtra = [
+        ...(viewModel.seasonLabel ? [`Saison ${viewModel.seasonLabel}`] : []),
+        `Réf. dossier ${viewModel.registrationId}`,
+      ];
+      let y = drawPaymentDocHeader(doc, {
+        documentTitle: "Facture",
+        documentNumber: buildPaymentDocumentNumber("FAC", viewModel.registrationId),
+        issuedAtLabel: viewModel.issuedAtLabel,
+        dueAtLabel: viewModel.issuedAtLabel,
+        billToName: viewModel.adherentName,
+        billToExtraLines: billToExtra,
       });
 
-      doc.moveDown(1.2);
-      doc
-        .font(PAYMENT_DOC_FONT_REGULAR)
-        .fontSize(9)
-        .fillColor("#666666")
-        .text(
-          "Document généré par TeamUp — facture / détail tarifaire de l'adhésion. " +
-            "Le reçu de paiement est un document distinct (preuve d'encaissement).",
-          { width: 495 }
-        );
+      y = drawPaymentDocLinesTable(
+        doc,
+        y,
+        viewModel.quoteLines.map((line) => ({
+          label: line.label,
+          amountCents: line.amountCents,
+        })),
+        "Total",
+        viewModel.invoicedTotalCents
+      );
+
+      doc.y = y;
+      drawPaymentDocFooter(
+        doc,
+        "Document généré par TeamUp — détail tarifaire de l'adhésion. " +
+          "Le reçu de paiement est un justificatif distinct."
+      );
 
       doc.end();
     } catch (error) {

@@ -72,7 +72,7 @@ export function buildPaymentInvoiceViewModel(
   return {
     registrationId,
     clubName: options?.clubName ?? "SQY Ping",
-    title: "Facture — adhésion",
+    title: "Facture",
     adherentName,
     seasonLabel: resolveSeasonLabel(data),
     issuedAtLabel: dateFormatter.format(options?.now ?? new Date()),

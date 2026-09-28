@@ -7,7 +7,10 @@ import {
 } from "./availability";
 import { buildPaymentInvoicePdf } from "./build-invoice-pdf";
 import { buildPaymentInvoiceViewModel } from "./build-invoice-view-model";
-import { buildPaymentReceiptPdf } from "./build-receipt-pdf";
+import {
+  buildPaymentReceiptPdf,
+  sanitizeReceiptPaymentDetail,
+} from "./build-receipt-pdf";
 import { buildPaymentReceiptViewModel } from "./build-receipt-view-model";
 
 describe("payment documents availability", () => {
@@ -342,3 +345,21 @@ describe("buildPaymentInvoiceViewModel", () => {
     expect(pdf.subarray(0, 4).toString("utf8")).toBe("%PDF");
   });
 });
+
+describe("sanitizeReceiptPaymentDetail", () => {
+  it("masque les identifiants Checkout Stripe", () => {
+    expect(
+      sanitizeReceiptPaymentDetail({
+        id: "p1",
+        label: "Paiement Stripe",
+        method: "card",
+        methodLabel: "Carte bancaire",
+        amountCents: 100,
+        receivedAt: "2026-09-01T10:00:00.000Z",
+        receivedAtLabel: "1 septembre 2026",
+        note: "Checkout cs_test_b1URoLJbNRcPRCGVM8MujQ25ob8zHALzED6ZDRPD4N83j4GonQIUAX3wvd",
+      })
+    ).toBe("1 septembre 2026 — Carte bancaire — Paiement Stripe — Paiement en ligne");
+  });
+});
+

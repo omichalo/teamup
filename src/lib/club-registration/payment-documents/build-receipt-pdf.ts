@@ -1,18 +1,47 @@
+import { formatCentsAsEuros } from "@/lib/pricing/format";
+import { CLUB_PAYMENT_DOCUMENT_IDENTITY } from "./club-document-identity";
 import {
   assertPaymentDocFontsExist,
-  drawPaymentDocAmountRow,
-  drawPaymentDocKeyValue,
-  drawPaymentDocSectionTitle,
+  buildPaymentDocumentNumber,
+  drawPaymentDocFooter,
+  drawPaymentDocHeader,
+  drawPaymentDocKeyValueBlock,
+  drawPaymentDocLinesTable,
   PAYMENT_DOC_FONT_BOLD,
   PAYMENT_DOC_FONT_REGULAR,
   PAYMENT_DOC_PAGE_MARGIN,
   registerPaymentDocFonts,
 } from "./pdf-kit-shared";
-import type { PaymentReceiptViewModel } from "./types";
+import type { PaymentReceiptPaymentLine, PaymentReceiptViewModel } from "./types";
 
-/**
- * Génère le PDF binaire du reçu / attestation d'encaissement TeamUp.
- */
+/** Retire les identifiants techniques Stripe / Checkout peu lisibles. */
+export function sanitizeReceiptPaymentDetail(
+  payment: PaymentReceiptPaymentLine
+): string {
+  const rawParts = [
+    payment.receivedAtLabel,
+    payment.methodLabel,
+    payment.label,
+    payment.reference ? `Réf. ${payment.reference}` : null,
+    payment.note ?? null,
+  ].filter((part): part is string => Boolean(part));
+
+  return rawParts
+    .map((part) =>
+      part
+        .replace(/\bCheckout\s+cs_[a-zA-Z0-9_]+/gi, "Paiement en ligne")
+        .replace(/\bcs_(test|live)_[a-zA-Z0-9]+/gi, "")
+        .replace(/\bpi_[a-zA-Z0-9]+/gi, "")
+        .replace(/\s{2,}/g, " ")
+        .replace(/\s—\s*$/g, "")
+        .trim()
+    )
+    .filter((part) => part.length > 0)
+    .filter((part, index, all) => all.indexOf(part) === index)
+    .join(" — ");
+}
+
+/** Génère le PDF reçu / attestation d'encaissement TeamUp. */
 export async function buildPaymentReceiptPdf(
   viewModel: PaymentReceiptViewModel
 ): Promise<Buffer> {
@@ -37,87 +66,84 @@ export async function buildPaymentReceiptPdf(
     doc.on("error", reject);
 
     try {
-      doc
-        .font(PAYMENT_DOC_FONT_BOLD)
-        .fontSize(18)
-        .fillColor("#0B3A6E")
-        .text(viewModel.clubName);
-      doc.moveDown(0.3);
-      doc
-        .font(PAYMENT_DOC_FONT_BOLD)
-        .fontSize(14)
-        .fillColor("#111111")
-        .text(viewModel.title);
-      doc.moveDown(0.2);
+      const billToExtra = [
+        ...(viewModel.seasonLabel ? [`Saison ${viewModel.seasonLabel}`] : []),
+        `Réf. dossier ${viewModel.registrationId}`,
+      ];
+      let y = drawPaymentDocHeader(doc, {
+        documentTitle: viewModel.isFullySettled ? "Reçu" : "Attestation",
+        documentNumber: buildPaymentDocumentNumber("REC", viewModel.registrationId),
+        issuedAtLabel: viewModel.issuedAtLabel,
+        statusLabel: viewModel.settlementLabel,
+        statusColor: viewModel.isFullySettled ? "#1B7F3A" : "#B07000",
+        billToName: viewModel.adherentName,
+        billToExtraLines: billToExtra,
+      });
+
+      if (viewModel.quoteLines.length > 0) {
+        y = drawPaymentDocLinesTable(
+          doc,
+          y,
+          viewModel.quoteLines.map((line) => ({
+            label: line.label,
+            amountCents: line.amountCents,
+          })),
+          "Total facturé",
+          viewModel.invoicedTotalCents
+        );
+      }
+
       doc
         .font(PAYMENT_DOC_FONT_BOLD)
         .fontSize(11)
-        .fillColor(viewModel.isFullySettled ? "#1B7F3A" : "#B07000")
-        .text(viewModel.settlementLabel);
-      doc.moveDown(0.8);
+        .fillColor(CLUB_PAYMENT_DOCUMENT_IDENTITY.primaryColor)
+        .text("Encaissements", PAYMENT_DOC_PAGE_MARGIN, y);
+      y = doc.y + 8;
 
-      let y = doc.y;
-      y = drawPaymentDocKeyValue(doc, "Adhérent :", viewModel.adherentName, y);
-      if (viewModel.seasonLabel) {
-        y = drawPaymentDocKeyValue(doc, "Saison :", viewModel.seasonLabel, y);
-      }
-      y = drawPaymentDocKeyValue(doc, "Référence dossier :", viewModel.registrationId, y);
-      y = drawPaymentDocKeyValue(doc, "Émis le :", viewModel.issuedAtLabel, y);
-      doc.y = y + 10;
-
-      if (viewModel.quoteLines.length > 0) {
-        doc.y = drawPaymentDocSectionTitle(doc, "Détail facturé", doc.y);
-        for (const line of viewModel.quoteLines) {
-          drawPaymentDocAmountRow(doc, line.label, line.amountCents);
-        }
-        drawPaymentDocAmountRow(doc, "Total facturé", viewModel.invoicedTotalCents, {
-          bold: true,
-        });
-        doc.moveDown(0.6);
-      } else {
-        doc.y = drawPaymentDocSectionTitle(doc, "Montant facturé", doc.y);
-        drawPaymentDocAmountRow(doc, "Total", viewModel.invoicedTotalCents, {
-          bold: true,
-        });
-        doc.moveDown(0.6);
-      }
-
-      doc.y = drawPaymentDocSectionTitle(doc, "Encaissements", doc.y);
       for (const payment of viewModel.payments) {
-        const details = [
-          payment.receivedAtLabel,
-          payment.methodLabel,
-          payment.label,
-          payment.reference ? `Réf. ${payment.reference}` : null,
-          payment.note ?? null,
-        ]
-          .filter((part): part is string => Boolean(part))
-          .join(" — ");
-        drawPaymentDocAmountRow(doc, details, payment.amountCents);
+        const detail = sanitizeReceiptPaymentDetail(payment);
+        doc
+          .font(PAYMENT_DOC_FONT_REGULAR)
+          .fontSize(9)
+          .fillColor("#1f2233")
+          .text(detail, PAYMENT_DOC_PAGE_MARGIN, y, { width: 360 });
+        doc
+          .font(PAYMENT_DOC_FONT_BOLD)
+          .fontSize(9)
+          .fillColor("#1f2233")
+          .text(formatCentsAsEuros(payment.amountCents), PAYMENT_DOC_PAGE_MARGIN + 380, y, {
+            width: 110,
+            align: "right",
+          });
+        y = Math.max(doc.y, y) + 10;
       }
 
-      doc.moveDown(0.4);
-      drawPaymentDocAmountRow(doc, "Total encaissé", viewModel.paidTotalCents, {
-        bold: true,
-        color: "#1B7F3A",
-      });
-      if (viewModel.remainingCents > 0) {
-        drawPaymentDocAmountRow(doc, "Reste dû", viewModel.remainingCents, {
-          bold: true,
-          color: "#B07000",
-        });
-      }
+      y += 4;
+      y = drawPaymentDocKeyValueBlock(doc, y, [
+        {
+          label: "Total encaissé",
+          value: formatCentsAsEuros(viewModel.paidTotalCents),
+          emphasize: true,
+          color: "#1B7F3A",
+        },
+        ...(viewModel.remainingCents > 0
+          ? [
+              {
+                label: "Reste dû",
+                value: formatCentsAsEuros(viewModel.remainingCents),
+                emphasize: true,
+                color: "#B07000",
+              },
+            ]
+          : []),
+      ]);
 
-      doc.moveDown(1.2);
-      doc
-        .font(PAYMENT_DOC_FONT_REGULAR)
-        .fontSize(9)
-        .fillColor("#666666")
-        .text(
-          "Document généré par TeamUp — justificatif d'encaissement pour l'adhérent et le club. " +
-            "La facture (détail tarifaire) est un document distinct.",
-          { width: 495 }
-        );
+      doc.y = y;
+      drawPaymentDocFooter(
+        doc,
+        "Document généré par TeamUp — justificatif d'encaissement. " +
+          "La facture (détail tarifaire) est un document distinct."
+      );
 
       doc.end();
     } catch (error) {
