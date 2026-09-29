@@ -59,7 +59,10 @@ export function SuggestionMaintainerTriageSection({
     setWaitingOn(detail.waitingOn);
     setError(null);
     setSuccess(null);
-  }, [detail]);
+    // Sync seulement au changement d'idée. Dépendre de `detail` (référence)
+    // réinitialisait le formulaire à chaque refresh et vidait la note en cours.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset on suggestion switch only
+  }, [detail.id]);
 
   const handleSubmit = async () => {
     setSubmitting(true);
