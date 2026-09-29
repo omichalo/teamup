@@ -100,13 +100,9 @@ export function SuggestionDetailPanel({
     setEditTitle(detail.title);
     setEditDescriptionHtml(detail.description || "<p></p>");
     setEditCategory(detail.category);
-  }, [
-    detail?.id,
-    detail?.title,
-    detail?.description,
-    detail?.category,
-    isEditing,
-  ]);
+    // Ne pas dépendre de l'objet `detail` (nouvelle ref à chaque refresh).
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync on stable fields only
+  }, [detail?.id, detail?.title, detail?.description, detail?.category, isEditing]);
 
   useEffect(() => {
     if (!detailId) {

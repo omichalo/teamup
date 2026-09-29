@@ -68,6 +68,7 @@ export function MarkExpectedPaymentReceivedDialog({
     setReceivedAt(new Date().toISOString().slice(0, 10));
     setReference("");
     setNote("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset on open / expected.id only
   }, [open, expected?.id]);
 
   const handleSubmit = async () => {
