@@ -100,7 +100,9 @@ export function SuggestionDetailPanel({
     setEditTitle(detail.title);
     setEditDescriptionHtml(detail.description || "<p></p>");
     setEditCategory(detail.category);
-  }, [detail, isEditing]);
+    // Ne pas dépendre de l'objet `detail` (nouvelle ref à chaque refresh).
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync on stable fields only
+  }, [detail?.id, detail?.title, detail?.description, detail?.category, isEditing]);
 
   useEffect(() => {
     if (!detailId) {
@@ -371,6 +373,7 @@ export function SuggestionDetailPanel({
 
       {canTriage || isMaintainer ? (
         <SuggestionMaintainerTriageSection
+          key={detail.id}
           detail={detail}
           canSeeInternal={canSeeInternal || isMaintainer}
           onPatchMaintainer={onPatchMaintainer}

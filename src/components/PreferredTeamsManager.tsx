@@ -44,9 +44,12 @@ export function PreferredTeamsManager({
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    if (editDialogOpen) {
+      return;
+    }
     setSelectedMasculine(player.preferredTeams.masculine);
     setSelectedFeminine(player.preferredTeams.feminine);
-  }, [player]);
+  }, [player, editDialogOpen]);
 
   const handleEdit = () => {
     setEditDialogOpen(true);

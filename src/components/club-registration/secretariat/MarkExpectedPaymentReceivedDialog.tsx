@@ -61,13 +61,15 @@ export function MarkExpectedPaymentReceivedDialog({
     expected?.method === "cheque" || expected?.method === "holiday_vouchers";
 
   useEffect(() => {
-    if (expected) {
-      setAmountEuros(centsToEurosInput(expected.expectedAmountCents));
-      setReceivedAt(new Date().toISOString().slice(0, 10));
-      setReference("");
-      setNote("");
+    if (!open || !expected) {
+      return;
     }
-  }, [expected]);
+    setAmountEuros(centsToEurosInput(expected.expectedAmountCents));
+    setReceivedAt(new Date().toISOString().slice(0, 10));
+    setReference("");
+    setNote("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset on open / expected.id only
+  }, [open, expected?.id]);
 
   const handleSubmit = async () => {
     if (!expected) return;
