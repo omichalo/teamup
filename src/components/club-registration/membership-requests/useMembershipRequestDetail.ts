@@ -68,7 +68,11 @@ export function useMembershipRequestDetail(
           registration.payment ??
           normalizeRegistrationPayment(registration as unknown as Record<string, unknown>);
         setSelected(registration);
-        setForm(toEditableRegistration(registration, config, payment));
+        // Silent refresh (ex. après encaissement) : ne pas écraser le formulaire
+        // en cours d'édition côté secrétariat.
+        if (!options?.silent) {
+          setForm(toEditableRegistration(registration, config, payment));
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Erreur de chargement.");
         if (!options?.silent) {

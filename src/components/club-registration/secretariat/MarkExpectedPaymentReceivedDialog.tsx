@@ -61,13 +61,14 @@ export function MarkExpectedPaymentReceivedDialog({
     expected?.method === "cheque" || expected?.method === "holiday_vouchers";
 
   useEffect(() => {
-    if (expected) {
-      setAmountEuros(centsToEurosInput(expected.expectedAmountCents));
-      setReceivedAt(new Date().toISOString().slice(0, 10));
-      setReference("");
-      setNote("");
+    if (!open || !expected) {
+      return;
     }
-  }, [expected]);
+    setAmountEuros(centsToEurosInput(expected.expectedAmountCents));
+    setReceivedAt(new Date().toISOString().slice(0, 10));
+    setReference("");
+    setNote("");
+  }, [open, expected?.id]);
 
   const handleSubmit = async () => {
     if (!expected) return;
