@@ -14,6 +14,7 @@ import {
   playerNameMatches,
   type PartieLike,
 } from "@/lib/shared/victoires-defaites";
+import { getDetailsRencontreWithClubFallback } from "@/lib/fftt/rencontre-details-clubs";
 
 export const runtime = "nodejs";
 
@@ -308,7 +309,9 @@ export async function GET(req: NextRequest) {
         const club2 = extractClubFromLien(rencontre.lien, "clubnum_2");
         let raw: unknown = null;
         try {
-          raw = await api.getDetailsRencontreByLien(
+          // clubnum_1/2 parfois inversés vs equa/equb → points absents sans fallback
+          raw = await getDetailsRencontreWithClubFallback(
+            api,
             rencontre.lien,
             club1,
             club2
