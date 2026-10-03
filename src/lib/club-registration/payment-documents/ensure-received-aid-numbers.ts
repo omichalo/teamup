@@ -5,10 +5,8 @@ import {
   paymentToFirestoreUpdate,
 } from "@/lib/club-registration/payment/normalize-payment";
 import type { PaymentAid, RegistrationPayment } from "@/lib/club-registration/payment/types";
-import {
-  allocateAccountingDocumentNumberInTransaction,
-  resolveAccountingSeasonKey,
-} from "./allocate-sequence";
+import { resolveAccountingSeasonKey } from "./allocate-sequence";
+import { formatPaymentDocumentNumber } from "./document-numbers";
 import {
   hasAidDocumentNumber,
   isReceivedCollectableAid,
@@ -16,6 +14,7 @@ import {
 
 export { hasAidDocumentNumber, isReceivedCollectableAid } from "./aid-document-helpers";
 
+const COUNTERS_COLLECTION = "clubPaymentDocumentCounters";
 const REGISTRATIONS_COLLECTION = "clubRegistrations";
 
 /**
@@ -58,9 +57,12 @@ export async function ensureReceivedAidDocumentNumbers(params: {
   const registrationRef = params.db
     .collection(REGISTRATIONS_COLLECTION)
     .doc(params.registrationId);
+  const counterRef = params.db.collection(COUNTERS_COLLECTION).doc(seasonKey);
 
   return params.db.runTransaction(async (tx) => {
+    // Tous les reads avant tout write (plusieurs AID dans la même tx).
     const snap = await tx.get(registrationRef);
+    const counterSnap = await tx.get(counterRef);
     const liveData = (snap.data() ?? {}) as Record<string, unknown>;
     const livePayment = normalizeRegistrationPayment(liveData);
     const liveTopAids = Array.isArray(liveData.paymentAids)
@@ -84,6 +86,11 @@ export async function ensureReceivedAidDocumentNumbers(params: {
       };
     }
 
+    let seq =
+      typeof counterSnap.data()?.nextAidSeq === "number"
+        ? (counterSnap.data()?.nextAidSeq as number)
+        : 0;
+    const seqBefore = seq;
     let assignedCount = 0;
     const stamped: PaymentAid[] = [];
     for (const aid of liveAids) {
@@ -91,14 +98,24 @@ export async function ensureReceivedAidDocumentNumbers(params: {
         stamped.push(aid);
         continue;
       }
-      const documentNumber = await allocateAccountingDocumentNumberInTransaction({
-        tx,
-        db: params.db,
-        seasonKey,
-        prefix: "AID",
-      });
+      seq += 1;
       assignedCount += 1;
-      stamped.push({ ...aid, documentNumber });
+      stamped.push({
+        ...aid,
+        documentNumber: formatPaymentDocumentNumber("AID", seasonKey, seq),
+      });
+    }
+
+    if (seq > seqBefore) {
+      tx.set(
+        counterRef,
+        {
+          seasonKey,
+          nextAidSeq: seq,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
     }
 
     const patch: Record<string, unknown> = {
