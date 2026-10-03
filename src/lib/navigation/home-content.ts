@@ -183,7 +183,11 @@ function playerHome(): RoleHomeContent {
         id: "adhesions",
         title: "Adhésions",
         description: "Créer un dossier et suivre ceux déjà transmis au club.",
-        items: cards([LAYOUT_NAV.nouvelleAdhesion, LAYOUT_NAV.mesDossiers]),
+        items: cards([
+          LAYOUT_NAV.nouvelleAdhesion,
+          LAYOUT_NAV.mesDossiers,
+          LAYOUT_NAV.maFiche,
+        ]),
       },
       {
         id: "club",
@@ -213,6 +217,7 @@ function boardMemberHome(): RoleHomeContent {
           LAYOUT_NAV.presencesEssais,
           LAYOUT_NAV.nouvelleAdhesion,
           LAYOUT_NAV.mesDossiers,
+          LAYOUT_NAV.maFiche,
         ]),
       },
       {
@@ -242,6 +247,7 @@ function assistantSecretaryHome(): RoleHomeContent {
           LAYOUT_NAV.matchsHorsInscription,
           LAYOUT_NAV.nouvelleAdhesion,
           LAYOUT_NAV.mesDossiers,
+          LAYOUT_NAV.maFiche,
         ]),
       },
       {
@@ -281,6 +287,7 @@ function coachHome(): RoleHomeContent {
           LAYOUT_NAV.statistiquesAdherents,
           LAYOUT_NAV.nouvelleAdhesion,
           LAYOUT_NAV.mesDossiers,
+          LAYOUT_NAV.maFiche,
         ]),
       },
       {
@@ -313,6 +320,7 @@ function secretaryHome(): RoleHomeContent {
             LAYOUT_NAV.validationsLicence,
             LAYOUT_NAV.matchsHorsInscription,
             LAYOUT_NAV.mesDossiers,
+            LAYOUT_NAV.maFiche,
           ]),
         ),
       },
@@ -363,6 +371,7 @@ function adminHome(): RoleHomeContent {
             LAYOUT_NAV.validationsLicence,
             LAYOUT_NAV.matchsHorsInscription,
             LAYOUT_NAV.mesDossiers,
+            LAYOUT_NAV.maFiche,
           ]),
         ),
       },
