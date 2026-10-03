@@ -1,6 +1,7 @@
 import {
   buildLayoutAccountMenuItems,
   buildLayoutNavigation,
+  LAYOUT_NAV,
 } from "@/components/layout-navigation";
 import { USER_ROLES, type UserRole } from "@/lib/auth/roles";
 import {
@@ -41,6 +42,10 @@ function expectedNavHrefs(role: UserRole): string[] {
 }
 
 describe("buildRoleHomeContent", () => {
+  it("expose Ma fiche dans LAYOUT_NAV pour les cartes d'accueil", () => {
+    expect(LAYOUT_NAV.maFiche?.href).toBe("/club/ma-fiche");
+  });
+
   it("keeps a welcome-only hero copy and grouped spaces for every role", () => {
     for (const role of Object.values(USER_ROLES)) {
       const content = buildRoleHomeContent(role);

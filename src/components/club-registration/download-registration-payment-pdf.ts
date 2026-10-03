@@ -136,3 +136,20 @@ export async function downloadRegistrationAidReceiptPdf(
     `aide-adhesion-${registrationId}-${aidType}.pdf`
   );
 }
+
+/** Télécharge l'attestation d'inscription (document informatif). */
+export async function downloadRegistrationCertificatePdf(
+  registrationId: string
+): Promise<void> {
+  const res = await fetch(
+    `/api/club/registration/${encodeURIComponent(registrationId)}/registration-certificate`,
+    { credentials: "include" }
+  );
+  if (!res.ok) {
+    const json = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(
+      json?.error ?? "Attestation d'inscription indisponible pour le moment."
+    );
+  }
+  await triggerBlobDownload(res, `attestation-inscription-${registrationId}.pdf`);
+}

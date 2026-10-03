@@ -24,6 +24,7 @@ export type MesInscriptionSummary = {
   invoiceAvailable?: boolean;
   receiptAvailable?: boolean;
   situationAvailable?: boolean;
+  registrationCertificateAvailable?: boolean;
   receipts?: PaymentReceiptSummary[];
   invoices?: PaymentInvoiceSummary[];
   aidReceipts?: PaymentAidReceiptSummary[];

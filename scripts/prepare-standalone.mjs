@@ -58,6 +58,7 @@ const requiredAssets = [
   "public/club-registration/questionnaire-medical-majeur.pdf",
   "public/club-registration/questionnaire-medical-mineur.pdf",
   "public/club-registration/reglement-interieur-sqy-ping-2019.pdf",
+  "public/club-registration/registration-certificate-signature.jpg",
   "public/fonts/payment-receipt/NotoSans-Regular.ttf",
   "public/fonts/payment-receipt/NotoSans-Bold.ttf",
   "node_modules/pdfkit/js/standard-fonts/Helvetica.cjs",

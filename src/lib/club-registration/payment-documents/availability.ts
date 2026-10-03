@@ -1,6 +1,7 @@
 import { hasStripeInvoiceId, isRegistrationPaidRecord } from "@/lib/club-registration/payment-proof";
 import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
 import { getRegistrationPaymentAids } from "@/lib/club-registration/payment/aid-receipt";
+import { isRegistrationCertificateAvailable } from "@/lib/club-registration/registration-certificate/availability";
 import { resolveRegistrationInvoiceLines } from "./build-invoice-view-model";
 import { parseAccountingInvoices } from "./accounting-invoice-parse";
 import {
@@ -143,6 +144,7 @@ export function resolvePaymentDocumentsAvailability(
     invoiceAvailable: isInvoiceDocumentAvailable(data),
     receiptAvailable,
     situationAvailable: isSituationDocumentAvailable(data),
+    registrationCertificateAvailable: isRegistrationCertificateAvailable(data),
     receipts: listReceiptSummaries(data),
     invoices: listInvoiceSummaries(data),
     aidReceipts: listAidReceiptSummaries(data),

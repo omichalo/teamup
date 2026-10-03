@@ -120,6 +120,8 @@ export type PaymentDocumentsAvailability = {
   /** True s'il existe au moins un encaissement (reçus unitaires et/ou situation). */
   receiptAvailable: boolean;
   situationAvailable: boolean;
+  /** Attestation d'inscription (dossier soldé). */
+  registrationCertificateAvailable: boolean;
   receipts: PaymentReceiptSummary[];
   invoices: PaymentInvoiceSummary[];
   aidReceipts: PaymentAidReceiptSummary[];
