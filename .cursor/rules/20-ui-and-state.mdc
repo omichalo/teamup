@@ -1,6 +1,7 @@
 ---
 description: React, composants, accessibilité UI
-alwaysApply: true
+globs: src/components/**/*,src/hooks/**/*
+alwaysApply: false
 ---
 
 # UI & State Management

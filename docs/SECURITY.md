@@ -265,3 +265,25 @@ git secrets --add 'api[_-]?key\s*=\s*.+'
    git push origin --force --tags
    ```
 
+## Protection des branches et scans CI
+
+### Branch protection (`staging`, `main`)
+
+Les branches `staging` et `main` sont protégées sur GitHub :
+
+- Pull Request obligatoire (pas de push direct)
+- Status check requis : **Lint, Type-check and Build** (workflow CI)
+- Force-push et suppression de branche interdits
+- `enforce_admins` activé (y compris pour les admins repo)
+
+Hotfix : passer par une PR ; un admin peut temporairement assouplir la protection si absolument nécessaire, puis la rétablir.
+
+### Security scan
+
+Le workflow [`.github/workflows/security-scan.yml`](../.github/workflows/security-scan.yml) (TruffleHog, Gitleaks, `npm audit`) s’exécute sur :
+
+- push / pull_request vers **`staging`** et **`main`**
+- cron hebdomadaire (scan historique)
+
+Ancien déclencheur `develop` : retiré (hors flux de livraison actuel).
+
