@@ -30,6 +30,8 @@ import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types"
 import type { RegistrationPayment } from "@/lib/club-registration/payment/types";
 import { formatRegistrationPaymentEmailsForStorage } from "@/lib/club-registration/resolve-registration-contact-email";
 import type { PriceQuote } from "@/lib/pricing/types";
+import { syncPaymentDocumentNumbersForRegistration } from "@/lib/club-registration/payment-documents/sync-document-numbers";
+import { getFirestoreAdmin } from "@/lib/firebase-admin";
 
 export {
   buildPaymentRequestedFirestoreUpdate,
@@ -91,6 +93,18 @@ export async function processManualPaymentFollowUp(params: {
     },
     { merge: true }
   );
+
+  try {
+    await syncPaymentDocumentNumbersForRegistration(
+      getFirestoreAdmin(),
+      params.registrationId
+    );
+  } catch (numberError) {
+    console.error(
+      "[request-payment] document number assignment",
+      numberError
+    );
+  }
 
   const instructionsMail = buildPaymentInstructionsEmail({
     adherentName: params.adherentName,

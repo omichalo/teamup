@@ -1,9 +1,9 @@
 "use client";
 
-import { Box, Button, Chip, IconButton, Stack, Typography } from "@mui/material";
+import { Box, Button, IconButton, Stack, Typography } from "@mui/material";
 import PersonRemoveOutlined from "@mui/icons-material/PersonRemoveOutlined";
 import type { AttendanceRosterPerson } from "@/lib/attendance/types";
-import { ATTENDANCE_ALERT_LABELS } from "@/lib/attendance/constants";
+import { AttendanceAlertChips } from "./AttendanceAlertChips";
 
 type Props = {
   person: AttendanceRosterPerson;
@@ -37,7 +37,7 @@ export function AttendancePlayerCard({
         minHeight: 72,
       }}
     >
-      <Stack spacing={0.5} sx={{ flex: 1, minWidth: 0 }}>
+      <Stack spacing={0.75} sx={{ flex: 1, minWidth: 0 }}>
         <Typography variant="h6" component="p" sx={{ fontSize: "1.15rem", lineHeight: 1.2 }}>
           {person.displayName}
           {person.age != null ? (
@@ -46,18 +46,12 @@ export function AttendancePlayerCard({
             </Typography>
           ) : null}
         </Typography>
-        {person.alerts.length > 0 ? (
-          <Stack direction="row" gap={0.75} flexWrap="wrap">
-            {person.alerts.map((alert) => (
-              <Chip
-                key={alert}
-                size="small"
-                color="warning"
-                label={ATTENDANCE_ALERT_LABELS[alert]}
-              />
-            ))}
-          </Stack>
-        ) : null}
+        <AttendanceAlertChips
+          alerts={person.alerts}
+          {...(person.registrationId
+            ? { registrationId: person.registrationId }
+            : {})}
+        />
       </Stack>
       {canRemove ? (
         <IconButton

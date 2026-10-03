@@ -34,11 +34,13 @@ Le PDF facture Stripe (même une fois payé) peut encore afficher « montant dû
    - Reçu : dès qu’il existe au moins un encaissement actif (`paidAmountCents > 0`).
    - CTAs sur **Mes dossiers** et sur le **suivi paiement secrétariat** (un seul bloc).
 
-6. **Numérotation comptable** : numéros séquentiels stables par saison, attribués
-   **au premier téléchargement** du PDF concerné, puis persistés sur le dossier
-   (`teamupInvoiceNumber`, `teamupReceiptNumber`). Format `FAC-{saison}-{NNNNN}` /
-   `REC-{saison}-{NNNNN}`. Compteur serveur : collection `clubPaymentDocumentCounters`
-   (Admin SDK uniquement).
+6. **Numérotation comptable** : numéros séquentiels stables par saison, format
+   `FAC-{saison}-{NNNNN}` / `REC-{saison}-{NNNNN}`, compteur
+   `clubPaymentDocumentCounters` (Admin SDK uniquement). **Amendé par ADR-0012** :
+   attribution à l’**événement métier** (facture engagée / premier encaissement),
+   plus au premier téléchargement. Les routes PDF gardent un `ensure` idempotent
+   en filet de sécurité. Champs persistés : `teamupInvoiceNumber`,
+   `teamupReceiptNumber`.
 
 7. **Présentation PDF** : destinataire libellé **Adhérent** (pas « Facturer à ») ;
    pas de date d’échéance sur ces justificatifs (détail tarifaire / preuve d’encaissement,
@@ -76,5 +78,6 @@ Le PDF facture Stripe (même une fois payé) peut encore afficher « montant dû
 ## Références
 
 - ADR-0010 (complément de paiement)
+- ADR-0012 (fiche adhérent + numérotation à l’événement métier)
 - `src/lib/club-registration/payment-documents/`
 - Point boîte à idées : téléchargement facture (paiements chèque)

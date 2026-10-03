@@ -1,13 +1,10 @@
 "use client";
 
 import {
-  Box,
   Button,
   Card,
   CardContent,
   Checkbox,
-  Chip,
-  Divider,
   FormControlLabel,
   Grid,
   MenuItem,
@@ -18,10 +15,7 @@ import {
 import { Add as AddIcon, Delete as DeleteIcon } from "@mui/icons-material";
 import { getEnabledSections, getSchoolPickupSlotIds } from "@/lib/club-registration-config/helpers";
 import type { Representative } from "@/lib/club-registration/schema";
-import {
-  formatPersonDisplayName,
-  normalizeLastNameOnInput,
-} from "@/lib/shared/person-name-format";
+import { normalizeLastNameOnInput } from "@/lib/shared/person-name-format";
 import { RegistrationMultiSelectField } from "../RegistrationMultiSelectField";
 import { SchoolPickupAdminFields } from "../SchoolPickupAdminFields";
 import {
@@ -29,10 +23,10 @@ import {
   RegistrationSubmissionContext,
 } from "./RegistrationSupplementarySections";
 import { DetailSectionTitle } from "./DetailSectionTitle";
+import { MembershipRequestDetailHeader } from "./MembershipRequestDetailHeader";
 import {
   ADHERENT_ROLE_OPTIONS,
   buildSlotOptions,
-  registrationStatusChipProps,
   REPRESENTATIVE_ROLE_OPTIONS,
   SEX_OPTIONS,
 } from "./membership-request-detail-shared";
@@ -61,39 +55,16 @@ export function MembershipRequestDetailFormPrimary({ detail, hideTitleHeader = f
 
   const sectionOptions = getEnabledSections(config);
   const allSlotOptions = buildSlotOptions(config);
-  const headerStatusChip = registrationStatusChipProps(
-    statusSummary?.status ?? selected.status
-  );
 
   return (
     <Stack spacing={3}>
-      {!hideTitleHeader ? (
-        <>
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            justifyContent="space-between"
-            spacing={1.5}
-          >
-            <Box>
-              <Typography variant="h5" fontWeight={700}>
-                {formatPersonDisplayName(form.firstName, form.lastName)}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Référence : {selected.id}
-              </Typography>
-            </Box>
-            <Chip label={headerStatusChip.label} color={headerStatusChip.color} />
-          </Stack>
-
-          <Divider />
-        </>
-      ) : null}
-
-      {hideTitleHeader ? (
-        <Typography variant="body2" color="text.secondary">
-          Référence : {selected.id}
-        </Typography>
-      ) : null}
+      <MembershipRequestDetailHeader
+        registrationId={selected.id}
+        firstName={form.firstName}
+        lastName={form.lastName}
+        status={statusSummary?.status ?? selected.status ?? undefined}
+        hideTitleHeader={hideTitleHeader}
+      />
 
       <RegistrationSubmissionContext
         submitterAccountEmail={selected.submitterAccountEmail}

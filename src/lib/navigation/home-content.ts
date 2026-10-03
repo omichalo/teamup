@@ -98,6 +98,12 @@ const HOME_LINK_META: Record<
     cta: "Voir mes dossiers",
     color: "primary",
   },
+  "/club/ma-fiche": {
+    description:
+      "Voir créneaux, présences et finances. En cas de plusieurs adhésions, choisissez la fiche.",
+    cta: "Ouvrir ma fiche",
+    color: "primary",
+  },
   "/club/idees": {
     description:
       "Proposer une évolution TeamUp ou club, ou signaler un problème.",

@@ -24,6 +24,7 @@ import {
 } from "@/lib/club-registration/registration-certificate-follow-up";
 import { buildManagerRegistrationPricingPatch } from "@/lib/club-registration/build-manager-registration-pricing-patch";
 import { resolveManagerPaymentAidsUpdate } from "@/lib/club-registration/build-manager-registration-aids-patch";
+import { syncAccountingDocumentsAfterRegistrationWrite } from "@/lib/club-registration/payment-documents/sync-document-numbers";
 import {
   ensureRegistrationConfigSeeded,
   getActiveRegistrationConfig,
@@ -324,6 +325,10 @@ export async function patchManagerRegistration(
     },
     { merge: true }
   );
+
+  await syncAccountingDocumentsAfterRegistrationWrite(db, registrationId, {
+    reason: "Mise à jour dossier secrétariat",
+  });
 
   logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_UPDATED, decoded.uid, {
     resource: "clubRegistration",

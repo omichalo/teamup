@@ -108,7 +108,10 @@ export function AttendanceSearchDialog({ open, slotId, onClose, onPick }: Props)
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                 {hit.displayName}
               </Typography>
-              <AttendanceAlertChips alerts={hit.alerts} />
+              <AttendanceAlertChips
+                alerts={hit.alerts}
+                registrationId={hit.registrationId}
+              />
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                 <Button
                   variant="contained"

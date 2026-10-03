@@ -13,6 +13,7 @@ import {
 import { addManualReceivedPayment } from "@/lib/club-registration/payment/payment-mutations";
 import { paymentWriteWithSettlement } from "@/lib/club-registration/payment/settlement-firestore";
 import { normalizePaymentReference } from "@/lib/club-registration/payment/payment-reference";
+import { syncPaymentDocumentNumbersForRegistration } from "@/lib/club-registration/payment-documents/sync-document-numbers";
 
 const COLLECTION = "clubRegistrations";
 
@@ -84,6 +85,15 @@ export async function POST(
       },
       { merge: true }
     );
+
+    try {
+      await syncPaymentDocumentNumbersForRegistration(db, id);
+    } catch (numberError) {
+      console.error(
+        "[api/club/registration/payment/received] document numbers",
+        numberError
+      );
+    }
 
     logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_UPDATED, auth.uid, {
       resource: "clubRegistration",

@@ -25,3 +25,24 @@ export function isRegistrationSupplementDue(payment?: PaymentBalance | null): bo
   }
   return payment.paidAmountCents > 0 && payment.remainingAmountCents > 0;
 }
+
+/** True seulement si le ledger est réellement soldé (pas de `paid` avec reliquat). */
+export function shouldMarkRegistrationPaid(
+  payment: Pick<RegistrationPayment, "remainingAmountCents" | "paymentStatus">
+): boolean {
+  return payment.remainingAmountCents === 0 && payment.paymentStatus === "paid";
+}
+
+/**
+ * Champs purs pour rouvrir un dossier avec solde dû.
+ * `paidAt: null` → converti en `FieldValue.delete()` par les scripts Admin.
+ */
+export function buildReopenForOutstandingBalanceFields(): {
+  status: "payment_requested";
+  paidAt: null;
+} {
+  return {
+    status: "payment_requested",
+    paidAt: null,
+  };
+}

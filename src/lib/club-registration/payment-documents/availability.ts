@@ -1,7 +1,19 @@
 import { hasStripeInvoiceId, isRegistrationPaidRecord } from "@/lib/club-registration/payment-proof";
 import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
+import { getRegistrationPaymentAids } from "@/lib/club-registration/payment/aid-receipt";
 import { resolveRegistrationInvoiceLines } from "./build-invoice-view-model";
-import type { PaymentDocumentsAvailability } from "./types";
+import { parseAccountingInvoices } from "./accounting-invoice-parse";
+import {
+  hasAidDocumentNumber,
+  isReceivedCollectableAid,
+} from "./aid-document-helpers";
+import { hasReceivedPaymentDocumentNumber } from "./received-payment-document-helpers";
+import type {
+  PaymentAidReceiptSummary,
+  PaymentDocumentsAvailability,
+  PaymentInvoiceSummary,
+  PaymentReceiptSummary,
+} from "./types";
 
 function hasActiveReceivedPayments(data: Record<string, unknown>): boolean {
   const payment = normalizeRegistrationPayment(data);
@@ -15,6 +27,9 @@ function hasActiveReceivedPayments(data: Record<string, unknown>): boolean {
 }
 
 function canBuildInvoiceDocument(data: Record<string, unknown>): boolean {
+  if (parseAccountingInvoices(data).length > 0) {
+    return true;
+  }
   const { totalCents, lines } = resolveRegistrationInvoiceLines(data);
   return totalCents > 0 || lines.length > 0;
 }
@@ -60,20 +75,76 @@ export function isInvoiceDocumentAvailable(data: Record<string, unknown>): boole
   return canBuildInvoiceDocument(data) && isPaymentPhaseStarted(data);
 }
 
-/** Reçu TeamUp : dès qu’un encaissement actif existe (y compris partiel). */
+/** Reçus unitaires / situation : dès qu’un encaissement actif existe. */
 export function isReceiptDocumentAvailable(data: Record<string, unknown>): boolean {
   if (hasActiveReceivedPayments(data)) {
     return true;
   }
-  // Dossiers legacy marqués payés sans objet payment détaillé.
   return isRegistrationPaidRecord(data);
+}
+
+export function isSituationDocumentAvailable(data: Record<string, unknown>): boolean {
+  return isInvoiceDocumentAvailable(data) || isReceiptDocumentAvailable(data);
+}
+
+export function listReceiptSummaries(
+  data: Record<string, unknown>
+): PaymentReceiptSummary[] {
+  const payment = normalizeRegistrationPayment(data);
+  if (!payment) {
+    return [];
+  }
+  return payment.receivedPayments
+    .filter((line) => !line.reversedAt && line.amountCents > 0)
+    .map((line) => ({
+      id: line.id,
+      documentNumber: hasReceivedPaymentDocumentNumber(line)
+        ? line.documentNumber!.trim()
+        : null,
+      amountCents: line.amountCents,
+      receivedAt: line.receivedAt,
+      method: line.method,
+      label: line.label,
+    }));
+}
+
+export function listInvoiceSummaries(
+  data: Record<string, unknown>
+): PaymentInvoiceSummary[] {
+  return parseAccountingInvoices(data).map((doc) => ({
+    id: doc.id,
+    kind: doc.kind,
+    documentNumber: doc.documentNumber,
+    label: doc.label,
+    totalCents: doc.totalCents,
+    issuedAt: doc.issuedAt,
+  }));
+}
+
+export function listAidReceiptSummaries(
+  data: Record<string, unknown>
+): PaymentAidReceiptSummary[] {
+  return getRegistrationPaymentAids(data)
+    .filter(isReceivedCollectableAid)
+    .map((aid) => ({
+      type: aid.type,
+      documentNumber: hasAidDocumentNumber(aid) ? aid.documentNumber!.trim() : null,
+      amountCents: aid.amountCents,
+      label: aid.label,
+      receivedAt: aid.receivedAt ?? null,
+    }));
 }
 
 export function resolvePaymentDocumentsAvailability(
   data: Record<string, unknown>
 ): PaymentDocumentsAvailability {
+  const receiptAvailable = isReceiptDocumentAvailable(data);
   return {
     invoiceAvailable: isInvoiceDocumentAvailable(data),
-    receiptAvailable: isReceiptDocumentAvailable(data),
+    receiptAvailable,
+    situationAvailable: isSituationDocumentAvailable(data),
+    receipts: listReceiptSummaries(data),
+    invoices: listInvoiceSummaries(data),
+    aidReceipts: listAidReceiptSummaries(data),
   };
 }

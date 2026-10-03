@@ -1,7 +1,7 @@
 import { normalizeRegistrationPayment, paymentToFirestoreUpdate } from "./payment/normalize-payment";
 import { markPaymentFullyPaid } from "./payment/payment-mutations";
 import { receivedMethodFromPlanned } from "./payment/received-method-from-planned";
-import { isRegistrationSupplementDue } from "./payment/registration-supplement";
+import { buildReopenForOutstandingBalanceFields } from "./payment/registration-supplement";
 
 type RegistrationPaymentRepairRecord = Record<string, unknown>;
 
@@ -34,22 +34,25 @@ export function needsRegistrationPaymentStatusRepair(
     return false;
   }
   const payment = normalizeRegistrationPayment(data);
-  if (payment && (payment.remainingAmountCents > 0 || isRegistrationSupplementDue(payment))) {
+  if (payment && payment.remainingAmountCents > 0) {
     return false;
   }
   return true;
 }
 
-/** Dossier clos (`paid`/`approved`) avec reliquat — doit être rouvert pour le complément. */
+/**
+ * Reliquat avec marqueurs de soldure (`paid` / `approved` / `paidAt`) —
+ * doit être rouvert et `paidAt` purgé.
+ */
 export function needsRegistrationSupplementReopenRepair(
   data: RegistrationPaymentRepairRecord
 ): boolean {
   const payment = normalizeRegistrationPayment(data);
-  if (!payment || !isRegistrationSupplementDue(payment)) {
+  if (!payment || payment.remainingAmountCents <= 0) {
     return false;
   }
   const status = data.status;
-  return status === "paid" || status === "approved";
+  return status === "paid" || status === "approved" || data.paidAt != null;
 }
 
 /**
@@ -108,9 +111,7 @@ export function buildLegacyPaymentStatusRepairPatch(
 }
 
 export function buildSupplementReopenRepairPatch(): Record<string, unknown> {
-  return {
-    status: "payment_requested",
-  };
+  return buildReopenForOutstandingBalanceFields();
 }
 
 export function buildSettlementFinalizeRepairPatch(

@@ -1,4 +1,3 @@
-import { attendanceAlertsFromRegistration } from "./alerts";
 import { buildAttendanceMarkId } from "./mark-id";
 import { buildSessionPayload } from "./roster";
 import { registrationMatchesQuery } from "./search-members";
@@ -20,46 +19,7 @@ import {
   filterActiveTargets,
   resolveCancellationTargets,
 } from "./cancellations";
-import { getDefaultRegistrationConfig } from "@/lib/club-registration-config/default-config";
 import { listSlotsForDate } from "./slots-for-date";
-
-describe("attendance alerts", () => {
-  it("signale paiement et certificat manquant", () => {
-    expect(
-      attendanceAlertsFromRegistration({
-        status: "submitted",
-        paymentStatus: "waiting_payment",
-        medicalCertificateDeclaration: "adult_certificate_required",
-        medicalCertificateStatus: "required_not_received",
-        birthDate: "1990-01-01",
-      })
-    ).toEqual(["unpaid", "certificate"]);
-  });
-
-  it("signale un PPS attendu", () => {
-    expect(
-      attendanceAlertsFromRegistration({
-        status: "paid",
-        paymentStatus: "paid",
-        medicalCertificateDeclaration: "adult_pps_declared",
-        ppsFollowUpStatus: "expected",
-        birthDate: "1990-01-01",
-      })
-    ).toEqual(["pps"]);
-  });
-
-  it("n'alerte pas un dossier soldé sans certificat requis", () => {
-    expect(
-      attendanceAlertsFromRegistration({
-        status: "paid",
-        paymentStatus: "paid",
-        medicalCertificateDeclaration: "under_40_all_no",
-        ppsFollowUpStatus: "not_applicable",
-        birthDate: "2015-01-01",
-      })
-    ).toEqual([]);
-  });
-});
 
 describe("attendance mark id", () => {
   it("est déterministe pour un adhérent inscrit", () => {

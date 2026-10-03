@@ -21,7 +21,6 @@ import { ADHERENT_PAYMENT_EMAIL_LANDING_ALERT, ADHERENT_PAYMENT_PENDING_ALERT, A
 import { canSelfServiceCheckout } from "@/lib/club-registration/self-service-checkout";
 import { resolveMesInscriptionSupplementDue } from "@/lib/club-registration/mes-inscription-supplement-display";
 import { MesInscriptionRegistrationCard } from "@/components/club-registration/MesInscriptionRegistrationCard";
-import { downloadRegistrationPaymentPdf } from "@/components/club-registration/download-registration-payment-pdf";
 import {
   isMesInscriptionPaid,
   type MesInscriptionSummary,
@@ -41,8 +40,6 @@ export function MesInscriptionsClient() {
   const [loading, setLoading] = useState(true);
   const [registrations, setRegistrations] = useState<MesInscriptionSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [documentError, setDocumentError] = useState<string | null>(null);
-  const [documentLoadingId, setDocumentLoadingId] = useState<string | null>(null);
   const highlightCardRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -128,34 +125,6 @@ export function MesInscriptionsClient() {
     [registrations]
   );
 
-  const openInvoice = async (registrationId: string) => {
-    setDocumentLoadingId(registrationId);
-    setDocumentError(null);
-    try {
-      await downloadRegistrationPaymentPdf(registrationId, "invoice");
-    } catch (err) {
-      setDocumentError(
-        err instanceof Error ? err.message : "Impossible de télécharger la facture."
-      );
-    } finally {
-      setDocumentLoadingId(null);
-    }
-  };
-
-  const downloadReceipt = async (registrationId: string) => {
-    setDocumentLoadingId(registrationId);
-    setDocumentError(null);
-    try {
-      await downloadRegistrationPaymentPdf(registrationId, "payment-receipt");
-    } catch (err) {
-      setDocumentError(
-        err instanceof Error ? err.message : "Impossible de télécharger le reçu."
-      );
-    } finally {
-      setDocumentLoadingId(null);
-    }
-  };
-
   return (
     <Container maxWidth="md" sx={{ py: { xs: 3, sm: 5 } }}>
       <Stack spacing={3}>
@@ -198,11 +167,12 @@ export function MesInscriptionsClient() {
             </strong>
             .{" "}
             {paymentJustCompleted.invoiceAvailable ||
+            paymentJustCompleted.situationAvailable ||
             paymentJustCompleted.receiptAvailable ||
             isMesInscriptionPaid(paymentJustCompleted) ? (
               <>
-                Votre <em>reçu</em> et, le cas échéant, votre <em>facture</em> sont
-                disponibles ci-dessous.
+                Votre <em>état de situation</em>, vos <em>reçus</em> et, le cas échéant,
+                votre <em>facture</em> sont disponibles ci-dessous.
               </>
             ) : (
               <>Les justificatifs apparaîtront d’ici quelques instants sur cette page.</>
@@ -234,11 +204,6 @@ export function MesInscriptionsClient() {
         ) : null}
 
         {error ? <Alert severity="error">{error}</Alert> : null}
-        {documentError ? (
-          <Alert severity="error" onClose={() => setDocumentError(null)}>
-            {documentError}
-          </Alert>
-        ) : null}
 
         {loading ? (
           <Box sx={{ display: "flex", justifyContent: "center", py: 6 }}>
@@ -261,9 +226,6 @@ export function MesInscriptionsClient() {
                 ref={r.id === highlightRegistrationId ? highlightCardRef : undefined}
                 registration={r}
                 highlighted={r.id === highlightRegistrationId}
-                documentLoadingId={documentLoadingId}
-                onOpenInvoice={openInvoice}
-                onDownloadReceipt={downloadReceipt}
                 onPaymentError={setError}
               />
             ))}

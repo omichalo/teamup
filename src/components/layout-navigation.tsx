@@ -11,6 +11,7 @@ import {
   Home,
   HowToReg,
   Person,
+  PersonSearch,
   PlaylistAddCheck,
   Preview,
   RateReview,
@@ -54,6 +55,11 @@ const NAV = {
     label: "Mes dossiers",
     href: "/club/mes-inscriptions",
     icon: <FactCheck />,
+  },
+  maFiche: {
+    label: "Ma fiche",
+    href: "/club/ma-fiche",
+    icon: <PersonSearch />,
   },
   dossiersAValider: {
     label: "Dossiers à valider",
@@ -161,14 +167,14 @@ export function buildLayoutAccountMenuItems(
   }
 
   if (isAdmin) {
-    return [NAV.mesDossiers];
+    return [NAV.mesDossiers, NAV.maFiche];
   }
 
   if (isSecretary) {
-    return [NAV.mesDossiers, NAV.nouvelleAdhesion];
+    return [NAV.mesDossiers, NAV.maFiche, NAV.nouvelleAdhesion];
   }
 
-  return [NAV.mesDossiers, NAV.nouvelleAdhesion];
+  return [NAV.mesDossiers, NAV.maFiche, NAV.nouvelleAdhesion];
 }
 
 export function buildLayoutNavigation(
@@ -192,6 +198,7 @@ export function buildLayoutNavigation(
       NAV.accueil,
       NAV.nouvelleAdhesion,
       NAV.mesDossiers,
+      NAV.maFiche,
     ];
     if (canAccessSpreadsheet) {
       primary.push(NAV.tableauAdhesions, NAV.statistiquesAdherents);

@@ -1,3 +1,4 @@
+import { FieldValue } from "firebase-admin/firestore";
 import { buildManagerRegistrationAidsPatch, resolveManagerPaymentAidsUpdate } from "./build-manager-registration-aids-patch";
 import type { RegistrationPayment } from "./payment/types";
 
@@ -272,6 +273,53 @@ describe("buildManagerRegistrationAidsPatch", () => {
     );
 
     expect(patch.status).toBeUndefined();
+  });
+
+  it("rouvre et purge paidAt si une aide retirée crée un reliquat", () => {
+    const currentPayment: RegistrationPayment = {
+      totalAmountCents: 10_000,
+      assistanceTotalAmountCents: 5_000,
+      amountToPayCents: 5_000,
+      aids: [{ type: "pass_sport", label: "Pass Sport", amountCents: 5_000, received: true }],
+      paymentMethod: "card",
+      paymentInstallments: 1,
+      expectedPayments: [],
+      receivedPayments: [
+        {
+          id: "rp_1",
+          method: "card",
+          label: "Carte",
+          amountCents: 5_000,
+          receivedAt: "2026-08-01T00:00:00.000Z",
+        },
+      ],
+      paidAmountCents: 5_000,
+      remainingAmountCents: 0,
+      paymentStatus: "paid",
+    };
+
+    const patch = buildManagerRegistrationAidsPatch(
+      {
+        reductionTypes: ["pass_sport"],
+        reductionReferenceCodes: {},
+      },
+      {
+        payment: currentPayment,
+        status: "paid",
+        paidAt: "2026-08-01T00:00:00.000Z",
+      },
+      config as never,
+      []
+    );
+
+    expect(patch.status).toBe("payment_requested");
+    expect(patch.paidAt).toEqual(FieldValue.delete());
+    expect(patch.payment).toMatchObject({
+      amountToPayCents: 10_000,
+      paidAmountCents: 5_000,
+      remainingAmountCents: 5_000,
+      paymentStatus: "partially_paid",
+    });
   });
 });
 

@@ -93,6 +93,7 @@ describe("buildRoleHomeContent", () => {
       "/club/presences/essais",
       "/club/inscription",
       "/club/mes-inscriptions",
+      "/club/ma-fiche",
       "/club/idees",
     ]);
   });
@@ -101,6 +102,7 @@ describe("buildRoleHomeContent", () => {
     expect(listHomeCardHrefs(buildRoleHomeContent(USER_ROLES.PLAYER))).toEqual([
       "/club/inscription",
       "/club/mes-inscriptions",
+      "/club/ma-fiche",
       "/club/idees",
     ]);
   });

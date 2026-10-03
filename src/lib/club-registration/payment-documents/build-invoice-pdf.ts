@@ -3,12 +3,13 @@ import {
   drawPaymentDocFooter,
   drawPaymentDocHeader,
   drawPaymentDocLinesTable,
+  PAYMENT_DOC_FONT_REGULAR,
   PAYMENT_DOC_PAGE_MARGIN,
   registerPaymentDocFonts,
 } from "./pdf-kit-shared";
 import type { PaymentInvoiceViewModel } from "./types";
 
-/** Génère le PDF facture TeamUp (détail tarifaire). */
+/** Génère le PDF facture / facture complémentaire / avoir TeamUp. */
 export async function buildPaymentInvoicePdf(
   viewModel: PaymentInvoiceViewModel
 ): Promise<Buffer> {
@@ -22,7 +23,7 @@ export async function buildPaymentInvoicePdf(
       info: {
         Title: viewModel.title,
         Author: viewModel.clubName,
-        Subject: `Facture ${viewModel.documentNumber}`,
+        Subject: `${viewModel.title} ${viewModel.documentNumber}`,
       },
     });
     registerPaymentDocFonts(doc);
@@ -38,7 +39,7 @@ export async function buildPaymentInvoicePdf(
         `Réf. dossier ${viewModel.registrationId}`,
       ];
       let y = drawPaymentDocHeader(doc, {
-        documentTitle: "Facture",
+        documentTitle: viewModel.title,
         documentNumber: viewModel.documentNumber,
         issuedAtLabel: viewModel.issuedAtLabel,
         partyLabel: "Adhérent",
@@ -53,15 +54,28 @@ export async function buildPaymentInvoicePdf(
           label: line.label,
           amountCents: line.amountCents,
         })),
-        "Total",
+        viewModel.isCreditNote ? "Total avoir" : "Total",
         viewModel.invoicedTotalCents
       );
+
+      if (viewModel.reason) {
+        doc
+          .font(PAYMENT_DOC_FONT_REGULAR)
+          .fontSize(9)
+          .fillColor("#4A5568")
+          .text(`Motif : ${viewModel.reason}`, PAYMENT_DOC_PAGE_MARGIN, y + 8, {
+            width: 595.28 - PAYMENT_DOC_PAGE_MARGIN * 2,
+          });
+        y = doc.y + 8;
+      }
 
       doc.y = y;
       drawPaymentDocFooter(
         doc,
-        "Document généré par TeamUp — détail tarifaire de l'adhésion. " +
-          "Le reçu de paiement est un justificatif distinct."
+        viewModel.isCreditNote
+          ? "Document généré par TeamUp — avoir comptable figé. Ne pas recalculer."
+          : "Document généré par TeamUp — pièce tarifaire figée. " +
+              "Le reçu de paiement est un justificatif distinct."
       );
 
       doc.end();

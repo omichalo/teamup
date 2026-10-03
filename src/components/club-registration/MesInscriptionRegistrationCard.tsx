@@ -7,16 +7,16 @@ import {
   CardActions,
   CardContent,
   Chip,
-  CircularProgress,
   Stack,
   Typography,
   Box,
 } from "@mui/material";
-import DownloadIcon from "@mui/icons-material/Download";
-import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
+import PersonSearchIcon from "@mui/icons-material/PersonSearch";
+import Link from "next/link";
 import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
 import { MEDICAL_CERTIFICATE_STATUS_LABELS } from "@/lib/club-registration/medical-certificate";
 import { MesInscriptionPayOnlineButton } from "@/components/club-registration/MesInscriptionPayOnlineButton";
+import { RegistrationPaymentDocumentsActions } from "@/components/club-registration/RegistrationPaymentDocumentsActions";
 import {
   findMesInscriptionSectionLabel,
   formatMesInscriptionDate,
@@ -29,27 +29,17 @@ import {
   type MesInscriptionSummary,
 } from "@/components/club-registration/mes-inscriptions-shared";
 import { resolveMesInscriptionStatusPresentation } from "@/lib/club-registration/mes-inscription-supplement-display";
-import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
+import { buildMemberProfileHref } from "@/lib/member-profile/urls";
 
 type Props = {
   registration: MesInscriptionSummary;
   highlighted?: boolean;
-  documentLoadingId: string | null;
-  onOpenInvoice: (registrationId: string) => void;
-  onDownloadReceipt: (registrationId: string) => void;
   onPaymentError: (message: string | null) => void;
 };
 
 export const MesInscriptionRegistrationCard = forwardRef<HTMLDivElement, Props>(
   function MesInscriptionRegistrationCard(
-    {
-      registration: r,
-      highlighted = false,
-      documentLoadingId,
-      onOpenInvoice,
-      onDownloadReceipt,
-      onPaymentError,
-    },
+    { registration: r, highlighted = false, onPaymentError },
     ref
   ) {
     const statusPresentation = resolveMesInscriptionStatusPresentation(
@@ -57,14 +47,6 @@ export const MesInscriptionRegistrationCard = forwardRef<HTMLDivElement, Props>(
       MES_INSCRIPTION_STATUS_LABEL,
       MES_INSCRIPTION_STATUS_COLOR
     );
-    const payment = normalizeRegistrationPayment(
-      r as unknown as Record<string, unknown>
-    );
-    const receiptPartial =
-      Boolean(r.receiptAvailable) &&
-      payment != null &&
-      payment.remainingAmountCents > 0;
-    const busy = documentLoadingId === r.id;
 
     return (
       <Card
@@ -91,11 +73,15 @@ export const MesInscriptionRegistrationCard = forwardRef<HTMLDivElement, Props>(
           >
             <Box sx={{ minWidth: 0 }}>
               <Typography
+                component={Link}
+                href={buildMemberProfileHref(r.id)}
                 variant="h6"
                 sx={{
                   color: "primary.main",
                   wordBreak: "break-word",
                   lineHeight: 1.3,
+                  textDecoration: "none",
+                  "&:hover": { textDecoration: "underline" },
                 }}
               >
                 {formatPersonDisplayName(r.firstName, r.lastName) || "—"}
@@ -168,47 +154,30 @@ export const MesInscriptionRegistrationCard = forwardRef<HTMLDivElement, Props>(
             alignItems={{ xs: "stretch", sm: "flex-end" }}
             sx={{ width: { xs: "100%", sm: "auto" } }}
           >
+            <Button
+              component={Link}
+              href={buildMemberProfileHref(r.id)}
+              size="small"
+              variant="contained"
+              color="primary"
+              startIcon={<PersonSearchIcon fontSize="small" />}
+              sx={{ alignSelf: { xs: "stretch", sm: "auto" }, flexShrink: 0 }}
+            >
+              Voir la fiche
+            </Button>
             <MesInscriptionPayOnlineButton registration={r} onError={onPaymentError} />
-            {r.receiptAvailable ? (
-              <Button
-                size="small"
-                variant="contained"
-                color="secondary"
-                startIcon={
-                  busy ? (
-                    <CircularProgress size={16} color="inherit" />
-                  ) : (
-                    <ReceiptLongIcon fontSize="small" />
-                  )
-                }
-                disabled={busy}
-                onClick={() => onDownloadReceipt(r.id)}
-                sx={{ alignSelf: { xs: "stretch", sm: "auto" }, flexShrink: 0 }}
-              >
-                {receiptPartial
-                  ? "Télécharger le reçu (partiel)"
-                  : "Télécharger le reçu"}
-              </Button>
-            ) : null}
-            {r.invoiceAvailable ? (
-              <Button
-                size="small"
-                variant="outlined"
-                color="secondary"
-                startIcon={
-                  busy ? (
-                    <CircularProgress size={16} color="inherit" />
-                  ) : (
-                    <DownloadIcon fontSize="small" />
-                  )
-                }
-                disabled={busy}
-                onClick={() => onOpenInvoice(r.id)}
-                sx={{ alignSelf: { xs: "stretch", sm: "auto" }, flexShrink: 0 }}
-              >
-                Télécharger la facture
-              </Button>
-            ) : isMesInscriptionPaid(r) && !r.receiptAvailable ? (
+            <RegistrationPaymentDocumentsActions
+              registrationId={r.id}
+              invoiceAvailable={Boolean(r.invoiceAvailable)}
+              situationAvailable={Boolean(r.situationAvailable ?? r.receiptAvailable)}
+              receipts={r.receipts ?? []}
+              invoices={r.invoices ?? []}
+              aidReceipts={r.aidReceipts ?? []}
+            />
+            {isMesInscriptionPaid(r) &&
+            !r.invoiceAvailable &&
+            !r.situationAvailable &&
+            !r.receiptAvailable ? (
               <Typography variant="caption" color="text.secondary">
                 Justificatifs en cours de publication…
               </Typography>
