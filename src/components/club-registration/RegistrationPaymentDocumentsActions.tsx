@@ -6,6 +6,7 @@ import DownloadIcon from "@mui/icons-material/Download";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import CardGiftcardIcon from "@mui/icons-material/CardGiftcard";
+import VerifiedIcon from "@mui/icons-material/Verified";
 import type {
   PaymentAidReceiptSummary,
   PaymentInvoiceSummary,
@@ -13,6 +14,7 @@ import type {
 } from "@/lib/club-registration/payment-documents/types";
 import {
   downloadRegistrationAidReceiptPdf,
+  downloadRegistrationCertificatePdf,
   downloadRegistrationInvoicePdf,
   downloadRegistrationPaymentPdf,
   downloadRegistrationUnitReceiptPdf,
@@ -25,6 +27,7 @@ type Props = {
   registrationId: string;
   invoiceAvailable: boolean;
   situationAvailable: boolean;
+  registrationCertificateAvailable?: boolean;
   receipts?: PaymentReceiptSummary[];
   invoices?: PaymentInvoiceSummary[];
   aidReceipts?: PaymentAidReceiptSummary[];
@@ -44,6 +47,7 @@ export function RegistrationPaymentDocumentsActions({
   registrationId,
   invoiceAvailable,
   situationAvailable,
+  registrationCertificateAvailable = false,
   receipts = [],
   invoices = [],
   aidReceipts = [],
@@ -57,6 +61,7 @@ export function RegistrationPaymentDocumentsActions({
   if (
     !invoiceAvailable &&
     !situationAvailable &&
+    !registrationCertificateAvailable &&
     receipts.length === 0 &&
     !hasInvoices &&
     aidReceipts.length === 0
@@ -87,6 +92,28 @@ export function RegistrationPaymentDocumentsActions({
         </Alert>
       ) : null}
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1} useFlexGap flexWrap="wrap">
+        {registrationCertificateAvailable ? (
+          <Button
+            size="small"
+            variant="contained"
+            color="primary"
+            startIcon={
+              loadingKind === "certificate" ? (
+                <CircularProgress size={16} color="inherit" />
+              ) : (
+                <VerifiedIcon fontSize="small" />
+              )
+            }
+            disabled={loadingKind != null}
+            onClick={() =>
+              void run("certificate", () =>
+                downloadRegistrationCertificatePdf(registrationId)
+              )
+            }
+          >
+            Attestation d&apos;inscription
+          </Button>
+        ) : null}
         {situationAvailable ? (
           <Button
             size="small"

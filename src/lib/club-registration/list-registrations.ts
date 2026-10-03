@@ -111,6 +111,8 @@ export function mapRegistrationDocToSummary(
   summary.invoiceAvailable = documents.invoiceAvailable;
   summary.receiptAvailable = documents.receiptAvailable;
   summary.situationAvailable = documents.situationAvailable;
+  summary.registrationCertificateAvailable =
+    documents.registrationCertificateAvailable;
   summary.receipts = documents.receipts;
   summary.invoices = documents.invoices;
   summary.aidReceipts = documents.aidReceipts;

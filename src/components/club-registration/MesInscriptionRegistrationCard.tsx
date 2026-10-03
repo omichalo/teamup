@@ -170,6 +170,9 @@ export const MesInscriptionRegistrationCard = forwardRef<HTMLDivElement, Props>(
               registrationId={r.id}
               invoiceAvailable={Boolean(r.invoiceAvailable)}
               situationAvailable={Boolean(r.situationAvailable ?? r.receiptAvailable)}
+              registrationCertificateAvailable={Boolean(
+                r.registrationCertificateAvailable
+              )}
               receipts={r.receipts ?? []}
               invoices={r.invoices ?? []}
               aidReceipts={r.aidReceipts ?? []}
@@ -177,7 +180,8 @@ export const MesInscriptionRegistrationCard = forwardRef<HTMLDivElement, Props>(
             {isMesInscriptionPaid(r) &&
             !r.invoiceAvailable &&
             !r.situationAvailable &&
-            !r.receiptAvailable ? (
+            !r.receiptAvailable &&
+            !r.registrationCertificateAvailable ? (
               <Typography variant="caption" color="text.secondary">
                 Justificatifs en cours de publication…
               </Typography>

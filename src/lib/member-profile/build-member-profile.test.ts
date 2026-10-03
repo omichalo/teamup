@@ -75,6 +75,7 @@ describe("buildMemberProfile", () => {
     expect(profile.finance.totals.invoicedCents).toBe(20000);
     expect(profile.documents.receiptAvailable).toBe(true);
     expect(profile.documents.situationAvailable).toBe(true);
+    expect(profile.documents.registrationCertificateAvailable).toBe(true);
     expect(profile.viewer.isOwner).toBe(true);
     expect(profile.viewer.canManage).toBe(false);
   });
