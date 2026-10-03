@@ -110,6 +110,10 @@ export function mapRegistrationDocToSummary(
   const documents = resolvePaymentDocumentsAvailability(data);
   summary.invoiceAvailable = documents.invoiceAvailable;
   summary.receiptAvailable = documents.receiptAvailable;
+  summary.situationAvailable = documents.situationAvailable;
+  summary.receipts = documents.receipts;
+  summary.invoices = documents.invoices;
+  summary.aidReceipts = documents.aidReceipts;
   return { summary, submittedAtMs };
 }
 

@@ -16,6 +16,8 @@ import {
   recalculateRegistrationPayment,
   regenerateExpectedPayments,
 } from "@/lib/club-registration/payment/payment-mutations";
+import { isRegistrationSupplementDue } from "@/lib/club-registration/payment/registration-supplement";
+import { buildReopenForOutstandingBalanceFirestorePatch } from "@/lib/club-registration/payment/settlement-firestore";
 import type { PaymentAid, RegistrationPayment } from "@/lib/club-registration/payment/types";
 import { managerPaymentAidPayloadSchema } from "@/lib/club-registration/payment-payload-schema";
 import { validateAdminAids } from "@/lib/club-registration/validate-admin-aids";
@@ -158,6 +160,20 @@ export function buildManagerRegistrationAidsPatch(
   const nextPayment = payment ? syncPaymentAfterAidsChange(payment, mergedAids) : null;
   if (nextPayment) {
     Object.assign(patch, paymentToFirestoreUpdate(nextPayment));
+    if (
+      nextPayment.remainingAmountCents > 0 &&
+      (isRegistrationSupplementDue(nextPayment) ||
+        currentData.status === "paid" ||
+        currentData.status === "approved" ||
+        currentData.paidAt != null)
+    ) {
+      Object.assign(
+        patch,
+        buildReopenForOutstandingBalanceFirestorePatch({
+          withSupplementRequestedAt: isRegistrationSupplementDue(nextPayment),
+        })
+      );
+    }
   }
 
   const approvedStatus = resolveApprovedStatusAfterAidReceipt({
@@ -165,7 +181,7 @@ export function buildManagerRegistrationAidsPatch(
     aids: mergedAids,
     amountToPayCents: nextPayment?.amountToPayCents ?? 0,
   });
-  if (approvedStatus) {
+  if (approvedStatus && !(typeof patch.status === "string" && patch.status === "payment_requested")) {
     patch.status = approvedStatus;
   }
 

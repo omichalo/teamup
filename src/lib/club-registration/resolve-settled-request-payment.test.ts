@@ -136,4 +136,18 @@ describe("buildPaidDossierValidationPatch", () => {
       payment,
     });
   });
+
+  it("ne marque pas paid si un reliquat reste dû", () => {
+    const payment = paidPayment({
+      paidAmountCents: 10_000,
+      remainingAmountCents: 5_000,
+      paymentStatus: "partially_paid",
+    });
+    const patch = buildPaidDossierValidationPatch(payment);
+    expect(patch.status).toBeUndefined();
+    expect(patch.payment).toMatchObject({
+      remainingAmountCents: 5_000,
+      paymentStatus: "partially_paid",
+    });
+  });
 });

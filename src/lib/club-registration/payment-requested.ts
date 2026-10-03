@@ -24,6 +24,8 @@ import { formatRegistrationPaymentEmailsForStorage } from "@/lib/club-registrati
 import { isRegistrationSupplementDue } from "@/lib/club-registration/payment/registration-supplement";
 import type { PriceQuote } from "@/lib/pricing/types";
 import type { PaymentRequestEmailVariant } from "@/lib/email/payment-email";
+import { syncPaymentDocumentNumbersForRegistration } from "@/lib/club-registration/payment-documents/sync-document-numbers";
+import { getFirestoreAdmin } from "@/lib/firebase-admin";
 
 export function validateRegistrationStripeCheckout(params: {
   quote: PriceQuote | null;
@@ -183,6 +185,18 @@ export async function persistPaymentRequestedAndNotify(params: {
     }),
     { merge: true }
   );
+
+  try {
+    await syncPaymentDocumentNumbersForRegistration(
+      getFirestoreAdmin(),
+      params.registrationId
+    );
+  } catch (numberError) {
+    console.error(
+      "[payment-requested] document number assignment",
+      numberError
+    );
+  }
 
   const hasValidatedQuote =
     params.quote != null &&

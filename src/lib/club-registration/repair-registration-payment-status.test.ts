@@ -97,6 +97,36 @@ describe("needsRegistrationSupplementReopenRepair", () => {
       })
     ).toBe(true);
   });
+
+  it("détecte paidAt résiduel avec status déjà rouvert", () => {
+    expect(
+      needsRegistrationSupplementReopenRepair({
+        status: "payment_requested",
+        paidAt: "2026-08-20T10:00:00.000Z",
+        payment: {
+          paymentMethod: "card",
+          totalAmountCents: 27_400,
+          assistanceTotalAmountCents: 0,
+          amountToPayCents: 27_400,
+          aids: [],
+          paymentInstallments: 1,
+          expectedPayments: [],
+          receivedPayments: [
+            {
+              id: "rp_cb",
+              method: "card",
+              label: "Carte",
+              amountCents: 23_900,
+              receivedAt: "2026-08-20T10:00:00.000Z",
+            },
+          ],
+          paidAmountCents: 23_900,
+          remainingAmountCents: 3_500,
+          paymentStatus: "partially_paid",
+        },
+      })
+    ).toBe(true);
+  });
 });
 
 describe("needsRegistrationSettlementFinalizeRepair", () => {

@@ -13,6 +13,7 @@ import {
   resolveRegistrationDonationPricing,
 } from "@/lib/club-registration/resolve-registration-donation";
 import { buildPaymentSyncPatchForQuote } from "@/lib/club-registration/payment/sync-payment-after-quote-change";
+import { syncAccountingDocumentsAfterRegistrationWrite } from "@/lib/club-registration/payment-documents/sync-document-numbers";
 import type { PriceQuote } from "@/lib/pricing/types";
 
 const COLLECTION = "clubRegistrations";
@@ -173,6 +174,11 @@ export async function POST(
       }
 
       await docRef.set(patch, { merge: true });
+
+      await syncAccountingDocumentsAfterRegistrationWrite(db, id, {
+        reconcileQuote: applyPaymentAmount,
+        reason: "Recalcul devis secrétariat",
+      });
 
       logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_UPDATED, decoded.uid, {
         resource: "clubRegistration",

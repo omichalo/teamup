@@ -1,7 +1,10 @@
-export type RegistrationPaymentDocumentKind = "invoice" | "payment-receipt";
+export type RegistrationPaymentDocumentKind =
+  | "invoice"
+  | "payment-situation"
+  | "payment-receipt";
 
 const DOCUMENT_META: Record<
-  RegistrationPaymentDocumentKind,
+  "invoice" | "payment-situation",
   { pathSegment: string; filePrefix: string; fallbackError: string }
 > = {
   invoice: {
@@ -9,10 +12,10 @@ const DOCUMENT_META: Record<
     filePrefix: "facture-adhesion",
     fallbackError: "Facture indisponible pour le moment.",
   },
-  "payment-receipt": {
-    pathSegment: "payment-receipt",
-    filePrefix: "recu-adhesion",
-    fallbackError: "Reçu indisponible pour le moment.",
+  "payment-situation": {
+    pathSegment: "payment-situation",
+    filePrefix: "situation-adhesion",
+    fallbackError: "État de situation indisponible pour le moment.",
   },
 };
 
@@ -43,12 +46,32 @@ export function resolveDownloadFileName(
   return fallback;
 }
 
-/** Télécharge un PDF facture/reçu depuis l’API club registration. */
+async function triggerBlobDownload(
+  res: Response,
+  fallbackFileName: string
+): Promise<void> {
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = resolveDownloadFileName(
+    res.headers.get("Content-Disposition"),
+    fallbackFileName
+  );
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+/** Télécharge facture ou état de situation. */
 export async function downloadRegistrationPaymentPdf(
   registrationId: string,
-  kind: RegistrationPaymentDocumentKind
+  kind: "invoice" | "payment-situation" | "payment-receipt"
 ): Promise<void> {
-  const meta = DOCUMENT_META[kind];
+  // Compat : ancien « payment-receipt » cumulatif → état de situation
+  const resolvedKind = kind === "payment-receipt" ? "payment-situation" : kind;
+  const meta = DOCUMENT_META[resolvedKind];
   const res = await fetch(
     `/api/club/registration/${encodeURIComponent(registrationId)}/${meta.pathSegment}`,
     { credentials: "include" }
@@ -57,16 +80,59 @@ export async function downloadRegistrationPaymentPdf(
     const json = (await res.json().catch(() => null)) as { error?: string } | null;
     throw new Error(json?.error ?? meta.fallbackError);
   }
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = resolveDownloadFileName(
-    res.headers.get("Content-Disposition"),
-    `${meta.filePrefix}-${registrationId}.pdf`
+  await triggerBlobDownload(res, `${meta.filePrefix}-${registrationId}.pdf`);
+}
+
+/** Télécharge une pièce FAC / complément / avoir figée. */
+export async function downloadRegistrationInvoicePdf(
+  registrationId: string,
+  invoiceId: string
+): Promise<void> {
+  const res = await fetch(
+    `/api/club/registration/${encodeURIComponent(registrationId)}/invoice/${encodeURIComponent(invoiceId)}`,
+    { credentials: "include" }
   );
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
+  if (!res.ok) {
+    const json = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(json?.error ?? "Facture indisponible pour le moment.");
+  }
+  await triggerBlobDownload(res, `facture-adhesion-${registrationId}-${invoiceId}.pdf`);
+}
+
+/** Télécharge un reçu unitaire (pièce REC). */
+export async function downloadRegistrationUnitReceiptPdf(
+  registrationId: string,
+  receivedPaymentId: string
+): Promise<void> {
+  const res = await fetch(
+    `/api/club/registration/${encodeURIComponent(registrationId)}/payment-receipt/${encodeURIComponent(receivedPaymentId)}`,
+    { credentials: "include" }
+  );
+  if (!res.ok) {
+    const json = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(json?.error ?? "Reçu indisponible pour le moment.");
+  }
+  await triggerBlobDownload(
+    res,
+    `recu-adhesion-${registrationId}-${receivedPaymentId}.pdf`
+  );
+}
+
+/** Télécharge un justificatif d'aide reçue (pièce AID). */
+export async function downloadRegistrationAidReceiptPdf(
+  registrationId: string,
+  aidType: string
+): Promise<void> {
+  const res = await fetch(
+    `/api/club/registration/${encodeURIComponent(registrationId)}/aid-receipt/${encodeURIComponent(aidType)}`,
+    { credentials: "include" }
+  );
+  if (!res.ok) {
+    const json = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(json?.error ?? "Justificatif d'aide indisponible pour le moment.");
+  }
+  await triggerBlobDownload(
+    res,
+    `aide-adhesion-${registrationId}-${aidType}.pdf`
+  );
 }

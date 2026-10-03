@@ -10,6 +10,7 @@ import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/no
 import { applyStripeCheckoutPaid } from "@/lib/club-registration/payment/apply-stripe-checkout-paid";
 import { paymentWriteWithSettlement } from "@/lib/club-registration/payment/settlement-firestore";
 import { syncRosterAfterRegistrationChange } from "@/lib/championship/sync-after-registration";
+import { syncPaymentDocumentNumbersForRegistration } from "@/lib/club-registration/payment-documents/sync-document-numbers";
 
 type StripeWebhookEvent = {
   id: string;
@@ -81,19 +82,15 @@ export async function POST(req: Request) {
         return { ...result, existing, amountCents: 0 };
       }
 
+      // Ne marquer soldé que via paymentWriteWithSettlement (remaining === 0).
       const paymentUpdate = result.payment
         ? paymentWriteWithSettlement(result.payment)
-        : result.markRegistrationPaid
-          ? { paymentStatus: "paid", status: "paid", paidAt: FieldValue.serverTimestamp() }
-          : {};
+        : {};
 
       tx.set(
         docRef,
         {
           ...paymentUpdate,
-          ...(result.markRegistrationPaid
-            ? { status: "paid", paidAt: FieldValue.serverTimestamp() }
-            : {}),
           stripeCheckoutSessionId: session?.id ?? null,
           stripeInvoiceId: session?.invoice ?? null,
           stripePaymentUrl: null,
@@ -114,6 +111,12 @@ export async function POST(req: Request) {
     }
     if (applied.ignored) {
       return jsonNoStore({ received: true, ignored: applied.ignored }, { status: 200 });
+    }
+
+    try {
+      await syncPaymentDocumentNumbersForRegistration(db, registrationId);
+    } catch (numberError) {
+      console.error("[api/stripe/webhook] document numbers", numberError);
     }
 
     logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_PAYMENT_CONFIRMED, "stripe", {

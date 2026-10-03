@@ -5,7 +5,6 @@ import {
   drawPaymentDocFooter,
   drawPaymentDocHeader,
   drawPaymentDocKeyValueBlock,
-  drawPaymentDocLinesTable,
   PAYMENT_DOC_FONT_BOLD,
   PAYMENT_DOC_FONT_REGULAR,
   PAYMENT_DOC_PAGE_MARGIN,
@@ -40,7 +39,7 @@ export function sanitizeReceiptPaymentDetail(
     .join(" — ");
 }
 
-/** Génère le PDF reçu / attestation d'encaissement TeamUp. */
+/** PDF reçu unitaire (une pièce REC = un encaissement). */
 export async function buildPaymentReceiptPdf(
   viewModel: PaymentReceiptViewModel
 ): Promise<Buffer> {
@@ -70,61 +69,53 @@ export async function buildPaymentReceiptPdf(
         `Réf. dossier ${viewModel.registrationId}`,
       ];
       let y = drawPaymentDocHeader(doc, {
-        documentTitle: viewModel.isFullySettled ? "Reçu" : "Attestation",
+        documentTitle: "Reçu",
         documentNumber: viewModel.documentNumber,
         issuedAtLabel: viewModel.issuedAtLabel,
-        statusLabel: viewModel.settlementLabel,
-        statusColor: viewModel.isFullySettled ? "#1B7F3A" : "#B07000",
         partyLabel: "Adhérent",
         billToName: viewModel.adherentName,
         billToExtraLines: billToExtra,
       });
 
-      if (viewModel.quoteLines.length > 0) {
-        y = drawPaymentDocLinesTable(
-          doc,
-          y,
-          viewModel.quoteLines.map((line) => ({
-            label: line.label,
-            amountCents: line.amountCents,
-          })),
-          "Total facturé",
-          viewModel.invoicedTotalCents
-        );
-      }
-
       doc
         .font(PAYMENT_DOC_FONT_BOLD)
         .fontSize(11)
         .fillColor(CLUB_PAYMENT_DOCUMENT_IDENTITY.primaryColor)
-        .text("Encaissements", PAYMENT_DOC_PAGE_MARGIN, y);
+        .text("Encaissement", PAYMENT_DOC_PAGE_MARGIN, y);
       y = doc.y + 8;
 
-      for (const payment of viewModel.payments) {
-        const detail = sanitizeReceiptPaymentDetail(payment);
-        doc
-          .font(PAYMENT_DOC_FONT_REGULAR)
-          .fontSize(9)
-          .fillColor("#1f2233")
-          .text(detail, PAYMENT_DOC_PAGE_MARGIN, y, { width: 360 });
-        doc
-          .font(PAYMENT_DOC_FONT_BOLD)
-          .fontSize(9)
-          .fillColor("#1f2233")
-          .text(formatCentsAsEuros(payment.amountCents), PAYMENT_DOC_PAGE_MARGIN + 380, y, {
-            width: 110,
-            align: "right",
-          });
-        y = Math.max(doc.y, y) + 10;
-      }
+      const detail = sanitizeReceiptPaymentDetail(viewModel.payment);
+      doc
+        .font(PAYMENT_DOC_FONT_REGULAR)
+        .fontSize(9)
+        .fillColor("#1f2233")
+        .text(detail, PAYMENT_DOC_PAGE_MARGIN, y, { width: 360 });
+      doc
+        .font(PAYMENT_DOC_FONT_BOLD)
+        .fontSize(9)
+        .fillColor("#1f2233")
+        .text(
+          formatCentsAsEuros(viewModel.payment.amountCents),
+          PAYMENT_DOC_PAGE_MARGIN + 380,
+          y,
+          { width: 110, align: "right" }
+        );
+      y = Math.max(doc.y, y) + 14;
 
-      y += 4;
       y = drawPaymentDocKeyValueBlock(doc, y, [
         {
-          label: "Total encaissé",
-          value: formatCentsAsEuros(viewModel.paidTotalCents),
+          label: "Montant reçu",
+          value: formatCentsAsEuros(viewModel.payment.amountCents),
           emphasize: true,
           color: "#1B7F3A",
+        },
+        {
+          label: "Total facturé (adhésion)",
+          value: formatCentsAsEuros(viewModel.invoicedTotalCents),
+        },
+        {
+          label: "Total encaissé à ce jour",
+          value: formatCentsAsEuros(viewModel.paidTotalCents),
         },
         ...(viewModel.remainingCents > 0
           ? [
@@ -141,7 +132,7 @@ export async function buildPaymentReceiptPdf(
       doc.y = y;
       drawPaymentDocFooter(
         doc,
-        "Document généré par TeamUp — justificatif d'encaissement. " +
+        "Pièce comptable d'encaissement. Pour le solde global, téléchargez l'état de situation. " +
           "La facture (détail tarifaire) est un document distinct."
       );
 

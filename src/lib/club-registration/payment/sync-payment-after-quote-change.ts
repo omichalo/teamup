@@ -1,4 +1,3 @@
-import { FieldValue } from "firebase-admin/firestore";
 import {
   normalizeRegistrationPayment,
   paymentToFirestoreUpdate,
@@ -8,6 +7,7 @@ import {
   recalculateRegistrationPayment,
   regenerateExpectedPayments,
 } from "./payment-mutations";
+import { buildReopenForOutstandingBalanceFirestorePatch } from "./settlement-firestore";
 import type { RegistrationPayment } from "./types";
 
 /**
@@ -42,6 +42,20 @@ function paymentNeedsQuoteSync(
   );
 }
 
+function shouldReopenAfterQuoteSync(
+  currentData: Record<string, unknown>,
+  next: RegistrationPayment
+): boolean {
+  if (next.remainingAmountCents <= 0) {
+    return false;
+  }
+  if (isRegistrationSupplementDue(next)) {
+    return true;
+  }
+  const status = currentData.status;
+  return status === "paid" || status === "approved" || currentData.paidAt != null;
+}
+
 /** Patch Firestore `payment` + champs plats, ou `{}` si déjà aligné. */
 export function buildPaymentSyncPatchForQuote(params: {
   currentData: Record<string, unknown>;
@@ -59,9 +73,13 @@ export function buildPaymentSyncPatchForQuote(params: {
 
   const patch = paymentToFirestoreUpdate(next);
 
-  if (isRegistrationSupplementDue(next)) {
-    patch.status = "payment_requested";
-    patch.supplementRequestedAt = FieldValue.serverTimestamp();
+  if (shouldReopenAfterQuoteSync(params.currentData, next)) {
+    Object.assign(
+      patch,
+      buildReopenForOutstandingBalanceFirestorePatch({
+        withSupplementRequestedAt: true,
+      })
+    );
   }
 
   return patch;

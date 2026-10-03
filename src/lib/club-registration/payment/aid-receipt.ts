@@ -69,23 +69,41 @@ export function sanitizePaymentAidsForFamilySubmit(
   return normalizePaymentAidList(aids).map(markAidUnreceived);
 }
 
+function preserveAidDocumentNumber(aid: PaymentAid, previous?: PaymentAid): PaymentAid {
+  const fromAid =
+    typeof aid.documentNumber === "string" && aid.documentNumber.trim()
+      ? aid.documentNumber.trim()
+      : null;
+  const fromPrev =
+    previous &&
+    typeof previous.documentNumber === "string" &&
+    previous.documentNumber.trim()
+      ? previous.documentNumber.trim()
+      : null;
+  const documentNumber = fromAid ?? fromPrev;
+  return documentNumber ? { ...aid, documentNumber } : aid;
+}
+
 export function applyManagerAidReceiptMetadata(
   incoming: PaymentAid[],
   previous: PaymentAid[],
   actor: AidReceiptActor
 ): PaymentAid[] {
   return incoming.map((aid) => {
+    const prev = previous.find((item) => item.type === aid.type);
     if (!isCollectableAid(aid)) {
-      return markAidUnreceived(aid);
+      return preserveAidDocumentNumber(markAidUnreceived(aid), prev);
     }
     if (aid.received !== true) {
-      return markAidUnreceived(aid);
+      return preserveAidDocumentNumber(markAidUnreceived(aid), prev);
     }
-    const prev = previous.find((item) => item.type === aid.type);
     if (prev?.received === true && prev.receivedAt && prev.receivedBy) {
-      return markAidReceived(aid, { uid: prev.receivedBy, at: prev.receivedAt });
+      return preserveAidDocumentNumber(
+        markAidReceived(aid, { uid: prev.receivedBy, at: prev.receivedAt }),
+        prev
+      );
     }
-    return markAidReceived(aid, actor);
+    return preserveAidDocumentNumber(markAidReceived(aid, actor), prev);
   });
 }
 

@@ -33,7 +33,7 @@ function resolveSeasonKey(data: Record<string, unknown>): string {
 }
 
 export function formatPaymentDocumentNumber(
-  prefix: "FAC" | "REC",
+  prefix: "FAC" | "REC" | "AVO" | "AID",
   seasonKey: string,
   sequence: number
 ): string {

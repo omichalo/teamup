@@ -4,35 +4,71 @@ import { useState } from "react";
 import { Alert, Button, CircularProgress, Stack, Typography } from "@mui/material";
 import DownloadIcon from "@mui/icons-material/Download";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
-import { downloadRegistrationPaymentPdf } from "@/components/club-registration/download-registration-payment-pdf";
+import AssessmentIcon from "@mui/icons-material/Assessment";
+import CardGiftcardIcon from "@mui/icons-material/CardGiftcard";
+import type {
+  PaymentAidReceiptSummary,
+  PaymentInvoiceSummary,
+  PaymentReceiptSummary,
+} from "@/lib/club-registration/payment-documents/types";
+import {
+  downloadRegistrationAidReceiptPdf,
+  downloadRegistrationInvoicePdf,
+  downloadRegistrationPaymentPdf,
+  downloadRegistrationUnitReceiptPdf,
+} from "@/components/club-registration/download-registration-payment-pdf";
+import { formatCentsAsEuros } from "@/lib/pricing/format";
+
+type LoadingKind = string | null;
 
 type Props = {
   registrationId: string;
   invoiceAvailable: boolean;
-  receiptAvailable: boolean;
-  receiptPartial?: boolean;
+  situationAvailable: boolean;
+  receipts?: PaymentReceiptSummary[];
+  invoices?: PaymentInvoiceSummary[];
+  aidReceipts?: PaymentAidReceiptSummary[];
 };
+
+function invoiceButtonLabel(invoice: PaymentInvoiceSummary): string {
+  const prefix =
+    invoice.kind === "credit_note"
+      ? "Avoir"
+      : invoice.kind === "supplement"
+        ? "Fac. compl."
+        : "Facture";
+  return `${prefix} ${invoice.documentNumber} (${formatCentsAsEuros(Math.abs(invoice.totalCents))})`;
+}
 
 export function RegistrationPaymentDocumentsActions({
   registrationId,
   invoiceAvailable,
-  receiptAvailable,
-  receiptPartial = false,
+  situationAvailable,
+  receipts = [],
+  invoices = [],
+  aidReceipts = [],
 }: Props) {
-  const [loadingKind, setLoadingKind] = useState<"invoice" | "payment-receipt" | null>(
-    null
-  );
+  const [loadingKind, setLoadingKind] = useState<LoadingKind>(null);
   const [error, setError] = useState<string | null>(null);
 
-  if (!invoiceAvailable && !receiptAvailable) {
+  const hasInvoices = invoices.length > 0;
+  const showLegacyInvoice = invoiceAvailable && !hasInvoices;
+
+  if (
+    !invoiceAvailable &&
+    !situationAvailable &&
+    receipts.length === 0 &&
+    !hasInvoices &&
+    aidReceipts.length === 0
+  ) {
     return null;
   }
 
-  const runDownload = async (kind: "invoice" | "payment-receipt") => {
+  const run = async (kind: string, action: () => Promise<void>) => {
     setLoadingKind(kind);
     setError(null);
     try {
-      await downloadRegistrationPaymentPdf(registrationId, kind);
+      await action();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Téléchargement impossible.");
     } finally {
@@ -51,25 +87,55 @@ export function RegistrationPaymentDocumentsActions({
         </Alert>
       ) : null}
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1} useFlexGap flexWrap="wrap">
-        {receiptAvailable ? (
+        {situationAvailable ? (
           <Button
             size="small"
             variant="contained"
             color="secondary"
             startIcon={
-              loadingKind === "payment-receipt" ? (
+              loadingKind === "situation" ? (
                 <CircularProgress size={16} color="inherit" />
               ) : (
-                <ReceiptLongIcon fontSize="small" />
+                <AssessmentIcon fontSize="small" />
               )
             }
             disabled={loadingKind != null}
-            onClick={() => void runDownload("payment-receipt")}
+            onClick={() =>
+              void run("situation", () =>
+                downloadRegistrationPaymentPdf(registrationId, "payment-situation")
+              )
+            }
           >
-            {receiptPartial ? "Télécharger le reçu (partiel)" : "Télécharger le reçu"}
+            État de situation
           </Button>
         ) : null}
-        {invoiceAvailable ? (
+        {invoices.map((invoice) => {
+          const key = `invoice:${invoice.id}`;
+          return (
+            <Button
+              key={invoice.id}
+              size="small"
+              variant="outlined"
+              color="secondary"
+              startIcon={
+                loadingKind === key ? (
+                  <CircularProgress size={16} color="inherit" />
+                ) : (
+                  <DownloadIcon fontSize="small" />
+                )
+              }
+              disabled={loadingKind != null}
+              onClick={() =>
+                void run(key, () =>
+                  downloadRegistrationInvoicePdf(registrationId, invoice.id)
+                )
+              }
+            >
+              {invoiceButtonLabel(invoice)}
+            </Button>
+          );
+        })}
+        {showLegacyInvoice ? (
           <Button
             size="small"
             variant="outlined"
@@ -82,11 +148,69 @@ export function RegistrationPaymentDocumentsActions({
               )
             }
             disabled={loadingKind != null}
-            onClick={() => void runDownload("invoice")}
+            onClick={() =>
+              void run("invoice", () =>
+                downloadRegistrationPaymentPdf(registrationId, "invoice")
+              )
+            }
           >
-            Télécharger la facture
+            Facture
           </Button>
         ) : null}
+        {receipts.map((receipt) => {
+          const key = `receipt:${receipt.id}`;
+          return (
+            <Button
+              key={receipt.id}
+              size="small"
+              variant="outlined"
+              startIcon={
+                loadingKind === key ? (
+                  <CircularProgress size={16} color="inherit" />
+                ) : (
+                  <ReceiptLongIcon fontSize="small" />
+                )
+              }
+              disabled={loadingKind != null}
+              onClick={() =>
+                void run(key, () =>
+                  downloadRegistrationUnitReceiptPdf(registrationId, receipt.id)
+                )
+              }
+            >
+              Reçu
+              {receipt.documentNumber ? ` ${receipt.documentNumber}` : ""}
+              {` (${formatCentsAsEuros(receipt.amountCents)})`}
+            </Button>
+          );
+        })}
+        {aidReceipts.map((aid) => {
+          const key = `aid:${aid.type}`;
+          return (
+            <Button
+              key={aid.type}
+              size="small"
+              variant="outlined"
+              startIcon={
+                loadingKind === key ? (
+                  <CircularProgress size={16} color="inherit" />
+                ) : (
+                  <CardGiftcardIcon fontSize="small" />
+                )
+              }
+              disabled={loadingKind != null}
+              onClick={() =>
+                void run(key, () =>
+                  downloadRegistrationAidReceiptPdf(registrationId, aid.type)
+                )
+              }
+            >
+              Aide
+              {aid.documentNumber ? ` ${aid.documentNumber}` : ""}
+              {` (${formatCentsAsEuros(aid.amountCents)})`}
+            </Button>
+          );
+        })}
       </Stack>
     </Stack>
   );
