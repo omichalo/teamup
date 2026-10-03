@@ -2,7 +2,10 @@ import { RECEIVED_PAYMENT_METHOD_LABELS } from "@/lib/club-registration/payment-
 import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
 import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
 import { resolveRegistrationInvoiceLines } from "./build-invoice-view-model";
-import type { PaymentReceiptViewModel } from "./types";
+import type {
+  PaymentReceiptPaymentLine,
+  PaymentReceiptViewModel,
+} from "./types";
 
 const dateFormatter = new Intl.DateTimeFormat("fr-FR", {
   day: "numeric",
@@ -28,97 +31,93 @@ function resolveSeasonLabel(data: Record<string, unknown>): string | null {
   return null;
 }
 
+function toPaymentLine(line: {
+  id: string;
+  label: string;
+  method: PaymentReceiptPaymentLine["method"];
+  amountCents: number;
+  receivedAt: string;
+  reference?: string;
+  note?: string;
+  documentNumber?: string;
+}): PaymentReceiptPaymentLine {
+  return {
+    id: line.id,
+    label: line.label,
+    method: line.method,
+    methodLabel: RECEIVED_PAYMENT_METHOD_LABELS[line.method] ?? line.method,
+    amountCents: line.amountCents,
+    receivedAt: line.receivedAt,
+    receivedAtLabel: formatDateLabel(line.receivedAt),
+    ...(line.reference ? { reference: line.reference } : {}),
+    ...(line.note ? { note: line.note } : {}),
+    ...(line.documentNumber ? { documentNumber: line.documentNumber } : {}),
+  };
+}
+
 /**
- * Construit le view-model du reçu PDF à partir d’un document `clubRegistrations`.
- * Retourne null s’il n’y a aucun encaissement à attester (sauf legacy payé).
+ * View-model d'un reçu unitaire (une pièce REC pour un encaissement).
  */
-export function buildPaymentReceiptViewModel(
+export function buildUnitPaymentReceiptViewModel(
   registrationId: string,
   data: Record<string, unknown>,
+  receivedPaymentId: string,
   options: { documentNumber: string; clubName?: string; now?: Date }
 ): PaymentReceiptViewModel | null {
   const payment = normalizeRegistrationPayment(data);
-  const activePayments = (payment?.receivedPayments ?? []).filter(
-    (line) => !line.reversedAt && line.amountCents > 0
-  );
-
-  const isLegacyPaidWithoutLines =
-    activePayments.length === 0 &&
-    (data.status === "paid" ||
-      data.paymentStatus === "paid" ||
-      data.paymentStatus === "complete" ||
-      data.paidAt != null);
-
-  if (activePayments.length === 0 && !isLegacyPaidWithoutLines) {
+  if (!payment) {
     return null;
   }
 
-  const { lines: quoteLines, totalCents: invoicedTotalCents } =
-    resolveRegistrationInvoiceLines(data);
-  const paidTotalCents =
-    payment?.paidAmountCents ??
-    activePayments.reduce((sum, line) => sum + line.amountCents, 0) ??
-    (typeof data.paymentAmountCents === "number" ? data.paymentAmountCents : 0);
+  const line = payment.receivedPayments.find((item) => item.id === receivedPaymentId);
+  if (!line || line.reversedAt || line.amountCents <= 0) {
+    return null;
+  }
 
-  const remainingCents =
-    payment?.remainingAmountCents ??
-    Math.max(0, invoicedTotalCents - paidTotalCents);
-
-  const isFullySettled = remainingCents <= 0;
+  const { totalCents: invoicedTotalCents } = resolveRegistrationInvoiceLines(data);
   const adherentName =
     formatPersonDisplayName(
       typeof data.firstName === "string" ? data.firstName : undefined,
       typeof data.lastName === "string" ? data.lastName : undefined
     ) || "Adhérent";
 
-  const payments =
-    activePayments.length > 0
-      ? activePayments.map((line) => ({
-          id: line.id,
-          label: line.label,
-          method: line.method,
-          methodLabel: RECEIVED_PAYMENT_METHOD_LABELS[line.method] ?? line.method,
-          amountCents: line.amountCents,
-          receivedAt: line.receivedAt,
-          receivedAtLabel: formatDateLabel(line.receivedAt),
-          ...(line.reference ? { reference: line.reference } : {}),
-          ...(line.note ? { note: line.note } : {}),
-        }))
-      : [
-          {
-            id: "legacy-paid",
-            label: "Paiement enregistré",
-            method: "other" as const,
-            methodLabel: "Enregistré par le club",
-            amountCents: paidTotalCents,
-            receivedAt:
-              typeof data.paidAt === "string"
-                ? data.paidAt
-                : (options.now ?? new Date()).toISOString(),
-            receivedAtLabel: formatDateLabel(
-              typeof data.paidAt === "string"
-                ? data.paidAt
-                : (options.now ?? new Date()).toISOString()
-            ),
-          },
-        ];
-
   return {
     registrationId,
+    receivedPaymentId: line.id,
     documentNumber: options.documentNumber,
     clubName: options.clubName ?? "SQY Ping",
-    title: isFullySettled
-      ? "Reçu de paiement — adhésion"
-      : "Attestation d'encaissement partiel — adhésion",
-    settlementLabel: isFullySettled ? "Soldé" : "Partiellement payé",
-    isFullySettled,
+    title: "Reçu de paiement — adhésion",
     adherentName,
     seasonLabel: resolveSeasonLabel(data),
     issuedAtLabel: dateFormatter.format(options.now ?? new Date()),
-    quoteLines,
+    payment: toPaymentLine({
+      id: line.id,
+      label: line.label,
+      method: line.method,
+      amountCents: line.amountCents,
+      receivedAt: line.receivedAt,
+      ...(line.reference ? { reference: line.reference } : {}),
+      ...(line.note ? { note: line.note } : {}),
+      documentNumber: options.documentNumber,
+    }),
     invoicedTotalCents,
-    payments,
-    paidTotalCents,
-    remainingCents,
+    paidTotalCents: payment.paidAmountCents,
+    remainingCents: payment.remainingAmountCents,
   };
+}
+
+/** @deprecated Prefer buildUnitPaymentReceiptViewModel — conservé pour tests legacy. */
+export function buildPaymentReceiptViewModel(
+  registrationId: string,
+  data: Record<string, unknown>,
+  options: { documentNumber: string; clubName?: string; now?: Date }
+): PaymentReceiptViewModel | null {
+  const payment = normalizeRegistrationPayment(data);
+  const active = (payment?.receivedPayments ?? []).find(
+    (line) => !line.reversedAt && line.amountCents > 0
+  );
+  if (!active) {
+    return null;
+  }
+  return buildUnitPaymentReceiptViewModel(registrationId, data, active.id, options);
 }

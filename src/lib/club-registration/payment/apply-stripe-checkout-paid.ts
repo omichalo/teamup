@@ -1,4 +1,5 @@
 import { addManualReceivedPayment } from "@/lib/club-registration/payment/payment-mutations";
+import { shouldMarkRegistrationPaid } from "@/lib/club-registration/payment/registration-supplement";
 import type { RegistrationPayment } from "@/lib/club-registration/payment/types";
 
 const STRIPE_CHECKOUT_NOTE_PREFIX = "Checkout ";
@@ -45,7 +46,7 @@ export function applyStripeCheckoutPaid(
     return {
       duplicate: true,
       payment: input.payment,
-      markRegistrationPaid: input.payment.remainingAmountCents === 0,
+      markRegistrationPaid: shouldMarkRegistrationPaid(input.payment),
     };
   }
 
@@ -69,7 +70,13 @@ export function applyStripeCheckoutPaid(
   }
 
   if (!input.payment) {
-    return { duplicate: false, payment: null, markRegistrationPaid: true };
+    // Sans ledger paiement, on ne peut pas garantir remaining === 0.
+    return {
+      duplicate: false,
+      payment: null,
+      markRegistrationPaid: false,
+      ignored: "missing payment ledger",
+    };
   }
 
   const payment = addManualReceivedPayment(input.payment, {
@@ -84,7 +91,6 @@ export function applyStripeCheckoutPaid(
   return {
     duplicate: false,
     payment,
-    markRegistrationPaid:
-      payment.remainingAmountCents === 0 && payment.paymentStatus === "paid",
+    markRegistrationPaid: shouldMarkRegistrationPaid(payment),
   };
 }

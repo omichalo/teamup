@@ -21,12 +21,14 @@ describe("buildLayoutNavigation", () => {
       "/joueur",
       "/club/inscription",
       "/club/mes-inscriptions",
+      "/club/ma-fiche",
       "/club/idees",
     ]);
     expect(nav.primary.map((item) => item.label)).toEqual([
       "Accueil",
       "Nouvelle adhésion",
       "Mes dossiers",
+      "Ma fiche",
       "Boîte à idées",
     ]);
     expect(nav.groups).toHaveLength(0);
@@ -42,6 +44,7 @@ describe("buildLayoutNavigation", () => {
       "/joueur",
       "/club/inscription",
       "/club/mes-inscriptions",
+      "/club/ma-fiche",
       "/club/adhesions-tableau",
       "/club/statistiques-adherents",
       "/club/idees",
@@ -59,6 +62,7 @@ describe("buildLayoutNavigation", () => {
       "/joueur",
       "/club/inscription",
       "/club/mes-inscriptions",
+      "/club/ma-fiche",
       "/club/adhesions-tableau",
       "/club/statistiques-adherents",
       "/club/presences",
@@ -79,6 +83,7 @@ describe("buildLayoutNavigation", () => {
       "/joueur",
       "/club/inscription",
       "/club/mes-inscriptions",
+      "/club/ma-fiche",
       "/club/adhesions-tableau",
       "/club/statistiques-adherents",
       "/club/validations-licence",
@@ -186,6 +191,7 @@ describe("buildLayoutAccountMenuItems", () => {
   it("moves personal links to account menu for coach", () => {
     expect(buildLayoutAccountMenuItems(base).map((item) => item.href)).toEqual([
       "/club/mes-inscriptions",
+      "/club/ma-fiche",
       "/club/inscription",
     ]);
   });
@@ -195,7 +201,7 @@ describe("buildLayoutAccountMenuItems", () => {
       buildLayoutAccountMenuItems({ ...base, isAdmin: true }).map(
         (item) => item.href,
       ),
-    ).toEqual(["/club/mes-inscriptions"]);
+    ).toEqual(["/club/mes-inscriptions", "/club/ma-fiche"]);
   });
 });
 

@@ -6,8 +6,10 @@ import { adminAuth, getFirestoreAdmin } from "@/lib/firebase-admin";
 import { resolveRole } from "@/lib/auth/roles";
 import { canAccessClubRegistration } from "@/lib/club-registration/registration-access";
 import {
+  buildAccountingInvoiceViewModel,
   buildPaymentInvoicePdf,
   buildPaymentInvoiceViewModel,
+  ensureInitialAccountingInvoiceSnapshot,
   ensurePaymentDocumentNumber,
   isInvoiceDocumentAvailable,
 } from "@/lib/club-registration/payment-documents";
@@ -16,7 +18,7 @@ const COLLECTION = "clubRegistrations";
 
 /**
  * GET /api/club/registration/[id]/invoice
- * Facture PDF TeamUp (détail tarifaire) — admin, secrétariat, ou soumettant.
+ * Facture PDF — pièce figée (1re FAC) ; filet ensure snapshot + n°.
  */
 export async function GET(
   _req: Request,
@@ -39,7 +41,7 @@ export async function GET(
       return jsonNoStore({ error: "Dossier introuvable" }, { status: 404 });
     }
 
-    const data = (snap.data() ?? {}) as Record<string, unknown>;
+    let data = (snap.data() ?? {}) as Record<string, unknown>;
     const submitterUid =
       typeof data.submitterUid === "string" ? data.submitterUid : undefined;
 
@@ -60,8 +62,19 @@ export async function GET(
       data,
       kind: "invoice",
     });
+    data = { ...data, teamupInvoiceNumber: documentNumber };
 
-    const viewModel = buildPaymentInvoiceViewModel(id, data, { documentNumber });
+    const invoices = await ensureInitialAccountingInvoiceSnapshot({
+      db,
+      registrationId: id,
+      data,
+    });
+    const primary =
+      invoices.find((doc) => doc.kind === "invoice") ?? invoices[0] ?? null;
+
+    const viewModel = primary
+      ? buildAccountingInvoiceViewModel(id, data, primary)
+      : buildPaymentInvoiceViewModel(id, data, { documentNumber });
     if (!viewModel) {
       return jsonNoStore(
         { error: "Impossible de constituer la facture." },
@@ -70,7 +83,7 @@ export async function GET(
     }
 
     const pdf = await buildPaymentInvoicePdf(viewModel);
-    const fileName = `${documentNumber}.pdf`;
+    const fileName = `${viewModel.documentNumber}.pdf`;
 
     return new Response(new Uint8Array(pdf), {
       status: 200,

@@ -6,18 +6,17 @@ import { adminAuth, getFirestoreAdmin } from "@/lib/firebase-admin";
 import { resolveRole } from "@/lib/auth/roles";
 import { canAccessClubRegistration } from "@/lib/club-registration/registration-access";
 import {
-  buildPaymentReceiptPdf,
-  buildPaymentReceiptViewModel,
-  ensurePaymentDocumentNumber,
-  isReceiptDocumentAvailable,
+  buildPaymentSituationPdf,
+  buildPaymentSituationViewModel,
+  isSituationDocumentAvailable,
 } from "@/lib/club-registration/payment-documents";
 
 const COLLECTION = "clubRegistrations";
 
 /**
  * GET /api/club/registration/[id]/payment-receipt
- * PDF justificatif d'encaissement (CB, hors CB, partiel).
- * Accès : admin, secrétariat, ou soumettant du dossier.
+ * Compatibilité : sert l'état de situation (ex-reçu cumulatif).
+ * Les reçus unitaires sont sur /payment-receipt/[receivedId].
  */
 export async function GET(
   _req: Request,
@@ -48,30 +47,23 @@ export async function GET(
       return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
     }
 
-    if (!isReceiptDocumentAvailable(data)) {
+    if (!isSituationDocumentAvailable(data)) {
       return jsonNoStore(
-        { error: "Aucun encaissement à attester pour ce dossier." },
+        { error: "Aucun état de situation disponible pour ce dossier." },
         { status: 404 }
       );
     }
 
-    const documentNumber = await ensurePaymentDocumentNumber({
-      db,
-      registrationId: id,
-      data,
-      kind: "receipt",
-    });
-
-    const viewModel = buildPaymentReceiptViewModel(id, data, { documentNumber });
+    const viewModel = buildPaymentSituationViewModel(id, data);
     if (!viewModel) {
       return jsonNoStore(
-        { error: "Impossible de constituer le reçu." },
+        { error: "Impossible de constituer l'état de situation." },
         { status: 404 }
       );
     }
 
-    const pdf = await buildPaymentReceiptPdf(viewModel);
-    const fileName = `${documentNumber}.pdf`;
+    const pdf = await buildPaymentSituationPdf(viewModel);
+    const fileName = `situation-adhesion-${id}.pdf`;
 
     return new Response(new Uint8Array(pdf), {
       status: 200,
@@ -86,7 +78,7 @@ export async function GET(
   } catch (error) {
     console.error("[api/club/registration/payment-receipt]", error);
     return jsonNoStore(
-      { error: "Impossible de générer le reçu" },
+      { error: "Impossible de générer l'état de situation" },
       { status: 500 }
     );
   }

@@ -42,7 +42,10 @@ export type PaymentDocTableRow = {
 
 export type PaymentDocHeaderParams = {
   documentTitle: string;
-  documentNumber: string;
+  /** N° de pièce comptable ; omit / null pour un document informatif. */
+  documentNumber?: string | null;
+  /** Libellé affiché à la place du n° (ex. « Document informatif »). */
+  documentNumberLabel?: string | null;
   issuedAtLabel: string;
   /** Réservé aux factures à payer ; omis sur les justificatifs post-paiement. */
   dueAtLabel?: string | null;
@@ -146,11 +149,15 @@ export function drawPaymentDocHeader(
       width: rightX - (leftX + 300),
       align: "right",
     });
+  const numberLine =
+    params.documentNumber && params.documentNumber.trim()
+      ? `N° ${params.documentNumber.trim()}`
+      : params.documentNumberLabel?.trim() || "Document informatif";
   doc
     .font(PAYMENT_DOC_FONT_REGULAR)
     .fontSize(9)
     .fillColor("#333333")
-    .text(`N° ${params.documentNumber}`, leftX + 300, metaTop + 26, {
+    .text(numberLine, leftX + 300, metaTop + 26, {
       width: rightX - (leftX + 300),
       align: "right",
     })

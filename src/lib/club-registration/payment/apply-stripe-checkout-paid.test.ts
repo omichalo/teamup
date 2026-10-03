@@ -106,4 +106,15 @@ describe("applyStripeCheckoutPaid", () => {
     expect(result.payment?.receivedPayments).toHaveLength(0);
     expect(result.markRegistrationPaid).toBe(false);
   });
+
+  it("ne marque pas paid sans ledger paiement", () => {
+    const result = applyStripeCheckoutPaid({
+      payment: null,
+      sessionId: "cs_test_no_ledger",
+      amountTotal: 20_000,
+    });
+    expect(result.ignored).toBe("missing payment ledger");
+    expect(result.markRegistrationPaid).toBe(false);
+    expect(result.payment).toBeNull();
+  });
 });

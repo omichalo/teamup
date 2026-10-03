@@ -308,10 +308,14 @@ async function main(): Promise<void> {
     }
 
     const patch = buildRegistrationPaymentRepairPatch(data, repairKind);
-    batch.update(docRef, {
+    const update: Record<string, unknown> = {
       ...patch,
       updatedAt: FieldValue.serverTimestamp(),
-    });
+    };
+    if (Object.prototype.hasOwnProperty.call(update, "paidAt") && update.paidAt === null) {
+      update.paidAt = FieldValue.delete();
+    }
+    batch.update(docRef, update);
     batchCount += 1;
     updated += 1;
 

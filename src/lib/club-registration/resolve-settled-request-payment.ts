@@ -1,6 +1,9 @@
 import { isRegistrationPaidRecord } from "@/lib/club-registration/payment-proof";
 import { paymentToFirestoreUpdate } from "@/lib/club-registration/payment/normalize-payment";
-import { hasRegistrationOutstandingBalance } from "@/lib/club-registration/payment/registration-supplement";
+import {
+  hasRegistrationOutstandingBalance,
+  shouldMarkRegistrationPaid,
+} from "@/lib/club-registration/payment/registration-supplement";
 import type { RegistrationPayment } from "@/lib/club-registration/payment/types";
 
 export const ALREADY_PAID_RESEND_ERROR =
@@ -51,8 +54,15 @@ export function resolveSettledRequestPaymentAction(
 export function buildPaidDossierValidationPatch(
   payment: RegistrationPayment | null
 ): Record<string, unknown> {
+  // Legacy sans ledger : le caller a déjà vérifié `isRegistrationPaymentSettled`.
+  if (!payment) {
+    return { status: "paid" };
+  }
+  if (!shouldMarkRegistrationPaid(payment)) {
+    return paymentToFirestoreUpdate(payment);
+  }
   return {
     status: "paid",
-    ...(payment ? paymentToFirestoreUpdate(payment) : {}),
+    ...paymentToFirestoreUpdate(payment),
   };
 }

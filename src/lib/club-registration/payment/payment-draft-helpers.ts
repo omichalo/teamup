@@ -32,6 +32,7 @@ export function normalizePaymentAidList(
     received?: boolean | undefined;
     receivedAt?: string | undefined;
     receivedBy?: string | undefined;
+    documentNumber?: string | undefined;
   }>
 ): PaymentAid[] {
   return aids.map((aid) => {
@@ -42,6 +43,9 @@ export function normalizePaymentAidList(
     };
     if (aid.reference) normalized.reference = aid.reference;
     if (aid.note) normalized.note = aid.note;
+    if (typeof aid.documentNumber === "string" && aid.documentNumber.trim()) {
+      normalized.documentNumber = aid.documentNumber.trim();
+    }
     assignAidReceiptFields(normalized, aid);
     return normalized;
   });

@@ -9,10 +9,14 @@ import { requireRegistrationManager } from "@/lib/club-registration/payment/api-
 import {
   isReceivedMethodIdSafe,
   normalizeRegistrationPayment,
-  paymentToFirestoreUpdate,
 } from "@/lib/club-registration/payment/normalize-payment";
 import { dispatchPaymentConfirmedEmail } from "@/lib/email/dispatch-payment-confirmed-email";
 import { markPaymentFullyPaid } from "@/lib/club-registration/payment/payment-mutations";
+import {
+  paymentWriteWithSettlement,
+  shouldMarkRegistrationPaid,
+} from "@/lib/club-registration/payment/settlement-firestore";
+import { syncPaymentDocumentNumbersForRegistration } from "@/lib/club-registration/payment-documents/sync-document-numbers";
 
 const COLLECTION = "clubRegistrations";
 
@@ -66,15 +70,29 @@ export async function POST(
         : {}),
     });
 
+    if (!shouldMarkRegistrationPaid(next)) {
+      return jsonNoStore(
+        { error: "Impossible de marquer soldé : un solde reste dû." },
+        { status: 409 }
+      );
+    }
+
     await docRef.set(
       {
-        ...paymentToFirestoreUpdate(next),
-        status: "paid",
-        paidAt: FieldValue.serverTimestamp(),
+        ...paymentWriteWithSettlement(next),
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true }
     );
+
+    try {
+      await syncPaymentDocumentNumbersForRegistration(db, id);
+    } catch (numberError) {
+      console.error(
+        "[api/club/registration/payment/mark-paid] document numbers",
+        numberError
+      );
+    }
 
     logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_UPDATED, auth.uid, {
       resource: "clubRegistration",

@@ -181,6 +181,17 @@ describe("markPaymentFullyPaid", () => {
     expect(next.remainingAmountCents).toBe(0);
     expect(next.paymentStatus).toBe("paid");
   });
+
+  it("annule les échéances encore expected à la soldure", () => {
+    const next = markPaymentFullyPaid(basePayment(), {
+      method: "card",
+      recordedBy: "secretary",
+    });
+
+    expect(next.remainingAmountCents).toBe(0);
+    expect(next.expectedPayments.every((line) => line.status !== "expected")).toBe(true);
+    expect(next.expectedPayments.some((line) => line.status === "cancelled")).toBe(true);
+  });
 });
 
 describe("reverseReceivedPayment", () => {

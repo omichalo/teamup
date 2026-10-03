@@ -2,6 +2,7 @@
 
 import { Alert, Box, Typography } from "@mui/material";
 import type { RegistrationPayment } from "@/lib/club-registration/payment/types";
+import { resolvePaymentDocumentsAvailability } from "@/lib/club-registration/payment-documents/availability";
 import { RegistrationPaymentDocumentsActions } from "@/components/club-registration/RegistrationPaymentDocumentsActions";
 
 type SummaryRow = { label: string; value: string };
@@ -12,6 +13,8 @@ type Props = {
   summaryRows: SummaryRow[];
   actionError: string | null;
   onClearError: () => void;
+  /** Données dossier pour résoudre facture / situation / reçus. */
+  registrationData?: Record<string, unknown>;
 };
 
 export function PaymentTrackingHeader({
@@ -20,7 +23,22 @@ export function PaymentTrackingHeader({
   summaryRows,
   actionError,
   onClearError,
+  registrationData,
 }: Props) {
+  const documents = resolvePaymentDocumentsAvailability(
+    registrationData ?? {
+      payment,
+      paymentStatus: payment.paymentStatus,
+      status:
+        payment.paymentStatus === "paid"
+          ? "paid"
+          : payment.paymentStatus === "waiting_payment" ||
+              payment.paymentStatus === "partially_paid"
+            ? "payment_requested"
+            : "submitted",
+    }
+  );
+
   return (
     <>
       <Typography variant="subtitle1" fontWeight={700}>
@@ -57,18 +75,11 @@ export function PaymentTrackingHeader({
 
       <RegistrationPaymentDocumentsActions
         registrationId={registrationId}
-        invoiceAvailable={
-          (payment.amountToPayCents > 0 || payment.totalAmountCents > 0) &&
-          (payment.paidAmountCents > 0 ||
-            payment.paymentStatus === "paid" ||
-            payment.paymentStatus === "partially_paid" ||
-            payment.paymentStatus === "waiting_payment")
-        }
-        receiptAvailable={
-          payment.paidAmountCents > 0 &&
-          payment.receivedPayments.some((line) => !line.reversedAt && line.amountCents > 0)
-        }
-        receiptPartial={payment.remainingAmountCents > 0 && payment.paidAmountCents > 0}
+        invoiceAvailable={documents.invoiceAvailable}
+        situationAvailable={documents.situationAvailable}
+        receipts={documents.receipts}
+        invoices={documents.invoices}
+        aidReceipts={documents.aidReceipts}
       />
     </>
   );

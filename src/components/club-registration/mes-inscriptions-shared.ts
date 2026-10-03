@@ -1,4 +1,9 @@
 import type { MedicalCertificateStatus } from "@/lib/club-registration/medical-certificate";
+import type {
+  PaymentAidReceiptSummary,
+  PaymentInvoiceSummary,
+  PaymentReceiptSummary,
+} from "@/lib/club-registration/payment-documents/types";
 import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
 import { resolveOnlinePayableCents } from "@/lib/club-registration/payment/resolve-remaining-payable";
 import { getEnabledSections } from "@/lib/club-registration-config/helpers";
@@ -18,6 +23,10 @@ export type MesInscriptionSummary = {
   payment?: Record<string, unknown>;
   invoiceAvailable?: boolean;
   receiptAvailable?: boolean;
+  situationAvailable?: boolean;
+  receipts?: PaymentReceiptSummary[];
+  invoices?: PaymentInvoiceSummary[];
+  aidReceipts?: PaymentAidReceiptSummary[];
   submittedAt?: string | null;
 };
 

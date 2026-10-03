@@ -1,3 +1,4 @@
+import { FieldValue } from "firebase-admin/firestore";
 import {
   buildPaymentSyncPatchForQuote,
   syncPaymentAfterQuoteChange,
@@ -148,6 +149,7 @@ describe("buildPaymentSyncPatchForQuote", () => {
     });
 
     expect(patch.status).toBe("payment_requested");
+    expect(patch.paidAt).toEqual(FieldValue.delete());
     expect(patch.payment).toMatchObject({
       paidAmountCents: 23_900,
       remainingAmountCents: 3_500,
@@ -155,6 +157,39 @@ describe("buildPaymentSyncPatchForQuote", () => {
     });
     expect(patch.supplementRequestedAt).toBeDefined();
     expect(patch.jerseyFollowUpStatus).toBeUndefined();
+  });
+
+  it("purge paidAt résiduel même si status est déjà payment_requested", () => {
+    const patch = buildPaymentSyncPatchForQuote({
+      currentData: {
+        status: "payment_requested",
+        paidAt: "2026-09-01T10:00:00.000Z",
+        payment: basePayment({
+          paymentMethod: "card",
+          receivedPayments: [
+            {
+              id: "rp_cb",
+              method: "card",
+              label: "Carte bancaire",
+              amountCents: 23_900,
+              receivedAt: "2026-08-20T10:00:00.000Z",
+            },
+          ],
+          paidAmountCents: 23_900,
+          remainingAmountCents: 0,
+          paymentStatus: "paid",
+        }),
+        paymentAmountCents: 23_900,
+      },
+      invoiceTotalCents: 27_400,
+    });
+
+    expect(patch.status).toBe("payment_requested");
+    expect(patch.paidAt).toEqual(FieldValue.delete());
+    expect(patch.payment).toMatchObject({
+      remainingAmountCents: 3_500,
+      paymentStatus: "partially_paid",
+    });
   });
 
   it("ne réécrit pas si le paiement est déjà aligné", () => {

@@ -16,6 +16,11 @@ export type PaymentAid = {
   received?: boolean;
   receivedAt?: string;
   receivedBy?: string;
+  /**
+   * N° de pièce comptable d'aide reçue (AID-…), attribué à la réception.
+   * Conservé même si la réception est annulée ensuite (piste d'audit).
+   */
+  documentNumber?: string;
 };
 
 export type ExpectedPayment = {
@@ -39,6 +44,11 @@ export type ReceivedPayment = {
   reference?: string;
   note?: string;
   expectedPaymentId?: string;
+  /**
+   * N° de pièce comptable d'encaissement (REC-…), un par paiement.
+   * Attribué à l'enregistrement (ou au rattrapage), jamais à la consultation.
+   */
+  documentNumber?: string;
   /** Encaissement annulé (erreur de saisie, remboursement manuel hors Stripe). */
   reversedAt?: string;
   reversedBy?: string;

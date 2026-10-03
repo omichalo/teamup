@@ -19,7 +19,19 @@ const nextConfig: NextConfig = {
       "./node_modules/pdfkit/js/data/**/*",
       "./node_modules/pdfkit/js/standard-fonts/**/*",
     ],
+    "/api/club/registration/[id]/invoice/[invoiceId]": [
+      "./public/fonts/payment-receipt/**/*",
+      "./public/sqyping-logo.png",
+      "./node_modules/pdfkit/js/data/**/*",
+      "./node_modules/pdfkit/js/standard-fonts/**/*",
+    ],
     "/api/club/registration/[id]/payment-receipt": [
+      "./public/fonts/payment-receipt/**/*",
+      "./public/sqyping-logo.png",
+      "./node_modules/pdfkit/js/data/**/*",
+      "./node_modules/pdfkit/js/standard-fonts/**/*",
+    ],
+    "/api/club/registration/[id]/aid-receipt/[aidType]": [
       "./public/fonts/payment-receipt/**/*",
       "./public/sqyping-logo.png",
       "./node_modules/pdfkit/js/data/**/*",
