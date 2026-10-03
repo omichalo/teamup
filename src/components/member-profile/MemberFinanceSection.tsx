@@ -236,6 +236,9 @@ export function MemberFinanceSection({ finance, documents, registrationId }: Pro
             registrationId={registrationId}
             invoiceAvailable={documents.invoiceAvailable}
             situationAvailable={documents.situationAvailable}
+            registrationCertificateAvailable={
+              documents.registrationCertificateAvailable
+            }
             receipts={documents.receipts}
             invoices={documents.invoices}
             aidReceipts={documents.aidReceipts}

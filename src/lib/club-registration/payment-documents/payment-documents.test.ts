@@ -49,6 +49,7 @@ describe("payment documents availability", () => {
       invoiceAvailable: true,
       receiptAvailable: true,
       situationAvailable: true,
+      registrationCertificateAvailable: false,
       receipts: [
         {
           id: "p1",
@@ -98,6 +99,7 @@ describe("payment documents availability", () => {
       invoiceAvailable: true,
       receiptAvailable: true,
       situationAvailable: true,
+      registrationCertificateAvailable: true,
       receipts: [
         {
           id: "p1",
@@ -153,6 +155,7 @@ describe("payment documents availability", () => {
       invoiceAvailable: true,
       receiptAvailable: false,
       situationAvailable: true,
+      registrationCertificateAvailable: false,
       receipts: [],
       invoices: [],
       aidReceipts: [],

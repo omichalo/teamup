@@ -138,6 +138,12 @@ const HOME_LINK_META: Record<
   },
 };
 
+function isLayoutNavigationItem(
+  item: LayoutNavigationItem | null | undefined
+): item is LayoutNavigationItem {
+  return Boolean(item && typeof item.href === "string" && item.href.length > 0);
+}
+
 function toHomeLinkCard(item: LayoutNavigationItem): HomeLinkCard {
   const meta = HOME_LINK_META[item.href];
   if (!meta) {
@@ -151,13 +157,17 @@ function toHomeLinkCard(item: LayoutNavigationItem): HomeLinkCard {
   return { ...item, ...meta };
 }
 
-function cards(items: LayoutNavigationItem[]): HomeLinkCard[] {
-  return items.map(toHomeLinkCard);
+function cards(
+  items: Array<LayoutNavigationItem | null | undefined>
+): HomeLinkCard[] {
+  return items.filter(isLayoutNavigationItem).map(toHomeLinkCard);
 }
 
-function uniqueByHref(items: LayoutNavigationItem[]): LayoutNavigationItem[] {
+function uniqueByHref(
+  items: Array<LayoutNavigationItem | null | undefined>
+): LayoutNavigationItem[] {
   const seen = new Set<string>();
-  return items.filter((item) => {
+  return items.filter(isLayoutNavigationItem).filter((item) => {
     if (seen.has(item.href)) return false;
     seen.add(item.href);
     return true;

@@ -169,10 +169,12 @@ export function MesInscriptionsClient() {
             {paymentJustCompleted.invoiceAvailable ||
             paymentJustCompleted.situationAvailable ||
             paymentJustCompleted.receiptAvailable ||
+            paymentJustCompleted.registrationCertificateAvailable ||
             isMesInscriptionPaid(paymentJustCompleted) ? (
               <>
-                Votre <em>état de situation</em>, vos <em>reçus</em> et, le cas échéant,
-                votre <em>facture</em> sont disponibles ci-dessous.
+                Votre <em>état de situation</em>, vos <em>reçus</em>, votre{" "}
+                <em>attestation d&apos;inscription</em> (si le dossier est soldé) et, le
+                cas échéant, votre <em>facture</em> sont disponibles ci-dessous.
               </>
             ) : (
               <>Les justificatifs apparaîtront d’ici quelques instants sur cette page.</>

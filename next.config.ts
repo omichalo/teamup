@@ -37,6 +37,13 @@ const nextConfig: NextConfig = {
       "./node_modules/pdfkit/js/data/**/*",
       "./node_modules/pdfkit/js/standard-fonts/**/*",
     ],
+    "/api/club/registration/[id]/registration-certificate": [
+      "./public/fonts/payment-receipt/**/*",
+      "./public/sqyping-logo.png",
+      "./public/club-registration/registration-certificate-signature.jpg",
+      "./node_modules/pdfkit/js/data/**/*",
+      "./node_modules/pdfkit/js/standard-fonts/**/*",
+    ],
   },
   // Identifiant unique par build pour invalider le cache navigateur/CDN entre déploiements.
   generateBuildId: async () => `build-${Date.now()}`,
