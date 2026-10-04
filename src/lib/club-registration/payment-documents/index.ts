@@ -46,6 +46,13 @@ export {
   reconcileAccountingInvoicesAfterQuoteChange,
 } from "./reconcile-accounting-invoices";
 export { parseAccountingInvoices } from "./accounting-invoice-parse";
+export {
+  ensureSageAuxiliaryCode,
+  formatAllocatedSageAuxiliaryCode,
+  readPersistedSageAuxiliaryCode,
+  deriveLegacySageAuxiliaryCode,
+  SAGE_AUXILIARY_FIELD,
+} from "./sage-auxiliary-code";
 export type {
   PaymentDocumentLine,
   PaymentDocumentsAvailability,

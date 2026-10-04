@@ -11,11 +11,11 @@ Fichiers : `tmp/sage-export/anomalies.csv`, `tmp/sage-export/anomalies-classific
 | `piece_manquante` | 29 | **3** | blocking | Backfill REC des 3 actifs du 2026-10-04 |
 | `moyen_inconnu` | 12 | **0** (10 `moyen_reclasse` info + 2 `encaissement_non_financier`) | info / blocking | Reclasser SumUp/virement ; 2 cas manuels |
 | `remise_exceptionnelle` | 11 | 11 | blocking | Émettre les AVO via sync |
-| `tiers_provisoire` | 33 | 33 | review | Saisie licences FFTT |
+| `tiers_provisoire` (obsolète) | 33 | remplacé par `licence_absente` | review | Voir ADR-0016 — plus de fusion P→C |
 | `aide_non_recue` | 14 | 14 | pending | Suivi secrétariat |
 
 Dry-run du rattrapage (`repair-plan.json`) : **25 dossiers**, 3 REC, 11 AVO, 10 reclassements, 2 revues manuelles.  
-Après `--apply` + traitement manuel des 2 remises déguisées, il ne reste que `tiers_provisoire` et `aide_non_recue`.
+Après `--apply` + traitement manuel des 2 remises déguisées : anomalies bloquantes résolues ; suivi `licence_absente` / `aide_non_recue`.
 
 ---
 
@@ -104,21 +104,19 @@ Point métier à trancher pour Andy RASOLOHERY : plutôt augmenter l'AID Pass Pl
 
 ---
 
-## 4. `tiers_provisoire` — 33
+## 4. Identifiant tiers — ADR-0016
 
-### Cause
+### Ancien modèle (`tiers_provisoire`)
 
-Pas de `ffttLicense` / `ffttLicenseLookup.licence` sur le dossier. Code export `P` + id dossier.
+Code recalculé `C{licence}` / `P{dossier}` à chaque export → bascule dangereuse pour les imports successifs.
 
-Rapprochement automatique sur la collection `players` : **1 seul** match fiable (Elise WATTEL → licence `7837430`).
+### Nouveau modèle
 
-### Correction
-
-- **Données** : saisie / sync licence FFTT sur les dossiers (premières licences, retards Spordle).
-- Elise WATTEL : proposer `ffttLicense = 7837430` après contrôle humain.
-- **Applicatif** (futur) : alerte secrétariat « dossier payé sans licence » + éventuelle synchro joueurs FFTT → dossier.
-
-Pas de blocage d'import si la secrétaire accepte des tiers `P…` temporaires dans Sage, à fusionner ensuite.
+- Champ figé `sageAuxiliaryCode` (`A######` pour les nouveaux ; backfill legacy `C…`/`P…`).
+- Licence = attribut (`licence_absente` si manquante, sévérité review).
+- Plus de consigne de fusion P→C dans Sage.
+- Backfill : `npx tsx scripts/backfill-sage-auxiliary-codes.ts --project sqyping-teamup --use-adc [--apply]`
+- Si export sans champ : `tiers_code_non_fige` + repli legacy temporaire.
 
 ---
 
@@ -145,6 +143,8 @@ Aides déclarées (`pass_plus`, `pass_sport`, `labaz`, `aide_municipale`) avec `
 | `accounting-export/append-settlements` | Ignore annulés sans n° ; reclasse SumUp/virement ; flag remises déguisées |
 | `sync-document-numbers` | Cible FAC/AVO = devis − remise exceptionnelle |
 | `reconcile-accounting-invoices` | Libellé AVO = motif de remise |
+| `sage-auxiliary-code` + ADR-0016 | Code auxiliaire opaque figé ; licence = attribut |
+| `scripts/backfill-sage-auxiliary-codes.ts` | Fige les codes legacy C…/P… |
 | `scripts/repair-sage-export-anomalies.ts` | Dry-run / apply du rattrapage |
 | `scripts/export-sage-entries.ts` | Anomalies avec colonne `Severite` |
 

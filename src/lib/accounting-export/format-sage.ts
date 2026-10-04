@@ -1,5 +1,8 @@
-import { FFTT_LICENSE_RE } from "@/lib/fftt/license-number";
-import { digitsLicense } from "@/lib/championship/person-key";
+import {
+  deriveLegacySageAuxiliaryCode,
+  readFfttLicenseDigitsFromRegistration,
+  readPersistedSageAuxiliaryCode,
+} from "@/lib/club-registration/payment-documents/sage-auxiliary-code";
 import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
 import { SAGE_LABEL_MAX, SAGE_PIECE_MAX } from "./chart";
 
@@ -84,30 +87,42 @@ export function readSeasonLabel(data: Record<string, unknown>): string {
 }
 
 export function readFfttLicenseDigits(data: Record<string, unknown>): string {
-  const direct = digitsLicense(data.ffttLicense);
-  if (FFTT_LICENSE_RE.test(direct)) {
-    return direct;
-  }
-  const lookup = data.ffttLicenseLookup;
-  if (lookup && typeof lookup === "object") {
-    const nested = digitsLicense((lookup as { licence?: unknown }).licence);
-    if (FFTT_LICENSE_RE.test(nested)) {
-      return nested;
-    }
-  }
-  return "";
+  return readFfttLicenseDigitsFromRegistration(data);
 }
 
+export type ResolvedSageThirdPartyCode = {
+  code: string;
+  /** Licence absente sur la fiche (attribut), pas un code provisoire. */
+  licenseMissing: boolean;
+  /** Code non encore persisté : repli legacy le temps du backfill. */
+  unfrozen: boolean;
+  license: string;
+};
+
+/**
+ * Code auxiliaire pour l'export : champ figé prioritaire.
+ * Repli legacy (C…/P…) uniquement si le backfill n'a pas encore tourné.
+ */
 export function buildThirdPartyCode(
   data: Record<string, unknown>,
   registrationId: string
-): { code: string; provisional: boolean; license: string } {
+): ResolvedSageThirdPartyCode {
   const license = readFfttLicenseDigits(data);
-  if (license) {
-    return { code: `C${license}`, provisional: false, license };
+  const persisted = readPersistedSageAuxiliaryCode(data);
+  if (persisted) {
+    return {
+      code: persisted,
+      licenseMissing: !license,
+      unfrozen: false,
+      license,
+    };
   }
-  const slug = registrationId.replace(/[^A-Za-z0-9]/g, "").slice(0, 12).toUpperCase();
-  return { code: `P${slug}`, provisional: true, license: "" };
+  return {
+    code: deriveLegacySageAuxiliaryCode(data, registrationId),
+    licenseMissing: !license,
+    unfrozen: true,
+    license,
+  };
 }
 
 export function readStringField(data: Record<string, unknown>, key: string): string {
