@@ -10,6 +10,7 @@ import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/no
 import { applyStripeCheckoutPaid } from "@/lib/club-registration/payment/apply-stripe-checkout-paid";
 import { paymentWriteWithSettlement } from "@/lib/club-registration/payment/settlement-firestore";
 import { syncRosterAfterRegistrationChange } from "@/lib/championship/sync-after-registration";
+import { assignMissingActiveReceiptNumbersInTransaction } from "@/lib/club-registration/payment-documents/assign-receipt-numbers-in-transaction";
 import { syncPaymentDocumentNumbersForRegistration } from "@/lib/club-registration/payment-documents/sync-document-numbers";
 
 type StripeWebhookEvent = {
@@ -82,9 +83,21 @@ export async function POST(req: Request) {
         return { ...result, existing, amountCents: 0 };
       }
 
+      // REC attribué dans la même transaction que l'encaissement Stripe.
+      let paymentToWrite = result.payment;
+      if (paymentToWrite) {
+        const assigned = await assignMissingActiveReceiptNumbersInTransaction({
+          tx,
+          db,
+          payment: paymentToWrite,
+          registrationData: existing as Record<string, unknown>,
+        });
+        paymentToWrite = assigned.payment;
+      }
+
       // Ne marquer soldé que via paymentWriteWithSettlement (remaining === 0).
-      const paymentUpdate = result.payment
-        ? paymentWriteWithSettlement(result.payment)
+      const paymentUpdate = paymentToWrite
+        ? paymentWriteWithSettlement(paymentToWrite)
         : {};
 
       tx.set(
@@ -101,6 +114,7 @@ export async function POST(req: Request) {
 
       return {
         ...result,
+        payment: paymentToWrite,
         existing,
         amountCents: amountTotal && amountTotal > 0 ? amountTotal : 0,
       };
