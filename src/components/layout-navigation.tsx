@@ -2,6 +2,7 @@
 
 import type React from "react";
 import {
+  AccountBalance,
   AdminPanelSettings,
   Assignment,
   Event,
@@ -85,6 +86,11 @@ const NAV = {
     label: "Campagnes & tarifs",
     href: "/club/parametrage-inscription",
     icon: <Tune />,
+  },
+  exportComptable: {
+    label: "Export comptable",
+    href: "/club/export-comptable",
+    icon: <AccountBalance />,
   },
   apercuFormulaire: {
     label: "Saisir une adhésion",
@@ -231,6 +237,7 @@ export function buildLayoutNavigation(
             NAV.statistiquesAdherents,
             NAV.presencesEssais,
             NAV.campagnesTarifs,
+            NAV.exportComptable,
             NAV.apercuFormulaire,
             NAV.validationsLicence,
             NAV.matchsHorsInscription,
@@ -270,6 +277,7 @@ export function buildLayoutNavigation(
             NAV.creneaux,
             NAV.presencesEssais,
             NAV.campagnesTarifs,
+            NAV.exportComptable,
             NAV.apercuFormulaire,
             NAV.validationsLicence,
             NAV.matchsHorsInscription,

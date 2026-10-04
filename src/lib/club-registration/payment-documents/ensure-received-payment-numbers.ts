@@ -4,10 +4,8 @@ import {
   normalizeRegistrationPayment,
   paymentToFirestoreUpdate,
 } from "@/lib/club-registration/payment/normalize-payment";
-import type {
-  RegistrationPayment,
-} from "@/lib/club-registration/payment/types";
-import { formatPaymentDocumentNumber } from "./document-numbers";
+import type { RegistrationPayment } from "@/lib/club-registration/payment/types";
+import { assignMissingActiveReceiptNumbersInTransaction } from "./assign-receipt-numbers-in-transaction";
 import {
   hasReceivedPaymentDocumentNumber,
   isActiveReceivedPayment,
@@ -18,18 +16,7 @@ export {
   isActiveReceivedPayment,
 } from "./received-payment-document-helpers";
 
-const COUNTERS_COLLECTION = "clubPaymentDocumentCounters";
 const REGISTRATIONS_COLLECTION = "clubRegistrations";
-
-function resolveSeasonKey(data: Record<string, unknown>): string {
-  if (typeof data.seasonLabel === "string" && data.seasonLabel.trim()) {
-    return data.seasonLabel.trim().replace(/\s+/g, "-");
-  }
-  if (typeof data.season === "string" && data.season.trim()) {
-    return data.season.trim().replace(/\s+/g, "-");
-  }
-  return String(new Date().getFullYear());
-}
 
 /**
  * Attribue un REC à chaque encaissement actif sans numéro.
@@ -63,11 +50,9 @@ export async function ensureReceivedPaymentDocumentNumbers(params: {
     };
   }
 
-  const seasonKey = resolveSeasonKey(params.data);
   const registrationRef = params.db
     .collection(REGISTRATIONS_COLLECTION)
     .doc(params.registrationId);
-  const counterRef = params.db.collection(COUNTERS_COLLECTION).doc(seasonKey);
 
   return params.db.runTransaction(async (tx) => {
     const registrationSnap = await tx.get(registrationRef);
@@ -77,84 +62,26 @@ export async function ensureReceivedPaymentDocumentNumbers(params: {
       return { payment: null, assignedCount: 0, numbers: [] };
     }
 
-    const stillNeeds = currentPayment.receivedPayments.some(
-      (line) => isActiveReceivedPayment(line) && !hasReceivedPaymentDocumentNumber(line)
-    );
-    if (!stillNeeds) {
-      return {
-        payment: currentPayment,
-        assignedCount: 0,
-        numbers: currentPayment.receivedPayments
-          .filter(hasReceivedPaymentDocumentNumber)
-          .map((line) => line.documentNumber!.trim()),
-      };
-    }
-
-    const legacyDossierReceipt =
-      typeof registrationData.teamupReceiptNumber === "string" &&
-      registrationData.teamupReceiptNumber.trim()
-        ? registrationData.teamupReceiptNumber.trim()
-        : null;
-
-    const counterSnap = await tx.get(counterRef);
-    let seq =
-      typeof counterSnap.data()?.nextReceiptSeq === "number"
-        ? (counterSnap.data()?.nextReceiptSeq as number)
-        : 0;
-    const seqBefore = seq;
-
-    let reusedLegacy = false;
-    let assignedCount = 0;
-
-    const receivedPayments = currentPayment.receivedPayments.map((line) => {
-      if (!isActiveReceivedPayment(line) || hasReceivedPaymentDocumentNumber(line)) {
-        return line;
-      }
-
-      let documentNumber: string;
-      if (legacyDossierReceipt && !reusedLegacy) {
-        documentNumber = legacyDossierReceipt;
-        reusedLegacy = true;
-      } else {
-        seq += 1;
-        documentNumber = formatPaymentDocumentNumber("REC", seasonKey, seq);
-      }
-      assignedCount += 1;
-      return { ...line, documentNumber };
+    const assigned = await assignMissingActiveReceiptNumbersInTransaction({
+      tx,
+      db: params.db,
+      payment: currentPayment,
+      registrationData,
     });
 
-    if (seq > seqBefore) {
-      tx.set(
-        counterRef,
-        {
-          seasonKey,
-          nextReceiptSeq: seq,
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
+    if (assigned.assignedCount === 0) {
+      return assigned;
     }
-
-    const nextPayment: RegistrationPayment = {
-      ...currentPayment,
-      receivedPayments,
-    };
 
     tx.set(
       registrationRef,
       {
-        ...paymentToFirestoreUpdate(nextPayment),
+        ...paymentToFirestoreUpdate(assigned.payment),
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true }
     );
 
-    return {
-      payment: nextPayment,
-      assignedCount,
-      numbers: receivedPayments
-        .filter(hasReceivedPaymentDocumentNumber)
-        .map((line) => line.documentNumber!.trim()),
-    };
+    return assigned;
   });
 }

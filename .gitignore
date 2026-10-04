@@ -78,6 +78,9 @@ backend-service-account.json
 # Cursor / agents locaux
 .jules/
 
+# Exports comptables locaux (données adhérents — ne pas versionner)
+/tmp/
+
 # IDE
 .vscode/
 .idea/

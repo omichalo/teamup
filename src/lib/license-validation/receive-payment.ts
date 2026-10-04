@@ -1,13 +1,11 @@
-import { FieldValue, type Firestore } from "firebase-admin/firestore";
+import { type Firestore } from "firebase-admin/firestore";
 import { jsonNoStore } from "@/lib/http/cache-headers";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
 import { AUDIT_ACTIONS, logAuditAction } from "@/lib/auth/audit-logger";
-import { COLLECTION } from "@/lib/club-registration/list-registrations";
 import {
   addManualReceivedPayment,
   markExpectedPaymentReceived,
 } from "@/lib/club-registration/payment/payment-mutations";
-import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
 import {
   RECEIVED_PAYMENT_METHOD_IDS,
   RECEIVED_PAYMENT_METHOD_LABELS,
@@ -15,8 +13,10 @@ import {
 } from "@/lib/club-registration/payment-constants";
 import { normalizePaymentReference } from "@/lib/club-registration/payment/payment-reference";
 import { wouldCreateOverpayment } from "@/lib/club-registration/payment/overpayment";
-import { paymentWriteWithSettlement } from "@/lib/club-registration/payment/settlement-firestore";
+import { commitRegistrationPaymentMutation } from "@/lib/club-registration/payment-documents/commit-registration-payment";
+import { syncPaymentDocumentNumbersForRegistration } from "@/lib/club-registration/payment-documents/sync-document-numbers";
 import { syncRosterAfterRegistrationChange } from "@/lib/championship/sync-after-registration";
+import { classifyOtherReceivedMethod } from "@/lib/accounting-export/chart";
 
 const ALLOWED_METHODS = new Set<ReceivedPaymentMethodId>(RECEIVED_PAYMENT_METHOD_IDS);
 
@@ -43,107 +43,144 @@ function isAllowedMethod(method: string): method is ReceivedPaymentMethodId {
 
 export { wouldCreateOverpayment };
 
+function resolveManualMethod(params: {
+  method: ReceivedPaymentMethodId;
+  label?: string | null;
+  note?: string | null;
+}):
+  | { ok: true; method: ReceivedPaymentMethodId }
+  | { ok: false; error: string } {
+  if (params.method !== "other") {
+    return { ok: true, method: params.method };
+  }
+  const classified = classifyOtherReceivedMethod({
+    label: params.label ?? null,
+    note: params.note ?? null,
+  });
+  if (classified === "non_settlement") {
+    return {
+      ok: false,
+      error:
+        "Cette ligne ressemble à une remise / trop-perçu. Utilisez la remise exceptionnelle du dossier (avoir AVO), pas un encaissement.",
+    };
+  }
+  if (classified === "sumup" || classified === "transfer") {
+    return { ok: true, method: classified };
+  }
+  return { ok: true, method: params.method };
+}
+
 export async function receiveLicenseValidationPayment(
   db: Firestore,
   registrationId: string,
   actorUid: string,
   body: ReceiveLicenseValidationPaymentInput
 ): Promise<ReceiveLicenseValidationPaymentResult> {
-  const docRef = db.collection(COLLECTION).doc(registrationId);
-  const snap = await docRef.get();
-  if (!snap.exists) {
-    return { ok: false, status: 404, error: "Dossier introuvable" };
-  }
-
-  const payment = normalizeRegistrationPayment(snap.data() ?? {});
-  if (!payment) {
-    return { ok: false, status: 400, error: "Aucune donnée de paiement sur ce dossier" };
-  }
-
   const receivedAt =
     typeof body.receivedAt === "string" && body.receivedAt
       ? body.receivedAt
       : new Date().toISOString();
 
   const reference = normalizePaymentReference(body.reference);
+  let overpayment = false;
 
-  let nextPayment = null;
+  const committed = await commitRegistrationPaymentMutation({
+    db,
+    registrationId,
+    mutate: (payment) => {
+      if (body.mode === "expected") {
+        if (!body.expectedId) {
+          return { error: "Échéance de paiement requise" };
+        }
+        if (!Number.isInteger(body.amountCents) || (body.amountCents as number) <= 0) {
+          return { error: "Montant invalide" };
+        }
+        overpayment = wouldCreateOverpayment(
+          payment.remainingAmountCents,
+          body.amountCents as number
+        );
+        if (overpayment && body.confirmOverpayment !== true) {
+          return {
+            error: "Ce montant dépasse le reste dû. Confirmez le trop-perçu.",
+            status: 400 as const,
+            code: "OVERPAYMENT_CONFIRMATION_REQUIRED",
+          };
+        }
+        const next = markExpectedPaymentReceived(payment, body.expectedId, {
+          amountCents: body.amountCents as number,
+          receivedAt,
+          recordedBy: actorUid,
+          ...(reference ? { reference } : {}),
+          ...(typeof body.note === "string" && body.note.trim()
+            ? { note: body.note.trim() }
+            : {}),
+        });
+        if (!next) {
+          return { error: "Impossible d'enregistrer le paiement" };
+        }
+        return next;
+      }
 
-  if (body.mode === "expected") {
-    if (!body.expectedId) {
-      return { ok: false, status: 400, error: "Échéance de paiement requise" };
-    }
-    if (!Number.isInteger(body.amountCents) || (body.amountCents as number) <= 0) {
-      return { ok: false, status: 400, error: "Montant invalide" };
-    }
-    if (
-      wouldCreateOverpayment(payment.remainingAmountCents, body.amountCents as number) &&
-      body.confirmOverpayment !== true
-    ) {
-      return {
-        ok: false,
-        status: 400,
-        error: "Ce montant dépasse le reste dû. Confirmez le trop-perçu.",
-        code: "OVERPAYMENT_CONFIRMATION_REQUIRED",
-      };
-    }
-    nextPayment = markExpectedPaymentReceived(payment, body.expectedId, {
-      amountCents: body.amountCents as number,
-      receivedAt,
-      recordedBy: actorUid,
-      ...(reference ? { reference } : {}),
-      ...(typeof body.note === "string" && body.note.trim()
-        ? { note: body.note.trim() }
-        : {}),
-    });
-  } else {
-    if (!body.method || !isAllowedMethod(body.method)) {
-      return {
-        ok: false,
-        status: 400,
-        error: "Moyen de paiement invalide",
-      };
-    }
-    if (!Number.isInteger(body.amountCents) || (body.amountCents as number) <= 0) {
-      return { ok: false, status: 400, error: "Montant invalide" };
-    }
-    if (
-      wouldCreateOverpayment(payment.remainingAmountCents, body.amountCents as number) &&
-      body.confirmOverpayment !== true
-    ) {
-      return {
-        ok: false,
-        status: 400,
-        error: "Ce montant dépasse le reste dû. Confirmez le trop-perçu.",
-        code: "OVERPAYMENT_CONFIRMATION_REQUIRED",
-      };
-    }
-    nextPayment = addManualReceivedPayment(payment, {
-      method: body.method,
-      label:
-        (typeof body.label === "string" && body.label.trim()) ||
-        RECEIVED_PAYMENT_METHOD_LABELS[body.method],
-      amountCents: body.amountCents as number,
-      receivedAt,
-      recordedBy: actorUid,
-      ...(reference ? { reference } : {}),
-      ...(typeof body.note === "string" && body.note.trim()
-        ? { note: body.note.trim() }
-        : {}),
-    });
-  }
+      if (!body.method || !isAllowedMethod(body.method)) {
+        return { error: "Moyen de paiement invalide" };
+      }
+      if (!Number.isInteger(body.amountCents) || (body.amountCents as number) <= 0) {
+        return { error: "Montant invalide" };
+      }
+      overpayment = wouldCreateOverpayment(
+        payment.remainingAmountCents,
+        body.amountCents as number
+      );
+      if (overpayment && body.confirmOverpayment !== true) {
+        return {
+          error: "Ce montant dépasse le reste dû. Confirmez le trop-perçu.",
+          status: 400 as const,
+          code: "OVERPAYMENT_CONFIRMATION_REQUIRED",
+        };
+      }
 
-  if (!nextPayment) {
-    return { ok: false, status: 400, error: "Impossible d'enregistrer le paiement" };
-  }
+      const resolved = resolveManualMethod({
+        method: body.method,
+        ...(typeof body.label === "string" ? { label: body.label } : {}),
+        ...(typeof body.note === "string" ? { note: body.note } : {}),
+      });
+      if (!resolved.ok) {
+        return { error: resolved.error };
+      }
 
-  await docRef.set(
-    {
-      ...paymentWriteWithSettlement(nextPayment),
-      updatedAt: FieldValue.serverTimestamp(),
+      return addManualReceivedPayment(payment, {
+        method: resolved.method,
+        label:
+          (typeof body.label === "string" && body.label.trim()) ||
+          RECEIVED_PAYMENT_METHOD_LABELS[resolved.method],
+        amountCents: body.amountCents as number,
+        receivedAt,
+        recordedBy: actorUid,
+        ...(reference ? { reference } : {}),
+        ...(typeof body.note === "string" && body.note.trim()
+          ? { note: body.note.trim() }
+          : {}),
+      });
     },
-    { merge: true }
-  );
+  });
+
+  if (!committed.ok) {
+    return {
+      ok: false,
+      status: committed.status,
+      error: committed.error,
+      ...(committed.code ? { code: committed.code } : {}),
+    };
+  }
+
+  try {
+    await syncPaymentDocumentNumbersForRegistration(db, registrationId);
+  } catch (numberError) {
+    console.error(
+      "[license-validation/receive-payment] document numbers",
+      numberError
+    );
+  }
 
   logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_PAYMENT_CONFIRMED, actorUid, {
     resource: "clubRegistration",
@@ -151,10 +188,7 @@ export async function receiveLicenseValidationPayment(
     details: {
       scope: "license_validation_payment",
       mode: body.mode ?? "manual",
-      overpayment: wouldCreateOverpayment(
-        payment.remainingAmountCents,
-        body.amountCents as number
-      ),
+      overpayment,
     },
     success: true,
   });

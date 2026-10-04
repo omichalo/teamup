@@ -87,6 +87,12 @@ const HOME_LINK_META: Record<
     cta: "Configurer les campagnes",
     color: "info",
   },
+  "/club/export-comptable": {
+    description:
+      "Générer l'export Sage (écritures, tiers, anomalies) pour la comptabilité du club.",
+    cta: "Ouvrir l'export comptable",
+    color: "warning",
+  },
   "/club/inscription": {
     description:
       "Créer un dossier d'adhésion pour vous, un proche ou un membre du club.",
@@ -326,6 +332,7 @@ function secretaryHome(): RoleHomeContent {
             LAYOUT_NAV.tableauAdhesions,
             LAYOUT_NAV.statistiquesAdherents,
             LAYOUT_NAV.campagnesTarifs,
+            LAYOUT_NAV.exportComptable,
             LAYOUT_NAV.apercuFormulaire,
             LAYOUT_NAV.validationsLicence,
             LAYOUT_NAV.matchsHorsInscription,
@@ -377,6 +384,7 @@ function adminHome(): RoleHomeContent {
             LAYOUT_NAV.tableauAdhesions,
             LAYOUT_NAV.statistiquesAdherents,
             LAYOUT_NAV.campagnesTarifs,
+            LAYOUT_NAV.exportComptable,
             LAYOUT_NAV.apercuFormulaire,
             LAYOUT_NAV.validationsLicence,
             LAYOUT_NAV.matchsHorsInscription,

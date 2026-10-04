@@ -176,6 +176,9 @@ export async function reconcileAccountingInvoicesAfterQuoteChange(params: {
         seasonKey,
         prefix: "FAC",
       });
+      const lineLabel = reason.toLowerCase().includes("remise exceptionnelle")
+        ? reason
+        : "Complément — ajustement tarifaire";
       nextDoc = {
         id: createAccountingInvoiceId(),
         kind: "supplement",
@@ -183,7 +186,7 @@ export async function reconcileAccountingInvoicesAfterQuoteChange(params: {
         label: "Facture complémentaire",
         lines: [
           {
-            label: "Complément — ajustement tarifaire",
+            label: lineLabel,
             amountCents: liveDelta,
           },
         ],
@@ -200,6 +203,9 @@ export async function reconcileAccountingInvoicesAfterQuoteChange(params: {
         seasonKey,
         prefix: "AVO",
       });
+      const lineLabel = reason.toLowerCase().includes("remise exceptionnelle")
+        ? reason
+        : "Avoir — ajustement tarifaire";
       nextDoc = {
         id: createAccountingInvoiceId(),
         kind: "credit_note",
@@ -207,7 +213,7 @@ export async function reconcileAccountingInvoicesAfterQuoteChange(params: {
         label: "Avoir",
         lines: [
           {
-            label: "Avoir — ajustement tarifaire",
+            label: lineLabel,
             amountCents: abs,
           },
         ],
