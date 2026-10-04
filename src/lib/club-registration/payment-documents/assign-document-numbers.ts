@@ -7,6 +7,7 @@ import { ensurePaymentDocumentNumber } from "@/lib/club-registration/payment-doc
 import { ensureReceivedPaymentDocumentNumbers } from "@/lib/club-registration/payment-documents/ensure-received-payment-numbers";
 import { ensureReceivedAidDocumentNumbers } from "@/lib/club-registration/payment-documents/ensure-received-aid-numbers";
 import { ensureInitialAccountingInvoiceSnapshot } from "@/lib/club-registration/payment-documents/reconcile-accounting-invoices";
+import { ensureSageAuxiliaryCode } from "@/lib/club-registration/payment-documents/sage-auxiliary-code";
 
 export type AssignedPaymentDocumentNumbers = {
   invoiceNumber: string | null;
@@ -48,6 +49,14 @@ export async function assignPaymentDocumentNumbersIfEligible(params: {
   }
 
   if (invoiceNumber && isInvoiceDocumentAvailable(workingData)) {
+    const sageAuxiliaryCode = await ensureSageAuxiliaryCode({
+      db: params.db,
+      registrationId: params.registrationId,
+      data: workingData,
+      preferNewAllocation: assignedInvoice,
+    });
+    workingData = { ...workingData, sageAuxiliaryCode };
+
     const invoices = await ensureInitialAccountingInvoiceSnapshot({
       db: params.db,
       registrationId: params.registrationId,

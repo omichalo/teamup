@@ -121,7 +121,7 @@ export function thirdPartiesToCsv(parties: SageThirdParty[]): string {
   const rows = [
     csvRow([
       "CodeTiers",
-      "Provisoire",
+      "LicenceAbsente",
       "Nom",
       "Prenom",
       "Licence",
@@ -137,7 +137,7 @@ export function thirdPartiesToCsv(parties: SageThirdParty[]): string {
     rows.push(
       csvRow([
         party.code,
-        party.provisional ? "oui" : "non",
+        party.licenseMissing ? "oui" : "non",
         party.lastName,
         party.firstName,
         party.license,

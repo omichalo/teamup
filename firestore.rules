@@ -293,6 +293,17 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Compteurs / registre codes auxiliaires Sage (Admin SDK uniquement)
+    match /clubSageAuxiliaryCounters/{document} {
+      allow read, write: if false;
+    }
+    match /clubSageAuxiliaryCodes/{code} {
+      allow read, write: if false;
+    }
+    match /clubSageAuxiliaryLicenseIndex/{licenseDigits} {
+      allow read, write: if false;
+    }
+
     // ============================================
     // Collection: clubRegistrationConfig
     // ============================================

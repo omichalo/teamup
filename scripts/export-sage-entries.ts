@@ -206,7 +206,9 @@ async function main(): Promise<void> {
     summary,
     anomalyCounts,
     thirdPartyCount: thirdParties.rows.length,
-    provisionalThirdPartyCount: thirdParties.rows.filter((party) => party.provisional).length,
+    missingLicenseThirdPartyCount: thirdParties.rows.filter(
+      (party) => party.licenseMissing
+    ).length,
     conflictingThirdPartyCodes: thirdParties.conflictingCodes,
   };
   fs.writeFileSync(
@@ -252,7 +254,7 @@ async function main(): Promise<void> {
         balanced: summary.balanced,
         anomalyCounts,
         thirdPartyCount: thirdParties.rows.length,
-        provisionalThirdPartyCount: control.provisionalThirdPartyCount,
+        missingLicenseThirdPartyCount: control.missingLicenseThirdPartyCount,
         conflictingThirdPartyCodes: thirdParties.conflictingCodes.length,
       },
       null,

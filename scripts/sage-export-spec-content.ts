@@ -68,7 +68,7 @@ export const specSections: Array<{ title: string; blocks: SpecBlock[] }> = [
       },
       {
         type: "p",
-        text: "Importez un seul des deux fichiers d'écritures (XIMPORT.TXT ou ecritures-sage.csv), jamais les deux : ce sont les mêmes mouvements. Le CSV est en UTF-8 avec BOM, séparateur point-virgule : Journal, Date, Piece, CompteGeneral, CompteAuxiliaire, Libelle, Debit, Credit. XIMPORT.TXT est en largeur fixe (ANSI), montant + sens D/C ; sur les lignes clients, le champ compte porte l'auxiliaire (C… / P…). Libellé XImport limité à 25 caractères ; le détail complet reste dans le CSV.",
+        text: "Importez un seul des deux fichiers d'écritures (XIMPORT.TXT ou ecritures-sage.csv), jamais les deux : ce sont les mêmes mouvements. Le CSV est en UTF-8 avec BOM, séparateur point-virgule : Journal, Date, Piece, CompteGeneral, CompteAuxiliaire, Libelle, Debit, Credit. XIMPORT.TXT est en largeur fixe (ANSI), montant + sens D/C ; sur les lignes clients, le champ compte porte l'auxiliaire TeamUp (A…). Libellé XImport limité à 25 caractères ; le détail complet reste dans le CSV.",
       },
       {
         type: "note",
@@ -88,7 +88,7 @@ export const specSections: Array<{ title: string; blocks: SpecBlock[] }> = [
         items: [
           "1. Copie de travail — ouvrez une copie du dossier Sage, ou un exercice de simulation. Ne faites pas le premier essai sur la comptabilité définitive.",
           "2. Plan — créez s'ils manquent les journaux VE, BQ, CA, OD (2 caractères) et les comptes de la section 6. Le 411000 doit être un collectif clients avec auxiliaires.",
-          "3. Tiers — créez ou mettez à jour les auxiliaires (tiers.csv). Un code P… est provisoire : fusionnez vers C + licence dès que possible.",
+          "3. Tiers — créez ou mettez à jour les auxiliaires (tiers.csv). Le code (A…) est stable ; la licence FFTT est une info de fiche, pas la clé.",
           "4a. Voie rapide — importez XIMPORT.TXT via Échanges → Importer des écritures (format Sage / Ciel / XImport).",
           "4b. Voie CSV — créez un import paramétrable (Dossier → Options → Imports paramétrables), mappez les 8 colonnes, puis importez ecritures-sage.csv.",
           "5. Contrôle — vérifiez l'équilibre avec controle.json, puis un adhérent de bout en bout (facture, CB ou SumUp, avoir ou Pass Sport).",
@@ -167,19 +167,20 @@ export const specSections: Array<{ title: string; blocks: SpecBlock[] }> = [
     blocks: [
       {
         type: "p",
-        text: "Le code auxiliaire du 411000 identifie la personne, d'une saison à l'autre, pour que le lettrage survive au changement de dossier d'adhésion.",
+        text: "Le code auxiliaire du 411000 est un identifiant TeamUp opaque, figé à la première facture. Il ne change pas quand la licence FFTT arrive plus tard. C'est ce code, pas le numéro de licence, qui porte le lettrage d'une saison à l'autre.",
       },
       {
         type: "ul",
         items: [
-          "Licence FFTT connue (4 à 12 chiffres) : C suivi du numéro. Exemple : 078101965 → C078101965.",
-          "Licence absente : P suivi des 12 premiers caractères de l'identifiant interne du dossier. Signalé dans anomalies.csv (tiers_provisoire). À fusionner vers C + licence avant un import durable.",
-          "Le libellé du tiers reprend nom, prénom, adresse et e-mail. La licence est la référence.",
+          "Forme courante : A suivi d'une séquence (exemple A000042). Attribué une fois pour la personne.",
+          "La licence FFTT est un attribut de la fiche tiers (colonne Licence de tiers.csv), jamais la clé des écritures.",
+          "Sans licence sur le dossier : le code reste valide ; anomalies.csv peut signaler licence_absente (suivi secrétariat), sans fusion à faire dans Sage.",
+          "À la réinscription, si la licence est déjà connue, TeamUp réutilise le même code auxiliaire.",
         ],
       },
       {
         type: "p",
-        text: "Longueur prévue : 13 caractères au plus, sous le plafond usuel de 17 du code tiers Sage 100. controle.json signale un code porté par deux noms différents.",
+        text: "Longueur bien sous le plafond usuel de 17 du code tiers Sage. controle.json signale un code porté par deux noms différents.",
       },
     ],
   },
@@ -341,8 +342,8 @@ export const specSections: Array<{ title: string; blocks: SpecBlock[] }> = [
         type: "ul",
         items: [
           "controle.json : balanced = oui, unbalancedPieces vide, total débit = total crédit.",
-          "Lire anomalies.csv : aides non reçues (normales tant que le dossier n'est pas soldé par l'organisme), tiers provisoires (P…), éventuellement d'autres codes.",
-          "Aucun tiers P… si l'import doit servir de base durable — fusionnez d'abord dans Sage, ou attendez la licence dans TeamUp et régénérez.",
+          "Lire anomalies.csv : aides non reçues (normales tant que le dossier n'est pas soldé par l'organisme), licences absentes sur la fiche (licence_absente), éventuellement d'autres codes.",
+          "Une licence manquante n'empêche pas l'import : le code auxiliaire est déjà figé.",
           "Importer d'abord sur une copie, et contrôler un adhérent de bout en bout.",
         ],
       },

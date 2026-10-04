@@ -25,7 +25,7 @@ export type SageExportControl = {
   summary: SageExportSummary;
   anomalyCounts: Record<string, number>;
   thirdPartyCount: number;
-  provisionalThirdPartyCount: number;
+  missingLicenseThirdPartyCount: number;
   conflictingThirdPartyCodes: string[];
 };
 
@@ -112,6 +112,9 @@ function buildReadme(control: SageExportControl): string {
     "Chaque ZIP est un journal complet de la saison : ne pas réimporter dans Sage",
     "sans avoir extourné l'import précédent.",
     "",
+    "Le code auxiliaire (A…) est figé par TeamUp ; la licence FFTT est un attribut",
+    "de tiers.csv, pas la clé des écritures.",
+    "",
     "Rapprochez le plan de comptes proposé du dossier Sage du club avant le",
     "premier import. Faites un essai sur une copie du dossier.",
     "",
@@ -187,8 +190,9 @@ export async function buildSageExportPack(params: {
     summary,
     anomalyCounts,
     thirdPartyCount: thirdParties.rows.length,
-    provisionalThirdPartyCount: thirdParties.rows.filter((party) => party.provisional)
-      .length,
+    missingLicenseThirdPartyCount: thirdParties.rows.filter(
+      (party) => party.licenseMissing
+    ).length,
     conflictingThirdPartyCodes: thirdParties.conflictingCodes,
   };
 

@@ -37,7 +37,8 @@ export type SageExportAnomaly = {
 
 export type SageThirdParty = {
   code: string;
-  provisional: boolean;
+  /** Licence FFTT absente (attribut) — le code auxiliaire reste valide. */
+  licenseMissing: boolean;
   lastName: string;
   firstName: string;
   license: string;
