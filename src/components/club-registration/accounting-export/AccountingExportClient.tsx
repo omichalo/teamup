@@ -204,7 +204,7 @@ export function AccountingExportClient() {
             </Typography>
             <Typography variant="body2">
               Tiers : {control.thirdPartyCount} dont{" "}
-              {control.provisionalThirdPartyCount} provisoires
+              {control.missingLicenseThirdPartyCount} sans licence FFTT
             </Typography>
             {Object.keys(control.anomalyCounts).length > 0 ? (
               <Typography variant="body2">

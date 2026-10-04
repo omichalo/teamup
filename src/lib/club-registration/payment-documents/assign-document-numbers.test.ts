@@ -23,6 +23,7 @@ describe("assignPaymentDocumentNumbersIfEligible", () => {
         status: "paid",
         paymentStatus: "paid",
         teamupInvoiceNumber: "FAC-2026-2027-00009",
+        sageAuxiliaryCode: "A000001",
         accountingInvoices: [
           {
             id: "inv-1",

@@ -116,10 +116,13 @@ describe("export Sage", () => {
     expect(compactPieceNumber("FAC-2026-2027-00009").length).toBeLessThanOrEqual(SAGE_PIECE_MAX);
   });
 
-  it("ventile cotisation, licence et don, et encode le tiers par la licence", () => {
-    const result = buildSageExportForRegistration("reg-alice", baseRegistration());
-    expect(result.thirdParty?.code).toBe("C078101965");
-    expect(result.thirdParty?.provisional).toBe(false);
+  it("ventile cotisation, licence et don, et utilise le code auxiliaire figé", () => {
+    const data = baseRegistration();
+    data.sageAuxiliaryCode = "A000042";
+    const result = buildSageExportForRegistration("reg-alice", data);
+    expect(result.thirdParty?.code).toBe("A000042");
+    expect(result.thirdParty?.licenseMissing).toBe(false);
+    expect(result.thirdParty?.license).toBe("078101965");
 
     const invoice = linesFor(result, "FAC262700009");
     const byAccount = (account: string) =>
@@ -127,7 +130,7 @@ describe("export Sage", () => {
 
     expect(byAccount(SAGE_ACCOUNTS.client)[0]).toMatchObject({
       journal: SAGE_JOURNALS.sales,
-      auxiliary: "C078101965",
+      auxiliary: "A000042",
       debitCents: 29_000,
       creditCents: 0,
       date: "15/09/2026",
@@ -242,12 +245,22 @@ describe("export Sage", () => {
     expect(result.anomalies.filter((item) => item.code === "moyen_reclasse")).toHaveLength(2);
   });
 
-  it("utilise un code tiers provisoire sans licence", () => {
+  it("signale licence absente sans changer le code figé", () => {
     const data = baseRegistration();
     delete data.ffttLicense;
+    data.sageAuxiliaryCode = "A000099";
     const result = buildSageExportForRegistration("abc123def456zzz", data);
-    expect(result.thirdParty?.code).toBe("PABC123DEF456");
-    expect(result.anomalies.some((item) => item.code === "tiers_provisoire")).toBe(true);
+    expect(result.thirdParty?.code).toBe("A000099");
+    expect(result.thirdParty?.licenseMissing).toBe(true);
+    expect(result.anomalies.some((item) => item.code === "licence_absente")).toBe(true);
+    expect(result.anomalies.some((item) => item.code === "tiers_provisoire")).toBe(false);
+  });
+
+  it("repli legacy si le code n'est pas encore figé", () => {
+    const data = baseRegistration();
+    const result = buildSageExportForRegistration("reg-alice", data);
+    expect(result.thirdParty?.code).toBe("C078101965");
+    expect(result.anomalies.some((item) => item.code === "tiers_code_non_fige")).toBe(true);
   });
 
   it("contrepassse un avoir au 756", () => {

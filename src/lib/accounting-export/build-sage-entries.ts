@@ -147,12 +147,22 @@ export function buildSageExportForRegistration(
   const party = buildThirdPartyCode(data, registrationId);
   const lines: SageEntryLine[] = [];
 
-  if (party.provisional) {
+  if (party.unfrozen) {
     anomalies.push({
       ...context,
-      code: "tiers_provisoire",
+      code: "tiers_code_non_fige",
       severity: "review",
-      message: `Pas de licence FFTT : code tiers provisoire ${party.code}. À fusionner vers C + licence avant import si le numéro est attribué.`,
+      message: `Code auxiliaire non persisté : repli temporaire ${party.code}. Relancer le backfill / sync FAC.`,
+      documentNumber: "",
+      amountCents: null,
+    });
+  }
+  if (party.licenseMissing) {
+    anomalies.push({
+      ...context,
+      code: "licence_absente",
+      severity: "review",
+      message: `Licence FFTT absente sur la fiche tiers (code auxiliaire ${party.code}). Attribut seulement — le code ne changera pas à l'arrivée du numéro.`,
       documentNumber: "",
       amountCents: null,
     });
@@ -185,7 +195,7 @@ export function buildSageExportForRegistration(
       ? null
       : {
           code: party.code,
-          provisional: party.provisional,
+          licenseMissing: party.licenseMissing,
           lastName: readStringField(data, "lastName"),
           firstName: readStringField(data, "firstName"),
           license: party.license,

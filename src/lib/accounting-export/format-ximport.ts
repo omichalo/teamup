@@ -57,7 +57,7 @@ function ximportCents(line: SageEntryLine): number {
 /**
  * Génère un fichier XIMPORT.TXT (format ASCII largeur fixe Sage 50 / Ciel).
  * Journaux TeamUp VE/BQ/CA/OD tiennent sur 2 caractères.
- * Sur les lignes 411, le compte exporté est l'auxiliaire (C… / P…).
+ * Sur les lignes 411, le compte exporté est l'auxiliaire TeamUp (A… / legacy).
  */
 export function sageLinesToXImportTxt(lines: SageEntryLine[]): string {
   const sorted = [...lines].sort(compareSageLines);
