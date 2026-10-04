@@ -4,6 +4,7 @@ import {
   exceptionalDiscountAidLabel,
   findExceptionalDiscountAid,
   removeExceptionalDiscountAid,
+  sumExceptionalDiscountCents,
   upsertExceptionalDiscountAid,
 } from "./exceptional-discount";
 import type { PaymentAid } from "./types";
@@ -50,6 +51,7 @@ describe("exceptional-discount", () => {
       },
     ];
     expect(findExceptionalDiscountAid(aids)?.amountCents).toBe(1_000);
+    expect(sumExceptionalDiscountCents(aids)).toBe(1_000);
     expect(removeExceptionalDiscountAid(aids)).toEqual([
       { type: "pass_sport", label: "Pass Sport", amountCents: 5_000 },
     ]);

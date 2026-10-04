@@ -40,6 +40,8 @@ export const REMAINING_PAYMENT_METHOD_LABELS: Record<RemainingPaymentMethodId, s
 
 export const RECEIVED_PAYMENT_METHOD_IDS = [
   "card",
+  "sumup",
+  "transfer",
   "cheque",
   "holiday_vouchers",
   "cash",
@@ -50,6 +52,8 @@ export type ReceivedPaymentMethodId = (typeof RECEIVED_PAYMENT_METHOD_IDS)[numbe
 
 export const RECEIVED_PAYMENT_METHOD_LABELS: Record<ReceivedPaymentMethodId, string> = {
   card: "Carte bancaire",
+  sumup: "SumUp (TPE)",
+  transfer: "Virement",
   cheque: "Chèque",
   holiday_vouchers: "Chèques vacances",
   cash: "Espèces",

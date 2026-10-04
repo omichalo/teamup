@@ -21,6 +21,16 @@ export function findExceptionalDiscountAid(aids: PaymentAid[]): PaymentAid | und
   return findPaymentAid(aids, EXCEPTIONAL_DISCOUNT_AID_TYPE);
 }
 
+/** Somme des remises exceptionnelles (type `other`) — hors aides collectibles. */
+export function sumExceptionalDiscountCents(aids: PaymentAid[]): number {
+  return aids.reduce((sum, aid) => {
+    if (!isExceptionalDiscountAidType(aid.type) || aid.amountCents <= 0) {
+      return sum;
+    }
+    return sum + aid.amountCents;
+  }, 0);
+}
+
 export function upsertExceptionalDiscountAid(
   aids: PaymentAid[],
   patch: { amountCents: number; note?: string },

@@ -1,6 +1,5 @@
 export const runtime = "nodejs";
 
-import { FieldValue } from "firebase-admin/firestore";
 import { jsonNoStore } from "@/lib/http/cache-headers";
 import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
@@ -12,13 +11,9 @@ import {
 } from "@/lib/club-registration/payment/normalize-payment";
 import { dispatchPaymentConfirmedEmail } from "@/lib/email/dispatch-payment-confirmed-email";
 import { markPaymentFullyPaid } from "@/lib/club-registration/payment/payment-mutations";
-import {
-  paymentWriteWithSettlement,
-  shouldMarkRegistrationPaid,
-} from "@/lib/club-registration/payment/settlement-firestore";
+import { shouldMarkRegistrationPaid } from "@/lib/club-registration/payment/settlement-firestore";
+import { commitRegistrationPaymentMutation } from "@/lib/club-registration/payment-documents/commit-registration-payment";
 import { syncPaymentDocumentNumbersForRegistration } from "@/lib/club-registration/payment-documents/sync-document-numbers";
-
-const COLLECTION = "clubRegistrations";
 
 export async function POST(
   req: Request,
@@ -40,19 +35,6 @@ export async function POST(
       method?: string;
     };
 
-    const db = getFirestoreAdmin();
-    const docRef = db.collection(COLLECTION).doc(id);
-    const snap = await docRef.get();
-    if (!snap.exists) {
-      return jsonNoStore({ error: "Dossier introuvable" }, { status: 404 });
-    }
-
-    const data = snap.data() ?? {};
-    const payment = normalizeRegistrationPayment(data);
-    if (!payment) {
-      return jsonNoStore({ error: "Aucune donnée de paiement sur ce dossier" }, { status: 400 });
-    }
-
     if (!isReceivedMethodIdSafe(body.method)) {
       return jsonNoStore(
         { error: "Indiquez le moyen d'encaissement réellement reçu." },
@@ -60,30 +42,37 @@ export async function POST(
       );
     }
 
-    const alreadyPaid = data.status === "paid" || payment.paymentStatus === "paid";
-
-    const next = markPaymentFullyPaid(payment, {
-      method: body.method,
-      recordedBy: auth.uid,
-      ...(typeof body.note === "string" && body.note.trim()
-        ? { note: body.note.trim() }
-        : {}),
+    const db = getFirestoreAdmin();
+    const committed = await commitRegistrationPaymentMutation({
+      db,
+      registrationId: id,
+      mutate: (payment) => {
+        if (!isReceivedMethodIdSafe(body.method)) {
+          return {
+            error: "Indiquez le moyen d'encaissement réellement reçu.",
+            status: 400 as const,
+          };
+        }
+        const next = markPaymentFullyPaid(payment, {
+          method: body.method,
+          recordedBy: auth.uid,
+          ...(typeof body.note === "string" && body.note.trim()
+            ? { note: body.note.trim() }
+            : {}),
+        });
+        if (!shouldMarkRegistrationPaid(next)) {
+          return {
+            error: "Impossible de marquer soldé : un solde reste dû.",
+            status: 409 as const,
+          };
+        }
+        return next;
+      },
     });
 
-    if (!shouldMarkRegistrationPaid(next)) {
-      return jsonNoStore(
-        { error: "Impossible de marquer soldé : un solde reste dû." },
-        { status: 409 }
-      );
+    if (!committed.ok) {
+      return jsonNoStore({ error: committed.error }, { status: committed.status });
     }
-
-    await docRef.set(
-      {
-        ...paymentWriteWithSettlement(next),
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
 
     try {
       await syncPaymentDocumentNumbersForRegistration(db, id);
@@ -94,6 +83,10 @@ export async function POST(
       );
     }
 
+    const priorPayment = normalizeRegistrationPayment(committed.data);
+    const alreadyPaid =
+      committed.data.status === "paid" || priorPayment?.paymentStatus === "paid";
+
     logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_UPDATED, auth.uid, {
       resource: "clubRegistration",
       resourceId: id,
@@ -101,12 +94,12 @@ export async function POST(
       success: true,
     });
 
-    if (!alreadyPaid && next.paidAmountCents > 0) {
+    if (!alreadyPaid && committed.payment.paidAmountCents > 0) {
       try {
         await dispatchPaymentConfirmedEmail({
           registrationId: id,
-          data,
-          amountCents: next.paidAmountCents,
+          data: committed.data,
+          amountCents: committed.payment.paidAmountCents,
           source: "secretariat",
           req,
         });
@@ -115,7 +108,7 @@ export async function POST(
       }
     }
 
-    return jsonNoStore({ payment: next }, { status: 200 });
+    return jsonNoStore({ payment: committed.payment }, { status: 200 });
   } catch (error) {
     console.error("[api/club/registration/payment/mark-paid POST]", error);
     return jsonNoStore({ error: "Impossible de marquer comme payé" }, { status: 500 });

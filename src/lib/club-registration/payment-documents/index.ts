@@ -26,6 +26,8 @@ export {
   formatPaymentDocumentNumber,
 } from "./document-numbers";
 export { ensureReceivedPaymentDocumentNumbers } from "./ensure-received-payment-numbers";
+export { commitRegistrationPaymentMutation } from "./commit-registration-payment";
+export { assignMissingActiveReceiptNumbersInTransaction } from "./assign-receipt-numbers-in-transaction";
 export {
   ensureReceivedAidDocumentNumbers,
 } from "./ensure-received-aid-numbers";
@@ -35,6 +37,7 @@ export {
 } from "./aid-document-helpers";
 export { assignPaymentDocumentNumbersIfEligible } from "./assign-document-numbers";
 export {
+  resolveAccountingInvoiceTargetCents,
   syncPaymentDocumentNumbersForRegistration,
   syncAccountingDocumentsAfterRegistrationWrite,
 } from "./sync-document-numbers";

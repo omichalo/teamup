@@ -168,6 +168,8 @@ function RECEIVED_PAYMENT_METHOD_LABELS_FALLBACK(
 ): string {
   const labels: Record<ReceivedPaymentMethodId, string> = {
     card: "Carte bancaire",
+    sumup: "SumUp (TPE)",
+    transfer: "Virement",
     cheque: "Chèque",
     holiday_vouchers: "Chèques vacances",
     cash: "Espèces",

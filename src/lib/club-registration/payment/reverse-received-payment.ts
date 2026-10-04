@@ -1,14 +1,12 @@
-import { FieldValue, type Firestore } from "firebase-admin/firestore";
+import { type Firestore } from "firebase-admin/firestore";
 import { jsonNoStore } from "@/lib/http/cache-headers";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
 import { AUDIT_ACTIONS, logAuditAction } from "@/lib/auth/audit-logger";
-import { COLLECTION } from "@/lib/club-registration/list-registrations";
-import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
 import {
   isReceivedPaymentReversible,
   reverseReceivedPayment,
 } from "@/lib/club-registration/payment/payment-mutations";
-import { paymentWriteWithSettlement } from "@/lib/club-registration/payment/settlement-firestore";
+import { commitRegistrationPaymentMutation } from "@/lib/club-registration/payment-documents/commit-registration-payment";
 import { syncRosterAfterRegistrationChange } from "@/lib/championship/sync-after-registration";
 
 export type ReverseReceivedPaymentResult =
@@ -27,53 +25,52 @@ export async function reverseRegistrationReceivedPayment(
     return { ok: false, status: 400, error: "Motif d'annulation requis" };
   }
 
-  const docRef = db.collection(COLLECTION).doc(registrationId);
-  const snap = await docRef.get();
-  if (!snap.exists) {
-    return { ok: false, status: 404, error: "Dossier introuvable" };
-  }
+  let reversedAmountCents = 0;
+  let reversedMethod: string | undefined;
 
-  const data = snap.data() ?? {};
-  const payment = normalizeRegistrationPayment(data);
-  if (!payment) {
-    return { ok: false, status: 400, error: "Aucune donnée de paiement sur ce dossier" };
-  }
+  const committed = await commitRegistrationPaymentMutation({
+    db,
+    registrationId,
+    mutate: (payment) => {
+      const received = payment.receivedPayments.find((line) => line.id === receivedId);
+      if (!received) {
+        return { error: "Encaissement introuvable", status: 404 as const };
+      }
+      if (!isReceivedPaymentReversible(received)) {
+        return {
+          error: "Cet encaissement ne peut pas être annulé depuis l'application",
+          status: 400 as const,
+          code: "PAYMENT_NOT_REVERSIBLE",
+        };
+      }
+      reversedAmountCents = received.amountCents;
+      reversedMethod = received.method;
+      const nextPayment = reverseReceivedPayment(payment, receivedId, {
+        reason: trimmedReason,
+        reversedBy: actorUid,
+      });
+      if (!nextPayment) {
+        return { error: "Impossible d'annuler cet encaissement" };
+      }
+      return nextPayment;
+    },
+    settlementOptions: (data) => {
+      const previousRegistrationStatus =
+        typeof data.status === "string" ? data.status : undefined;
+      return previousRegistrationStatus
+        ? { previousRegistrationStatus }
+        : undefined;
+    },
+  });
 
-  const received = payment.receivedPayments.find((line) => line.id === receivedId);
-  if (!received) {
-    return { ok: false, status: 404, error: "Encaissement introuvable" };
-  }
-  if (!isReceivedPaymentReversible(received)) {
+  if (!committed.ok) {
     return {
       ok: false,
-      status: 400,
-      error: "Cet encaissement ne peut pas être annulé depuis l'application",
-      code: "PAYMENT_NOT_REVERSIBLE",
+      status: committed.status,
+      error: committed.error,
+      ...(committed.code ? { code: committed.code } : {}),
     };
   }
-
-  const previousRegistrationStatus =
-    typeof data.status === "string" ? data.status : undefined;
-
-  const nextPayment = reverseReceivedPayment(payment, receivedId, {
-    reason: trimmedReason,
-    reversedBy: actorUid,
-  });
-  if (!nextPayment) {
-    return { ok: false, status: 400, error: "Impossible d'annuler cet encaissement" };
-  }
-
-  await docRef.set(
-    {
-      ...paymentWriteWithSettlement(nextPayment, {
-        ...(previousRegistrationStatus
-          ? { previousRegistrationStatus }
-          : {}),
-      }),
-      updatedAt: FieldValue.serverTimestamp(),
-    },
-    { merge: true }
-  );
 
   logAuditAction(AUDIT_ACTIONS.CLUB_REGISTRATION_UPDATED, actorUid, {
     resource: "clubRegistration",
@@ -81,8 +78,8 @@ export async function reverseRegistrationReceivedPayment(
     details: {
       action: "payment_received_reversed",
       receivedId,
-      amountCents: received.amountCents,
-      method: received.method,
+      amountCents: reversedAmountCents,
+      method: reversedMethod,
     },
     success: true,
   });
