@@ -12,12 +12,11 @@ import {
   Typography,
 } from "@mui/material";
 import ArrowBack from "@mui/icons-material/ArrowBack";
-import { PageHeader } from "@/components/ui";
-import { TabPanel } from "@/components/ui";
+import { PageHeader, TabPanel } from "@/components/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { readJsonResponse } from "@/lib/http/read-json-response";
 import { isAttendanceCancellationManager } from "@/lib/attendance/access";
-import { todayYmdInParis } from "@/lib/attendance/calendar";
+import { isoWeekStartYmd, todayYmdInParis } from "@/lib/attendance/calendar";
 import {
   attendancePickerHref,
   readAttendanceDateParam,
@@ -33,6 +32,7 @@ import { AttendanceStatsPanel } from "./AttendanceStatsPanel";
 import { AttendanceSessionDock, AttendanceSessionDockSpacer } from "./AttendanceSessionDock";
 import { AttendanceCancellationConfirmDialog } from "./AttendanceCancellationConfirmDialog";
 import { AttendanceRemoveFromSlotDialog } from "./AttendanceRemoveFromSlotDialog";
+import { AttendanceSessionCoachMessage } from "./AttendanceSessionCoachMessage";
 
 export function AttendanceSessionClient() {
   const router = useRouter();
@@ -227,10 +227,7 @@ export function AttendanceSessionClient() {
     setRemoveError(null);
     setRemoveTarget(person);
   }
-
-  if (!slotId) {
-    return null;
-  }
+  if (!slotId) return null;
 
   const slotTitle = session
     ? `${formatMinutesAsLabel(session.slot.startMinutes)} – ${formatMinutesAsLabel(session.slot.endMinutes)}`
@@ -286,6 +283,17 @@ export function AttendanceSessionClient() {
           enregistrées sont conservées.
         </Alert>
       ) : null}
+      {session && slotId ? (
+        <AttendanceSessionCoachMessage
+          date={date}
+          slotId={slotId}
+          coachMessage={session.coachMessage}
+          canManage={canManage}
+          weekLabel={isoWeekStartYmd(date)}
+          onChanged={reload}
+        />
+      ) : null}
+
       {actionError || error ? (
         <Alert severity="error" sx={{ mb: 2 }}>
           {actionError ?? error}

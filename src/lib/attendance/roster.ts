@@ -58,6 +58,7 @@ export function buildSessionPayload(params: {
   date: string;
   slot: AttendanceSlotOption;
   cancelled?: boolean;
+  coachMessage?: string | null;
   registrations: Array<{ id: string; data: Record<string, unknown> }>;
   marks: AttendanceMark[];
 }): AttendanceSessionPayload {
@@ -89,10 +90,16 @@ export function buildSessionPayload(params: {
 
   const cancelled = params.cancelled ?? params.slot.cancelled === true;
 
+  const coachMessage =
+    typeof params.coachMessage === "string" && params.coachMessage.trim()
+      ? params.coachMessage.trim()
+      : null;
+
   return {
     date: params.date,
     slot: { ...params.slot, cancelled },
     cancelled,
+    coachMessage,
     roster,
     extras,
     counts: {

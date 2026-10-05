@@ -54,6 +54,18 @@ export type AttendanceSlotCancellation = {
   cancelledByUid: string;
 };
 
+/** Message bureau → coachs pour une occurrence (date + créneau). */
+export type AttendanceSessionNote = {
+  id: string;
+  date: string;
+  slotId: string;
+  siteId: string;
+  seasonLabel: string;
+  body: string;
+  updatedAt: string;
+  updatedByUid: string;
+};
+
 export type AttendanceWeekSummary = {
   weekStart: string;
   weekEnd: string;
@@ -79,6 +91,8 @@ export type AttendanceSessionPayload = {
   date: string;
   slot: AttendanceSlotOption;
   cancelled: boolean;
+  /** Message admin/secrétaire/bureau visible des coachs. */
+  coachMessage: string | null;
   roster: AttendanceRosterPerson[];
   extras: AttendanceRosterPerson[];
   counts: {
