@@ -20,7 +20,7 @@ function createLicenseConflictDb(
 }
 
 describe("findRegistrationLicenseConflicts", () => {
-  it("bloque tout dossier non refusé partageant la même licence", async () => {
+  it("bloque tout dossier actif partageant la même licence", async () => {
     const docs = [
       {
         id: "active-1",
@@ -39,9 +39,9 @@ describe("findRegistrationLicenseConflicts", () => {
         },
       },
       {
-        id: "rejected-1",
+        id: "cancelled-1",
         data: {
-          status: "rejected",
+          status: "cancelled",
           firstName: "E",
           lastName: "F",
         },

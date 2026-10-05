@@ -10,7 +10,7 @@ export type CampaignBarometer = {
   /** Dossiers clos : payés + validés à 0 €. */
   settled: number;
   actionable: number;
-  rejected: number;
+  cancelled: number;
   approvedPct: number;
   paidPct: number;
   settledPct: number;
@@ -32,7 +32,8 @@ export function buildCampaignBarometer(summary: RegistrationAnalyticsSummary): C
   const total = summary.total;
   const approved = summary.status.approved ?? 0;
   const paid = summary.status.paid ?? 0;
-  const rejected = summary.status.rejected ?? 0;
+  const cancelled =
+    (summary.status.cancelled ?? 0) + (summary.status.rejected ?? 0);
   const actionable = ACTIONABLE_REGISTRATION_STATUSES.reduce(
     (sum, status) => sum + (summary.status[status] ?? 0),
     0
@@ -46,7 +47,7 @@ export function buildCampaignBarometer(summary: RegistrationAnalyticsSummary): C
     paid,
     settled,
     actionable,
-    rejected,
+    cancelled,
     approvedPct: pct(approved, total),
     paidPct: pct(paid, total),
     settledPct: pct(settled, total),

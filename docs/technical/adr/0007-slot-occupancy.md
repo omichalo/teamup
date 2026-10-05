@@ -19,7 +19,7 @@ Le staff a besoin d’une vue synthétique du remplissage (taux + liste) pour pi
 3. **Fermeture à la demande** : flag `enrollmentsClosed` sur le créneau. Pilotage admin / secrétaire (page Créneaux et Campagnes & tarifs).
 4. **Blocage** : une personne sans rôle prioritaire (anonyme, joueur, secrétaire adjoint) ne peut pas sélectionner ni soumettre un créneau fermé. Bypass : admin, secrétaire, coach, membre du bureau. Le walk-in pointage n’est pas bloqué ; l’info « Inscriptions fermées » y est affichée.
 5. **Libellé formulaire / pointage** : uniquement « Inscriptions fermées ». Pas de taux de remplissage dans le wizard ni au choix de créneau du pointage.
-6. **Population** : même règle que le pointage (dossiers non refusés, source `clubRegistrations`, jamais `players`). Liste d’inscrits : mêmes alertes (paiement, certificat, PPS) via le mapping roster existant.
+6. **Population** : même règle que le pointage (dossiers non annulés, source `clubRegistrations`, jamais `players`). Liste d’inscrits : mêmes alertes (paiement, certificat, PPS) via le mapping roster existant.
 7. **Domaine** : lecture via `/api/club/slots/occupancy*` et `src/lib/club-slot-occupancy/`. Pas de nouvelle collection. Accès occupancy = opérateurs de présence. Édition capacité / fermeture = `ADMIN`, `SECRETARY`.
 8. **Taux** : `enrolledCount / capacity` lorsque `capacity` est défini. Surcharge visuelle si `enrolledCount > capacity`.
 

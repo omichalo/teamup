@@ -58,15 +58,15 @@ describe("findRecentDuplicateRegistrationId", () => {
     expect(id).toBe("dup-1");
   });
 
-  it("ignore un dossier refusé", async () => {
+  it("ignore un dossier annulé", async () => {
     const db = makeDb([
       {
-        id: "rejected-1",
+        id: "cancelled-1",
         data: {
           firstName: "Théo",
           lastName: "Nosperger",
           birthDate: "2012-05-10",
-          status: "rejected",
+          status: "cancelled",
         },
       },
     ]);

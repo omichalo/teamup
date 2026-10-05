@@ -16,7 +16,8 @@ import {
 import {
   REGISTRATION_STATUS_COLORS,
   REGISTRATION_STATUS_LABELS,
-  type RegistrationStatus,
+  coerceRegistrationStatus,
+  registrationStatusLabel,
 } from "@/lib/club-registration/registration-status";
 import type { Representative } from "@/lib/club-registration/schema";
 import { buildPricingContext, type FamilyRegistrationOrder } from "@/lib/pricing";
@@ -173,12 +174,12 @@ export function registrationStatusChipProps(status: string | undefined): {
   label: string;
   color: "default" | "info" | "warning" | "success" | "error";
 } {
-  if (status && status in REGISTRATION_STATUS_LABELS) {
-    const known = status as RegistrationStatus;
+  const known = coerceRegistrationStatus(status);
+  if (known) {
     return {
       label: REGISTRATION_STATUS_LABELS[known],
       color: REGISTRATION_STATUS_COLORS[known],
     };
   }
-  return { label: status ?? "Statut inconnu", color: "default" };
+  return { label: registrationStatusLabel(status), color: "default" };
 }

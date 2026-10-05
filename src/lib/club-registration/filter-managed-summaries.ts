@@ -80,6 +80,9 @@ export function matchesManagedStatusFilter(
   if (statusFilter === "actionable") {
     return (ACTIONABLE_REGISTRATION_STATUSES as readonly string[]).includes(status);
   }
+  if (statusFilter === "cancelled") {
+    return status === "cancelled" || status === "rejected";
+  }
   return status === statusFilter;
 }
 

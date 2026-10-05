@@ -52,6 +52,10 @@ export function attendanceAlertsFromRegistration(
   return alerts;
 }
 
+import { isTerminalInactiveRegistrationStatus } from "@/lib/club-registration/registration-status";
+
 export function isRejectedRegistration(data: Record<string, unknown>): boolean {
-  return data.status === "rejected";
+  return isTerminalInactiveRegistrationStatus(
+    typeof data.status === "string" ? data.status : null
+  );
 }

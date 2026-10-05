@@ -5,6 +5,7 @@ import {
 import { resolveLicensePresence } from "./license-presence";
 import { resolveChampionshipPersonKey } from "./person-key";
 import type { ChampionshipPlayerRecord } from "./records";
+import { isTerminalInactiveRegistrationStatus } from "@/lib/club-registration/registration-status";
 
 export type ExistingRosterState = {
   coachExcluded: boolean;
@@ -33,7 +34,7 @@ export type RegistrationRosterInput = {
 };
 
 export type ResolveRosterDecision =
-  | { action: "skip"; reason: "rejected" | "no_intent" | "no_person_key" }
+  | { action: "skip"; reason: "cancelled" | "no_intent" | "no_person_key" }
   | { action: "exclude"; personKey: string }
   | { action: "upsert"; record: ChampionshipPlayerRecord };
 
@@ -44,8 +45,8 @@ export function resolveRosterEntryFromRegistration(
   registration: RegistrationRosterInput,
   existing?: ExistingRosterState | null
 ): ResolveRosterDecision {
-  if (registration.status === "rejected") {
-    return { action: "skip", reason: "rejected" };
+  if (isTerminalInactiveRegistrationStatus(registration.status)) {
+    return { action: "skip", reason: "cancelled" };
   }
 
   const flags = flagsFromCompetitionIds(registration.competitionIds);

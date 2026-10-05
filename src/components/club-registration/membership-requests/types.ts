@@ -45,6 +45,8 @@ export type RegistrationSummary = {
   wantsCompetitorExtras?: boolean;
   wantsOptionalJersey?: boolean;
   status?: string;
+  cancellationReason?: string;
+  cancelledAt?: string;
   paymentAmountCents?: number;
   voluntaryDonationCents?: number;
   donationDiscountCents?: number;

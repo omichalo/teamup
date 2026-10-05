@@ -6,7 +6,7 @@ import {
 import { matchesManagedStatusFilter } from "@/lib/club-registration/filter-managed-summaries";
 import type { ManagedListQueueViewCounts, ManagedListQueueViewId } from "@/lib/club-registration/managed-list-saved-views";
 import {
-  isRegistrationStatus,
+  coerceRegistrationStatus,
   type RegistrationStatus,
 } from "@/lib/club-registration/registration-status";
 
@@ -38,7 +38,7 @@ export function emptyManagedQueueStatusCounts(): ManagedQueueStatusCounts {
     payment_requested: 0,
     paid: 0,
     approved: 0,
-    rejected: 0,
+    cancelled: 0,
   };
 }
 
@@ -57,10 +57,13 @@ export function summarizeManagedQueue(
   for (const summary of summaries) {
     const status = summary.status;
     const pendingAid = hasPendingAidReceipt(getRegistrationPaymentAids(summary));
-    if (typeof status === "string" && isRegistrationStatus(status)) {
-      byStatus[status] += 1;
+    const coerced = coerceRegistrationStatus(
+      typeof status === "string" ? status : null
+    );
+    if (coerced) {
+      byStatus[coerced] += 1;
       if (pendingAid) {
-        byStatusPendingAid[status] += 1;
+        byStatusPendingAid[coerced] += 1;
       }
     }
     if (matchesManagedStatusFilter(summary, "actionable")) {

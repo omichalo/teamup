@@ -9,7 +9,7 @@ import {
 } from "@/lib/club-registration/payment/aid-receipt";
 import {
   ACTIONABLE_REGISTRATION_STATUSES,
-  isRegistrationStatus,
+  coerceRegistrationStatus,
   REGISTRATION_STATUS_LABELS,
   REGISTRATION_STATUS_VALUES,
   type RegistrationStatus,
@@ -134,8 +134,9 @@ export function getSpreadsheetSavedView(
 export function getRowRegistrationStatus(
   row: RegistrationClientRecord
 ): RegistrationStatus | null {
-  const status = row.status;
-  return typeof status === "string" && isRegistrationStatus(status) ? status : null;
+  return coerceRegistrationStatus(
+    typeof row.status === "string" ? row.status : null
+  );
 }
 
 export function getRowPaymentStatus(row: RegistrationClientRecord): PaymentStatusId | null {

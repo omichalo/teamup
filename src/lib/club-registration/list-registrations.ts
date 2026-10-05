@@ -133,6 +133,9 @@ function applyManagedStatusFilter(
   if (statusFilter === "all") {
     return query;
   }
+  if (statusFilter === "cancelled") {
+    return query.where("status", "in", ["cancelled", "rejected"]);
+  }
   return query.where("status", "==", statusFilter);
 }
 

@@ -15,7 +15,7 @@ Le championnat 2026-2027 doit se baser sur l’intention des dossiers (paiement 
 ## Décision
 
 1. **`players`** : miroir FFTT actif (liste club courante), plus `listedInClub` / `lastSeenInClubListAt`. **`playersArchive`** : miroir historique des licences sorties de la liste club (rafraîchi à la synchro, restauré dans `players` si la licence réapparaît).
-2. **`seasons/{seasonLabel}/championshipPlayers/{personKey}`** : effectif championnat de la saison (`meta.seasonLabel`, 1er septembre → 31 août, comme ADR-0006). Seed automatique depuis les dossiers non refusés avec `championnat_equipe` et/ou `championnat_paris`. `coachExcluded` est sticky. Ajout coach sans intention dossier autorisé.
+2. **`seasons/{seasonLabel}/championshipPlayers/{personKey}`** : effectif championnat de la saison (`meta.seasonLabel`, 1er septembre → 31 août, comme ADR-0006). Seed automatique depuis les dossiers non annulés avec `championnat_equipe` et/ou `championnat_paris`. `coachExcluded` est sticky. Ajout coach sans intention dossier autorisé.
 3. **Paiement et licence** : informatifs (`paymentStatus`, `licensePresence`). L’entraîneur les voit ; ils n’excluent pas du pool.
 4. **Clé personne** : licence FFTT si connue, sinon `reg_{registrationId}`. Fusion vers la licence quand elle arrive.
 5. **`playerClubProfiles/{personKey}`** : Discord et fauteuil, durables hors saison.
