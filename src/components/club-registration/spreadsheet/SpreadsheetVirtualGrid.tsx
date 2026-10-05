@@ -13,7 +13,7 @@ import type {
   SpreadsheetSort,
 } from "@/lib/club-registration/spreadsheet/row-processing";
 import { SPREADSHEET_STICKY_COLUMN_COUNT } from "@/lib/club-registration/spreadsheet/spreadsheet-sticky-columns";
-import { isRegistrationStatus } from "@/lib/club-registration/registration-status";
+import { coerceRegistrationStatus } from "@/lib/club-registration/registration-status";
 import {
   getSpreadsheetTableDensitySx,
   type SpreadsheetTableDensity,
@@ -227,7 +227,7 @@ export function SpreadsheetVirtualGrid({
           borderLeftColor: "success.dark",
           bgcolor: "success.50",
         },
-        "& [role='row'][data-row-id].status-rejected": {
+        "& [role='row'][data-row-id].status-cancelled": {
           borderLeftColor: "error.main",
           bgcolor: "error.50",
         },
@@ -268,8 +268,11 @@ export function SpreadsheetVirtualGrid({
           if (row.id === selectedRegistrationId) {
             parts.push("selected");
           }
-          if (typeof row.status === "string" && isRegistrationStatus(row.status)) {
-            parts.push(`status-${row.status}`);
+          const coerced = coerceRegistrationStatus(
+            typeof row.status === "string" ? row.status : null
+          );
+          if (coerced) {
+            parts.push(`status-${coerced}`);
           }
           return parts.join(" ");
         }}

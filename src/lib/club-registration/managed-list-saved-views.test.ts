@@ -78,7 +78,7 @@ describe("managed-list-saved-views", () => {
       "payment_requested",
       "paid",
       "approved",
-      "rejected",
+      "cancelled",
     ]);
     expect(getManagedListPipelineTabs("pending_aid_receipt")).toEqual(
       getManagedListPipelineTabs("all")

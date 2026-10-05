@@ -45,7 +45,7 @@ const ROW_STATUS_STYLES: Record<RegistrationStatus, RowStatusStyle> = {
     selectedBg: "primary.50",
     selectedHoverBg: "primary.100",
   },
-  rejected: {
+  cancelled: {
     borderLeftColor: "error.main",
     baseBg: "error.50",
     hoverBg: "error.100",

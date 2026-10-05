@@ -13,7 +13,7 @@ Deux référentiels personnes coexistent : `clubRegistrations` (adhérents saiso
 ## Décision
 
 1. **Domaine isolé** : collections `attendanceMarks`, `attendanceLeads` et `attendanceSlotCancellations`, API `/api/club/attendance/*`, pas de présence stockée dans `clubRegistrations`. Accès client Firestore refusé (Admin SDK uniquement).
-2. **Effectif** : dossiers non refusés dont `slotIds` contient le créneau. Source = `clubRegistrations`, jamais `players`.
+2. **Effectif** : dossiers non annulés dont `slotIds` contient le créneau. Source = `clubRegistrations`, jamais `players`.
 3. **Créneaux du jour** : champs structurés `weekday` (ISO 1–7), `startMinutes`, `endMinutes` sur chaque slot, backfill depuis le libellé / l’id. Catalogue récurrent filtré sur le weekday de la date choisie.
 4. **Pointage** : un document par présence, id déterministe `{date}_{slotId}_{personKey}` (idempotent). Dépointage = suppression. Geste opt-in « Présent ».
 5. **Walk-in adhérent** : mark `walkin` ; ajout optionnel du créneau via un endpoint dédié (`arrayUnion` sur `slotIds` uniquement), pas le PATCH manager des dossiers.

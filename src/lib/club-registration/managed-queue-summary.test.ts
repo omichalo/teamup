@@ -37,7 +37,7 @@ describe("summarizeManagedQueue", () => {
       payment_requested: 1,
       paid: 1,
       approved: 0,
-      rejected: 0,
+      cancelled: 0,
     });
     expect(getManagedListQueueViewCounts(summary)).toEqual({
       to_review: 2,

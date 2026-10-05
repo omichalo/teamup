@@ -136,8 +136,8 @@ export function AnalyticsStatusPipeline({
           sx={{ mt: 2 }}
         >
           <Typography variant="body2" color="text.secondary">
-            Refusés : <strong>{pipeline.rejected}</strong>
-            {pipeline.total > 0 ? ` (${pipeline.rejectedPct} %)` : null}
+            Annulés : <strong>{pipeline.cancelled}</strong>
+            {pipeline.total > 0 ? ` (${pipeline.cancelledPct} %)` : null}
             {" · "}
             Parcours principal : <strong>{pipeline.mainPathTotal}</strong>
           </Typography>

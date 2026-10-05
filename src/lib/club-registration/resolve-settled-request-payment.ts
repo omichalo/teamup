@@ -5,6 +5,7 @@ import {
   shouldMarkRegistrationPaid,
 } from "@/lib/club-registration/payment/registration-supplement";
 import type { RegistrationPayment } from "@/lib/club-registration/payment/types";
+import { isTerminalInactiveRegistrationStatus } from "@/lib/club-registration/registration-status";
 
 export const ALREADY_PAID_RESEND_ERROR =
   "Ce dossier est déjà réglé (paiement enregistré). Impossible de renvoyer un lien de paiement.";
@@ -42,7 +43,9 @@ export type SettledRequestPaymentAction =
 export function resolveSettledRequestPaymentAction(
   dossierStatus: unknown
 ): SettledRequestPaymentAction {
-  if (dossierStatus === "rejected") {
+  if (isTerminalInactiveRegistrationStatus(
+    typeof dossierStatus === "string" ? dossierStatus : null
+  )) {
     return { kind: "reject", error: ALREADY_PAID_RESEND_ERROR };
   }
   if (dossierStatus === "paid" || dossierStatus === "approved") {

@@ -1,4 +1,5 @@
 import { isRegistrationPaidRecord } from "@/lib/club-registration/payment-proof";
+import { isTerminalInactiveRegistrationStatus } from "@/lib/club-registration/registration-status";
 import type { UnregisteredPlayCompetition } from "./unregistered-play-follow-up";
 
 /**
@@ -6,7 +7,13 @@ import type { UnregisteredPlayCompetition } from "./unregistered-play-follow-up"
  * le secrétariat considère l’option comme payée.
  */
 export function isPaidChampionshipRegistration(data: Record<string, unknown>): boolean {
-  if (data.status === "rejected") return false;
+  if (
+    isTerminalInactiveRegistrationStatus(
+      typeof data.status === "string" ? data.status : null
+    )
+  ) {
+    return false;
+  }
   if (data.status === "approved") return true;
   return isRegistrationPaidRecord(data);
 }

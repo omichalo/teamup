@@ -3,7 +3,11 @@ import { COLLECTION } from "@/lib/club-registration/list-registrations";
 import {
   formatPersonDisplayName,
 } from "@/lib/shared/person-name-format";
-import type { RegistrationStatus } from "@/lib/club-registration/registration-status";
+import {
+  isRegistrationStatus,
+  isTerminalInactiveRegistrationStatus,
+  type RegistrationStatus,
+} from "@/lib/club-registration/registration-status";
 
 export type RegistrationLicenseConflict = {
   id: string;
@@ -26,23 +30,12 @@ const BLOCKING_STATUSES = new Set<RegistrationStatus>([
   "approved",
 ]);
 
-function isRegistrationStatus(value: string): value is RegistrationStatus {
-  return (
-    value === "submitted" ||
-    value === "in_review" ||
-    value === "payment_requested" ||
-    value === "paid" ||
-    value === "approved" ||
-    value === "rejected"
-  );
-}
-
 function toConflict(
   id: string,
   data: Record<string, unknown>
 ): RegistrationLicenseConflict | null {
   const statusRaw = typeof data.status === "string" ? data.status : "";
-  if (!isRegistrationStatus(statusRaw) || statusRaw === "rejected") {
+  if (!isRegistrationStatus(statusRaw) || isTerminalInactiveRegistrationStatus(statusRaw)) {
     return null;
   }
   const firstName = typeof data.firstName === "string" ? data.firstName : "";

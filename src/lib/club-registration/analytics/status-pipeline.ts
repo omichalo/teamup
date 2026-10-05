@@ -20,7 +20,7 @@ export type StatusPipelineStage = {
   label: string;
   /** Dossiers actuellement à cette étape. */
   stock: number;
-  /** Dossiers ayant atteint cette étape ou une étape plus avancée (hors refus). */
+  /** Dossiers ayant atteint cette étape ou une étape plus avancée (hors annulés). */
   cumulativeReached: number;
   stockPct: number;
   cumulativePct: number;
@@ -28,11 +28,11 @@ export type StatusPipelineStage = {
 
 export type StatusPipeline = {
   stages: StatusPipelineStage[];
-  rejected: number;
-  rejectedPct: number;
+  cancelled: number;
+  cancelledPct: number;
   mainPathTotal: number;
   total: number;
-  /** Part des dossiers hors refus clos (payés ou validés à 0 €). */
+  /** Part des dossiers hors annulés clos (payés ou validés à 0 €). */
   completionPct: number;
 };
 
@@ -56,8 +56,9 @@ function stageStock(statusBucket: CountBucket, id: RegistrationStatus): number {
 export function buildStatusPipeline(statusBucket: CountBucket): StatusPipeline {
   const stagesStock = PIPELINE_MAIN_PATH.map((id) => stageStock(statusBucket, id));
   const mainPathTotal = stagesStock.reduce((sum, n) => sum + n, 0);
-  const rejected = statusBucket.rejected ?? 0;
-  const total = mainPathTotal + rejected + (statusBucket.unknown ?? 0);
+  const cancelled =
+    (statusBucket.cancelled ?? 0) + (statusBucket.rejected ?? 0);
+  const total = mainPathTotal + cancelled + (statusBucket.unknown ?? 0);
 
   let suffixSum = 0;
   const cumulativeFromEnd = [...stagesStock].reverse().map((stock) => {
@@ -79,8 +80,8 @@ export function buildStatusPipeline(statusBucket: CountBucket): StatusPipeline {
 
   return {
     stages,
-    rejected,
-    rejectedPct: pct(rejected, total),
+    cancelled,
+    cancelledPct: pct(cancelled, total),
     mainPathTotal,
     total,
     completionPct: pct(settled, mainPathTotal),

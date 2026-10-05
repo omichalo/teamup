@@ -8,7 +8,7 @@ import { resolveRegistrationPaymentStatus } from "@/lib/club-registration/resolv
 import {
   REGISTRATION_STATUS_COLORS,
   REGISTRATION_STATUS_LABELS,
-  type RegistrationStatus,
+  coerceRegistrationStatus,
 } from "@/lib/club-registration/registration-status";
 import type { SpreadsheetColumnId } from "@/lib/club-registration/spreadsheet/column-ids";
 import {
@@ -42,9 +42,10 @@ export function SpreadsheetDataCell({ columnId, row, config, context }: Props) {
   const formatContext = context ?? EMPTY_SPREADSHEET_FORMAT_CONTEXT;
 
   if (columnId === "status") {
-    const status = typeof row.status === "string" ? row.status : "";
-    if (status in REGISTRATION_STATUS_LABELS) {
-      const known = status as RegistrationStatus;
+    const known = coerceRegistrationStatus(
+      typeof row.status === "string" ? row.status : null
+    );
+    if (known) {
       return (
         <StatusChip
           label={REGISTRATION_STATUS_LABELS[known]}

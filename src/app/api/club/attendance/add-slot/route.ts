@@ -76,7 +76,7 @@ export async function POST(req: Request) {
     return jsonNoStore({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
-    if (message === "Dossier introuvable" || message === "Dossier refusé") {
+    if (message === "Dossier introuvable" || message === "Dossier annulé") {
       return jsonNoStore({ error: message }, { status: 404 });
     }
     console.error("[api/club/attendance/add-slot POST]", error);

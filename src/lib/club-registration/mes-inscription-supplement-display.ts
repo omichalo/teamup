@@ -7,6 +7,7 @@ import { resolveOnlinePayableCents } from "@/lib/club-registration/payment/resol
 import {
   MES_INSCRIPTION_SUPPLEMENT_STATUS_LABEL,
 } from "@/lib/club-registration/payment/bnpl-checkout-copy";
+import { coerceRegistrationStatus } from "@/lib/club-registration/registration-status";
 
 export type MesInscriptionLike = {
   status?: string;
@@ -61,9 +62,11 @@ export function resolveMesInscriptionStatusPresentation(
     };
   }
 
+  const statusKey = coerceRegistrationStatus(status) ?? status;
+
   return {
-    label: statusLabels[status] ?? status ?? "—",
-    color: statusColors[status] ?? "default",
+    label: statusLabels[statusKey] ?? status ?? "—",
+    color: statusColors[statusKey] ?? "default",
     supplementDue: false,
     payableLabel: null,
   };

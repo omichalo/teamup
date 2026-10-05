@@ -119,8 +119,8 @@ describe("resolveSettledRequestPaymentAction", () => {
     });
   });
 
-  it("refuse de valider un dossier rejeté", () => {
-    expect(resolveSettledRequestPaymentAction("rejected")).toEqual({
+  it("refuse de valider un dossier annulé", () => {
+    expect(resolveSettledRequestPaymentAction("cancelled")).toEqual({
       kind: "reject",
       error: ALREADY_PAID_RESEND_ERROR,
     });

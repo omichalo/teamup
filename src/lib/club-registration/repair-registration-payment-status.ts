@@ -13,7 +13,8 @@ function storedPaymentStatusIsPaid(paymentStatus: unknown): boolean {
   return paymentStatus === "paid" || paymentStatus === "complete";
 }
 
-const TERMINAL_NON_PAID_STATUSES = new Set(["rejected", "cancelled"]);
+const TERMINAL_NON_PAID_STATUSES = new Set(["cancelled", "rejected"]);
+// Keep rejected for legacy docs until migrate-rejected-registrations-to-cancelled.ts is applied.
 
 export type RegistrationPaymentRepairKind =
   | "legacy_payment_status"
