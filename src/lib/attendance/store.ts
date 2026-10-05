@@ -303,8 +303,8 @@ export async function addSlotToRegistration(
       throw new Error("Dossier introuvable");
     }
     const data = registration.data() ?? {};
-    if (data.status === "rejected") {
-      throw new Error("Dossier refusé");
+    if (isRejectedRegistration(data)) {
+      throw new Error("Dossier annulé");
     }
     tx.update(regRef, { slotIds: FieldValue.arrayUnion(params.slotId) });
     const now = new Date().toISOString();
@@ -348,8 +348,8 @@ export async function removeSlotFromRegistration(
       throw new Error("Dossier introuvable");
     }
     const data = registration.data() ?? {};
-    if (data.status === "rejected") {
-      throw new Error("Dossier refusé");
+    if (isRejectedRegistration(data)) {
+      throw new Error("Dossier annulé");
     }
     tx.update(regRef, { slotIds: FieldValue.arrayRemove(params.slotId) });
     // Retire le pointage du jour s'il existe ; l'historique des autres dates est conservé.

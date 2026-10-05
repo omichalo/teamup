@@ -47,7 +47,7 @@ const FULL_PIPELINE_TABS: readonly ManagedListPipelineTab[] = [
   { value: "payment_requested", label: REGISTRATION_STATUS_LABELS.payment_requested },
   { value: "paid", label: REGISTRATION_STATUS_LABELS.paid },
   { value: "approved", label: REGISTRATION_STATUS_LABELS.approved },
-  { value: "rejected", label: REGISTRATION_STATUS_LABELS.rejected },
+  { value: "cancelled", label: REGISTRATION_STATUS_LABELS.cancelled },
 ];
 
 export type ManagedListQueueViewCounts = Partial<Record<ManagedListQueueViewId, number>>;

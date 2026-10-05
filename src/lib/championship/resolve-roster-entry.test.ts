@@ -86,12 +86,12 @@ describe("resolveRosterEntryFromRegistration", () => {
     expect(result.record.includedFromDossier).toBe(false);
   });
 
-  it("skips rejected registrations", () => {
+  it("skips cancelled registrations", () => {
     const result = resolveRosterEntryFromRegistration(SEASON, {
       registrationId: "rej",
-      status: "rejected",
+      status: "cancelled",
       competitionIds: ["championnat_equipe"],
     });
-    expect(result).toEqual({ action: "skip", reason: "rejected" });
+    expect(result).toEqual({ action: "skip", reason: "cancelled" });
   });
 });

@@ -1,3 +1,6 @@
+import { isRegistrationPaidRecord } from "@/lib/club-registration/payment-proof";
+import { isTerminalInactiveRegistrationStatus } from "@/lib/club-registration/registration-status";
+import type { PaymentMethodId } from "@/lib/club-registration/payment-constants";
 import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
 import {
   resolveOnlinePayableCents,
@@ -7,8 +10,6 @@ import {
   hasRegistrationOutstandingBalance,
   isRegistrationSupplementDue,
 } from "@/lib/club-registration/payment/registration-supplement";
-import { isRegistrationPaidRecord } from "@/lib/club-registration/payment-proof";
-import type { PaymentMethodId } from "@/lib/club-registration/payment-constants";
 
 export type SelfServiceCheckoutRecord = Record<string, unknown> & {
   status?: string;
@@ -25,7 +26,7 @@ export function resolveRegistrationPaymentMethod(
 
 function isSelfServiceEligible(data: SelfServiceCheckoutRecord): boolean {
   const status = data.status ?? "";
-  if (status === "rejected" || status === "approved") {
+  if (isTerminalInactiveRegistrationStatus(status) || status === "approved") {
     return false;
   }
 

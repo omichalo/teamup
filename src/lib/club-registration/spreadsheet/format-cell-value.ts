@@ -34,8 +34,7 @@ import {
 } from "@/lib/club-registration/payment-constants";
 import { resolveRegistrationPaymentStatus } from "@/lib/club-registration/resolve-registration-payment-status";
 import {
-  REGISTRATION_STATUS_LABELS,
-  type RegistrationStatus,
+  registrationStatusLabel,
 } from "@/lib/club-registration/registration-status";
 import { getRegistrationPaymentAids } from "@/lib/club-registration/payment/aid-receipt";
 import type { SpreadsheetColumnId } from "./column-ids";
@@ -308,9 +307,7 @@ export function formatSpreadsheetCellValue(
           ? value
           : "";
     case "status":
-      return typeof value === "string"
-        ? (REGISTRATION_STATUS_LABELS[value as RegistrationStatus] ?? value)
-        : "";
+      return typeof value === "string" ? registrationStatusLabel(value) : "";
     case "paymentStatus": {
       const resolved = resolveRegistrationPaymentStatus(row);
       return resolved ? PAYMENT_STATUS_LABELS[resolved] : "";

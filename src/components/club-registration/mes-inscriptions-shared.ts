@@ -53,7 +53,7 @@ export const MES_INSCRIPTION_STATUS_COLOR: Record<
   payment_requested: "warning",
   paid: "success",
   approved: "success",
-  rejected: "error",
+  cancelled: "error",
 };
 
 export const MES_INSCRIPTION_STATUS_LABEL: Record<string, string> = {
@@ -62,7 +62,7 @@ export const MES_INSCRIPTION_STATUS_LABEL: Record<string, string> = {
   payment_requested: "Paiement demandé",
   paid: "Paiement reçu",
   approved: "Inscription validée",
-  rejected: "Refusé",
+  cancelled: "Annulé",
 };
 
 export const MES_INSCRIPTION_MEDICAL_COLOR: Record<

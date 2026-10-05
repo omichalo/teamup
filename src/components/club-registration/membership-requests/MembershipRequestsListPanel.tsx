@@ -20,6 +20,7 @@ import { Search as SearchIcon } from "@mui/icons-material";
 import {
   REGISTRATION_STATUS_COLORS,
   REGISTRATION_STATUS_LABELS,
+  coerceRegistrationStatus,
   type ManagedListStatusFilter,
   type RegistrationStatus,
 } from "@/lib/club-registration/registration-status";
@@ -55,8 +56,8 @@ function statusChipProps(status: string | undefined): {
   label: string;
   color: "default" | "info" | "warning" | "success" | "error";
 } {
-  if (status && status in REGISTRATION_STATUS_LABELS) {
-    const known = status as RegistrationStatus;
+  const known = coerceRegistrationStatus(status);
+  if (known) {
     return {
       label: REGISTRATION_STATUS_LABELS[known],
       color: REGISTRATION_STATUS_COLORS[known],

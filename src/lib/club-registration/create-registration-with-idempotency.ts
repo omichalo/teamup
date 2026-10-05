@@ -1,5 +1,6 @@
 import type { Firestore } from "firebase-admin/firestore";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { isTerminalInactiveRegistrationStatus } from "@/lib/club-registration/registration-status";
 
 const REGISTRATIONS_COLLECTION = "clubRegistrations";
 const ATTEMPTS_COLLECTION = "clubRegistrationSubmissionAttempts";
@@ -35,7 +36,9 @@ export async function findRecentDuplicateRegistrationId(
 
   for (const doc of snap.docs) {
     const data = doc.data();
-    if (data.status === "rejected") continue;
+    if (isTerminalInactiveRegistrationStatus(
+      typeof data.status === "string" ? data.status : null
+    )) continue;
     if (
       data.firstName === identity.firstName &&
       data.lastName === identity.lastName &&

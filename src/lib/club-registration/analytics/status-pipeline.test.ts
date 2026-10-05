@@ -8,11 +8,11 @@ describe("buildStatusPipeline", () => {
       payment_requested: 8,
       paid: 12,
       approved: 40,
-      rejected: 5,
+      cancelled: 5,
     });
 
     expect(pipeline.mainPathTotal).toBe(75);
-    expect(pipeline.rejected).toBe(5);
+    expect(pipeline.cancelled).toBe(5);
     expect(pipeline.stages).toHaveLength(4);
     expect(pipeline.completionPct).toBe(69);
 

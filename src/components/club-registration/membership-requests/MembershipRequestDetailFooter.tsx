@@ -5,7 +5,7 @@ import { SecretariatPaymentNotesSection } from "../secretariat/SecretariatPaymen
 import { isRegistrationPaymentSettled } from "@/lib/club-registration/resolve-settled-request-payment";
 import { resolveOnlinePayableCents } from "@/lib/club-registration/payment/resolve-remaining-payable";
 import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
-import { DeleteRegistrationSection } from "./DeleteRegistrationSection";
+import { CancelRegistrationSection } from "./CancelRegistrationSection";
 import type { MembershipRequestDetailState } from "./useMembershipRequestDetail";
 import type { MembershipListReloadFn } from "./types";
 
@@ -34,6 +34,9 @@ export function MembershipRequestDetailFooter({
   } = detail;
 
   if (!selected || !form) return null;
+
+  const hasActiveReceipts =
+    selectedPayment?.receivedPayments.some((line) => !line.reversedAt) === true;
 
   return (
     <Stack spacing={2}>
@@ -74,14 +77,20 @@ export function MembershipRequestDetailFooter({
       />
 
       {registrationId ? (
-        <DeleteRegistrationSection
+        <CancelRegistrationSection
           registrationId={registrationId}
           firstName={form.firstName}
           lastName={form.lastName}
           adherentDisplayName={formatPersonDisplayName(form.firstName, form.lastName)}
           status={selected.status ?? null}
+          cancellationReason={
+            typeof selected.cancellationReason === "string"
+              ? selected.cancellationReason
+              : null
+          }
+          hasActiveReceipts={hasActiveReceipts}
           disabled={saving || requestingPayment || persistingQuote}
-          onDeleted={async () => {
+          onCancelled={async () => {
             await onListReload?.({ advance: "always" });
             await onDeleted?.();
           }}

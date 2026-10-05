@@ -11,17 +11,11 @@ import {
   Typography,
 } from "@mui/material";
 import type { PaidChampionshipNotPlayedItem } from "@/lib/championship/paid-championship-not-played";
-import {
-  REGISTRATION_STATUS_LABELS,
-  type RegistrationStatus,
-} from "@/lib/club-registration/registration-status";
+import { registrationStatusLabel } from "@/lib/club-registration/registration-status";
 
 function statusLabel(status: string | null): string {
   if (!status) return "—";
-  if (status in REGISTRATION_STATUS_LABELS) {
-    return REGISTRATION_STATUS_LABELS[status as RegistrationStatus];
-  }
-  return status;
+  return registrationStatusLabel(status);
 }
 
 type Props = {

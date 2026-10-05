@@ -1,3 +1,4 @@
+import { isTerminalInactiveRegistrationStatus } from "@/lib/club-registration/registration-status";
 import type { Firestore } from "firebase-admin/firestore";
 import { COLLECTION as REGISTRATIONS_COLLECTION } from "@/lib/club-registration/list-registrations";
 import { registrationMatchesActiveSeason } from "@/lib/club-registration/resolve-registration-season-label";
@@ -81,7 +82,7 @@ function pickDossier(
   }
   if (!license) return null;
   const candidates = (byLicense.get(license) ?? []).filter(
-    (r) => r.status !== "rejected"
+    (r) => !isTerminalInactiveRegistrationStatus(r.status)
   );
   if (candidates.length === 0) return null;
   return (

@@ -2,7 +2,7 @@
 
 import { Alert, Stack, Typography } from "@mui/material";
 import type { RegistrationLicenseUsageSummary } from "@/lib/club-registration/license-lookup";
-import { REGISTRATION_STATUS_LABELS, type RegistrationStatus } from "@/lib/club-registration/registration-status";
+import { registrationStatusLabel } from "@/lib/club-registration/registration-status";
 
 type Props = {
   blocking: RegistrationLicenseUsageSummary["blocking"];
@@ -28,8 +28,7 @@ function ConflictList({
         <Stack component="ul" spacing={0.5} sx={{ m: 0, pl: 2.25 }}>
           {conflicts.map((conflict) => (
             <Typography key={conflict.id} component="li" variant="body2">
-              {conflict.displayName} —{" "}
-              {REGISTRATION_STATUS_LABELS[conflict.status as RegistrationStatus]} (dossier{" "}
+              {conflict.displayName} — {registrationStatusLabel(conflict.status)} (dossier{" "}
               {conflict.id})
             </Typography>
           ))}

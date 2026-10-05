@@ -5,8 +5,7 @@ import {
   type MedicalCertificateStatus,
 } from "@/lib/club-registration/medical-certificate";
 import {
-  REGISTRATION_STATUS_LABELS,
-  type RegistrationStatus,
+  registrationStatusLabel,
 } from "@/lib/club-registration/registration-status";
 import { formatSpreadsheetCellValue } from "./format-cell-value";
 import type { SpreadsheetFormatContext } from "./format-context";
@@ -28,10 +27,10 @@ function formatSubmittedAt(value: unknown): string {
 }
 
 function formatStatus(value: unknown): string {
-  if (typeof value === "string" && value in REGISTRATION_STATUS_LABELS) {
-    return REGISTRATION_STATUS_LABELS[value as RegistrationStatus];
+  if (typeof value !== "string" || !value) {
+    return "—";
   }
-  return "—";
+  return registrationStatusLabel(value);
 }
 
 function formatCertificate(value: unknown): string {

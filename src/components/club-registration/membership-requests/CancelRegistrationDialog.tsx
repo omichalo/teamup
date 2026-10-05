@@ -13,11 +13,12 @@ import {
   Typography,
 } from "@mui/material";
 import { ResponsiveDialog } from "@/components/ui/ResponsiveDialog";
-import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
+import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
 import {
-  getRegistrationDeleteConfirmationPhrase,
-  isRegistrationDeleteConfirmationValid,
-} from "@/lib/club-registration/validate-registration-delete-confirmation";
+  CANCELLATION_REASON_MAX_LENGTH,
+  getRegistrationCancelConfirmationPhrase,
+  isRegistrationCancelConfirmationValid,
+} from "@/lib/club-registration/validate-registration-cancel-confirmation";
 
 type Props = {
   open: boolean;
@@ -25,41 +26,43 @@ type Props = {
   firstName: string;
   lastName: string;
   adherentDisplayName: string;
-  status?: string | null | undefined;
+  hasActiveReceipts: boolean;
   onClose: () => void;
-  onDeleted: () => void | Promise<void>;
+  onCancelled: () => void | Promise<void>;
 };
 
-type Step = "warning" | "confirm";
+type Step = "form" | "confirm";
 
-const PAID_OR_APPROVED_STATUSES = new Set(["paid", "approved"]);
-
-export function DeleteRegistrationDialog({
+export function CancelRegistrationDialog({
   open,
   registrationId,
   firstName,
   lastName,
   adherentDisplayName,
-  status,
+  hasActiveReceipts,
   onClose,
-  onDeleted,
+  onCancelled,
 }: Props) {
-  const [step, setStep] = useState<Step>("warning");
+  const [step, setStep] = useState<Step>("form");
+  const [reason, setReason] = useState("");
   const [confirmationInput, setConfirmationInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const identity = { firstName, lastName };
-  const confirmationPhrase = getRegistrationDeleteConfirmationPhrase(identity);
-  const confirmationMatches = isRegistrationDeleteConfirmationValid(
+  const confirmationPhrase = getRegistrationCancelConfirmationPhrase(identity);
+  const confirmationMatches = isRegistrationCancelConfirmationValid(
     identity,
     confirmationInput
   );
-  const isSensitiveStatus = status ? PAID_OR_APPROVED_STATUSES.has(status) : false;
+  const reasonTrimmed = reason.trim();
+  const reasonValid =
+    reasonTrimmed.length > 0 && reasonTrimmed.length <= CANCELLATION_REASON_MAX_LENGTH;
 
   useEffect(() => {
     if (!open) {
-      setStep("warning");
+      setStep("form");
+      setReason("");
       setConfirmationInput("");
       setSubmitting(false);
       setError(null);
@@ -71,28 +74,34 @@ export function DeleteRegistrationDialog({
     onClose();
   };
 
-  const handleDelete = async () => {
-    if (!confirmationMatches) return;
+  const handleCancel = async () => {
+    if (!confirmationMatches || !reasonValid || hasActiveReceipts) return;
     setSubmitting(true);
     setError(null);
     try {
       const res = await fetch(
-        `/api/club/registration/${encodeURIComponent(registrationId)}`,
+        `/api/club/registration/${encodeURIComponent(registrationId)}/cancel`,
         {
-          method: "DELETE",
+          method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ confirmationPhrase: confirmationInput.trim() }),
+          body: JSON.stringify({
+            reason: reasonTrimmed,
+            confirmationPhrase: confirmationInput.trim(),
+          }),
         }
       );
-      const json = (await res.json().catch(() => ({}))) as { error?: string };
+      const json = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        code?: string;
+      };
       if (!res.ok || json.error) {
-        throw new Error(json.error || "Impossible de supprimer le dossier.");
+        throw new Error(json.error || "Impossible d'annuler le dossier.");
       }
-      await onDeleted();
+      await onCancelled();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Impossible de supprimer le dossier.");
+      setError(err instanceof Error ? err.message : "Impossible d'annuler le dossier.");
     } finally {
       setSubmitting(false);
     }
@@ -101,30 +110,46 @@ export function DeleteRegistrationDialog({
   return (
     <ResponsiveDialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
       <DialogTitle>
-        {step === "warning" ? "Supprimer ce dossier ?" : "Confirmation de suppression"}
+        {step === "form" ? "Annuler ce dossier ?" : "Confirmation d'annulation"}
       </DialogTitle>
       <DialogContent>
-        {step === "warning" ? (
+        {step === "form" ? (
           <Stack spacing={2}>
             <DialogContentText>
-              Vous allez supprimer définitivement le dossier de{" "}
-              <strong>{adherentDisplayName}</strong>. Cette action est irréversible : le dossier,
-              son historique de paiement et les notes associées seront effacés.
+              Vous allez annuler le dossier de <strong>{adherentDisplayName}</strong>. Le
+              dossier reste consultable (filtre « Annulé ») et les pièces comptables sont
+              conservées. Une créance FAC ouverte sera clôturée par un avoir (AVO).
             </DialogContentText>
-            {isSensitiveStatus ? (
+            {hasActiveReceipts ? (
               <Alert severity="error">
-                Ce dossier est au statut « {status} ». Assurez-vous qu&apos;aucun suivi comptable ou
-                légal ne dépend encore de cet enregistrement.
+                Des encaissements (REC) sont encore actifs. Annulez-les d&apos;abord dans le
+                suivi de paiement, puis réessayez.
               </Alert>
             ) : (
               <Alert severity="warning">
-                Utilisez cette action pour retirer un doublon ou un dossier créé par erreur. Les
-                e-mails déjà envoyés ne peuvent pas être annulés.
+                Réservé aux doublons, erreurs de saisie ou désistements. Les e-mails déjà
+                envoyés ne peuvent pas être rappelés.
               </Alert>
             )}
+            <TextField
+              label="Motif d'annulation"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              fullWidth
+              required
+              multiline
+              minRows={2}
+              disabled={hasActiveReceipts || submitting}
+              inputProps={{ maxLength: CANCELLATION_REASON_MAX_LENGTH }}
+              helperText={`${reasonTrimmed.length}/${CANCELLATION_REASON_MAX_LENGTH}`}
+            />
+            {error ? <Alert severity="error">{error}</Alert> : null}
           </Stack>
         ) : (
           <Stack spacing={2}>
+            <DialogContentText>
+              Motif : <strong>{reasonTrimmed}</strong>
+            </DialogContentText>
             <DialogContentText>
               Pour confirmer, recopiez la phrase ci-dessous (majuscules / accents tolérés).
             </DialogContentText>
@@ -158,12 +183,13 @@ export function DeleteRegistrationDialog({
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={handleClose} disabled={submitting}>
-          Annuler
+          Fermer
         </Button>
-        {step === "warning" ? (
+        {step === "form" ? (
           <Button
             color="error"
             variant="contained"
+            disabled={!reasonValid || hasActiveReceipts}
             onClick={() => setStep("confirm")}
           >
             Continuer
@@ -172,11 +198,11 @@ export function DeleteRegistrationDialog({
           <Button
             color="error"
             variant="contained"
-            startIcon={<DeleteForeverIcon />}
+            startIcon={<CancelOutlinedIcon />}
             disabled={!confirmationMatches || submitting}
-            onClick={() => void handleDelete()}
+            onClick={() => void handleCancel()}
           >
-            {submitting ? "Suppression…" : "Supprimer définitivement"}
+            {submitting ? "Annulation…" : "Annuler définitivement"}
           </Button>
         )}
       </DialogActions>

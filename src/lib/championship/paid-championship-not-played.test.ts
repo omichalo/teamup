@@ -20,8 +20,8 @@ describe("isPaidChampionshipRegistration", () => {
     ).toBe(true);
   });
 
-  it("rejects unpaid or rejected dossiers", () => {
-    expect(isPaidChampionshipRegistration({ status: "rejected" })).toBe(false);
+  it("rejects unpaid or cancelled dossiers", () => {
+    expect(isPaidChampionshipRegistration({ status: "cancelled" })).toBe(false);
     expect(
       isPaidChampionshipRegistration({ status: "payment_requested" })
     ).toBe(false);
