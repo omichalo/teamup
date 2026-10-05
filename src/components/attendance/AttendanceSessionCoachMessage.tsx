@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Alert,
   Button,
   CircularProgress,
@@ -18,6 +21,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import ExpandMore from "@mui/icons-material/ExpandMore";
 import { ATTENDANCE_COACH_MESSAGE_MAX_LENGTH } from "@/lib/attendance/constants";
 import { readJsonResponse } from "@/lib/http/read-json-response";
 
@@ -64,6 +68,8 @@ export function AttendanceSessionCoachMessage({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingAction | null>(null);
+  /** Réduit par défaut : un admin-coach voit surtout le pointage. */
+  const [editorExpanded, setEditorExpanded] = useState(false);
 
   useEffect(() => {
     setDraft(coachMessage ?? "");
@@ -116,6 +122,10 @@ export function AttendanceSessionCoachMessage({
     setPending({ mode: "clear", scope });
   }
 
+  if (!canManage && !coachMessage) {
+    return null;
+  }
+
   const trimmedDraft = draft.trim();
   const unchanged = trimmedDraft === (coachMessage ?? "").trim();
   /** Autoriser un fan-out jour/semaine même si le texte du créneau courant est inchangé. */
@@ -135,68 +145,88 @@ export function AttendanceSessionCoachMessage({
       ) : null}
 
       {canManage ? (
-        <Stack
-          spacing={1.5}
+        <Accordion
+          disableGutters
+          elevation={0}
+          expanded={editorExpanded}
+          onChange={(_event, expanded) => setEditorExpanded(expanded)}
           sx={{
-            p: 2,
             border: 1,
             borderColor: "divider",
             borderRadius: 1,
+            "&:before": { display: "none" },
           }}
         >
-          <Typography variant="subtitle2">Message aux entraîneurs</Typography>
-          <TextField
-            label="Message"
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            multiline
-            minRows={2}
-            maxRows={6}
-            fullWidth
-            disabled={busy}
-            inputProps={{ maxLength: ATTENDANCE_COACH_MESSAGE_MAX_LENGTH }}
-            helperText={`${trimmedDraft.length}/${ATTENDANCE_COACH_MESSAGE_MAX_LENGTH}`}
-          />
-          <FormControl fullWidth size="small" disabled={busy}>
-            <InputLabel id="coach-message-scope-label">Portée</InputLabel>
-            <Select
-              labelId="coach-message-scope-label"
-              label="Portée"
-              value={scope}
-              onChange={(event) => setScope(event.target.value as CoachMessageScope)}
-            >
-              <MenuItem value="slot">Ce créneau uniquement</MenuItem>
-              <MenuItem value="day">Tous les créneaux du jour</MenuItem>
-              <MenuItem value="week">
-                Toute la semaine{weekLabel ? ` (${weekLabel})` : ""}
-              </MenuItem>
-            </Select>
-          </FormControl>
-          {error ? <Alert severity="error">{error}</Alert> : null}
-          <Stack direction="row" flexWrap="wrap" gap={1}>
-            <Button
-              variant="contained"
-              onClick={requestSave}
-              disabled={busy || !canSave}
-              sx={{ minHeight: 44 }}
-            >
-              {busy && pending?.mode === "save" ? (
-                <CircularProgress size={22} color="inherit" />
-              ) : (
-                "Enregistrer"
-              )}
-            </Button>
-            <Button
-              variant="outlined"
-              color="inherit"
-              onClick={requestClear}
-              disabled={busy || !canClear}
-              sx={{ minHeight: 44 }}
-            >
-              Effacer
-            </Button>
-          </Stack>
-        </Stack>
+          <AccordionSummary
+            expandIcon={<ExpandMore />}
+            aria-controls="coach-message-editor-content"
+            id="coach-message-editor-header"
+            sx={{ minHeight: 48, "& .MuiAccordionSummary-content": { my: 1 } }}
+          >
+            <Typography variant="subtitle2">
+              {coachMessage
+                ? "Modifier le message aux entraîneurs"
+                : "Écrire un message aux entraîneurs"}
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Stack spacing={1.5}>
+              <TextField
+                label="Message"
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                multiline
+                minRows={2}
+                maxRows={6}
+                fullWidth
+                disabled={busy}
+                inputProps={{ maxLength: ATTENDANCE_COACH_MESSAGE_MAX_LENGTH }}
+                helperText={`${trimmedDraft.length}/${ATTENDANCE_COACH_MESSAGE_MAX_LENGTH}`}
+              />
+              <FormControl fullWidth size="small" disabled={busy}>
+                <InputLabel id="coach-message-scope-label">Portée</InputLabel>
+                <Select
+                  labelId="coach-message-scope-label"
+                  label="Portée"
+                  value={scope}
+                  onChange={(event) =>
+                    setScope(event.target.value as CoachMessageScope)
+                  }
+                >
+                  <MenuItem value="slot">Ce créneau uniquement</MenuItem>
+                  <MenuItem value="day">Tous les créneaux du jour</MenuItem>
+                  <MenuItem value="week">
+                    Toute la semaine{weekLabel ? ` (${weekLabel})` : ""}
+                  </MenuItem>
+                </Select>
+              </FormControl>
+              {error ? <Alert severity="error">{error}</Alert> : null}
+              <Stack direction="row" flexWrap="wrap" gap={1}>
+                <Button
+                  variant="contained"
+                  onClick={requestSave}
+                  disabled={busy || !canSave}
+                  sx={{ minHeight: 44 }}
+                >
+                  {busy && pending?.mode === "save" ? (
+                    <CircularProgress size={22} color="inherit" />
+                  ) : (
+                    "Enregistrer"
+                  )}
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="inherit"
+                  onClick={requestClear}
+                  disabled={busy || !canClear}
+                  sx={{ minHeight: 44 }}
+                >
+                  Effacer
+                </Button>
+              </Stack>
+            </Stack>
+          </AccordionDetails>
+        </Accordion>
       ) : null}
 
       <Dialog open={pending !== null} onClose={() => (busy ? undefined : setPending(null))}>
