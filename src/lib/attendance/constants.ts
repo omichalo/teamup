@@ -1,7 +1,11 @@
 export const ATTENDANCE_MARKS_COLLECTION = "attendanceMarks";
 export const ATTENDANCE_LEADS_COLLECTION = "attendanceLeads";
 export const ATTENDANCE_SLOT_CANCELLATIONS_COLLECTION = "attendanceSlotCancellations";
+export const ATTENDANCE_SESSION_NOTES_COLLECTION = "attendanceSessionNotes";
 export const ATTENDANCE_TIMEZONE = "Europe/Paris";
+
+/** Longueur max du message coach (caractères, après trim). */
+export const ATTENDANCE_COACH_MESSAGE_MAX_LENGTH = 500;
 
 export const ATTENDANCE_MARK_KINDS = ["enrolled", "walkin", "guest"] as const;
 export type AttendanceMarkKind = (typeof ATTENDANCE_MARK_KINDS)[number];

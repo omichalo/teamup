@@ -337,7 +337,8 @@ service cloud.firestore {
     }
 
     // ============================================
-    // Collections: attendanceMarks / attendanceLeads / attendanceSlotCancellations
+    // Collections: attendanceMarks / attendanceLeads / attendanceSlotCancellations /
+    // attendanceSessionNotes
     // ============================================
     // Pointage entraînement — Admin SDK uniquement (routes /api/club/attendance/*).
     match /attendanceMarks/{markId} {
@@ -347,6 +348,9 @@ service cloud.firestore {
       allow read, write: if false;
     }
     match /attendanceSlotCancellations/{cancellationId} {
+      allow read, write: if false;
+    }
+    match /attendanceSessionNotes/{noteId} {
       allow read, write: if false;
     }
 

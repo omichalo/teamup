@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { ATTENDANCE_LEAD_STATUSES, ATTENDANCE_MARK_KINDS, YMD_RE } from "./constants";
+import {
+  ATTENDANCE_COACH_MESSAGE_MAX_LENGTH,
+  ATTENDANCE_LEAD_STATUSES,
+  ATTENDANCE_MARK_KINDS,
+  YMD_RE,
+} from "./constants";
 
 export const attendanceDateSchema = z.string().regex(YMD_RE, "Date invalide");
 
@@ -71,3 +76,43 @@ export const attendanceCancellationBodySchema = z.union([
 ]);
 
 export type AttendanceCancellationBody = z.infer<typeof attendanceCancellationBodySchema>;
+
+const attendanceSessionNoteSlotSchema = z.object({
+  date: attendanceDateSchema,
+  slotId: z.string().trim().min(1).max(120),
+  scope: z.literal("slot").optional(),
+  body: z.string().max(ATTENDANCE_COACH_MESSAGE_MAX_LENGTH),
+});
+
+const attendanceSessionNoteBulkSchema = z.object({
+  date: attendanceDateSchema,
+  scope: z.enum(["day", "week"]),
+  slotId: z.undefined().optional(),
+  body: z.string().max(ATTENDANCE_COACH_MESSAGE_MAX_LENGTH),
+});
+
+/** PUT body : body vide = clear sur le scope. */
+export const attendanceSessionNoteUpsertSchema = z.union([
+  attendanceSessionNoteSlotSchema,
+  attendanceSessionNoteBulkSchema,
+]);
+
+const attendanceSessionNoteClearSlotSchema = z.object({
+  date: attendanceDateSchema,
+  slotId: z.string().trim().min(1).max(120),
+  scope: z.literal("slot").optional(),
+});
+
+const attendanceSessionNoteClearBulkSchema = z.object({
+  date: attendanceDateSchema,
+  scope: z.enum(["day", "week"]),
+  slotId: z.undefined().optional(),
+});
+
+export const attendanceSessionNoteClearSchema = z.union([
+  attendanceSessionNoteClearSlotSchema,
+  attendanceSessionNoteClearBulkSchema,
+]);
+
+export type AttendanceSessionNoteUpsertBody = z.infer<typeof attendanceSessionNoteUpsertSchema>;
+export type AttendanceSessionNoteClearBody = z.infer<typeof attendanceSessionNoteClearSchema>;
