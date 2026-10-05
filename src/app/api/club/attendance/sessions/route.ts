@@ -10,6 +10,7 @@ import {
   listMarksForSession,
   listRegistrationsForSlot,
 } from "@/lib/attendance/store";
+import { getSessionNote } from "@/lib/attendance/session-notes";
 import { buildSessionPayload } from "@/lib/attendance/roster";
 
 /** GET /api/club/attendance/sessions?date=&slotId= */
@@ -35,14 +36,16 @@ export async function GET(req: Request) {
     if (!slot) {
       return jsonNoStore({ error: "Créneau introuvable" }, { status: 404 });
     }
-    const [registrations, marks] = await Promise.all([
+    const [registrations, marks, note] = await Promise.all([
       listRegistrationsForSlot(auth.session.db, slotId),
       listMarksForSession(auth.session.db, date, slotId),
+      getSessionNote(auth.session.db, date, slotId),
     ]);
     const session = buildSessionPayload({
       date,
       slot,
       cancelled,
+      coachMessage: note?.body ?? null,
       registrations,
       marks,
     });

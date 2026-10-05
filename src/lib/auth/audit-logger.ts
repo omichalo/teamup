@@ -114,6 +114,8 @@ export const AUDIT_ACTIONS = {
   ATTENDANCE_SLOT_REMOVED: "attendance.slot.removed",
   ATTENDANCE_SLOT_CANCELLED: "attendance.slot.cancelled",
   ATTENDANCE_SLOT_RESTORED: "attendance.slot.restored",
+  ATTENDANCE_SESSION_NOTE_UPSERTED: "attendance.session_note.upserted",
+  ATTENDANCE_SESSION_NOTE_CLEARED: "attendance.session_note.cleared",
   CHAMPIONSHIP_ROSTER_RECALCULATED: "championship.roster.recalculated",
   CHAMPIONSHIP_ROSTER_UPDATED: "championship.roster.updated",
   CHAMPIONSHIP_ROSTER_DELETED: "championship.roster.deleted",
