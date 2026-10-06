@@ -15,13 +15,13 @@ import {
   ensureOpenEnrollmentInConfig,
   OPEN_ENROLLMENT_SLOT_ID,
 } from "../src/lib/club-registration-config/open-enrollment";
-import {
-  REGISTRATION_CONFIG_ACTIVE_ID,
-  REGISTRATION_CONFIG_COLLECTION,
-  REGISTRATION_CONFIG_DRAFT_ID,
-} from "../src/lib/club-registration-config/store";
 import { registrationConfigV1Schema } from "../src/lib/club-registration-config/schema";
 import type { RegistrationConfigV1 } from "../src/lib/club-registration-config/types";
+
+/** Constantes locales — ne pas importer `store.ts` (init Firebase Admin trop tôt). */
+const REGISTRATION_CONFIG_COLLECTION = "clubRegistrationConfig";
+const REGISTRATION_CONFIG_ACTIVE_ID = "active";
+const REGISTRATION_CONFIG_DRAFT_ID = "draft";
 
 type ScriptArgs = {
   apply: boolean;
