@@ -38,6 +38,7 @@ import {
 } from "./repair-jersey";
 import { DEFAULT_COMPETITION_AVAILABILITY_COMMITMENT_NOTICE } from "./competition-availability-commitment";
 import { buildDefaultPricingDevices } from "./pricing-devices";
+import { buildOpenEnrollmentSite } from "./open-enrollment";
 
 function sectionPricingProfile(id: string): RegistrationSection["pricingProfile"] {
   if (id === "handisport") return "handisport";
@@ -244,26 +245,32 @@ export function buildDefaultRegistrationConfig(): RegistrationConfigV1 {
         enabled: true,
       };
     }),
-    sites: CLUB_REGISTRATION_SITES.map((site, index) => ({
-      id: site.id,
-      label: site.label,
-      ...(site.gymnasiumName?.trim()
-        ? { gymnasiumName: site.gymnasiumName.trim() }
-        : {}),
-      linkedSectionIds: inferLinkedSectionIdsFromSite(site),
-      sortOrder: index,
-      slots: site.slots.map((slot, slotIndex) =>
-        withResolvedSlotSchedule({
-          id: slot.id,
-          label: slot.label,
-          sortOrder: slotIndex,
-          enabled: true,
-          ...(slot.schoolPickupSchool
-            ? { schoolPickupSchool: slot.schoolPickupSchool }
-            : {}),
-        })
-      ),
-    })),
+    sites: [
+      ...CLUB_REGISTRATION_SITES.map((site, index) => ({
+        id: site.id,
+        label: site.label,
+        ...(site.gymnasiumName?.trim()
+          ? { gymnasiumName: site.gymnasiumName.trim() }
+          : {}),
+        linkedSectionIds: inferLinkedSectionIdsFromSite(site),
+        sortOrder: index,
+        slots: site.slots.map((slot, slotIndex) =>
+          withResolvedSlotSchedule({
+            id: slot.id,
+            label: slot.label,
+            sortOrder: slotIndex,
+            enabled: true,
+            ...(slot.schoolPickupSchool
+              ? { schoolPickupSchool: slot.schoolPickupSchool }
+              : {}),
+          })
+        ),
+      })),
+      buildOpenEnrollmentSite({
+        sortOrder: CLUB_REGISTRATION_SITES.length,
+        linkedSectionIds: SECTION_PRINCIPALE_OPTIONS.map((section) => section.id),
+      }),
+    ],
     competitions: COMPETITION_OPTIONS.map((comp) => ({
       id: comp.id,
       formLabel: comp.label.replace(/\s*\([0-9 €—]+.*\)$/, ""),

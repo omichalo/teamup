@@ -53,6 +53,7 @@ export function SiteSlotEditorCard({
   const [enrollmentsConfirmOpen, setEnrollmentsConfirmOpen] = useState(false);
   const [pendingEnrollmentsClosed, setPendingEnrollmentsClosed] = useState(false);
   const schoolPickupEnabled = Boolean(slot.schoolPickupSchool);
+  const openEnrollment = slot.openEnrollment === true;
   const weekday = isIsoWeekday(slot.weekday) ? slot.weekday : 1;
   const startInput = formatMinutesAsInput(slot.startMinutes ?? 17 * 60);
   const endInput = formatMinutesAsInput(slot.endMinutes ?? 18 * 60 + 30);
@@ -77,98 +78,136 @@ export function SiteSlotEditorCard({
         size="small"
         value={slot.label}
         onChange={(e) => onChange({ label: e.target.value })}
-        helperText="Ex. Lundi / 17h00 – 18h30 / Jeunes Loisirs"
+        helperText={
+          openEnrollment
+            ? "Ex. Inscription libre (pas de créneau fixe)"
+            : "Ex. Lundi / 17h00 – 18h30 / Jeunes Loisirs"
+        }
         fullWidth
       />
 
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-        <FormControl size="small" sx={{ minWidth: 160 }}>
-          <InputLabel id={`slot-weekday-${slot.id}`}>Jour</InputLabel>
-          <Select
-            labelId={`slot-weekday-${slot.id}`}
-            label="Jour"
-            value={weekday}
-            onChange={(e) => onChange({ weekday: Number(e.target.value) as IsoWeekday })}
-          >
-            {WEEKDAY_OPTIONS.map((value) => (
-              <MenuItem key={value} value={value}>
-                {ISO_WEEKDAY_LABELS[value]}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <TextField
-          label="Début"
-          type="time"
-          size="small"
-          value={startInput}
-          onChange={(e) => {
-            const minutes = parseTimeInput(e.target.value);
-            if (minutes != null) onChange({ startMinutes: minutes });
-          }}
-          slotProps={{ inputLabel: { shrink: true } }}
-        />
-        <TextField
-          label="Fin"
-          type="time"
-          size="small"
-          value={endInput}
-          onChange={(e) => {
-            const minutes = parseTimeInput(e.target.value);
-            if (minutes != null) onChange({ endMinutes: minutes });
-          }}
-          slotProps={{ inputLabel: { shrink: true } }}
-        />
-      </Stack>
-
-      <TextField
-        label="Capacité (inscrits)"
-        type="number"
-        size="small"
-        value={slot.capacity ?? ""}
-        onChange={(e) => {
-          const raw = e.target.value.trim();
-          if (raw === "") {
-            onChange({ capacity: undefined });
-            return;
-          }
-          const parsed = Number.parseInt(raw, 10);
-          if (Number.isInteger(parsed) && parsed >= 1) {
-            onChange({ capacity: parsed });
-          }
-        }}
-        helperText="Nombre max d'inscrits pour le taux de remplissage. N'empêche pas les inscriptions."
-        slotProps={{ htmlInput: { min: 1, step: 1 } }}
-        sx={{ maxWidth: 280 }}
+      <FormControlLabel
+        sx={configEditorSwitchLabelSx}
+        control={
+          <Switch
+            checked={openEnrollment}
+            onChange={(e) => {
+              if (e.target.checked) {
+                onSchoolPickupChange(false);
+                onChange({
+                  openEnrollment: true,
+                  weekday: undefined,
+                  startMinutes: undefined,
+                  endMinutes: undefined,
+                  capacity: undefined,
+                  schoolPickupSchool: undefined,
+                });
+                return;
+              }
+              onChange({
+                openEnrollment: undefined,
+                weekday: 1,
+                startMinutes: 17 * 60,
+                endMinutes: 18 * 60 + 30,
+              });
+            }}
+          />
+        }
+        label="Inscription libre (pas d'horaire fixe, exclusif avec les autres créneaux)"
       />
 
-      <ConfigEditorOptionPanel title="Récupération scolaire">
-        <FormControlLabel
-          sx={configEditorSwitchLabelSx}
-          control={
-            <Switch
-              checked={schoolPickupEnabled}
-              onChange={(e) =>
-                onSchoolPickupChange(
-                  e.target.checked,
-                  e.target.checked ? slot.schoolPickupSchool ?? "École" : undefined
-                )
-              }
+      {!openEnrollment ? (
+        <>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
+            <FormControl size="small" sx={{ minWidth: 160 }}>
+              <InputLabel id={`slot-weekday-${slot.id}`}>Jour</InputLabel>
+              <Select
+                labelId={`slot-weekday-${slot.id}`}
+                label="Jour"
+                value={weekday}
+                onChange={(e) => onChange({ weekday: Number(e.target.value) as IsoWeekday })}
+              >
+                {WEEKDAY_OPTIONS.map((value) => (
+                  <MenuItem key={value} value={value}>
+                    {ISO_WEEKDAY_LABELS[value]}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField
+              label="Début"
+              type="time"
+              size="small"
+              value={startInput}
+              onChange={(e) => {
+                const minutes = parseTimeInput(e.target.value);
+                if (minutes != null) onChange({ startMinutes: minutes });
+              }}
+              slotProps={{ inputLabel: { shrink: true } }}
             />
-          }
-          label="Proposer la récupération à la sortie de l'école pour ce créneau"
-        />
-        {schoolPickupEnabled ? (
+            <TextField
+              label="Fin"
+              type="time"
+              size="small"
+              value={endInput}
+              onChange={(e) => {
+                const minutes = parseTimeInput(e.target.value);
+                if (minutes != null) onChange({ endMinutes: minutes });
+              }}
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
+          </Stack>
+
           <TextField
-            label="Nom de l'école"
+            label="Capacité (inscrits)"
+            type="number"
             size="small"
-            value={slot.schoolPickupSchool ?? ""}
-            onChange={(e) => onSchoolPickupChange(true, e.target.value)}
-            fullWidth
-            sx={{ mt: 1 }}
+            value={slot.capacity ?? ""}
+            onChange={(e) => {
+              const raw = e.target.value.trim();
+              if (raw === "") {
+                onChange({ capacity: undefined });
+                return;
+              }
+              const parsed = Number.parseInt(raw, 10);
+              if (Number.isInteger(parsed) && parsed >= 1) {
+                onChange({ capacity: parsed });
+              }
+            }}
+            helperText="Nombre max d'inscrits pour le taux de remplissage. N'empêche pas les inscriptions."
+            slotProps={{ htmlInput: { min: 1, step: 1 } }}
+            sx={{ maxWidth: 280 }}
           />
-        ) : null}
-      </ConfigEditorOptionPanel>
+
+          <ConfigEditorOptionPanel title="Récupération scolaire">
+            <FormControlLabel
+              sx={configEditorSwitchLabelSx}
+              control={
+                <Switch
+                  checked={schoolPickupEnabled}
+                  onChange={(e) =>
+                    onSchoolPickupChange(
+                      e.target.checked,
+                      e.target.checked ? slot.schoolPickupSchool ?? "École" : undefined
+                    )
+                  }
+                />
+              }
+              label="Proposer la récupération à la sortie de l'école pour ce créneau"
+            />
+            {schoolPickupEnabled ? (
+              <TextField
+                label="Nom de l'école"
+                size="small"
+                value={slot.schoolPickupSchool ?? ""}
+                onChange={(e) => onSchoolPickupChange(true, e.target.value)}
+                fullWidth
+                sx={{ mt: 1 }}
+              />
+            ) : null}
+          </ConfigEditorOptionPanel>
+        </>
+      ) : null}
 
       <FormControlLabel
         sx={configEditorSwitchLabelSx}

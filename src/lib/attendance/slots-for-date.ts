@@ -1,4 +1,5 @@
 import type { RegistrationConfigV1, RegistrationSiteSlot } from "@/lib/club-registration-config/types";
+import { isOpenEnrollmentSlot } from "@/lib/club-registration-config/open-enrollment";
 import { resolveSlotSchedule } from "@/lib/club-registration-config/slot-schedule";
 import type { AttendanceSlotOption } from "./types";
 import { isoWeekdayFromYmd } from "./calendar";
@@ -13,7 +14,7 @@ export function listSlotsForDate(
 
   for (const site of config.sites) {
     for (const slot of site.slots) {
-      if (!slot.enabled) {
+      if (!slot.enabled || isOpenEnrollmentSlot(slot)) {
         continue;
       }
       const option = toSlotOption(site.id, site.label, site.gymnasiumName, slot, weekday);

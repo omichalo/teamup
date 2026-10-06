@@ -7,7 +7,6 @@ import {
   getEnabledSectionIds,
   getSchoolPickupSlotIds,
 } from "@/lib/club-registration-config/helpers";
-import { getClosedEnabledSlotIds } from "@/lib/club-registration-config/slot-enrollments";
 import { getToggleAidRules } from "@/lib/club-registration-config/aid-rules";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import { preprocessRegistrationPayloadInput } from "./reduction-reference-codes";
@@ -28,6 +27,7 @@ import {
   paymentPayloadFieldsSchema,
   refinePaymentPayload,
 } from "./payment-payload-schema";
+import { refineRegistrationPayloadSlots } from "./refine-payload-slots";
 import { isValidFrenchPhoneSurface, normalizeFrenchPhoneInput } from "./phone-fr";
 import { calculateQuoteFromConfig } from "@/lib/club-registration-config/pricing-engine";
 import { isValidVoluntaryDonationCents, getMembershipNetCents, computeInvoiceTotalCents } from "@/lib/pricing/donation-discount";
@@ -145,48 +145,14 @@ export function buildRegistrationPayloadSchema(
       ...paymentPayloadFieldsSchema,
     })
     .superRefine((data, ctx) => {
-      for (const id of data.slotIds) {
-        if (!allSlotIds.has(id)) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Créneau inconnu",
-            path: ["slotIds"],
-          });
-          return;
-        }
-      }
-
-      if (!options.allowClosedSlots) {
-        const closedSlotIds = getClosedEnabledSlotIds(config);
-        if (data.slotIds.some((id) => closedSlotIds.has(id))) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Les inscriptions sont fermées sur un créneau sélectionné.",
-            path: ["slotIds"],
-          });
-          return;
-        }
-      }
-
-      const selectedSlots = new Set(data.slotIds);
-      for (const id of data.schoolPickupSlotIds) {
-        if (!schoolPickupSlotIds.has(id)) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Créneau de récupération scolaire inconnu",
-            path: ["schoolPickupSlotIds"],
-          });
-          return;
-        }
-        if (!selectedSlots.has(id)) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message:
-              "La récupération à la sortie de l’école ne peut être demandée que pour un créneau sélectionné",
-            path: ["schoolPickupSlotIds"],
-          });
-          return;
-        }
+      if (
+        !refineRegistrationPayloadSlots(config, data, ctx, {
+          allSlotIds,
+          schoolPickupSlotIds,
+          allowClosedSlots: Boolean(options.allowClosedSlots),
+        })
+      ) {
+        return;
       }
 
       const uniqueAdditional = new Set(data.additionalSectionIds);

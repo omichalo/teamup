@@ -1,9 +1,23 @@
 import type { RegistrationConfigV1, RegistrationSiteSlot } from "./types";
+import { isOpenEnrollmentSlot } from "./open-enrollment";
 import { resolveSlotSchedule } from "./slot-schedule";
 
 export function withResolvedSlotSchedule(
   slot: RegistrationSiteSlot
 ): RegistrationSiteSlot {
+  if (isOpenEnrollmentSlot(slot)) {
+    return {
+      id: slot.id,
+      label: slot.label,
+      sortOrder: slot.sortOrder,
+      enabled: slot.enabled,
+      openEnrollment: true,
+      ...(slot.enrollmentsClosed !== undefined
+        ? { enrollmentsClosed: slot.enrollmentsClosed }
+        : {}),
+      ...(slot.capacity !== undefined ? { capacity: slot.capacity } : {}),
+    };
+  }
   const resolved = resolveSlotSchedule(slot);
   if (!resolved) {
     return slot;
