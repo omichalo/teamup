@@ -43,6 +43,7 @@ const registrationSiteSlotSchema = z.object({
   endMinutes: z.number().int().min(1).max(23 * 60 + 59).optional(),
   capacity: z.number().int().min(1).max(500).optional(),
   enrollmentsClosed: z.boolean().optional(),
+  openEnrollment: z.boolean().optional(),
 });
 
 /** Chaîne optionnelle : vide ou espaces → `undefined` (champ masqué côté formulaire). */

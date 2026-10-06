@@ -14,6 +14,7 @@ import {
 } from "@mui/material";
 import { Add as AddIcon, Delete as DeleteIcon } from "@mui/icons-material";
 import { getEnabledSections, getSchoolPickupSlotIds } from "@/lib/club-registration-config/helpers";
+import { getOpenEnrollmentSlotIds } from "@/lib/club-registration-config/open-enrollment";
 import type { Representative } from "@/lib/club-registration/schema";
 import { normalizeLastNameOnInput } from "@/lib/shared/person-name-format";
 import { RegistrationMultiSelectField } from "../RegistrationMultiSelectField";
@@ -359,6 +360,7 @@ export function MembershipRequestDetailFormPrimary({ detail, hideTitleHeader = f
           slotIds={form.slotIds}
           schoolPickupSlotIds={form.schoolPickupSlotIds}
           eligibleSchoolPickupSlotIds={getSchoolPickupSlotIds(config)}
+          openEnrollmentSlotIds={getOpenEnrollmentSlotIds(config)}
           allSlotOptions={allSlotOptions}
           onSlotIdsChange={(value) => updateField("slotIds", value)}
           onSchoolPickupSlotIdsChange={(value) => updateField("schoolPickupSlotIds", value)}

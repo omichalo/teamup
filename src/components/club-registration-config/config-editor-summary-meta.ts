@@ -30,18 +30,25 @@ export function slotSummaryMeta(
     endMinutes?: number | undefined;
     capacity?: number | undefined;
     enrollmentsClosed?: boolean | undefined;
+    openEnrollment?: boolean | undefined;
     id?: string;
     label?: string;
   }
 ): string | undefined {
   const parts: string[] = [];
-  const schedule = resolveSlotSchedule({
-    id: slot.id ?? "",
-    label: slot.label ?? "",
-    weekday: slot.weekday,
-    startMinutes: slot.startMinutes,
-    endMinutes: slot.endMinutes,
-  });
+  if (slot.openEnrollment === true) {
+    parts.push("Inscription libre");
+  }
+  const schedule =
+    slot.openEnrollment === true
+      ? null
+      : resolveSlotSchedule({
+          id: slot.id ?? "",
+          label: slot.label ?? "",
+          weekday: slot.weekday,
+          startMinutes: slot.startMinutes,
+          endMinutes: slot.endMinutes,
+        });
   if (schedule) {
     parts.push(formatSlotScheduleSummary(schedule));
   }

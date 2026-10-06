@@ -44,6 +44,17 @@ describe("resolveActivePricingDevice — CHAMP'YON", () => {
     expect(device?.id).toBe(CHAMP_YON_DEVICE_ID);
   });
 
+  it("s'applique avec inscription libre seule (exactSlotCount: 1)", () => {
+    const device = resolveActivePricingDevice(
+      ctx({
+        birthDate: "2014-06-01",
+        slotIds: ["inscription-libre"],
+      }),
+      config
+    );
+    expect(device?.id).toBe(CHAMP_YON_DEVICE_ID);
+  });
+
   it("ne s'applique pas avec 2 créneaux", () => {
     const device = resolveActivePricingDevice(
       ctx({

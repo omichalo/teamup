@@ -12,6 +12,7 @@ import {
   FormControlLabel,
   FormGroup,
   Stack,
+  Switch,
   Typography,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
@@ -19,6 +20,11 @@ import {
   getEnabledSites,
   sanitizeSchoolPickupSlotIdsFromConfig,
 } from "@/lib/club-registration-config/helpers";
+import {
+  getOpenEnrollmentSlotId,
+  isOpenEnrollmentSlot,
+  OPEN_ENROLLMENT_SLOT_LABEL,
+} from "@/lib/club-registration-config/open-enrollment";
 import { registrationSiteGymnasiumLabel } from "@/lib/club-registration-config/site-display";
 import {
   isSlotEnrollmentsClosed,
@@ -44,7 +50,15 @@ export function PracticeSlotPicker({
   canSelectClosedSlots = false,
 }: Props) {
   const config = useRegistrationConfigValue();
-  const sites = getEnabledSites(config);
+  const openEnrollmentSlotId = getOpenEnrollmentSlotId(config);
+  const openEnrollmentSelected =
+    openEnrollmentSlotId !== null && draft.slotIds.includes(openEnrollmentSlotId);
+  const sites = getEnabledSites(config)
+    .map((site) => ({
+      ...site,
+      slots: site.slots.filter((slot) => slot.enabled && !isOpenEnrollmentSlot(slot)),
+    }))
+    .filter((site) => site.slots.length > 0);
   const schoolPickupCopy = config.uiCopy.schoolPickupService;
 
   useEffect(() => {
@@ -65,11 +79,37 @@ export function PracticeSlotPicker({
     });
   }, [canSelectClosedSlots, config, draft.schoolPickupSlotIds, draft.slotIds, onChange]);
 
+  const setOpenEnrollment = (enabled: boolean) => {
+    if (!openEnrollmentSlotId) {
+      return;
+    }
+    if (enabled) {
+      onChange({
+        slotIds: [openEnrollmentSlotId],
+        schoolPickupSlotIds: [],
+      });
+      return;
+    }
+    onChange({
+      slotIds: draft.slotIds.filter((id) => id !== openEnrollmentSlotId),
+      schoolPickupSlotIds: sanitizeSchoolPickupSlotIdsFromConfig(
+        config,
+        draft.slotIds.filter((id) => id !== openEnrollmentSlotId),
+        draft.schoolPickupSlotIds
+      ),
+    });
+  };
+
   const toggleSlot = (id: string, closed: boolean) => {
     if (closed && !canSelectClosedSlots) {
       return;
     }
-    const slotSet = new Set(draft.slotIds);
+    if (openEnrollmentSelected) {
+      return;
+    }
+    const slotSet = new Set(
+      draft.slotIds.filter((slotId) => slotId !== openEnrollmentSlotId)
+    );
     const pickupSet = new Set(draft.schoolPickupSlotIds);
     if (slotSet.has(id)) {
       slotSet.delete(id);
@@ -104,111 +144,159 @@ export function PracticeSlotPicker({
       <Typography variant="subtitle2" data-field="slotIds" tabIndex={-1}>
         Créneaux souhaités
       </Typography>
-      <Alert severity="warning" variant="outlined">
-        Il est possible de s&apos;inscrire sur plusieurs créneaux, sous réserve
-        d&apos;une participation régulière à chacun d&apos;eux, afin de ne pas
-        bloquer inutilement des places.
-      </Alert>
+
+      {openEnrollmentSlotId ? (
+        <Box
+          sx={{
+            p: 2,
+            border: 1,
+            borderColor: "divider",
+            borderRadius: 1,
+          }}
+        >
+          <FormControlLabel
+            control={
+              <Switch
+                checked={openEnrollmentSelected}
+                onChange={(_, checked) => setOpenEnrollment(checked)}
+              />
+            }
+            label={OPEN_ENROLLMENT_SLOT_LABEL}
+          />
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            Choisissez cette option si vous n&apos;avez pas de créneau
+            d&apos;entraînement attitré. Vous pourrez fréquenter les créneaux
+            libres du club.
+          </Typography>
+        </Box>
+      ) : null}
+
+      {!openEnrollmentSelected ? (
+        <Alert severity="warning" variant="outlined">
+          Il est possible de s&apos;inscrire sur plusieurs créneaux, sous réserve
+          d&apos;une participation régulière à chacun d&apos;eux, afin de ne pas
+          bloquer inutilement des places.
+        </Alert>
+      ) : (
+        <Alert severity="info" variant="outlined">
+          Les créneaux horaires sont désactivés tant que l&apos;inscription libre
+          est sélectionnée.
+        </Alert>
+      )}
+
       {sites.map((site) => {
         const gymnasiumLabel = registrationSiteGymnasiumLabel(site);
         return (
-        <Accordion
-          key={site.id}
-          disableGutters
-          expanded={expandedSiteIds.has(site.id)}
-          onChange={(_, expanded) => {
-            onExpandedSiteIdsChange(
-              (() => {
-                const next = new Set(expandedSiteIds);
-                if (expanded) next.add(site.id);
-                else next.delete(site.id);
-                return next;
-              })()
-            );
-          }}
-        >
-          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-            <Stack spacing={0.25}>
-              <Typography fontWeight={600}>{site.label}</Typography>
-              {gymnasiumLabel ? (
-                <Typography variant="body2" color="text.secondary">
-                  {gymnasiumLabel}
-                </Typography>
-              ) : null}
-            </Stack>
-          </AccordionSummary>
-          <AccordionDetails>
-            <FormGroup>
-              {site.slots
-                .filter((slot) => slot.enabled)
-                .map((slot) => {
-                const isSelected = draft.slotIds.includes(slot.id);
-                const wantsSchoolPickup = draft.schoolPickupSlotIds.includes(slot.id);
-                const closed = isSlotEnrollmentsClosed(slot);
-                const blocked = closed && !canSelectClosedSlots;
+          <Accordion
+            key={site.id}
+            disableGutters
+            disabled={openEnrollmentSelected}
+            expanded={!openEnrollmentSelected && expandedSiteIds.has(site.id)}
+            onChange={(_, expanded) => {
+              if (openEnrollmentSelected) {
+                return;
+              }
+              onExpandedSiteIdsChange(
+                (() => {
+                  const next = new Set(expandedSiteIds);
+                  if (expanded) next.add(site.id);
+                  else next.delete(site.id);
+                  return next;
+                })()
+              );
+            }}
+          >
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Stack spacing={0.25}>
+                <Typography fontWeight={600}>{site.label}</Typography>
+                {gymnasiumLabel ? (
+                  <Typography variant="body2" color="text.secondary">
+                    {gymnasiumLabel}
+                  </Typography>
+                ) : null}
+              </Stack>
+            </AccordionSummary>
+            <AccordionDetails>
+              <FormGroup>
+                {site.slots.map((slot) => {
+                  const isSelected = draft.slotIds.includes(slot.id);
+                  const wantsSchoolPickup = draft.schoolPickupSlotIds.includes(slot.id);
+                  const closed = isSlotEnrollmentsClosed(slot);
+                  const blocked =
+                    openEnrollmentSelected || (closed && !canSelectClosedSlots);
 
-                return (
-                  <Box key={slot.id} sx={{ mb: slot.schoolPickupSchool ? 1.5 : 0 }}>
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={isSelected}
-                          disabled={blocked}
-                          onChange={() => toggleSlot(slot.id, closed)}
-                        />
-                      }
-                      label={
-                        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-                          <Typography component="span">{slot.label}</Typography>
-                          {closed ? (
-                            <Chip size="small" color="warning" label={SLOT_ENROLLMENTS_CLOSED_LABEL} />
-                          ) : null}
-                        </Stack>
-                      }
-                    />
-                    {isSelected && slot.schoolPickupSchool ? (
-                      <Box sx={{ pl: 4, mt: 0.5 }}>
-                        <Alert severity="info" variant="outlined" sx={{ mb: 1 }}>
-                          <Typography variant="subtitle2" gutterBottom>
-                            {schoolPickupCopy.title}
-                          </Typography>
-                          <Typography variant="body2" sx={{ mb: 1 }}>
-                            {schoolPickupCopy.intro}
-                          </Typography>
-                          <Typography variant="body2" sx={{ mb: 0.5 }}>
-                            École concernée : <strong>{slot.schoolPickupSchool}</strong>
-                          </Typography>
-                          <Stack component="ul" spacing={0.25} sx={{ m: 0, pl: 2.5 }}>
-                            {schoolPickupCopy.steps.map((step) => (
-                              <Typography
-                                key={step}
-                                component="li"
-                                variant="body2"
-                                color="text.secondary"
-                              >
-                                {step}
-                              </Typography>
-                            ))}
+                  return (
+                    <Box key={slot.id} sx={{ mb: slot.schoolPickupSchool ? 1.5 : 0 }}>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={isSelected}
+                            disabled={blocked}
+                            onChange={() => toggleSlot(slot.id, closed)}
+                          />
+                        }
+                        label={
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            alignItems="center"
+                            flexWrap="wrap"
+                          >
+                            <Typography component="span">{slot.label}</Typography>
+                            {closed ? (
+                              <Chip
+                                size="small"
+                                color="warning"
+                                label={SLOT_ENROLLMENTS_CLOSED_LABEL}
+                              />
+                            ) : null}
                           </Stack>
-                        </Alert>
-                        <FormControlLabel
-                          control={
-                            <Checkbox
-                              checked={wantsSchoolPickup}
-                              onChange={() => toggleSchoolPickup(slot.id)}
-                            />
-                          }
-                          label={schoolPickupCopy.optInLabel}
-                        />
-                      </Box>
-                    ) : null}
-                  </Box>
-                );
-              })}
-            </FormGroup>
-          </AccordionDetails>
-        </Accordion>
-      );
+                        }
+                      />
+                      {isSelected && slot.schoolPickupSchool ? (
+                        <Box sx={{ pl: 4, mt: 0.5 }}>
+                          <Alert severity="info" variant="outlined" sx={{ mb: 1 }}>
+                            <Typography variant="subtitle2" gutterBottom>
+                              {schoolPickupCopy.title}
+                            </Typography>
+                            <Typography variant="body2" sx={{ mb: 1 }}>
+                              {schoolPickupCopy.intro}
+                            </Typography>
+                            <Typography variant="body2" sx={{ mb: 0.5 }}>
+                              École concernée :{" "}
+                              <strong>{slot.schoolPickupSchool}</strong>
+                            </Typography>
+                            <Stack component="ul" spacing={0.25} sx={{ m: 0, pl: 2.5 }}>
+                              {schoolPickupCopy.steps.map((step) => (
+                                <Typography
+                                  key={step}
+                                  component="li"
+                                  variant="body2"
+                                  color="text.secondary"
+                                >
+                                  {step}
+                                </Typography>
+                              ))}
+                            </Stack>
+                          </Alert>
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={wantsSchoolPickup}
+                                onChange={() => toggleSchoolPickup(slot.id)}
+                              />
+                            }
+                            label={schoolPickupCopy.optInLabel}
+                          />
+                        </Box>
+                      ) : null}
+                    </Box>
+                  );
+                })}
+              </FormGroup>
+            </AccordionDetails>
+          </Accordion>
+        );
       })}
     </>
   );

@@ -74,12 +74,18 @@ export function buildSlotOptions(config: RegistrationConfigV1) {
   return getEnabledSites(config).flatMap((site) =>
     site.slots
       .filter((slot) => slot.enabled)
-      .map((slot) => ({
-        value: slot.id,
-        label: slot.enrollmentsClosed
-          ? `${formatRegistrationSiteLabel(site)} — ${slot.label} (${SLOT_ENROLLMENTS_CLOSED_LABEL})`
-          : `${formatRegistrationSiteLabel(site)} — ${slot.label}`,
-      }))
+      .map((slot) => {
+        const base =
+          slot.openEnrollment === true
+            ? slot.label
+            : `${formatRegistrationSiteLabel(site)} — ${slot.label}`;
+        return {
+          value: slot.id,
+          label: slot.enrollmentsClosed
+            ? `${base} (${SLOT_ENROLLMENTS_CLOSED_LABEL})`
+            : base,
+        };
+      })
   );
 }
 

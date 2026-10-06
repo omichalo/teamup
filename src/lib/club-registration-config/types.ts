@@ -51,6 +51,11 @@ export type RegistrationSiteSlot = {
   capacity?: number | undefined;
   /** Inscriptions fermées sur ce créneau. */
   enrollmentsClosed?: boolean | undefined;
+  /**
+   * Créneau virtuel : inscription sans horaire fixe.
+   * Exclusif avec les autres créneaux ; exclu du pointage journalier.
+   */
+  openEnrollment?: boolean | undefined;
 };
 
 export type RegistrationSite = {

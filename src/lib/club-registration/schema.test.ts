@@ -376,6 +376,22 @@ describe("clubRegistrationPayloadSchema", () => {
     expect(r.success).toBe(false);
   });
 
+  it("accepte l'inscription libre seule", () => {
+    const r = clubRegistrationPayloadSchema.safeParse(
+      buildPayload({ slotIds: ["inscription-libre"] })
+    );
+    expect(r.success).toBe(true);
+  });
+
+  it("refuse l'inscription libre combinée à un créneau horaire", () => {
+    const r = clubRegistrationPayloadSchema.safeParse(
+      buildPayload({
+        slotIds: ["inscription-libre", "voisins-jeu-1900-adultes-elite"],
+      })
+    );
+    expect(r.success).toBe(false);
+  });
+
   it("refuse un créneau dont les inscriptions sont fermées", () => {
     const config = buildDefaultRegistrationConfig();
     const slotId = "voisins-mar-2030-adultes-loisirs";
