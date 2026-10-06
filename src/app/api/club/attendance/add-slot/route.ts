@@ -5,6 +5,11 @@ import { validateOrigin } from "@/lib/auth/csrf-utils";
 import { AUDIT_ACTIONS, logAuditAction } from "@/lib/auth/audit-logger";
 import { getActiveRegistrationConfig } from "@/lib/club-registration-config/store";
 import {
+  getOpenEnrollmentExclusivityError,
+  getOpenEnrollmentSlotIds,
+  OPEN_ENROLLMENT_EXCLUSIVE_ERROR,
+} from "@/lib/club-registration-config/open-enrollment";
+import {
   invalidOriginResponse,
   requireAttendanceOperator,
 } from "@/lib/attendance/api-auth";
@@ -37,6 +42,12 @@ export async function POST(req: Request) {
 
   try {
     const config = await getActiveRegistrationConfig();
+    if (getOpenEnrollmentSlotIds(config).has(parsed.data.slotId)) {
+      return jsonNoStore(
+        { error: "Ce créneau virtuel ne peut pas être ajouté depuis le pointage." },
+        { status: 400 }
+      );
+    }
     const slot = findSlotOption(config, parsed.data.slotId, parsed.data.date);
     if (!slot) {
       return jsonNoStore({ error: "Créneau introuvable" }, { status: 404 });
@@ -55,6 +66,19 @@ export async function POST(req: Request) {
     const data = await getRegistrationData(auth.session.db, parsed.data.registrationId);
     if (!data || isRejectedRegistration(data)) {
       return jsonNoStore({ error: "Dossier introuvable" }, { status: 404 });
+    }
+    const currentSlotIds = Array.isArray(data.slotIds)
+      ? data.slotIds.filter((id): id is string => typeof id === "string")
+      : [];
+    const nextSlotIds = currentSlotIds.includes(parsed.data.slotId)
+      ? currentSlotIds
+      : [...currentSlotIds, parsed.data.slotId];
+    const exclusiveError = getOpenEnrollmentExclusivityError(config, nextSlotIds);
+    if (exclusiveError) {
+      return jsonNoStore(
+        { error: exclusiveError || OPEN_ENROLLMENT_EXCLUSIVE_ERROR },
+        { status: 400 }
+      );
     }
     const firstName = typeof data.firstName === "string" ? data.firstName : "";
     const lastName = typeof data.lastName === "string" ? data.lastName : "";

@@ -29,6 +29,8 @@ import {
   ensureRegistrationConfigSeeded,
   getActiveRegistrationConfig,
 } from "@/lib/club-registration-config/store";
+import { getOpenEnrollmentExclusivityError } from "@/lib/club-registration-config/open-enrollment";
+import { getAllSlotIds } from "@/lib/club-registration-config/helpers";
 import { isValidVoluntaryDonationCents } from "@/lib/pricing/donation-discount";
 import {
   APPLICANT_NOTES_MAX_LENGTH,
@@ -191,6 +193,27 @@ export async function patchManagerRegistration(
   const currentStatus = currentData.status;
   const statusPatch =
     currentStatus === "submitted" ? { status: "in_review" as const } : {};
+
+  if (updates.slotIds !== undefined) {
+    if (!Array.isArray(updates.slotIds) || updates.slotIds.some((id) => typeof id !== "string")) {
+      return jsonNoStore({ error: "Créneaux invalides" }, { status: 400 });
+    }
+    const slotIds = (updates.slotIds as string[]).map((id) => id.trim()).filter(Boolean);
+    if (slotIds.length === 0) {
+      return jsonNoStore({ error: "Sélectionnez au moins un créneau." }, { status: 400 });
+    }
+    await ensureRegistrationConfigSeeded();
+    const config = await getActiveRegistrationConfig();
+    const knownIds = getAllSlotIds(config);
+    if (slotIds.some((id) => !knownIds.has(id))) {
+      return jsonNoStore({ error: "Créneau inconnu" }, { status: 400 });
+    }
+    const exclusiveError = getOpenEnrollmentExclusivityError(config, slotIds);
+    if (exclusiveError) {
+      return jsonNoStore({ error: exclusiveError }, { status: 400 });
+    }
+    updates.slotIds = slotIds;
+  }
 
   if (
     updates.medicalCertificateDeclaration !== undefined ||

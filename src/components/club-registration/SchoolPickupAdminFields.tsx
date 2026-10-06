@@ -10,6 +10,8 @@ type Props = {
   schoolPickupSlotIds: string[];
   /** Créneaux éligibles au dispositif école (config Firestore active). */
   eligibleSchoolPickupSlotIds: ReadonlySet<string>;
+  /** Créneaux virtuels « inscription libre » (exclusifs). */
+  openEnrollmentSlotIds?: ReadonlySet<string>;
   allSlotOptions: Option[];
   onSlotIdsChange: (slotIds: string[]) => void;
   onSchoolPickupSlotIdsChange: (schoolPickupSlotIds: string[]) => void;
@@ -21,10 +23,31 @@ type Props = {
   }>;
 };
 
+function normalizeSlotIdsWithOpenEnrollment(
+  next: string[],
+  previous: string[],
+  openEnrollmentSlotIds: ReadonlySet<string>
+): string[] {
+  if (openEnrollmentSlotIds.size === 0) {
+    return next;
+  }
+  const addedOpen = next.find(
+    (id) => openEnrollmentSlotIds.has(id) && !previous.includes(id)
+  );
+  if (addedOpen) {
+    return [addedOpen];
+  }
+  if (next.some((id) => openEnrollmentSlotIds.has(id)) && next.length > 1) {
+    return next.filter((id) => !openEnrollmentSlotIds.has(id));
+  }
+  return next;
+}
+
 export function SchoolPickupAdminFields({
   slotIds,
   schoolPickupSlotIds,
   eligibleSchoolPickupSlotIds,
+  openEnrollmentSlotIds,
   allSlotOptions,
   onSlotIdsChange,
   onSchoolPickupSlotIdsChange,
@@ -38,9 +61,14 @@ export function SchoolPickupAdminFields({
           value={slotIds}
           options={allSlotOptions}
           onChange={(value) => {
-            onSlotIdsChange(value);
+            const normalized = normalizeSlotIdsWithOpenEnrollment(
+              value,
+              slotIds,
+              openEnrollmentSlotIds ?? new Set()
+            );
+            onSlotIdsChange(normalized);
             onSchoolPickupSlotIdsChange(
-              schoolPickupSlotIds.filter((id) => value.includes(id))
+              schoolPickupSlotIds.filter((id) => normalized.includes(id))
             );
           }}
         />

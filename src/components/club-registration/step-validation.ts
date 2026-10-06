@@ -15,6 +15,7 @@ import { validateAdminAids } from "@/lib/club-registration/validate-admin-aids";
 import { isValidFrenchPhoneSurface } from "@/lib/club-registration/phone-fr";
 import type { RegistrationDraft } from "./registration-defaults";
 import { getClosedEnabledSlotIds } from "@/lib/club-registration-config/slot-enrollments";
+import { getOpenEnrollmentExclusivityError } from "@/lib/club-registration-config/open-enrollment";
 
 export type StepValidationResult =
   | { valid: true }
@@ -247,6 +248,10 @@ export function validateStep(
     }
     if (draft.slotIds.length === 0) {
       return invalid("Sélectionnez au moins un créneau.", '[data-field="slotIds"]');
+    }
+    const openEnrollmentError = getOpenEnrollmentExclusivityError(config, draft.slotIds);
+    if (openEnrollmentError) {
+      return invalid(openEnrollmentError, '[data-field="slotIds"]');
     }
     if (!options.allowClosedSlots) {
       const closedSlotIds = getClosedEnabledSlotIds(config);
