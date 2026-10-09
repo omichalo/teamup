@@ -2,6 +2,8 @@ import {
   formatRegistrationPaymentEmailsForStorage,
   resolveRegistrationContactEmail,
   resolveRegistrationDisplayContactEmails,
+  resolveRegistrationMailingListContacts,
+  resolveRegistrationMailingListEmails,
   resolveRegistrationPaymentRecipientEmails,
   resolveRegistrationRepresentativeEmails,
 } from "@/lib/club-registration/resolve-registration-contact-email";
@@ -223,5 +225,80 @@ describe("formatRegistrationPaymentEmailsForStorage", () => {
         "parent2@example.com",
       ])
     ).toBe("parent1@example.com, parent2@example.com");
+  });
+});
+
+describe("resolveRegistrationMailingListEmails", () => {
+  it("retourne les deux représentants pour un mineur", () => {
+    expect(
+      resolveRegistrationMailingListEmails({
+        isMinor: true,
+        adherentEmail: "enfant@example.com",
+        representatives: [
+          { email: "parent1@example.com" },
+          { email: "parent2@example.com" },
+        ],
+        submitterRole: USER_ROLES.PLAYER,
+        submitterAccountEmail: "parent1@example.com",
+      })
+    ).toEqual(["parent1@example.com", "parent2@example.com"]);
+  });
+
+  it("accepte un seul représentant pour un mineur", () => {
+    expect(
+      resolveRegistrationMailingListEmails({
+        adherentRole: "minor_dependent",
+        representatives: [{ email: "parent@example.com" }],
+      })
+    ).toEqual(["parent@example.com"]);
+  });
+
+  it("utilise l'e-mail de contact pour un majeur", () => {
+    expect(
+      resolveRegistrationMailingListEmails({
+        isMinor: false,
+        adherentEmail: "jean@example.com",
+        representatives: [],
+        submitterRole: USER_ROLES.PLAYER,
+        submitterAccountEmail: "jean@example.com",
+      })
+    ).toEqual(["jean@example.com"]);
+  });
+
+  it("exclut le compte admin créateur même s'il figure en contact", () => {
+    expect(
+      resolveRegistrationMailingListContacts({
+        isMinor: true,
+        representatives: [
+          { email: "admin@club.fr" },
+          { email: "parent@example.com" },
+        ],
+        submitterRole: USER_ROLES.ADMIN,
+        submitterAccountEmail: "admin@club.fr",
+      })
+    ).toEqual([{ email: "parent@example.com", contactType: "representative" }]);
+  });
+
+  it("n'utilise jamais le compte secrétariat en fallback", () => {
+    expect(
+      resolveRegistrationMailingListEmails({
+        isMinor: false,
+        adherentEmail: "",
+        representatives: [],
+        submitterRole: USER_ROLES.SECRETARY,
+        submitterAccountEmail: "secretariat@club.fr",
+      })
+    ).toEqual([]);
+  });
+
+  it("exclut l'e-mail adhérent égal au compte staff créateur", () => {
+    expect(
+      resolveRegistrationMailingListEmails({
+        isMinor: false,
+        adherentEmail: "secretariat@club.fr",
+        submitterRole: USER_ROLES.SECRETARY,
+        submitterAccountEmail: "secretariat@club.fr",
+      })
+    ).toEqual([]);
   });
 });

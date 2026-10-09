@@ -294,6 +294,7 @@ export function RegistrationsSpreadsheetClient() {
             quickFilters={quickFilters}
             activeViewId={activeViewId}
             exportDisabled={loading || displayedRows.length === 0}
+            mailingListRows={displayedRows}
             onSearchQueryChange={setSearchQuery}
             onShowColumnFiltersChange={setShowColumnFilters}
             onClearAllFilters={clearAllFilters}
