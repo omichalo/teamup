@@ -118,6 +118,62 @@ const REPRESENTATIVE_ROLE_LABELS: Record<string, string> = {
   other: "autre",
 };
 
+export type RegistrationMailingListContactType = "adherent" | "representative";
+
+export type RegistrationMailingListContact = {
+  email: string;
+  contactType: RegistrationMailingListContactType;
+};
+
+/**
+ * E-mails pour une liste de diffusion secrétariat.
+ * Mineur : représentants légaux (1 ou 2). Majeur : e-mail de contact adhérent.
+ * Ne retombe jamais sur le compte admin/secrétariat créateur du dossier.
+ */
+export function resolveRegistrationMailingListContacts(
+  data: DocumentData
+): RegistrationMailingListContact[] {
+  const staffSubmitterEmail = wasSubmittedByClubStaff(data)
+    ? resolveSubmitterAccountEmail(data)
+    : null;
+  const excludedKey = staffSubmitterEmail?.toLowerCase() ?? null;
+
+  const pushUnique = (
+    contacts: RegistrationMailingListContact[],
+    seen: Set<string>,
+    email: string,
+    contactType: RegistrationMailingListContactType
+  ) => {
+    const key = email.toLowerCase();
+    if (seen.has(key) || (excludedKey != null && key === excludedKey)) {
+      return;
+    }
+    seen.add(key);
+    contacts.push({ email, contactType });
+  };
+
+  const contacts: RegistrationMailingListContact[] = [];
+  const seen = new Set<string>();
+
+  if (isRegistrationMinor(data)) {
+    for (const email of resolveRegistrationRepresentativeEmails(data)) {
+      pushUnique(contacts, seen, email, "representative");
+    }
+    return contacts;
+  }
+
+  if (typeof data.adherentEmail === "string" && isValidEmail(data.adherentEmail)) {
+    pushUnique(contacts, seen, trimEmail(data.adherentEmail), "adherent");
+  }
+
+  return contacts;
+}
+
+/** Adresses e-mail de diffusion pour un dossier (sans compte staff créateur). */
+export function resolveRegistrationMailingListEmails(data: DocumentData): string[] {
+  return resolveRegistrationMailingListContacts(data).map((contact) => contact.email);
+}
+
 /**
  * Contacts e-mail à afficher au secrétariat : e-mail adhérent (s’il existe)
  * puis tous les représentants légaux. Compte soumettant en dernier recours.

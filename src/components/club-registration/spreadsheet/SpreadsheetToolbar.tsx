@@ -22,7 +22,9 @@ import type { PaymentStatusId } from "@/lib/club-registration/payment-constants"
 import type { RegistrationStatus } from "@/lib/club-registration/registration-status";
 import type { SpreadsheetQuickFilters, SpreadsheetSavedViewId, AidReceiptFilterStatus } from "@/lib/club-registration/spreadsheet/quick-filters";
 import type { SpreadsheetTableDensity } from "@/lib/club-registration/spreadsheet/preferences";
+import type { RegistrationClientRecord } from "@/lib/club-registration/map-registration-doc-to-client";
 import { FilterCard } from "@/components/ui";
+import { SpreadsheetMailingListMenu } from "./SpreadsheetMailingListMenu";
 import { SpreadsheetQuickFilterChips } from "./SpreadsheetQuickFilterChips";
 import { SpreadsheetSavedViewsBar } from "./SpreadsheetSavedViewsBar";
 
@@ -39,6 +41,7 @@ type Props = {
   quickFilters: SpreadsheetQuickFilters;
   activeViewId: SpreadsheetSavedViewId | null;
   exportDisabled: boolean;
+  mailingListRows: RegistrationClientRecord[];
   onSearchQueryChange: (value: string) => void;
   onShowColumnFiltersChange: (value: boolean) => void;
   onClearAllFilters: () => void;
@@ -67,6 +70,7 @@ export function SpreadsheetToolbar({
   quickFilters,
   activeViewId,
   exportDisabled,
+  mailingListRows,
   onSearchQueryChange,
   onShowColumnFiltersChange,
   onClearAllFilters,
@@ -165,6 +169,7 @@ export function SpreadsheetToolbar({
           >
             CSV
           </Button>
+          <SpreadsheetMailingListMenu rows={mailingListRows} disabled={exportDisabled} />
           <Button variant="outlined" size="small" startIcon={<RefreshIcon />} onClick={onReload} disabled={loading}>
             Actualiser
           </Button>
