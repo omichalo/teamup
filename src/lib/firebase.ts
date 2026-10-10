@@ -14,7 +14,12 @@ function getFirebaseConfig() {
     try {
       const parsed = JSON.parse(process.env.FIREBASE_WEBAPP_CONFIG);
       if (parsed && parsed.apiKey && parsed.projectId) {
-        return parsed;
+        const measurementId =
+          process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID?.trim() ||
+          (typeof parsed.measurementId === "string"
+            ? parsed.measurementId.trim()
+            : undefined);
+        return measurementId ? { ...parsed, measurementId } : parsed;
       }
     } catch (e) {
       console.error("Error parsing FIREBASE_WEBAPP_CONFIG:", e);
@@ -30,6 +35,7 @@ function getFirebaseConfig() {
     return value && value.trim() !== "" ? value : undefined;
   };
 
+  const measurementId = getEnvVar("NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID");
   const config = {
     apiKey: getEnvVar("NEXT_PUBLIC_FIREBASE_API_KEY"),
     authDomain: getEnvVar("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN"),
@@ -37,6 +43,7 @@ function getFirebaseConfig() {
     storageBucket: getEnvVar("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET"),
     messagingSenderId: getEnvVar("NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID"),
     appId: getEnvVar("NEXT_PUBLIC_FIREBASE_APP_ID"),
+    ...(measurementId ? { measurementId } : {}),
   };
 
   // Si aucune variable d'environnement n'est disponible (undefined ou vide), utiliser les valeurs par défaut
@@ -48,6 +55,7 @@ function getFirebaseConfig() {
     config.projectId.trim() === ""
   ) {
     // Configuration Firebase pour sqyping-teamup (valeurs publiques)
+    const fallbackMeasurementId = getEnvVar("NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID");
     return {
       apiKey: "AIzaSyC9fsfuDqF0jjV8ocgCtqMpcPA-E6pZoNg",
       authDomain: "sqyping-teamup.firebaseapp.com",
@@ -55,6 +63,7 @@ function getFirebaseConfig() {
       storageBucket: "sqyping-teamup.firebasestorage.app",
       messagingSenderId: "567392028186",
       appId: "1:567392028186:web:0fa11cf39ce060931eb3a3",
+      ...(fallbackMeasurementId ? { measurementId: fallbackMeasurementId } : {}),
     };
   }
 
@@ -265,6 +274,23 @@ export const db = new Proxy({} as Firestore, {
 // Export également une fonction pour accès direct à l'instance
 export function getDbInstanceDirect(): Firestore {
   return getDb();
+}
+
+/** measurementId GA4 (public) — absent si Analytics non configuré. */
+export function getFirebaseMeasurementId(): string | undefined {
+  const fromEnv =
+    typeof process !== "undefined"
+      ? process.env?.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID?.trim()
+      : undefined;
+  if (fromEnv) return fromEnv;
+  const config = getFirebaseConfig() as { measurementId?: string };
+  const fromConfig = config.measurementId?.trim();
+  return fromConfig || undefined;
+}
+
+/** Instance Firebase App (lazy) — client uniquement pour Analytics. */
+export function getFirebaseApp(): FirebaseApp {
+  return getFirebaseAppInstance();
 }
 
 export const storage = new Proxy({} as FirebaseStorage, {

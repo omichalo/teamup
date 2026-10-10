@@ -54,6 +54,7 @@ Copier les valeurs du projet **sqyping-teamup-dev** (console Firebase ou `.env.l
 | `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET_DEV` | `sqyping-teamup-dev.firebasestorage.app` |
 | `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID_DEV` | … |
 | `NEXT_PUBLIC_FIREBASE_APP_ID_DEV` | … |
+| `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID` (prod + staging) | `G-XXXXXXXX` — voir `docs/technical/FIREBASE_ANALYTICS.md` |
 | `NEXT_PUBLIC_APP_URL_STAGING` | `https://teamup-staging--sqyping-teamup-dev.us-east4.hosted.app` |
 | `APP_URL_STAGING` | idem |
 
