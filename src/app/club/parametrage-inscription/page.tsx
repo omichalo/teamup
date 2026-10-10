@@ -2,6 +2,10 @@ import { AuthGuard } from "@/components/AuthGuard";
 import { RegistrationConfigClient } from "@/components/club-registration-config/RegistrationConfigClient";
 import { USER_ROLES } from "@/lib/auth/roles";
 
+import { pageMetadata } from "@/lib/seo/page-metadata";
+
+export const metadata = pageMetadata("Campagnes & tarifs");
+
 export default function ParametrageInscriptionPage() {
   return (
     <AuthGuard
