@@ -36,6 +36,8 @@ NEXT_PUBLIC_FIREBASE_PROJECT_ID=sqyping-teamup-dev
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=sqyping-teamup-dev.firebasestorage.app
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
 NEXT_PUBLIC_FIREBASE_APP_ID=...
+# Optionnel — mesure d’audience (voir docs/technical/FIREBASE_ANALYTICS.md)
+NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=G-XXXXXXXX
 
 GOOGLE_APPLICATION_CREDENTIALS=sqyping-teamup-dev-firebase-adminsdk-xxxxx.json
 

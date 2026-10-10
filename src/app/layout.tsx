@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
 import { ClientThemeProvider } from "@/components/ClientThemeProvider";
 import { AppLayoutWrapper } from "@/components/AppLayoutWrapper";
 import { FirebaseAuthRestorer } from "@/components/FirebaseAuthRestorer";
@@ -23,6 +24,7 @@ export default function RootLayout({
         <FirebaseAuthRestorer />
         <ClientThemeProvider>
           <AppLayoutWrapper>{children}</AppLayoutWrapper>
+          <AnalyticsProvider />
         </ClientThemeProvider>
       </body>
     </html>

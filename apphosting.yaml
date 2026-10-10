@@ -49,6 +49,13 @@ env:
       - BUILD
       - RUNTIME
 
+  # Google Analytics (Firebase) — voir docs/technical/FIREBASE_ANALYTICS.md
+  - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+    value: G-C1QLGYZYRQ
+    availability:
+      - BUILD
+      - RUNTIME
+
   - variable: NEXT_PUBLIC_APP_URL
     value: https://teamup.sqyping.fr
     availability:
