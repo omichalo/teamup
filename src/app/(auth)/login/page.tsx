@@ -1,6 +1,10 @@
 import { Suspense } from "react";
 import { LoginContent } from "./LoginContent";
 
+import { pageMetadata } from "@/lib/seo/page-metadata";
+
+export const metadata = pageMetadata("Connexion");
+
 function LoginFallback() {
   return (
     <main

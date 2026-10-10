@@ -3,6 +3,10 @@ import { MemberProfileClient } from "@/components/member-profile/MemberProfileCl
 import { ALL_USER_ROLES } from "@/lib/auth/roles";
 import { Container } from "@mui/material";
 
+import { pageMetadata } from "@/lib/seo/page-metadata";
+
+export const metadata = pageMetadata("Fiche adhérent");
+
 type PageProps = {
   params: Promise<{ registrationId: string }>;
 };

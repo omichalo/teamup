@@ -2,6 +2,10 @@ import { MesInscriptionsClient } from "@/components/club-registration/MesInscrip
 import { AuthGuard } from "@/components/AuthGuard";
 import { ALL_USER_ROLES } from "@/lib/auth/roles";
 
+import { pageMetadata } from "@/lib/seo/page-metadata";
+
+export const metadata = pageMetadata("Mes dossiers");
+
 /**
  * Liste des dossiers d'inscription du soumettant connecté.
  *

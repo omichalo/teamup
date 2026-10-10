@@ -3,6 +3,10 @@ import { AuthGuard } from "@/components/AuthGuard";
 import { AttendanceSlotSelectClient } from "@/components/attendance/AttendanceSlotSelectClient";
 import { ATTENDANCE_OPERATOR_ROLES } from "@/lib/attendance/access";
 
+import { pageMetadata } from "@/lib/seo/page-metadata";
+
+export const metadata = pageMetadata("Présences");
+
 export default function ClubPresencesPage() {
   return (
     <AuthGuard

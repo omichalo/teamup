@@ -3,6 +3,10 @@ import { MyMemberProfileEntryClient } from "@/components/member-profile/MyMember
 import { ALL_USER_ROLES } from "@/lib/auth/roles";
 import { Container } from "@mui/material";
 
+import { pageMetadata } from "@/lib/seo/page-metadata";
+
+export const metadata = pageMetadata("Ma fiche");
+
 /**
  * Accès direct joueur/famille à la fiche adhérent.
  * 1 dossier → redirection ; plusieurs → sélecteur ; 0 → empty state.
