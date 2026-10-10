@@ -4,7 +4,7 @@ import { Box, Container, Stack, Typography } from "@mui/material";
 import { ManageAnalyticsConsentButton } from "@/components/analytics/ManageAnalyticsConsentButton";
 
 export const metadata: Metadata = {
-  title: "Confidentialité — Team Up",
+  title: "Confidentialité",
   description:
     "Informations sur la mesure d’audience et le traitement des données de navigation sur TeamUp.",
 };

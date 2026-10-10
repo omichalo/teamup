@@ -3,6 +3,10 @@ import { AuthGuard } from "@/components/AuthGuard";
 import { AttendanceSessionClient } from "@/components/attendance/AttendanceSessionClient";
 import { ATTENDANCE_OPERATOR_ROLES } from "@/lib/attendance/access";
 
+import { pageMetadata } from "@/lib/seo/page-metadata";
+
+export const metadata = pageMetadata("Pointage de séance");
+
 export default function ClubPresencesSeancePage() {
   return (
     <AuthGuard

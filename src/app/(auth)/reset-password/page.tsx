@@ -1,6 +1,10 @@
 import { Suspense } from "react";
 import { ResetPasswordContent } from "./ResetPasswordContent";
 
+import { pageMetadata } from "@/lib/seo/page-metadata";
+
+export const metadata = pageMetadata("Nouveau mot de passe");
+
 function ResetPasswordFallback() {
   return (
     <main

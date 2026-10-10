@@ -1,6 +1,10 @@
 import { Suspense } from "react";
 import { VerifyEmailContent } from "./VerifyEmailContent";
 
+import { pageMetadata } from "@/lib/seo/page-metadata";
+
+export const metadata = pageMetadata("Vérifier l'e-mail");
+
 function VerifyEmailFallback() {
   return (
     <main
