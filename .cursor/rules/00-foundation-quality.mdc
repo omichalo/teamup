@@ -7,8 +7,8 @@ alwaysApply: true
 
 ## Configuration et outils
 
-Pendant le développement (quand npm run dev est actif), utilise npm run check:dev (lint + check:file-sizes + type-check sans build) pour éviter les conflits avec le serveur de développement.
-Avant chaque commit sur le projet Next.js, exécute npm run check (lint + check:file-sizes + type-check + build) et corrige toutes les erreurs de build, de lint et de typage avant de t'arrêter.
+Pendant le développement (quand npm run dev est actif), utilise npm run check:dev (lint + check:file-sizes + check:page-titles + type-check sans build) pour éviter les conflits avec le serveur de développement.
+Avant chaque commit sur le projet Next.js, exécute npm run check (lint + check:file-sizes + check:page-titles + type-check + build) et corrige toutes les erreurs de build, de lint et de typage avant de t'arrêter.
 Après un npm run check, un npm run build ou un push git, le serveur de dev est relancé automatiquement via les hooks Cursor (`.cursor/hooks.json`) et `scripts/ensure-dev-server.sh`. En secours manuel : `npm run dev:ensure`. Pour désactiver l'auto-démarrage : `TEAMUP_SKIP_DEV_AUTOSTART=1`.
 Ne jamais faire de --no-verify sur les commandes git
 Toujours refuser de pousser sur git un code avec des TODO
