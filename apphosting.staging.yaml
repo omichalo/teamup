@@ -51,6 +51,14 @@ env:
       - BUILD
       - RUNTIME
 
+  # Google Analytics (Firebase) — même propriété que la prod (un seul measurementId fourni).
+  # Voir docs/technical/FIREBASE_ANALYTICS.md
+  - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+    value: G-C1QLGYZYRQ
+    availability:
+      - BUILD
+      - RUNTIME
+
   # URL publique du backend staging (teamup-staging sur sqyping-teamup-dev)
   - variable: NEXT_PUBLIC_APP_URL
     value: https://teamup-staging--sqyping-teamup-dev.us-east4.hosted.app
