@@ -8,6 +8,7 @@ import { resolveRole } from "@/lib/auth/roles";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
 import { checkRateLimit } from "@/lib/auth/rate-limit";
 import { AUDIT_ACTIONS, logAuditAction } from "@/lib/auth/audit-logger";
+import { effectiveLinkedAccountUids } from "@/lib/club-registration/effective-linked-accounts";
 import { canAccessClubRegistration } from "@/lib/club-registration/registration-access";
 import { getAppBaseUrl } from "@/lib/club-registration/stripe";
 import { normalizeRegistrationPayment } from "@/lib/club-registration/payment/normalize-payment";
@@ -81,9 +82,8 @@ export async function POST(
     }
 
     const data = snap.data() ?? {};
-    const submitterUid =
-      typeof data.submitterUid === "string" ? data.submitterUid : undefined;
-    if (!canAccessClubRegistration(role, submitterUid, decoded.uid)) {
+    const linkedAccountUids = effectiveLinkedAccountUids(data);
+    if (!canAccessClubRegistration(role, linkedAccountUids, decoded.uid)) {
       return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
     }
 

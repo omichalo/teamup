@@ -56,11 +56,17 @@ export function registrationMatchesSearch(
   if (q.length < 2) {
     return true;
   }
+  const linkedEmails = Array.isArray(summary.linkedAccountEmails)
+    ? summary.linkedAccountEmails.filter(
+        (email): email is string => typeof email === "string" && email.length > 0
+      )
+    : [];
   const haystack = [
     summary.firstName,
     summary.lastName,
     summary.adherentEmail,
     summary.submitterAccountEmail,
+    ...linkedEmails,
   ]
     .filter((value): value is string => typeof value === "string" && value.length > 0)
     .join(" ")

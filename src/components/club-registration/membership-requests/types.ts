@@ -33,7 +33,11 @@ export type RegistrationSummary = {
   id: string;
   firstName?: string;
   lastName?: string;
+  submitterUid?: string;
   submitterAccountEmail?: string;
+  submitterRole?: string;
+  linkedAccountUids?: string[];
+  linkedAccountEmails?: string[];
   mainSectionId?: string;
   medicalCertificateDeclaration?: string;
   medicalCertificateStatus?: MedicalCertificateStatus;

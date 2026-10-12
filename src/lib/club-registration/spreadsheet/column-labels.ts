@@ -56,6 +56,8 @@ export const SPREADSHEET_COLUMN_LABELS: Record<SpreadsheetColumnId, string> = {
   submitterUid: "Soumettant du dossier",
   submitterAccountEmail: "E-mail compte soumettant",
   submitterRole: "Rôle compte soumettant",
+  linkedAccountUids: "UID accès en ligne",
+  linkedAccountEmails: "E-mail accès en ligne",
   schemaVersion: "Version schéma",
   status: "Statut dossier",
   cancellationReason: "Motif d'annulation",
