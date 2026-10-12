@@ -17,7 +17,7 @@
     "src/components/club-registration/RecapStep.tsx": 585,
     "src/components/disponibilites/DiscordPollManager.tsx": 847,
     "src/components/disponibilites/PlayerAvailabilityList.tsx": 479,
-    "src/lib/discord/poll-interactions.ts": 1267,
+    "src/lib/discord/poll-interactions.ts": 1169,
     "src/lib/openapi.ts": 561,
     "src/lib/services/firestore-player-service.ts": 543,
     "src/lib/shared/fftt-utils.ts": 755,
