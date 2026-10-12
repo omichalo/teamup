@@ -1,5 +1,6 @@
 import type { Firestore } from "firebase-admin/firestore";
 import { COLLECTION as REGISTRATIONS_COLLECTION } from "@/lib/club-registration/list-registrations";
+import { effectiveLinkedAccountUids } from "@/lib/club-registration/effective-linked-accounts";
 import { isRejectedRegistration } from "@/lib/attendance/alerts";
 import {
   MEMBER_SEARCH_LIMIT,
@@ -44,18 +45,28 @@ export async function searchClubMembersForCamp(
     const lastName = readString(data, "lastName");
     if (!registrationMatchesQuery(firstName, lastName, query)) continue;
 
-    const submitterUid = readString(data, "submitterUid");
-    if (!submitterUid) continue;
+    const linkedUids = effectiveLinkedAccountUids(data);
+    const portalOwnerUid = linkedUids[0] || readString(data, "submitterUid");
+    if (!portalOwnerUid) continue;
+
+    const linkedEmails = Array.isArray(data.linkedAccountEmails)
+      ? data.linkedAccountEmails.filter(
+          (email): email is string => typeof email === "string" && email.includes("@")
+        )
+      : [];
 
     hits.push({
       registrationId: doc.id,
-      submitterUid,
+      submitterUid: portalOwnerUid,
       firstName,
       lastName,
       displayName: displayNameFromParts(firstName, lastName) || doc.id,
       birthDate: readString(data, "birthDate"),
       phone: readString(data, "adherentPhonePrimary"),
-      email: readString(data, "adherentEmail") || readString(data, "submitterAccountEmail"),
+      email:
+        linkedEmails[0] ||
+        readString(data, "adherentEmail") ||
+        readString(data, "submitterAccountEmail"),
     });
     if (hits.length >= MEMBER_SEARCH_LIMIT) break;
   }

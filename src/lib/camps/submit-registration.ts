@@ -57,10 +57,16 @@ export async function submitCampRegistration(params: {
     if (isRejectedRegistration(clubData)) {
       return { ok: false, status: 400, error: "Dossier d’adhésion inactif" };
     }
+    const linkedUids = Array.isArray(clubData.linkedAccountUids)
+      ? clubData.linkedAccountUids.filter(
+          (uid): uid is string => typeof uid === "string" && uid.trim().length > 0
+        )
+      : [];
     const submitterUid =
       typeof clubData.submitterUid === "string" ? clubData.submitterUid.trim() : "";
-    if (submitterUid) {
-      ownerUid = submitterUid;
+    const portalOwnerUid = linkedUids[0] || submitterUid;
+    if (portalOwnerUid) {
+      ownerUid = portalOwnerUid;
     } else if (isStaff && input.ownerUid) {
       ownerUid = input.ownerUid;
     } else {
@@ -83,12 +89,26 @@ export async function submitCampRegistration(params: {
   }
 
   if (input.isClubMember && !clubRegistrationId) {
-    const snap = await db
-      .collection(CLUB_REGISTRATIONS_COLLECTION)
-      .where("submitterUid", "==", ownerUid)
-      .limit(5)
-      .get();
-    const active = snap.docs.find((doc) => {
+    const [linkedSnap, legacySnap] = await Promise.all([
+      db
+        .collection(CLUB_REGISTRATIONS_COLLECTION)
+        .where("linkedAccountUids", "array-contains", ownerUid)
+        .limit(5)
+        .get(),
+      db
+        .collection(CLUB_REGISTRATIONS_COLLECTION)
+        .where("submitterUid", "==", ownerUid)
+        .limit(5)
+        .get(),
+    ]);
+    const candidates = [
+      ...linkedSnap.docs,
+      ...legacySnap.docs.filter((doc) => {
+        const data = doc.data() as Record<string, unknown>;
+        return !Array.isArray(data.linkedAccountUids);
+      }),
+    ];
+    const active = candidates.find((doc) => {
       const status = doc.data()?.status;
       return status !== "cancelled" && status !== "rejected";
     });
