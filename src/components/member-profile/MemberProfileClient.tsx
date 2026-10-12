@@ -11,9 +11,13 @@ import {
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import EditNoteIcon from "@mui/icons-material/EditNote";
+import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 import Link from "next/link";
 import type { MemberProfileResponse } from "@/lib/member-profile/types";
 import { buildTreatDossierHref } from "@/lib/member-profile/urls";
+import { isClubRegistrationManager } from "@/lib/club-registration/registration-access";
+import { resolveRole } from "@/lib/auth/roles";
+import { LinkRegistrationAccountDialog } from "@/components/club-registration/membership-requests/LinkRegistrationAccountDialog";
 import { MemberProfileHeader } from "./MemberProfileHeader";
 import { MemberSlotsSection } from "./MemberSlotsSection";
 import { MemberAttendanceSection } from "./MemberAttendanceSection";
@@ -23,6 +27,18 @@ import { MemberFinanceSection } from "./MemberFinanceSection";
 type Props = {
   registrationId: string;
 };
+
+function resolveAccessDialogMode(profile: MemberProfileResponse): "grant" | "change" {
+  const staffCreated = isClubRegistrationManager(
+    resolveRole(profile.identity.submitterRole)
+  );
+  if (!staffCreated) return "change";
+  const linked = profile.identity.linkedAccountUids;
+  if (linked === null || linked.length === 0) return "grant";
+  return linked.every((uid) => uid === profile.identity.submitterUid)
+    ? "grant"
+    : "change";
+}
 
 function MemberProfileSkeleton() {
   return (
@@ -43,6 +59,7 @@ export function MemberProfileClient({ registrationId }: Props) {
   const [profile, setProfile] = useState<MemberProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -126,15 +143,24 @@ export function MemberProfileClient({ registrationId }: Props) {
           Retour
         </Button>
         {profile.viewer.canManage ? (
-          <Button
-            component={Link}
-            href={buildTreatDossierHref(registrationId)}
-            variant="contained"
-            color="secondary"
-            startIcon={<EditNoteIcon />}
-          >
-            Traiter le dossier
-          </Button>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            <Button
+              variant="outlined"
+              startIcon={<ManageAccountsIcon />}
+              onClick={() => setLinkDialogOpen(true)}
+            >
+              Accès en ligne
+            </Button>
+            <Button
+              component={Link}
+              href={buildTreatDossierHref(registrationId)}
+              variant="contained"
+              color="secondary"
+              startIcon={<EditNoteIcon />}
+            >
+              Traiter le dossier
+            </Button>
+          </Stack>
         ) : null}
       </Stack>
 
@@ -178,6 +204,22 @@ export function MemberProfileClient({ registrationId }: Props) {
             .
           </Typography>
         </Alert>
+      ) : null}
+
+      {profile.viewer.canManage ? (
+        <LinkRegistrationAccountDialog
+          open={linkDialogOpen}
+          registrationId={registrationId}
+          adherentDisplayName={profile.identity.displayName}
+          mode={resolveAccessDialogMode(profile)}
+          currentAccessEmails={
+            resolveAccessDialogMode(profile) === "grant"
+              ? []
+              : profile.identity.linkedAccountEmails
+          }
+          onClose={() => setLinkDialogOpen(false)}
+          onLinked={() => void load()}
+        />
       ) : null}
     </Stack>
   );

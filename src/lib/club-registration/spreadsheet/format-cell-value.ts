@@ -218,6 +218,18 @@ export function formatSpreadsheetCellValue(
       return resolveSpreadsheetUserLabel(value, context, row.submitterAccountEmail);
     case "submitterRole":
       return typeof value === "string" ? (SUBMITTER_ROLE_LABELS[value] ?? value) : "";
+    case "linkedAccountEmails":
+      return Array.isArray(value)
+        ? value
+            .filter((email): email is string => typeof email === "string" && email.length > 0)
+            .join(" ; ")
+        : "";
+    case "linkedAccountUids":
+      return Array.isArray(value)
+        ? value
+            .filter((uid): uid is string => typeof uid === "string" && uid.length > 0)
+            .join(" ; ")
+        : "";
     case "paymentRequestedBy":
     case "medicalCertificateStatusUpdatedBy":
     case "ppsFollowUpUpdatedBy":

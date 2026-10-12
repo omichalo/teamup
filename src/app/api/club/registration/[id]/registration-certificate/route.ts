@@ -5,6 +5,7 @@ import { jsonNoStore } from "@/lib/http/cache-headers";
 import { adminAuth, getFirestoreAdmin } from "@/lib/firebase-admin";
 import { resolveRole } from "@/lib/auth/roles";
 import { canAccessClubRegistration } from "@/lib/club-registration/registration-access";
+import { effectiveLinkedAccountUids } from "@/lib/club-registration/effective-linked-accounts";
 import {
   buildRegistrationCertificatePdf,
   buildRegistrationCertificateViewModel,
@@ -39,10 +40,8 @@ export async function GET(
     }
 
     const data = (snap.data() ?? {}) as Record<string, unknown>;
-    const submitterUid =
-      typeof data.submitterUid === "string" ? data.submitterUid : undefined;
-
-    if (!canAccessClubRegistration(role, submitterUid, decoded.uid)) {
+    const linkedAccountUids = effectiveLinkedAccountUids(data);
+    if (!canAccessClubRegistration(role, linkedAccountUids, decoded.uid)) {
       return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
     }
 

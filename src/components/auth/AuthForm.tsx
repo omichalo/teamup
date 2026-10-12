@@ -14,6 +14,7 @@ import NextLink from "next/link";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  signOut,
 } from "firebase/auth";
 import { clientAuth } from "@/lib/firebase.client";
 import {
@@ -115,17 +116,15 @@ function LoginPanel({
 
     try {
       const cred = await signInWithEmailAndPassword(clientAuth, email, password);
+      // Recharge les claims (évite un emailVerified stale juste après le clic sur le lien).
+      await cred.user.reload();
       if (!cred.user.emailVerified) {
-        const verification = await requestVerificationEmail(email);
-        if (verification.ok) {
-          setErr(
-            "Email non vérifié. Un nouveau lien de vérification vient d'être envoyé à votre adresse. Vérifiez votre boîte de réception (et vos spams)."
-          );
-        } else {
-          setErr(
-            `Email non vérifié. ${verification.error} Vous pouvez réessayer via la page de renvoi.`
-          );
-        }
+        // Ne pas renvoyer un lien à chaque tentative : chaque generateEmailVerificationLink
+        // invalide les liens précédents et crée une boucle « je clique → je me reconnecte → nouveau lien ».
+        await signOut(clientAuth);
+        setErr(
+          "Email non vérifié. Ouvrez le dernier lien reçu (et vos spams), ou demandez un nouveau lien via « Renvoyer l’email de vérification » ci-dessous — un seul lien à la fois."
+        );
         setLoading(false);
         return;
       }

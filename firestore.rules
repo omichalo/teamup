@@ -51,14 +51,29 @@ service cloud.firestore {
              || authRole() == "coach";
     }
 
-    // Liste client : uniquement ses propres dossiers (requête filtrée + plafond).
+    // Liste client : dossiers liés au compte (array-contains) ou legacy submitterUid.
     // Les listes secrétariat passent par l'API (Admin SDK).
     function isPersonalClubRegistrationListQuery() {
       return request.query.limit <= 50
              && request.query.filters.size() == 1
-             && request.query.filters[0].field.path == 'submitterUid'
-             && request.query.filters[0].op == '=='
-             && request.query.filters[0].value == request.auth.uid;
+             && (
+               (request.query.filters[0].field.path == 'submitterUid'
+                && request.query.filters[0].op == '=='
+                && request.query.filters[0].value == request.auth.uid)
+               ||
+               (request.query.filters[0].field.path == 'linkedAccountUids'
+                && request.query.filters[0].op == 'array-contains'
+                && request.query.filters[0].value == request.auth.uid)
+             );
+    }
+
+    // Accès portail : compte dans linkedAccountUids, ou legacy submitterUid
+    // si le champ linkedAccountUids n'existe pas encore.
+    function isClubRegistrationPortalOwner() {
+      return (resource.data.keys().hasAll(['linkedAccountUids'])
+              && request.auth.uid in resource.data.linkedAccountUids)
+          || (!resource.data.keys().hasAll(['linkedAccountUids'])
+              && resource.data.submitterUid == request.auth.uid);
     }
     
     // ============================================
@@ -240,23 +255,22 @@ service cloud.firestore {
     // Collection: clubRegistrations
     // ============================================
     // Dossier d'inscription au club. Un soumettant (parent ou adulte qui s'inscrit lui-même)
-    // peut créer plusieurs dossiers (ex. inscription de 2 enfants). Le couplage 1 dossier ↔ 1 uid
-    // est volontairement abandonné.
+    // peut créer plusieurs dossiers (ex. inscription de 2 enfants). Accès portail via
+    // linkedAccountUids (submitterUid reste l'audit de dépôt).
     //
-    // - get    : owner (submitterUid == uid), admin, secrétariat, secrétaire adjoint,
+    // - get    : compte lié / legacy soumettant, admin, secrétariat, secrétaire adjoint,
     //            membre du bureau ou coach (même lecture que le tableau)
-    // - list   : owner uniquement, requête where submitterUid == uid, limit <= 50
+    // - list   : compte lié (array-contains) ou legacy submitterUid, limit <= 50
     //            (listes secrétariat via API / Admin SDK)
-    // - create : owner se déclare comme submitterUid, schemaVersion strict ;
-    //            le suivi Critérium fédéral / maillot / attestation n’est pas saisissable côté client
-    // - update : owner uniquement, tant que status != 'approved' ;
-    //            les suivis secrétariat (critérium, maillot, attestation) sont figés (écrits via Admin SDK) ;
-    //            les n° facture/reçu TeamUp sont figés (écrits via Admin SDK)
+    // - create : soumettant = auth.uid ; linkedAccountUids figés côté client hors create
+    // - update : compte lié / legacy soumettant, tant que status != 'approved' ;
+    //            submitterUid + linkedAccount* immuables côté client (Admin SDK) ;
+    //            les suivis secrétariat et n° facture/reçu sont figés
     // - delete : interdit côté client (l'admin gère via Admin SDK)
     match /clubRegistrations/{registrationId} {
       allow get: if isAuthenticated()
                  && (isClubRegistrationViewer()
-                     || resource.data.submitterUid == request.auth.uid);
+                     || isClubRegistrationPortalOwner());
       allow list: if isAuthenticated()
                   && isPersonalClubRegistrationListQuery();
       allow create: if isAuthenticated()
@@ -270,8 +284,12 @@ service cloud.firestore {
                       'teamupReceiptNumber',
                     ]);
       allow update: if isAuthenticated()
-                    && resource.data.submitterUid == request.auth.uid
-                    && request.resource.data.submitterUid == request.auth.uid
+                    && isClubRegistrationPortalOwner()
+                    && request.resource.data.submitterUid == resource.data.submitterUid
+                    && request.resource.data.get('linkedAccountUids', [])
+                       == resource.data.get('linkedAccountUids', [])
+                    && request.resource.data.get('linkedAccountEmails', [])
+                       == resource.data.get('linkedAccountEmails', [])
                     && resource.data.get('status', 'draft') != 'approved'
                     && request.resource.data.get('criteriumFederalRegistrationStatus', '')
                        == resource.data.get('criteriumFederalRegistrationStatus', '')

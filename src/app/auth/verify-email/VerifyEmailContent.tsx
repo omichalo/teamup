@@ -46,6 +46,12 @@ export function VerifyEmailContent() {
         }
 
         await applyActionCode(clientAuth, oobCode);
+        // Si une session client était déjà ouverte (tentative de login avant vérif),
+        // forcer le refresh des claims pour que le prochain login voie emailVerified.
+        if (clientAuth.currentUser) {
+          await clientAuth.currentUser.reload();
+          await clientAuth.currentUser.getIdToken(true);
+        }
         if (cancelled) return;
         setStatus("success");
         setMessage("Votre email a été vérifié avec succès.");

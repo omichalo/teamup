@@ -111,6 +111,8 @@ export function buildRegistrationSubmitDocument(params: {
     submitterUid,
     submitterAccountEmail,
     submitterRole,
+    linkedAccountUids: [submitterUid],
+    linkedAccountEmails: submitterAccountEmail ? [submitterAccountEmail] : [],
     schemaVersion: 1,
     seasonLabel: config.meta.seasonLabel,
     status: "submitted",

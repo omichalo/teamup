@@ -53,6 +53,8 @@ export const REGISTRATION_CLIENT_FIELDS = [
   "submitterUid",
   "submitterAccountEmail",
   "submitterRole",
+  "linkedAccountUids",
+  "linkedAccountEmails",
   "schemaVersion",
   "status",
   "cancellationReason",

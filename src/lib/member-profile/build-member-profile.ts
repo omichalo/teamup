@@ -4,6 +4,10 @@ import type { CampRegistration } from "@/lib/camps/types";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import { resolvePaymentDocumentsAvailability } from "@/lib/club-registration/payment-documents/availability";
 import {
+  effectiveLinkedAccountEmails,
+  effectiveLinkedAccountUids,
+} from "@/lib/club-registration/effective-linked-accounts";
+import {
   mergeLedgerViews,
   projectCampPaymentToLedger,
 } from "@/lib/member-ledger/project-camp-payment";
@@ -49,6 +53,14 @@ export function buildMemberProfile(params: {
     "Adhérent";
   const slotIds = resolveSlotIds(params.data);
   const submitterUid = readString(params.data, "submitterUid") || null;
+  const linkedAccountUids = effectiveLinkedAccountUids(params.data);
+  const linkedAccountEmails = effectiveLinkedAccountEmails(params.data);
+  const linkedAccountUidsStored = Array.isArray(params.data.linkedAccountUids)
+    ? linkedAccountUids
+    : null;
+  const submitterAccountEmail =
+    readString(params.data, "submitterAccountEmail") || null;
+  const submitterRole = readString(params.data, "submitterRole") || null;
   const ffttLicense = readString(params.data, "ffttLicense") || null;
   const status =
     typeof params.data.status === "string" ? params.data.status : null;
@@ -104,6 +116,10 @@ export function buildMemberProfile(params: {
       status,
       ffttLicense,
       submitterUid,
+      submitterAccountEmail,
+      submitterRole,
+      linkedAccountUids: linkedAccountUidsStored,
+      linkedAccountEmails,
       slotIds,
     },
     slots,
@@ -112,7 +128,9 @@ export function buildMemberProfile(params: {
     finance,
     documents: resolvePaymentDocumentsAvailability(params.data),
     viewer: {
-      isOwner: Boolean(submitterUid && submitterUid === params.viewerUid),
+      isOwner: Boolean(
+        params.viewerUid && linkedAccountUids.includes(params.viewerUid)
+      ),
       canManage: params.canManage,
     },
   };
