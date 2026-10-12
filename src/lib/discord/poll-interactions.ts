@@ -11,6 +11,10 @@ import type {
   DiscordMessageComponentInteraction,
   DiscordModalSubmitInteraction,
 } from "@/lib/discord/poll-interactions-types";
+import {
+  loadWomenTeamAvailability,
+  saveWomenTeamDaySelection,
+} from "@/lib/discord/women-team-availability";
 export type {
   DiscordMessageComponentInteraction,
   DiscordModalSubmitInteraction,
@@ -74,17 +78,6 @@ export async function handleRespondButton(
     const isParisChampionship = idEpreuve === 15980;
 
     const availabilityService = new AvailabilityServiceAdmin();
-    
-    // Pour le championnat de Paris, toujours utiliser "masculin" pour récupérer les disponibilités
-    const availabilityChampionshipType = isParisChampionship ? "masculin" : championshipType;
-    
-    const availability = await availabilityService.getAvailability(
-      journee,
-      phase,
-      availabilityChampionshipType,
-      idEpreuve
-    );
-    const currentResponse = availability?.players[player.playerId];
 
     // Détecter le genre uniquement pour le championnat par équipes
     let normalizedGender: "M" | "F" | undefined;
@@ -98,10 +91,14 @@ export async function handleRespondButton(
 
     // Championnat de Paris (hommes et femmes - même sondage)
     if (isParisChampionship) {
-      const isAvailable = currentResponse?.available;
-      const hasResponse = isAvailable !== undefined;
-
-      const options = createSelectOptions(!hasResponse, isAvailable);
+      const availability = await availabilityService.getAvailability(
+        journee,
+        phase,
+        "masculin",
+        idEpreuve
+      );
+      const isAvailable = availability?.players[player.playerId]?.available;
+      const options = createSelectOptions(isAvailable === undefined, isAvailable);
 
       return NextResponse.json({
         type: 4,
@@ -110,10 +107,10 @@ export async function handleRespondButton(
           flags: 64,
           components: [
             {
-              type: 1, // ACTION_ROW
+              type: 1,
               components: [
                 {
-                  type: 3, // SELECT_MENU
+                  type: 3,
                   custom_id: `availability_${pollId}_select`,
                   options,
                   placeholder: "Sélectionnez votre disponibilité",
@@ -127,11 +124,14 @@ export async function handleRespondButton(
 
     // Championnat par équipes
     if (normalizedGender === "M") {
-      // Homme : 1 select menu
-      const isAvailable = currentResponse?.available;
-      const hasResponse = isAvailable !== undefined;
-
-      const options = createSelectOptions(!hasResponse, isAvailable);
+      const availability = await availabilityService.getAvailability(
+        journee,
+        phase,
+        championshipType,
+        idEpreuve
+      );
+      const isAvailable = availability?.players[player.playerId]?.available;
+      const options = createSelectOptions(isAvailable === undefined, isAvailable);
 
       return NextResponse.json({
         type: 4,
@@ -140,10 +140,10 @@ export async function handleRespondButton(
           flags: 64,
           components: [
             {
-              type: 1, // ACTION_ROW
+              type: 1,
               components: [
                 {
-                  type: 3, // SELECT_MENU
+                  type: 3,
                   custom_id: `availability_${pollId}_men_select`,
                   options,
                   placeholder: "Sélectionnez votre disponibilité",
@@ -153,49 +153,57 @@ export async function handleRespondButton(
           ],
         },
       });
-    } else {
-      // Femme : 2 select menus (vendredi et samedi)
-      // Discord n'autorise qu'un seul select menu par ACTION_ROW → 2 lignes distinctes
-      const venAvailable = currentResponse?.fridayAvailable;
-      const satAvailable = currentResponse?.saturdayAvailable;
-      const hasVenResponse = venAvailable !== undefined;
-      const hasSatResponse = satAvailable !== undefined;
-
-      const venOptions = createSelectOptions(!hasVenResponse, venAvailable);
-      const satOptions = createSelectOptions(!hasSatResponse, satAvailable);
-
-      return NextResponse.json({
-        type: 4,
-        data: {
-          content: "**Votre disponibilité (vendredi et/ou samedi) :**\n💡 Sélectionnez votre disponibilité pour chaque jour dans les menus déroulants.",
-          flags: 64,
-          components: [
-            {
-              type: 1, // ACTION_ROW (1 select par ligne max)
-              components: [
-                {
-                  type: 3, // SELECT_MENU
-                  custom_id: `availability_${pollId}_women_ven_select`,
-                  options: venOptions,
-                  placeholder: "Vendredi",
-                },
-              ],
-            },
-            {
-              type: 1, // ACTION_ROW
-              components: [
-                {
-                  type: 3, // SELECT_MENU
-                  custom_id: `availability_${pollId}_women_sat_select`,
-                  options: satOptions,
-                  placeholder: "Samedi",
-                },
-              ],
-            },
-          ],
-        },
-      });
     }
+
+    // Femmes : VEN (doc masculin) + SAM (doc féminin)
+    const { merged } = await loadWomenTeamAvailability(
+      availabilityService,
+      journee,
+      phase,
+      player.playerId,
+      idEpreuve
+    );
+    const venOptions = createSelectOptions(
+      merged.fridayAvailable === undefined,
+      merged.fridayAvailable
+    );
+    const satOptions = createSelectOptions(
+      merged.saturdayAvailable === undefined,
+      merged.saturdayAvailable
+    );
+
+    return NextResponse.json({
+      type: 4,
+      data: {
+        content:
+          "**Votre disponibilité (vendredi et/ou samedi) :**\n💡 Sélectionnez votre disponibilité pour chaque jour dans les menus déroulants.",
+        flags: 64,
+        components: [
+          {
+            type: 1,
+            components: [
+              {
+                type: 3,
+                custom_id: `availability_${pollId}_women_ven_select`,
+                options: venOptions,
+                placeholder: "Vendredi",
+              },
+            ],
+          },
+          {
+            type: 1,
+            components: [
+              {
+                type: 3,
+                custom_id: `availability_${pollId}_women_sat_select`,
+                options: satOptions,
+                placeholder: "Samedi",
+              },
+            ],
+          },
+        ],
+      },
+    });
   } catch (error) {
     console.error("[Discord Poll] Erreur dans handleRespondButton:", error);
     return NextResponse.json({
@@ -253,31 +261,14 @@ export async function handleModifyButton(
       });
     }
 
-    // Charger la réponse actuelle
     const parts = pollId.split("_");
     const phase = parts[0] as "aller" | "retour";
     const journee = parseInt(parts[1], 10);
     const championshipType = parts[2] as ChampionshipType;
     const idEpreuve = parts.length > 3 ? parseInt(parts[3], 10) : undefined;
-
-    // Détecter si c'est le championnat de Paris
     const isParisChampionship = idEpreuve === 15980;
-
     const availabilityService = new AvailabilityServiceAdmin();
-    
-    // Pour le championnat de Paris, toujours utiliser "masculin" pour récupérer les disponibilités
-    const availabilityChampionshipType = isParisChampionship ? "masculin" : championshipType;
-    
-    const availability = await availabilityService.getAvailability(
-      journee,
-      phase,
-      availabilityChampionshipType,
-      idEpreuve
-    );
 
-    const currentResponse = availability?.players[player.playerId];
-
-    // Détecter le genre uniquement pour le championnat par équipes
     let normalizedGender: "M" | "F" | undefined;
     if (!isParisChampionship) {
       const playerGender =
@@ -287,66 +278,47 @@ export async function handleModifyButton(
         playerGender === "F" || playerGender === "féminin" ? "F" : "M";
     }
 
-    let currentStatusText = "";
-    if (isParisChampionship) {
-      // Championnat de Paris : logique simple sans distinction de genre
-      if (currentResponse?.available === true) {
-        currentStatusText = "✅ **Disponible**";
-      } else if (currentResponse?.available === false) {
-        currentStatusText = "❌ **Indisponible**";
-      } else {
-        currentStatusText = "❓ **Non renseigné**";
-      }
-    } else if (normalizedGender === "M") {
-      // Championnat par équipes - Hommes
-      if (currentResponse?.available === true) {
-        currentStatusText = "✅ **Disponible**";
-      } else if (currentResponse?.available === false) {
-        currentStatusText = "❌ **Indisponible**";
-      } else {
-        currentStatusText = "❓ **Non renseigné**";
-      }
-    } else {
-      // Championnat par équipes - Femmes
-      const venStatus =
-        currentResponse?.fridayAvailable === true
-          ? "✅"
-          : currentResponse?.fridayAvailable === false
-          ? "❌"
-          : "❓";
-      const satStatus =
-        currentResponse?.saturdayAvailable === true
-          ? "✅"
-          : currentResponse?.saturdayAvailable === false
-          ? "❌"
-          : "❓";
-      currentStatusText = `VEN: ${venStatus} / SAM: ${satStatus}`;
-    }
+    const statusLabel = (available?: boolean) =>
+      available === true
+        ? "✅ **Disponible**"
+        : available === false
+          ? "❌ **Indisponible**"
+          : "❓ **Non renseigné**";
+    const dayEmoji = (available?: boolean) =>
+      available === true ? "✅" : available === false ? "❌" : "❓";
 
-    const commentText = currentResponse?.comment
-      ? `\n💬 **Commentaire :** ${currentResponse.comment}`
-      : "";
-
-    // Championnat de Paris (hommes et femmes - même sondage)
-    if (isParisChampionship) {
+    if (isParisChampionship || normalizedGender === "M") {
+      const availability = await availabilityService.getAvailability(
+        journee,
+        phase,
+        isParisChampionship ? "masculin" : championshipType,
+        idEpreuve
+      );
+      const currentResponse = availability?.players[player.playerId];
       const isAvailable = currentResponse?.available;
-      const hasResponse = isAvailable !== undefined;
+      const commentText = currentResponse?.comment
+        ? `\n💬 **Commentaire :** ${currentResponse.comment}`
+        : "";
+      const selectCustomId = isParisChampionship
+        ? `availability_${pollId}_select`
+        : `availability_${pollId}_men_select`;
 
-      const options = createSelectOptions(!hasResponse, isAvailable);
-
-    return NextResponse.json({
+      return NextResponse.json({
         type: 4,
-      data: {
-          content: `📋 **Votre réponse actuelle :**\n${currentStatusText}${commentText}\n\n**Modifier :**\n💡 Sélectionnez votre disponibilité dans le menu déroulant.`,
+        data: {
+          content: `📋 **Votre réponse actuelle :**\n${statusLabel(isAvailable)}${commentText}\n\n**Modifier :**\n💡 Sélectionnez votre disponibilité dans le menu déroulant.`,
           flags: 64,
-        components: [
-          {
+          components: [
+            {
               type: 1,
-            components: [
-              {
-                  type: 3, // SELECT_MENU
-                  custom_id: `availability_${pollId}_select`,
-                  options,
+              components: [
+                {
+                  type: 3,
+                  custom_id: selectCustomId,
+                  options: createSelectOptions(
+                    isAvailable === undefined,
+                    isAvailable
+                  ),
                   placeholder: "Sélectionnez votre disponibilité",
                 },
               ],
@@ -356,77 +328,55 @@ export async function handleModifyButton(
       });
     }
 
-    // Championnat par équipes
-    if (normalizedGender === "M") {
-      // Homme : 1 select menu
-      const isAvailable = currentResponse?.available;
-      const hasResponse = isAvailable !== undefined;
-
-      const options = createSelectOptions(!hasResponse, isAvailable);
+    const { merged } = await loadWomenTeamAvailability(
+      availabilityService,
+      journee,
+      phase,
+      player.playerId,
+      idEpreuve
+    );
+    const commentText = merged.comment
+      ? `\n💬 **Commentaire :** ${merged.comment}`
+      : "";
+    const currentStatusText = `VEN: ${dayEmoji(merged.fridayAvailable)} / SAM: ${dayEmoji(merged.saturdayAvailable)}`;
 
     return NextResponse.json({
-        type: 4,
+      type: 4,
       data: {
-          content: `📋 **Votre réponse actuelle :**\n${currentStatusText}${commentText}\n\n**Modifier :**\n💡 Sélectionnez votre disponibilité dans le menu déroulant.`,
-          flags: 64,
-          components: [
-            {
-              type: 1,
-              components: [
-                {
-                  type: 3, // SELECT_MENU
-                  custom_id: `availability_${pollId}_men_select`,
-                  options,
-                  placeholder: "Sélectionnez votre disponibilité",
+        content: `📋 **Votre réponse actuelle :**\n${currentStatusText}${commentText}\n\n**Modifier :**\n💡 Sélectionnez votre disponibilité pour chaque jour dans les menus déroulants.`,
+        flags: 64,
+        components: [
+          {
+            type: 1,
+            components: [
+              {
+                type: 3,
+                custom_id: `availability_${pollId}_women_ven_select`,
+                options: createSelectOptions(
+                  merged.fridayAvailable === undefined,
+                  merged.fridayAvailable
+                ),
+                placeholder: "Vendredi",
+              },
+            ],
+          },
+          {
+            type: 1,
+            components: [
+              {
+                type: 3,
+                custom_id: `availability_${pollId}_women_sat_select`,
+                options: createSelectOptions(
+                  merged.saturdayAvailable === undefined,
+                  merged.saturdayAvailable
+                ),
+                placeholder: "Samedi",
               },
             ],
           },
         ],
       },
     });
-    } else {
-      // Femme : 2 select menus (vendredi et samedi)
-      // Discord n'autorise qu'un seul select menu par ACTION_ROW → 2 lignes distinctes
-      const venAvailable = currentResponse?.fridayAvailable;
-      const satAvailable = currentResponse?.saturdayAvailable;
-      const hasVenResponse = venAvailable !== undefined;
-      const hasSatResponse = satAvailable !== undefined;
-
-      const venOptions = createSelectOptions(!hasVenResponse, venAvailable);
-      const satOptions = createSelectOptions(!hasSatResponse, satAvailable);
-
-      return NextResponse.json({
-        type: 4,
-        data: {
-          content: `📋 **Votre réponse actuelle :**\n${currentStatusText}${commentText}\n\n**Modifier :**\n💡 Sélectionnez votre disponibilité pour chaque jour dans les menus déroulants.`,
-          flags: 64,
-          components: [
-            {
-              type: 1, // ACTION_ROW (1 select par ligne max)
-              components: [
-                {
-                  type: 3, // SELECT_MENU
-                  custom_id: `availability_${pollId}_women_ven_select`,
-                  options: venOptions,
-                  placeholder: "Vendredi",
-                },
-              ],
-            },
-            {
-              type: 1, // ACTION_ROW
-              components: [
-                {
-                  type: 3, // SELECT_MENU
-                  custom_id: `availability_${pollId}_women_sat_select`,
-                  options: satOptions,
-                  placeholder: "Samedi",
-                },
-              ],
-            },
-          ],
-        },
-      });
-    }
   } catch (error) {
     console.error("[Discord Poll] Erreur dans handleModifyButton:", error);
     return NextResponse.json({
@@ -828,16 +778,16 @@ export async function handleWomenSelect(
           return;
         }
 
-        // Extraire les infos du pollId
         const parts = pollId.split("_");
         const phase = parts[0] as "aller" | "retour";
         const journee = parseInt(parts[1], 10);
-        const championshipType = parts[2] as ChampionshipType;
         const idEpreuve = parts.length > 3 ? parseInt(parts[3], 10) : undefined;
 
-        // Récupérer la valeur sélectionnée
         const selectedValue = interaction.data.values?.[0];
-        if (!selectedValue || (selectedValue !== "available" && selectedValue !== "unavailable")) {
+        if (
+          !selectedValue ||
+          (selectedValue !== "available" && selectedValue !== "unavailable")
+        ) {
           await updateEphemeralMessage(
             applicationId,
             interactionToken,
@@ -847,91 +797,37 @@ export async function handleWomenSelect(
           return;
         }
 
-        // Convertir la valeur en boolean
         const isAvailable = selectedValue === "available";
-
-        // Récupérer l'état actuel pour les deux jours
         const availabilityService = new AvailabilityServiceAdmin();
-        const availability = await availabilityService.getAvailability(
+        // VEN→masculin uniquement, SAM→féminin uniquement (évite d'effacer l'autre jour)
+        const next = await saveWomenTeamDaySelection(availabilityService, {
           journee,
           phase,
-          championshipType,
-          idEpreuve
-        );
-        const currentResponse = availability?.players[player.playerId];
-
-        let fridayAvailable: boolean | undefined = currentResponse?.fridayAvailable;
-        let saturdayAvailable: boolean | undefined = currentResponse?.saturdayAvailable;
-
-        // Mettre à jour le jour sélectionné
-        if (day === "ven") {
-          fridayAvailable = isAvailable;
-        } else {
-          saturdayAvailable = isAvailable;
-        }
-
-        // Pour le championnat par équipes, les femmes doivent sauvegarder :
-        // - Vendredi disponible → disponible pour le championnat masculin
-        // - Samedi disponible → disponible pour le championnat féminin
-        const masculineData: {
-          available?: boolean;
-          fridayAvailable?: boolean;
-          saturdayAvailable?: boolean;
-        } = {};
-        const feminineData: {
-          available?: boolean;
-          fridayAvailable?: boolean;
-          saturdayAvailable?: boolean;
-        } = {};
-
-        // Vendredi → championnat masculin
-        if (fridayAvailable !== undefined) {
-          masculineData.available = fridayAvailable;
-          masculineData.fridayAvailable = fridayAvailable;
-        }
-
-        // Samedi → championnat féminin
-        if (saturdayAvailable !== undefined) {
-          feminineData.available = saturdayAvailable;
-          feminineData.saturdayAvailable = saturdayAvailable;
-        }
-
-        // Sauvegarder dans les deux championnats
-        await Promise.all([
-          availabilityService.updatePlayerAvailability(
-            journee,
-            phase,
-            "masculin",
-            player.playerId,
-            masculineData,
-            idEpreuve
-          ),
-          availabilityService.updatePlayerAvailability(
-            journee,
-            phase,
-            "feminin",
-            player.playerId,
-            feminineData,
-            idEpreuve
-          ),
-        ]);
+          playerId: player.playerId,
+          day,
+          isAvailable,
+          ...(idEpreuve !== undefined ? { idEpreuve } : {}),
+        });
 
         const playerName = `${player.playerData.prenom || ""} ${
           player.playerData.nom || ""
         }`.trim();
-
         const dayLabel = day === "ven" ? "Vendredi" : "Samedi";
         const statusEmoji = isAvailable ? "✅" : "❌";
         const statusText = isAvailable ? "disponible" : "indisponible";
+        const venEmoji =
+          next.fridayAvailable === true
+            ? "✅"
+            : next.fridayAvailable === false
+              ? "❌"
+              : "❓";
+        const satEmoji =
+          next.saturdayAvailable === true
+            ? "✅"
+            : next.saturdayAvailable === false
+              ? "❌"
+              : "❓";
 
-        const venEmoji = fridayAvailable === true ? "✅" : fridayAvailable === false ? "❌" : "❓";
-        const satEmoji = saturdayAvailable === true ? "✅" : saturdayAvailable === false ? "❌" : "❓";
-
-        // Créer les options pour chaque select menu (sans "Non renseigné" car une réponse existe maintenant)
-        const venOptions = createSelectOptions(false, fridayAvailable);
-        const satOptions = createSelectOptions(false, saturdayAvailable);
-
-        // Mettre à jour le message éphémère (1 select par ACTION_ROW)
         await updateEphemeralMessage(
           applicationId,
           interactionToken,
@@ -940,23 +836,29 @@ export async function handleWomenSelect(
           }\n\n💡 Vous pouvez modifier votre réponse en sélectionnant une autre option.`,
           [
             {
-              type: 1, // ACTION_ROW
+              type: 1,
               components: [
                 {
                   type: 3,
                   custom_id: `availability_${pollId}_women_ven_select`,
-                  options: venOptions,
+                  options: createSelectOptions(
+                    next.fridayAvailable === undefined,
+                    next.fridayAvailable
+                  ),
                   placeholder: "Vendredi",
                 },
               ],
             },
             {
-              type: 1, // ACTION_ROW
+              type: 1,
               components: [
                 {
                   type: 3,
                   custom_id: `availability_${pollId}_women_sat_select`,
-                  options: satOptions,
+                  options: createSelectOptions(
+                    next.saturdayAvailable === undefined,
+                    next.saturdayAvailable
+                  ),
                   placeholder: "Samedi",
                 },
               ],
