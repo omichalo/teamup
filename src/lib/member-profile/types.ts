@@ -25,6 +25,10 @@ export type MemberProfileIdentity = {
   status: string | null;
   ffttLicense: string | null;
   submitterUid: string | null;
+  submitterAccountEmail: string | null;
+  submitterRole: string | null;
+  linkedAccountUids: string[] | null;
+  linkedAccountEmails: string[];
   slotIds: string[];
 };
 

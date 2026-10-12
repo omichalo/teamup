@@ -313,8 +313,21 @@ export function MembershipRequestsListPanel({
                       <MembershipRequestCardFollowUpChips registration={registration} />
                     </Stack>
                     <Typography variant="body2" color="text.secondary" sx={{ wordBreak: "break-all" }}>
-                      {registration.submitterAccountEmail ?? "E-mail compte inconnu"}
+                      {registration.linkedAccountEmails &&
+                      registration.linkedAccountEmails.length > 0
+                        ? registration.linkedAccountEmails.join(", ")
+                        : (registration.submitterAccountEmail ?? "E-mail compte inconnu")}
                     </Typography>
+                    {registration.linkedAccountEmails &&
+                    registration.linkedAccountEmails.length > 0 &&
+                    registration.submitterAccountEmail &&
+                    !registration.linkedAccountEmails.includes(
+                      registration.submitterAccountEmail
+                    ) ? (
+                      <Typography variant="caption" color="text.secondary" sx={{ wordBreak: "break-all" }}>
+                        Soumettant : {registration.submitterAccountEmail}
+                      </Typography>
+                    ) : null}
                     <Typography variant="caption" color="text.secondary">
                       Envoyé le {formatDate(registration.submittedAt)}
                     </Typography>

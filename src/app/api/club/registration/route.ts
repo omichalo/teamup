@@ -6,6 +6,7 @@ import { mapRegistrationDocToClient } from "@/lib/club-registration/map-registra
 import { cookies } from "next/headers";
 import { getFirestoreAdmin, adminAuth } from "@/lib/firebase-admin";
 import { ALL_USER_ROLES, hasAnyRole, resolveRole } from "@/lib/auth/roles";
+import { effectiveLinkedAccountUids } from "@/lib/club-registration/effective-linked-accounts";
 import {
   canViewClubRegistration,
   isClubRegistrationManager,
@@ -84,9 +85,8 @@ export async function GET(req: Request) {
       return jsonNoStore({ error: "Dossier introuvable" }, { status: 404 });
     }
 
-    const submitterUid =
-      typeof data.submitterUid === "string" ? data.submitterUid : undefined;
-    if (!canViewClubRegistration(role, submitterUid, decoded.uid)) {
+    const linkedAccountUids = effectiveLinkedAccountUids(data);
+    if (!canViewClubRegistration(role, linkedAccountUids, decoded.uid)) {
       return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
     }
 

@@ -2,6 +2,10 @@ import { formatAttendanceSlotDisplay } from "@/lib/attendance/slot-display";
 import type { AttendanceMark } from "@/lib/attendance/types";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import { resolvePaymentDocumentsAvailability } from "@/lib/club-registration/payment-documents/availability";
+import {
+  effectiveLinkedAccountEmails,
+  effectiveLinkedAccountUids,
+} from "@/lib/club-registration/effective-linked-accounts";
 import { projectRegistrationPaymentToLedger } from "@/lib/member-ledger/project-registration-payment";
 import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
 import type { MemberProfileResponse } from "./types";
@@ -43,6 +47,14 @@ export function buildMemberProfile(params: {
     "Adhérent";
   const slotIds = resolveSlotIds(params.data);
   const submitterUid = readString(params.data, "submitterUid") || null;
+  const linkedAccountUids = effectiveLinkedAccountUids(params.data);
+  const linkedAccountEmails = effectiveLinkedAccountEmails(params.data);
+  const linkedAccountUidsStored = Array.isArray(params.data.linkedAccountUids)
+    ? linkedAccountUids
+    : null;
+  const submitterAccountEmail =
+    readString(params.data, "submitterAccountEmail") || null;
+  const submitterRole = readString(params.data, "submitterRole") || null;
   const ffttLicense = readString(params.data, "ffttLicense") || null;
   const status =
     typeof params.data.status === "string" ? params.data.status : null;
@@ -77,6 +89,10 @@ export function buildMemberProfile(params: {
       status,
       ffttLicense,
       submitterUid,
+      submitterAccountEmail,
+      submitterRole,
+      linkedAccountUids: linkedAccountUidsStored,
+      linkedAccountEmails,
       slotIds,
     },
     slots,
@@ -87,7 +103,9 @@ export function buildMemberProfile(params: {
     ),
     documents: resolvePaymentDocumentsAvailability(params.data),
     viewer: {
-      isOwner: Boolean(submitterUid && submitterUid === params.viewerUid),
+      isOwner: Boolean(
+        params.viewerUid && linkedAccountUids.includes(params.viewerUid)
+      ),
       canManage: params.canManage,
     },
   };

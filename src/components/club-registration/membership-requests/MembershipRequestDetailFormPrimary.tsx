@@ -69,6 +69,7 @@ export function MembershipRequestDetailFormPrimary({ detail, hideTitleHeader = f
 
       <RegistrationSubmissionContext
         submitterAccountEmail={selected.submitterAccountEmail}
+        linkedAccountEmails={selected.linkedAccountEmails}
         submittedAt={selected.submittedAt}
         updatedAt={selected.updatedAt}
       />

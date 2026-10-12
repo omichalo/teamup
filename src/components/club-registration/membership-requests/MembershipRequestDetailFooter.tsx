@@ -6,6 +6,7 @@ import { isRegistrationPaymentSettled } from "@/lib/club-registration/resolve-se
 import { resolveOnlinePayableCents } from "@/lib/club-registration/payment/resolve-remaining-payable";
 import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
 import { CancelRegistrationSection } from "./CancelRegistrationSection";
+import { LinkRegistrationAccountSection } from "./LinkRegistrationAccountSection";
 import type { MembershipRequestDetailState } from "./useMembershipRequestDetail";
 import type { MembershipListReloadFn } from "./types";
 
@@ -75,6 +76,23 @@ export function MembershipRequestDetailFooter({
           requestPayment("stripe", { charge: "remaining" })
         }
       />
+
+      {registrationId ? (
+        <LinkRegistrationAccountSection
+          registrationId={registrationId}
+          adherentDisplayName={formatPersonDisplayName(form.firstName, form.lastName)}
+          submitterUid={selected.submitterUid ?? null}
+          submitterAccountEmail={selected.submitterAccountEmail ?? null}
+          submitterRole={selected.submitterRole ?? null}
+          linkedAccountUids={selected.linkedAccountUids}
+          linkedAccountEmails={selected.linkedAccountEmails}
+          disabled={saving || requestingPayment || persistingQuote}
+          onLinked={async () => {
+            await detail.fetchDetail(registrationId, { silent: true });
+            await onListReload?.({ advance: "if_removed" });
+          }}
+        />
+      ) : null}
 
       {registrationId ? (
         <CancelRegistrationSection

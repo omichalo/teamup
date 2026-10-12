@@ -9,6 +9,7 @@ import {
 describe("club registration access", () => {
   const ownerUid = "user-owner";
   const otherUid = "user-other";
+  const linked = [ownerUid];
 
   describe("isClubRegistrationManager", () => {
     it("autorise admin et secrétariat uniquement", () => {
@@ -43,21 +44,21 @@ describe("club registration access", () => {
       expect(
         canViewClubRegistration(
           USER_ROLES.ASSISTANT_SECRETARY,
-          ownerUid,
+          linked,
           otherUid
         )
       ).toBe(true);
       expect(
-        canViewClubRegistration(USER_ROLES.BOARD_MEMBER, ownerUid, otherUid)
+        canViewClubRegistration(USER_ROLES.BOARD_MEMBER, linked, otherUid)
       ).toBe(true);
       expect(
-        canViewClubRegistration(USER_ROLES.COACH, ownerUid, otherUid)
+        canViewClubRegistration(USER_ROLES.COACH, linked, otherUid)
       ).toBe(true);
     });
 
     it("refuse le joueur sur le dossier d'un autre", () => {
       expect(
-        canViewClubRegistration(USER_ROLES.PLAYER, ownerUid, otherUid)
+        canViewClubRegistration(USER_ROLES.PLAYER, linked, otherUid)
       ).toBe(false);
     });
   });
@@ -65,10 +66,10 @@ describe("club registration access", () => {
   describe("canAccessClubRegistration", () => {
     it("autorise admin et secrétariat sur un dossier tiers", () => {
       expect(
-        canAccessClubRegistration(USER_ROLES.ADMIN, ownerUid, otherUid)
+        canAccessClubRegistration(USER_ROLES.ADMIN, linked, otherUid)
       ).toBe(true);
       expect(
-        canAccessClubRegistration(USER_ROLES.SECRETARY, ownerUid, otherUid)
+        canAccessClubRegistration(USER_ROLES.SECRETARY, linked, otherUid)
       ).toBe(true);
     });
 
@@ -76,43 +77,43 @@ describe("club registration access", () => {
       expect(
         canAccessClubRegistration(
           USER_ROLES.ASSISTANT_SECRETARY,
-          ownerUid,
+          linked,
           otherUid
         )
       ).toBe(false);
       expect(
-        canAccessClubRegistration(USER_ROLES.BOARD_MEMBER, ownerUid, otherUid)
+        canAccessClubRegistration(USER_ROLES.BOARD_MEMBER, linked, otherUid)
       ).toBe(false);
       expect(
-        canAccessClubRegistration(USER_ROLES.COACH, ownerUid, otherUid)
+        canAccessClubRegistration(USER_ROLES.COACH, linked, otherUid)
       ).toBe(false);
     });
 
-    it("autorise le propriétaire (submitterUid)", () => {
+    it("autorise le propriétaire (compte lié)", () => {
       expect(
-        canAccessClubRegistration(USER_ROLES.PLAYER, ownerUid, ownerUid)
+        canAccessClubRegistration(USER_ROLES.PLAYER, linked, ownerUid)
       ).toBe(true);
       expect(
         canAccessClubRegistration(
           USER_ROLES.ASSISTANT_SECRETARY,
-          ownerUid,
+          linked,
           ownerUid
         )
       ).toBe(true);
       expect(
-        canAccessClubRegistration(USER_ROLES.BOARD_MEMBER, ownerUid, ownerUid)
+        canAccessClubRegistration(USER_ROLES.BOARD_MEMBER, linked, ownerUid)
       ).toBe(true);
     });
 
     it("refuse le joueur sur le dossier d'un autre", () => {
       expect(
-        canAccessClubRegistration(USER_ROLES.PLAYER, ownerUid, otherUid)
+        canAccessClubRegistration(USER_ROLES.PLAYER, linked, otherUid)
       ).toBe(false);
     });
 
-    it("refuse si submitterUid absent", () => {
+    it("refuse si aucun compte lié", () => {
       expect(
-        canAccessClubRegistration(USER_ROLES.PLAYER, undefined, ownerUid)
+        canAccessClubRegistration(USER_ROLES.PLAYER, [], ownerUid)
       ).toBe(false);
     });
   });

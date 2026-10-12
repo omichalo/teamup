@@ -98,4 +98,27 @@ describe("buildMemberProfile", () => {
     expect(profile.viewer.isOwner).toBe(false);
     expect(profile.viewer.canManage).toBe(true);
   });
+
+  it("reconnaît le propriétaire via linkedAccountUids", () => {
+    const profile = buildMemberProfile({
+      registrationId: "reg-3",
+      data: {
+        firstName: "Grace",
+        lastName: "Hopper",
+        seasonLabel: "2026-2027",
+        submitterUid: "staff",
+        submitterAccountEmail: "secretariat@club.fr",
+        linkedAccountUids: ["member-uid"],
+        linkedAccountEmails: ["member@ex.com"],
+        slotIds: [],
+      },
+      config,
+      marks: [],
+      viewerUid: "member-uid",
+      canManage: false,
+    });
+    expect(profile.viewer.isOwner).toBe(true);
+    expect(profile.identity.linkedAccountEmails).toEqual(["member@ex.com"]);
+    expect(profile.identity.submitterAccountEmail).toBe("secretariat@club.fr");
+  });
 });

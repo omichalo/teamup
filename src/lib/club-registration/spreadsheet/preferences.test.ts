@@ -17,7 +17,9 @@ describe("spreadsheet preferences", () => {
       "ffttCategorie",
     ]);
     expect(visible).toContain("submitterAccountEmail");
+    expect(visible).toContain("linkedAccountEmails");
     expect(visible).not.toContain("submitterUid");
+    expect(visible).not.toContain("linkedAccountUids");
     expect(visible).toContain("criteriumFederalRegistrationStatus");
     expect(visible).toContain("jerseyFollowUpStatus");
     expect(visible).toContain("registrationCertificateFollowUpStatus");

@@ -13,3 +13,12 @@ alwaysApply: true
 - Respecter les conventions Next : 'page.tsx', 'layout.tsx', 'loading.tsx', 'error.tsx', 'not-found.tsx' quand cela a du sens.
 - Utiliser le cache Next/fetch de façon explicite (cache, revalidate) et éviter les appels inutiles côté client.
 - Forcer le runtime Node.js pour les routes API nécessitant des modules Node.js : `export const runtime = "nodejs";`
+
+## Titres de page (obligatoire)
+
+- Chaque nouvelle route `src/app/**/page.tsx` doit avoir un **titre dédié** (onglet navigateur + analytics GA4).
+- Le layout racine applique le template `%s — Team Up` ; le titre par défaut seul ne suffit pas.
+- **Page serveur** : `export const metadata = pageMetadata("Mon titre")` via `@/lib/seo/page-metadata`.
+- **Page `"use client"`** : `layout.tsx` du segment avec `export const metadata = pageMetadata("Mon titre")`.
+- Exemption : page qui ne fait que `redirect(...)`.
+- Harnais bloquant : `npm run check:page-titles` (intégré à `check:dev`, `check`, pre-commit).
