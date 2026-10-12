@@ -110,6 +110,9 @@ export function AttendanceSlotPicker({
                       <Typography variant="caption" sx={{ opacity: 0.9 }}>
                         {slot.label}
                       </Typography>
+                      {slot.source === "camp" ? (
+                        <Chip size="small" color="secondary" label="Stage" />
+                      ) : null}
                       {cancelled ? <Chip size="small" label="Annulé" color="default" /> : null}
                       {!cancelled && slot.highlighted ? (
                         <Chip size="small" label="Proche de maintenant" />
@@ -123,7 +126,7 @@ export function AttendanceSlotPicker({
                       ) : null}
                     </Stack>
                   </Button>
-                  {canManageCancellations ? (
+                  {canManageCancellations && slot.source !== "camp" ? (
                     cancelled ? (
                       <IconButton
                         aria-label={`Restaurer ${slot.label}`}

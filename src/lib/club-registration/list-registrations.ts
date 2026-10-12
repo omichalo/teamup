@@ -31,6 +31,7 @@ export const LIST_FIELDS = [
   "isMinor",
   "mainSectionId",
   "adherentEmail",
+  "adherentPhonePrimary",
   "medicalCertificateDeclaration",
   "medicalCertificateStatus",
   "ppsFollowUpStatus",

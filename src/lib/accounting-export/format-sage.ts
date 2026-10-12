@@ -6,7 +6,7 @@ import {
 import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
 import { SAGE_LABEL_MAX, SAGE_PIECE_MAX } from "./chart";
 
-const PIECE_RE = /^(FAC|AVO|REC|AID)-(\d{4})-(\d{4})-(\d+)$/;
+const PIECE_RE = /^(STG-FAC|STG-REC|FAC|AVO|REC|AID)-(\d{4})-(\d{4})-(\d+)$/;
 
 export function foldLabel(value: string): string {
   return value

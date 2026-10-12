@@ -116,7 +116,7 @@ export function AttendanceSlotSelectClient() {
       <PageHeader
         eyebrow="Présences"
         title="Choisir un créneau"
-        subtitle="Sélectionnez la séance à pointer. Le créneau le plus proche de l’heure actuelle est mis en avant."
+        subtitle="Sélectionnez la séance à pointer (entraînement ou stage). Le créneau le plus proche de l’heure actuelle est mis en avant."
         marginBottom={3}
       />
       <Stack spacing={3}>
@@ -170,13 +170,24 @@ export function AttendanceSlotSelectClient() {
           error={error}
           selectedSlotId={null}
           canManageCancellations={canManage}
-          onSelect={(slotId) => router.push(attendanceSessionHref(date, slotId))}
-          onCancelSlot={(slot) =>
-            setPending({ mode: "cancel", scope: "slot", slot, count: 1 })
-          }
-          onRestoreSlot={(slot) =>
-            setPending({ mode: "restore", scope: "slot", slot, count: 1 })
-          }
+          onSelect={(slotId) => {
+            const slot = slots.find((s) => s.slotId === slotId);
+            router.push(
+              attendanceSessionHref(
+                date,
+                slotId,
+                slot?.source === "camp" ? "camp" : "training"
+              )
+            );
+          }}
+          onCancelSlot={(slot) => {
+            if (slot.source === "camp") return;
+            setPending({ mode: "cancel", scope: "slot", slot, count: 1 });
+          }}
+          onRestoreSlot={(slot) => {
+            if (slot.source === "camp") return;
+            setPending({ mode: "restore", scope: "slot", slot, count: 1 });
+          }}
         />
       </Stack>
       <AttendanceCancellationConfirmDialog

@@ -7,5 +7,8 @@ describe("attendance urls", () => {
     expect(attendanceSessionHref("2026-08-20", "voisins-jeu-1900-adultes-elite")).toBe(
       "/club/presences/seance?date=2026-08-20&slot=voisins-jeu-1900-adultes-elite"
     );
+    expect(attendanceSessionHref("2026-08-20", "camp-slot-1", "camp")).toBe(
+      "/club/presences/seance?date=2026-08-20&slot=camp-slot-1&source=camp"
+    );
   });
 });

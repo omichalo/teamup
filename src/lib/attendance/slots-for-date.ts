@@ -59,6 +59,7 @@ function toSlotOption(
     startMinutes: schedule.startMinutes,
     endMinutes: schedule.endMinutes,
     enrollmentsClosed: slot.enrollmentsClosed === true,
+    source: "training",
   };
 }
 

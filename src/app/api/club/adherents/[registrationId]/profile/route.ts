@@ -10,6 +10,7 @@ import {
 } from "@/lib/club-registration/registration-access";
 import { getActiveRegistrationConfig } from "@/lib/club-registration-config/store";
 import { listMarksForRegistration } from "@/lib/attendance/list-marks-for-registration";
+import { listRegistrationsForClubRegistration } from "@/lib/camps/store";
 import { buildMemberProfile } from "@/lib/member-profile/build-member-profile";
 
 const COLLECTION = "clubRegistrations";
@@ -52,9 +53,10 @@ export async function GET(
       return jsonNoStore({ error: "Accès refusé" }, { status: 403 });
     }
 
-    const [config, marks] = await Promise.all([
+    const [config, marks, campRegistrations] = await Promise.all([
       getActiveRegistrationConfig(),
       listMarksForRegistration(db, registrationId),
+      listRegistrationsForClubRegistration(db, registrationId),
     ]);
 
     const profile = buildMemberProfile({
@@ -62,6 +64,7 @@ export async function GET(
       data,
       config,
       marks,
+      campRegistrations,
       viewerUid: decoded.uid,
       canManage: isClubRegistrationManager(role),
     });

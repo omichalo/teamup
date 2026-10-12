@@ -16,6 +16,8 @@ export const SAGE_JOURNALS = {
 export const SAGE_ACCOUNTS = {
   client: "411000",
   cotisation: "756000",
+  /** Produit stages vacances — n° proposé (à confirmer trésorier), jamais cotisation. */
+  stages: "706100",
   donation: "754000",
   ffttPayable: "467100",
   stripeClearing: "511200",

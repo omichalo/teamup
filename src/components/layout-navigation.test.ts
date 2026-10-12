@@ -21,6 +21,7 @@ describe("buildLayoutNavigation", () => {
       "/joueur",
       "/club/inscription",
       "/club/mes-inscriptions",
+      "/club/mes-stages",
       "/club/ma-fiche",
       "/club/idees",
     ]);
@@ -28,6 +29,7 @@ describe("buildLayoutNavigation", () => {
       "Accueil",
       "Nouvelle adhésion",
       "Mes dossiers",
+      "Mes stages",
       "Ma fiche",
       "Boîte à idées",
     ]);
@@ -44,6 +46,7 @@ describe("buildLayoutNavigation", () => {
       "/joueur",
       "/club/inscription",
       "/club/mes-inscriptions",
+      "/club/mes-stages",
       "/club/ma-fiche",
       "/club/adhesions-tableau",
       "/club/statistiques-adherents",
@@ -62,6 +65,7 @@ describe("buildLayoutNavigation", () => {
       "/joueur",
       "/club/inscription",
       "/club/mes-inscriptions",
+      "/club/mes-stages",
       "/club/ma-fiche",
       "/club/adhesions-tableau",
       "/club/statistiques-adherents",
@@ -83,6 +87,7 @@ describe("buildLayoutNavigation", () => {
       "/joueur",
       "/club/inscription",
       "/club/mes-inscriptions",
+      "/club/mes-stages",
       "/club/ma-fiche",
       "/club/adhesions-tableau",
       "/club/statistiques-adherents",
@@ -92,18 +97,17 @@ describe("buildLayoutNavigation", () => {
     ]);
   });
 
-  it("keeps secretary work in primary and adhesions in group", () => {
+  it("keeps secretary work in primary with adhesions and stages groups", () => {
     const nav = buildLayoutNavigation({ ...base, isSecretary: true });
     expect(nav.primary.map((item) => item.href)).toEqual([
       "/",
       "/club/demandes-adhesion",
+      "/club/stages",
       "/club/presences",
       "/club/creneaux",
       "/club/idees",
     ]);
-    expect(nav.groups).toHaveLength(1);
-    expect(nav.groups[0]?.id).toBe("adhesions");
-    expect(nav.groups[0]?.label).toBe("Adhésions");
+    expect(nav.groups.map((group) => group.id)).toEqual(["adhesions", "stages"]);
     expect(nav.groups[0]?.items.map((item) => item.href)).toEqual([
       "/club/adhesions-tableau",
       "/club/statistiques-adherents",
@@ -113,6 +117,12 @@ describe("buildLayoutNavigation", () => {
       "/club/inscription",
       "/club/validations-licence",
       "/club/matchs-hors-inscription",
+    ]);
+    expect(nav.groups[1]?.items.map((item) => item.href)).toEqual([
+      "/club/stages/catalogue",
+      "/club/stages/paiements",
+      "/club/stages/tableau",
+      "/club/stages/statistiques",
     ]);
   });
 
@@ -137,17 +147,19 @@ describe("buildLayoutNavigation", () => {
     ]);
   });
 
-  it("splits admin navigation across primary and two groups", () => {
+  it("splits admin navigation across primary and three groups", () => {
     const nav = buildLayoutNavigation({ ...base, isAdmin: true });
     expect(nav.primary.map((item) => item.href)).toEqual([
       "/",
       "/club/demandes-adhesion",
+      "/club/stages",
       "/club/idees",
       "/admin",
     ]);
     expect(nav.groups.map((group) => group.id)).toEqual([
       "championnat",
       "adhesions",
+      "stages",
     ]);
     expect(nav.groups[0]?.items.map((item) => item.href)).toEqual([
       "/joueurs",
@@ -167,6 +179,12 @@ describe("buildLayoutNavigation", () => {
       "/club/inscription",
       "/club/validations-licence",
       "/club/matchs-hors-inscription",
+    ]);
+    expect(nav.groups[2]?.items.map((item) => item.href)).toEqual([
+      "/club/stages/catalogue",
+      "/club/stages/paiements",
+      "/club/stages/tableau",
+      "/club/stages/statistiques",
     ]);
   });
 });
@@ -193,6 +211,7 @@ describe("buildLayoutAccountMenuItems", () => {
   it("moves personal links to account menu for coach", () => {
     expect(buildLayoutAccountMenuItems(base).map((item) => item.href)).toEqual([
       "/club/mes-inscriptions",
+      "/club/mes-stages",
       "/club/ma-fiche",
       "/club/inscription",
     ]);
@@ -203,7 +222,7 @@ describe("buildLayoutAccountMenuItems", () => {
       buildLayoutAccountMenuItems({ ...base, isAdmin: true }).map(
         (item) => item.href,
       ),
-    ).toEqual(["/club/mes-inscriptions", "/club/ma-fiche"]);
+    ).toEqual(["/club/mes-inscriptions", "/club/mes-stages", "/club/ma-fiche"]);
   });
 });
 

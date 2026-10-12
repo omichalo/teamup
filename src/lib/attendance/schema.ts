@@ -16,6 +16,7 @@ export const attendanceMarkBodySchema = z
     registrationId: z.string().trim().min(1).max(120).optional(),
     leadId: z.string().trim().min(1).max(120).optional(),
     addSlotRequested: z.boolean().optional(),
+    source: z.enum(["training", "camp"]).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.kind === "guest" && !data.leadId) {

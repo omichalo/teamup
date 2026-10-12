@@ -28,10 +28,24 @@ export type MemberProfileIdentity = {
   slotIds: string[];
 };
 
+export type MemberProfileCampItem = {
+  id: string;
+  campId: string;
+  siteLabel: string;
+  formulaId: string;
+  formulaLabel: string;
+  status: string;
+  totalCents: number;
+  invoiceNumber: string | null;
+  slotCount: number;
+  submittedAt: string;
+};
+
 export type MemberProfileResponse = {
   identity: MemberProfileIdentity;
   slots: MemberProfileSlot[];
   attendance: MemberProfileAttendanceItem[];
+  camps: MemberProfileCampItem[];
   finance: MemberLedgerView;
   documents: PaymentDocumentsAvailability;
   viewer: {

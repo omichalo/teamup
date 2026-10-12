@@ -3,8 +3,8 @@
 import { Box, Button, Paper, Stack } from "@mui/material";
 
 type Props = {
-  onSearch: () => void;
-  onGuest: () => void;
+  onSearch?: (() => void) | undefined;
+  onGuest?: (() => void) | undefined;
 };
 
 /** Hauteur réservée au-dessus du dock (boutons + safe area). */
@@ -12,6 +12,9 @@ export const ATTENDANCE_SESSION_DOCK_CLEARANCE =
   "calc(96px + env(safe-area-inset-bottom, 0px))";
 
 export function AttendanceSessionDock({ onSearch, onGuest }: Props) {
+  if (!onSearch && !onGuest) {
+    return null;
+  }
   return (
     <Paper
       elevation={8}
@@ -30,12 +33,16 @@ export function AttendanceSessionDock({ onSearch, onGuest }: Props) {
       }}
     >
       <Stack direction="row" spacing={1.5} sx={{ maxWidth: 900, mx: "auto" }}>
-        <Button variant="contained" fullWidth onClick={onSearch} sx={{ minHeight: 52 }}>
-          Chercher un adhérent
-        </Button>
-        <Button variant="outlined" fullWidth onClick={onGuest} sx={{ minHeight: 52 }}>
-          Ajouter un essai
-        </Button>
+        {onSearch ? (
+          <Button variant="contained" fullWidth onClick={onSearch} sx={{ minHeight: 52 }}>
+            Chercher un adhérent
+          </Button>
+        ) : null}
+        {onGuest ? (
+          <Button variant="outlined" fullWidth onClick={onGuest} sx={{ minHeight: 52 }}>
+            Ajouter un essai
+          </Button>
+        ) : null}
       </Stack>
     </Paper>
   );

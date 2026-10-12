@@ -35,6 +35,11 @@ export const SAGE_CHART_ACCOUNTS: readonly SageChartAccountRow[] = [
     usualSense: "Crédit à la facture",
   },
   {
+    account: SAGE_ACCOUNTS.stages,
+    label: "Stages vacances (proposé — confirmer trésorier)",
+    usualSense: "Crédit à la facture stage",
+  },
+  {
     account: SAGE_ACCOUNTS.donation,
     label: "Dons",
     usualSense: "Crédit à la facture",

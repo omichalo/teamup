@@ -1,6 +1,9 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { Firestore } from "firebase-admin/firestore";
+import { CAMP_COLLECTIONS } from "@/lib/camps/constants";
+import type { CampRegistration } from "@/lib/camps/types";
+import { buildSageExportForCampRegistration } from "./build-camp-sage-entries";
 import { buildSageExportForRegistration } from "./build-sage-entries";
 import { sageLinesToXImportTxt } from "./format-ximport";
 import {
@@ -90,6 +93,25 @@ function seasonSlug(seasonLabel: string | null): string {
   return seasonLabel.trim().replace(/\s+/g, "-");
 }
 
+async function resolveCampSeasonLabel(
+  db: Firestore,
+  registration: CampRegistration
+): Promise<string> {
+  try {
+    const campDoc = await db
+      .collection(CAMP_COLLECTIONS.camps)
+      .doc(registration.campId)
+      .get();
+    const label = campDoc.data()?.seasonLabel;
+    if (typeof label === "string" && label.trim()) {
+      return label.trim();
+    }
+  } catch {
+    // ignore
+  }
+  return "";
+}
+
 function buildReadme(control: SageExportControl): string {
   return [
     "Export comptable TeamUp → Sage (lecture seule).",
@@ -161,6 +183,36 @@ export async function buildSageExportPack(params: {
     }
     registrationsRead += 1;
     const exported = buildSageExportForRegistration(doc.id, data);
+    if (exported.lines.length === 0 && exported.anomalies.length === 0) {
+      continue;
+    }
+    if (exported.lines.length > 0) {
+      exportedRegistrations += 1;
+    }
+    lines.push(...exported.lines);
+    anomalies.push(...exported.anomalies);
+    if (exported.thirdParty) {
+      parties.push(exported.thirdParty);
+    }
+  }
+
+  const campSnap = await params.db.collection(CAMP_COLLECTIONS.registrations).get();
+  for (const doc of campSnap.docs) {
+    const registration = {
+      id: doc.id,
+      ...(doc.data() as Omit<CampRegistration, "id">),
+    };
+    const campSeason = registration.submittedAt
+      ? await resolveCampSeasonLabel(params.db, registration)
+      : "";
+    if (seasonLabel && campSeason && campSeason !== seasonLabel) {
+      continue;
+    }
+    registrationsRead += 1;
+    const exported = buildSageExportForCampRegistration(
+      registration,
+      campSeason || seasonLabel || String(new Date().getFullYear())
+    );
     if (exported.lines.length === 0 && exported.anomalies.length === 0) {
       continue;
     }

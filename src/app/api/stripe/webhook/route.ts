@@ -12,6 +12,8 @@ import { paymentWriteWithSettlement } from "@/lib/club-registration/payment/sett
 import { syncRosterAfterRegistrationChange } from "@/lib/championship/sync-after-registration";
 import { assignMissingActiveReceiptNumbersInTransaction } from "@/lib/club-registration/payment-documents/assign-receipt-numbers-in-transaction";
 import { syncPaymentDocumentNumbersForRegistration } from "@/lib/club-registration/payment-documents/sync-document-numbers";
+import { applyCampStripeCheckoutPaid } from "@/lib/camps/apply-payment";
+import { dispatchCampPaymentConfirmedEmail } from "@/lib/camps/camp-payment-email";
 
 type StripeWebhookEvent = {
   id: string;
@@ -53,6 +55,57 @@ export async function POST(req: Request) {
         { status: 200 }
       );
     }
+    const domain = session?.metadata?.domain;
+    const campRegistrationId =
+      session?.metadata?.campRegistrationId ||
+      (domain === "camp" ? session?.client_reference_id : null) ||
+      null;
+
+    if (domain === "camp" || campRegistrationId) {
+      if (!campRegistrationId) {
+        return jsonNoStore(
+          { received: true, ignored: "missing camp registration id" },
+          { status: 200 }
+        );
+      }
+      const db = getFirestoreAdmin();
+      const amountTotal =
+        typeof session?.amount_total === "number" ? session.amount_total : 0;
+      const applied = await applyCampStripeCheckoutPaid({
+        db,
+        registrationId: campRegistrationId,
+        sessionId: session?.id ?? event.id,
+        amountCents: amountTotal,
+      });
+      if (applied.duplicate) {
+        return jsonNoStore({ received: true, duplicate: true }, { status: 200 });
+      }
+      if (!applied.registration) {
+        return jsonNoStore(
+          { received: true, ignored: "camp registration not found" },
+          { status: 200 }
+        );
+      }
+      logAuditAction(AUDIT_ACTIONS.CLUB_CAMP_PAYMENT_CONFIRMED, "stripe", {
+        resource: "campRegistration",
+        resourceId: campRegistrationId,
+        details: {
+          eventId: event.id,
+          checkoutSessionId: session?.id,
+          amountCents: amountTotal,
+        },
+        success: true,
+      });
+      if (applied.registration.status === "paid") {
+        try {
+          await dispatchCampPaymentConfirmedEmail(applied.registration);
+        } catch (emailError) {
+          console.error("[api/stripe/webhook] camp email", emailError);
+        }
+      }
+      return jsonNoStore({ received: true, domain: "camp" }, { status: 200 });
+    }
+
     const registrationId =
       session?.metadata?.registrationId || session?.client_reference_id || null;
     if (!registrationId) {

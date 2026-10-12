@@ -7,8 +7,15 @@ export function attendancePickerHref(date?: string): string {
   return "/club/presences";
 }
 
-export function attendanceSessionHref(date: string, slotId: string): string {
+export function attendanceSessionHref(
+  date: string,
+  slotId: string,
+  source: "training" | "camp" = "training"
+): string {
   const params = new URLSearchParams({ date, slot: slotId });
+  if (source === "camp") {
+    params.set("source", "camp");
+  }
   return `/club/presences/seance?${params.toString()}`;
 }
 

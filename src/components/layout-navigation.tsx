@@ -5,6 +5,7 @@ import {
   AccountBalance,
   AdminPanelSettings,
   Assignment,
+  Category,
   Event,
   EventAvailable,
   FactCheck,
@@ -23,6 +24,8 @@ import {
   VerifiedUser,
   ViewWeek,
   WarningAmber,
+  SportsTennis,
+  Payments,
 } from "@mui/icons-material";
 
 export interface LayoutNavigationItem {
@@ -31,7 +34,7 @@ export interface LayoutNavigationItem {
   icon: React.ReactNode;
 }
 
-export type LayoutNavGroupId = "championnat" | "adhesions";
+export type LayoutNavGroupId = "championnat" | "adhesions" | "stages";
 
 export interface LayoutNavigationGroup {
   id: LayoutNavGroupId;
@@ -144,7 +147,45 @@ const NAV = {
     href: "/club/presences/essais",
     icon: <HowToReg />,
   },
+  stages: {
+    label: "Stages",
+    href: "/club/stages",
+    icon: <SportsTennis />,
+  },
+  stagesCatalogue: {
+    label: "Catalogue",
+    href: "/club/stages/catalogue",
+    icon: <Category />,
+  },
+  stagesPaiements: {
+    label: "Paiements",
+    href: "/club/stages/paiements",
+    icon: <Payments />,
+  },
+  stagesTableau: {
+    label: "Inscriptions",
+    href: "/club/stages/tableau",
+    icon: <TableChart />,
+  },
+  stagesStatistiques: {
+    label: "Statistiques",
+    href: "/club/stages/statistiques",
+    icon: <BarChart />,
+  },
+  mesStages: {
+    label: "Mes stages",
+    href: "/club/mes-stages",
+    icon: <SportsTennis />,
+  },
 } as const satisfies Record<string, LayoutNavigationItem>;
+
+/** Outils staff stages (hors parcours personnel « Mes stages »). */
+const STAGES_STAFF_GROUP_ITEMS: LayoutNavigationItem[] = [
+  NAV.stagesCatalogue,
+  NAV.stagesPaiements,
+  NAV.stagesTableau,
+  NAV.stagesStatistiques,
+];
 
 export const LAYOUT_NAV = NAV;
 
@@ -173,14 +214,14 @@ export function buildLayoutAccountMenuItems(
   }
 
   if (isAdmin) {
-    return [NAV.mesDossiers, NAV.maFiche];
+    return [NAV.mesDossiers, NAV.mesStages, NAV.maFiche];
   }
 
   if (isSecretary) {
-    return [NAV.mesDossiers, NAV.maFiche, NAV.nouvelleAdhesion];
+    return [NAV.mesDossiers, NAV.mesStages, NAV.maFiche, NAV.nouvelleAdhesion];
   }
 
-  return [NAV.mesDossiers, NAV.maFiche, NAV.nouvelleAdhesion];
+  return [NAV.mesDossiers, NAV.mesStages, NAV.maFiche, NAV.nouvelleAdhesion];
 }
 
 export function buildLayoutNavigation(
@@ -204,6 +245,7 @@ export function buildLayoutNavigation(
       NAV.accueil,
       NAV.nouvelleAdhesion,
       NAV.mesDossiers,
+      NAV.mesStages,
       NAV.maFiche,
     ];
     if (canAccessSpreadsheet) {
@@ -224,6 +266,7 @@ export function buildLayoutNavigation(
       primary: [
         NAV.accueilStaff,
         NAV.dossiersAValider,
+        NAV.stages,
         NAV.presences,
         NAV.creneaux,
         NAV.boiteIdees,
@@ -243,6 +286,11 @@ export function buildLayoutNavigation(
             NAV.matchsHorsInscription,
           ],
         },
+        {
+          id: "stages",
+          label: "Stages",
+          items: STAGES_STAFF_GROUP_ITEMS,
+        },
       ],
     };
   }
@@ -252,6 +300,7 @@ export function buildLayoutNavigation(
       primary: [
         NAV.accueilStaff,
         NAV.dossiersAValider,
+        NAV.stages,
         NAV.boiteIdees,
         NAV.administration,
       ],
@@ -282,6 +331,11 @@ export function buildLayoutNavigation(
             NAV.validationsLicence,
             NAV.matchsHorsInscription,
           ],
+        },
+        {
+          id: "stages",
+          label: "Stages",
+          items: STAGES_STAFF_GROUP_ITEMS,
         },
       ],
     };

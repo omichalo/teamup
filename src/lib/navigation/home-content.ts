@@ -1,21 +1,22 @@
-import type { LayoutNavigationItem } from "@/components/layout-navigation";
 import { LAYOUT_NAV } from "@/components/layout-navigation";
 import { USER_ROLES, type UserRole } from "@/lib/auth/roles";
+import {
+  cards,
+  uniqueByHref,
+  type HomeLinkCard,
+} from "@/lib/navigation/home-link-cards";
+
+export type { HomeLinkCard, HomeLinkColor } from "@/lib/navigation/home-link-cards";
 
 export const HOME_HERO_IMAGE_SRC = "/sqyping-home-hero.jpg";
 export const HOME_HERO_IMAGE_ALT =
   "Joueuses et joueurs de SQY Ping — visuel du site sqyping.fr";
 
-export type HomeLinkColor =
-  "primary" | "secondary" | "success" | "info" | "warning";
-
-export type HomeLinkCard = LayoutNavigationItem & {
-  description: string;
-  cta: string;
-  color: HomeLinkColor;
-};
-
-export type HomeDashboardSectionId = "championnat" | "adhesions" | "club";
+export type HomeDashboardSectionId =
+  | "championnat"
+  | "adhesions"
+  | "stages"
+  | "club";
 
 export type HomeDashboardSection = {
   id: HomeDashboardSectionId;
@@ -31,155 +32,6 @@ export type RoleHomeContent = {
   sections: HomeDashboardSection[];
 };
 
-const HOME_LINK_META: Record<
-  string,
-  { description: string; cta: string; color: HomeLinkColor }
-> = {
-  "/joueurs": {
-    description: "Gérer les joueurs, participations et équipes préférées.",
-    cta: "Gérer les joueurs",
-    color: "primary",
-  },
-  "/equipes": {
-    description: "Consulter les équipes, résultats et classements.",
-    cta: "Voir les équipes",
-    color: "secondary",
-  },
-  "/disponibilites": {
-    description:
-      "Saisir les disponibilités par journée et suivre les réponses.",
-    cta: "Gérer les disponibilités",
-    color: "info",
-  },
-  "/compositions": {
-    description: "Composer les équipes en respectant les règles de brûlage.",
-    cta: "Composer les équipes",
-    color: "warning",
-  },
-  "/compositions/defaults": {
-    description: "Définir la base de chaque équipe en début de phase.",
-    cta: "Configurer les modèles",
-    color: "success",
-  },
-  "/club/demandes-adhesion": {
-    description: "Traiter les dossiers soumis et suivre les paiements.",
-    cta: "Ouvrir les dossiers",
-    color: "secondary",
-  },
-  "/club/adhesions-tableau": {
-    description:
-      "Vue d'ensemble de tous les dossiers, avec tri, filtres et export.",
-    cta: "Ouvrir le tableau",
-    color: "info",
-  },
-  "/club/statistiques-adherents": {
-    description: "KPI et graphiques sur les adhérents du club (sexe, âge, section, ville…).",
-    cta: "Voir les statistiques",
-    color: "primary",
-  },
-  "/admin": {
-    description: "Synchroniser les données FFTT et gérer les accès.",
-    cta: "Ouvrir l'administration",
-    color: "secondary",
-  },
-  "/club/parametrage-inscription": {
-    description: "Configurer campagnes, tarifs et règles d'adhésion.",
-    cta: "Configurer les campagnes",
-    color: "info",
-  },
-  "/club/export-comptable": {
-    description:
-      "Générer l'export Sage (écritures, tiers, anomalies) pour la comptabilité du club.",
-    cta: "Ouvrir l'export comptable",
-    color: "warning",
-  },
-  "/club/inscription": {
-    description:
-      "Créer un dossier d'adhésion pour vous, un proche ou un membre du club.",
-    cta: "Ouvrir le formulaire",
-    color: "primary",
-  },
-  "/club/mes-inscriptions": {
-    description: "Suivre vos propres dossiers d'adhésion.",
-    cta: "Voir mes dossiers",
-    color: "primary",
-  },
-  "/club/ma-fiche": {
-    description:
-      "Voir créneaux, présences et finances. En cas de plusieurs adhésions, choisissez la fiche.",
-    cta: "Ouvrir ma fiche",
-    color: "primary",
-  },
-  "/club/idees": {
-    description:
-      "Proposer une évolution TeamUp ou club, ou signaler un problème.",
-    cta: "Ouvrir la boîte à idées",
-    color: "warning",
-  },
-  "/club/validations-licence": {
-    description: "Saisir les licences FFTT et suivre les encaissements.",
-    cta: "Ouvrir l'espace licences",
-    color: "success",
-  },
-  "/club/matchs-hors-inscription": {
-    description:
-      "Suivre les joueurs ayant joué sans option dossier, et ceux qui ont payé sans avoir encore joué.",
-    cta: "Ouvrir le suivi",
-    color: "warning",
-  },
-  "/club/presences": {
-    description: "Pointer les présences d'entraînement et consulter les taux.",
-    cta: "Ouvrir le pointage",
-    color: "info",
-  },
-  "/club/creneaux": {
-    description: "Taux de remplissage des créneaux et liste des inscrits.",
-    cta: "Voir les créneaux",
-    color: "info",
-  },
-  "/club/presences/essais": {
-    description: "Relancer les personnes venues essayer un entraînement.",
-    cta: "Ouvrir les essais",
-    color: "warning",
-  },
-};
-
-function isLayoutNavigationItem(
-  item: LayoutNavigationItem | null | undefined
-): item is LayoutNavigationItem {
-  return Boolean(item && typeof item.href === "string" && item.href.length > 0);
-}
-
-function toHomeLinkCard(item: LayoutNavigationItem): HomeLinkCard {
-  const meta = HOME_LINK_META[item.href];
-  if (!meta) {
-    return {
-      ...item,
-      description: "",
-      cta: item.label,
-      color: "primary",
-    };
-  }
-  return { ...item, ...meta };
-}
-
-function cards(
-  items: Array<LayoutNavigationItem | null | undefined>
-): HomeLinkCard[] {
-  return items.filter(isLayoutNavigationItem).map(toHomeLinkCard);
-}
-
-function uniqueByHref(
-  items: Array<LayoutNavigationItem | null | undefined>
-): LayoutNavigationItem[] {
-  const seen = new Set<string>();
-  return items.filter(isLayoutNavigationItem).filter((item) => {
-    if (seen.has(item.href)) return false;
-    seen.add(item.href);
-    return true;
-  });
-}
-
 const TITLE = "Bienvenue sur TeamUp";
 
 function intro(
@@ -193,17 +45,23 @@ function intro(
 function playerHome(): RoleHomeContent {
   return intro(
     "Espace adhérent",
-    "Vos démarches d'adhésion et vos idées pour le club, au même endroit.",
+    "Vos démarches d'adhésion, vos stages et vos idées pour le club.",
     [
       {
         id: "adhesions",
         title: "Adhésions",
-        description: "Créer un dossier et suivre ceux déjà transmis au club.",
+        description: "Créer un dossier, suivre ceux transmis, et ouvrir votre fiche.",
         items: cards([
           LAYOUT_NAV.nouvelleAdhesion,
           LAYOUT_NAV.mesDossiers,
           LAYOUT_NAV.maFiche,
         ]),
+      },
+      {
+        id: "stages",
+        title: "Stages",
+        description: "Inscriptions aux stages vacances et règlement.",
+        items: cards([LAYOUT_NAV.mesStages]),
       },
       {
         id: "club",
@@ -237,6 +95,12 @@ function boardMemberHome(): RoleHomeContent {
         ]),
       },
       {
+        id: "stages",
+        title: "Stages",
+        description: "Vos inscriptions aux stages vacances et paiements.",
+        items: cards([LAYOUT_NAV.mesStages]),
+      },
+      {
         id: "club",
         title: "Vie du club",
         description: "Proposer une idée ou signaler un problème.",
@@ -265,6 +129,12 @@ function assistantSecretaryHome(): RoleHomeContent {
           LAYOUT_NAV.mesDossiers,
           LAYOUT_NAV.maFiche,
         ]),
+      },
+      {
+        id: "stages",
+        title: "Stages",
+        description: "Vos inscriptions aux stages vacances et paiements.",
+        items: cards([LAYOUT_NAV.mesStages]),
       },
       {
         id: "club",
@@ -307,6 +177,12 @@ function coachHome(): RoleHomeContent {
         ]),
       },
       {
+        id: "stages",
+        title: "Stages",
+        description: "Vos inscriptions aux stages vacances et paiements.",
+        items: cards([LAYOUT_NAV.mesStages]),
+      },
+      {
         id: "club",
         title: "Vie du club",
         description:
@@ -320,7 +196,7 @@ function coachHome(): RoleHomeContent {
 function secretaryHome(): RoleHomeContent {
   return intro(
     "Espace secrétariat",
-    "Validez les dossiers, suivez les licences et pilotez les campagnes d'adhésion.",
+    "Validez les dossiers, pilotez les stages vacances et suivez les licences.",
     [
       {
         id: "adhesions",
@@ -342,10 +218,24 @@ function secretaryHome(): RoleHomeContent {
         ),
       },
       {
+        id: "stages",
+        title: "Stages",
+        description:
+          "Administration des stages, catalogue, paiements et vos propres inscriptions.",
+        items: cards([
+          LAYOUT_NAV.stages,
+          LAYOUT_NAV.stagesCatalogue,
+          LAYOUT_NAV.stagesPaiements,
+          LAYOUT_NAV.stagesTableau,
+          LAYOUT_NAV.stagesStatistiques,
+          LAYOUT_NAV.mesStages,
+        ]),
+      },
+      {
         id: "club",
         title: "Vie du club",
         description:
-          "Présences aux entraînements et remontées sur l'application.",
+          "Présences (entraînement et stages) et remontées sur l'application.",
         items: cards([
           LAYOUT_NAV.presences,
           LAYOUT_NAV.creneaux,
@@ -360,7 +250,7 @@ function secretaryHome(): RoleHomeContent {
 function adminHome(): RoleHomeContent {
   return intro(
     "Espace administration",
-    "Pilotez le championnat, les adhésions et les accès depuis un même accueil.",
+    "Pilotez le championnat, les adhésions, les stages et les accès.",
     [
       {
         id: "championnat",
@@ -394,9 +284,23 @@ function adminHome(): RoleHomeContent {
         ),
       },
       {
+        id: "stages",
+        title: "Stages",
+        description:
+          "Administration des stages, catalogue, paiements et vos propres inscriptions.",
+        items: cards([
+          LAYOUT_NAV.stages,
+          LAYOUT_NAV.stagesCatalogue,
+          LAYOUT_NAV.stagesPaiements,
+          LAYOUT_NAV.stagesTableau,
+          LAYOUT_NAV.stagesStatistiques,
+          LAYOUT_NAV.mesStages,
+        ]),
+      },
+      {
         id: "club",
         title: "Vie du club",
-        description: "Présences, administration de la plateforme et remontées.",
+        description: "Présences (entraînement et stages), administration et remontées.",
         items: cards([
           LAYOUT_NAV.presences,
           LAYOUT_NAV.creneaux,

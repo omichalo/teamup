@@ -1,7 +1,12 @@
 import { formatAttendanceSlotDisplay } from "@/lib/attendance/slot-display";
 import type { AttendanceMark } from "@/lib/attendance/types";
+import type { CampRegistration } from "@/lib/camps/types";
 import type { RegistrationConfigV1 } from "@/lib/club-registration-config/types";
 import { resolvePaymentDocumentsAvailability } from "@/lib/club-registration/payment-documents/availability";
+import {
+  mergeLedgerViews,
+  projectCampPaymentToLedger,
+} from "@/lib/member-ledger/project-camp-payment";
 import { projectRegistrationPaymentToLedger } from "@/lib/member-ledger/project-registration-payment";
 import { formatPersonDisplayName } from "@/lib/shared/person-name-format";
 import type { MemberProfileResponse } from "./types";
@@ -33,6 +38,7 @@ export function buildMemberProfile(params: {
   data: Record<string, unknown>;
   config: RegistrationConfigV1;
   marks: AttendanceMark[];
+  campRegistrations?: CampRegistration[];
   viewerUid: string;
   canManage: boolean;
 }): MemberProfileResponse {
@@ -67,6 +73,27 @@ export function buildMemberProfile(params: {
       markedAt: mark.markedAt,
     }));
 
+  const campRegistrations = params.campRegistrations ?? [];
+  const camps = campRegistrations.map((reg) => ({
+    id: reg.id,
+    campId: reg.campId,
+    siteLabel: reg.siteLabel,
+    formulaId: reg.formulaId,
+    formulaLabel: reg.formulaLabel || reg.formulaId,
+    status: reg.status,
+    totalCents: reg.pricingQuote.totalCents,
+    invoiceNumber: reg.payment.invoiceNumber ?? null,
+    slotCount: reg.slotIds.length,
+    submittedAt: reg.submittedAt,
+  }));
+
+  const membershipLedger = projectRegistrationPaymentToLedger(
+    params.registrationId,
+    params.data
+  );
+  const campLedgers = campRegistrations.map(projectCampPaymentToLedger);
+  const finance = mergeLedgerViews(membershipLedger, ...campLedgers);
+
   return {
     identity: {
       registrationId: params.registrationId,
@@ -81,10 +108,8 @@ export function buildMemberProfile(params: {
     },
     slots,
     attendance,
-    finance: projectRegistrationPaymentToLedger(
-      params.registrationId,
-      params.data
-    ),
+    camps,
+    finance,
     documents: resolvePaymentDocumentsAvailability(params.data),
     viewer: {
       isOwner: Boolean(submitterUid && submitterUid === params.viewerUid),

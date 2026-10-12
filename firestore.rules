@@ -355,6 +355,37 @@ service cloud.firestore {
     }
 
     // ============================================
+    // Collections: camps / campSlots / campRegistrations /
+    // campAttendanceMarks / campPaymentDocumentCounters /
+    // campCatalogSites / campCatalogFormulas / campCatalogPricings
+    // ============================================
+    // Stages vacances — Admin SDK uniquement (routes /api/club/camps/*).
+    match /camps/{campId} {
+      allow read, write: if false;
+    }
+    match /campSlots/{slotId} {
+      allow read, write: if false;
+    }
+    match /campRegistrations/{registrationId} {
+      allow read, write: if false;
+    }
+    match /campAttendanceMarks/{markId} {
+      allow read, write: if false;
+    }
+    match /campPaymentDocumentCounters/{seasonKey} {
+      allow read, write: if false;
+    }
+    match /campCatalogSites/{siteId} {
+      allow read, write: if false;
+    }
+    match /campCatalogFormulas/{formulaId} {
+      allow read, write: if false;
+    }
+    match /campCatalogPricings/{pricingId} {
+      allow read, write: if false;
+    }
+
+    // ============================================
     // Collections: seasons / championshipPlayers, playerClubProfiles
     // ============================================
     // Effectif championnat saisonnier + profils durables (Discord, fauteuil).

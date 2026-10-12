@@ -10,7 +10,11 @@ async function readError(res: Response, fallback: string): Promise<string> {
   return json.error ?? fallback;
 }
 
-export function useAttendanceSession(date: string, slotId: string | null) {
+export function useAttendanceSession(
+  date: string,
+  slotId: string | null,
+  source: "training" | "camp" = "training"
+) {
   const [session, setSession] = useState<AttendanceSessionPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +29,7 @@ export function useAttendanceSession(date: string, slotId: string | null) {
     setError(null);
     try {
       const params = new URLSearchParams({ date, slotId });
+      if (source === "camp") params.set("source", "camp");
       const res = await fetch(`/api/club/attendance/sessions?${params.toString()}`);
       const json = await readJsonResponse<{
         session?: AttendanceSessionPayload;
@@ -40,7 +45,7 @@ export function useAttendanceSession(date: string, slotId: string | null) {
     } finally {
       setLoading(false);
     }
-  }, [date, slotId]);
+  }, [date, slotId, source]);
 
   useEffect(() => {
     void load();
@@ -65,6 +70,7 @@ export function useAttendanceSession(date: string, slotId: string | null) {
           });
           if (params.registrationId) query.set("registrationId", params.registrationId);
           if (params.leadId) query.set("leadId", params.leadId);
+          if (source === "camp") query.set("source", "camp");
           const res = await fetch(`/api/club/attendance/marks?${query.toString()}`, {
             method: "DELETE",
           });
@@ -79,6 +85,7 @@ export function useAttendanceSession(date: string, slotId: string | null) {
               kind: params.kind,
               registrationId: params.registrationId,
               leadId: params.leadId,
+              source,
             }),
           });
           if (!res.ok) throw new Error(await readError(res, "Impossible de pointer"));
@@ -90,7 +97,7 @@ export function useAttendanceSession(date: string, slotId: string | null) {
         setBusyKey(null);
       }
     },
-    [date, slotId, load]
+    [date, slotId, source, load]
   );
 
   return { session, loading, error, setError, busyKey, reload: load, togglePresent };

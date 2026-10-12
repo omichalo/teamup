@@ -17,6 +17,7 @@ import { buildTreatDossierHref } from "@/lib/member-profile/urls";
 import { MemberProfileHeader } from "./MemberProfileHeader";
 import { MemberSlotsSection } from "./MemberSlotsSection";
 import { MemberAttendanceSection } from "./MemberAttendanceSection";
+import { MemberCampsSection } from "./MemberCampsSection";
 import { MemberFinanceSection } from "./MemberFinanceSection";
 
 type Props = {
@@ -153,6 +154,7 @@ export function MemberProfileClient({ registrationId }: Props) {
         <Stack spacing={2.5}>
           <MemberSlotsSection slots={profile.slots} />
           <MemberAttendanceSection attendance={profile.attendance} />
+          <MemberCampsSection camps={profile.camps} />
         </Stack>
         <MemberFinanceSection
           finance={profile.finance}

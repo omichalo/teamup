@@ -30,6 +30,8 @@ export type AttendanceLead = {
   status: AttendanceLeadStatus;
 };
 
+export type AttendanceSlotSource = "training" | "camp";
+
 export type AttendanceSlotOption = {
   slotId: string;
   label: string;
@@ -42,6 +44,9 @@ export type AttendanceSlotOption = {
   highlighted: boolean;
   enrollmentsClosed: boolean;
   cancelled: boolean;
+  /** Entraînement (défaut) ou créneau de stage. */
+  source?: AttendanceSlotSource | undefined;
+  campId?: string | undefined;
 };
 
 export type AttendanceSlotCancellation = {

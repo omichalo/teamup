@@ -28,7 +28,7 @@ import { useAttendanceSession } from "./useAttendanceSession";
 import { AttendanceRoster } from "./AttendanceRoster";
 import { AttendanceSearchDialog } from "./AttendanceSearchDialog";
 import { AttendanceGuestDialog } from "./AttendanceGuestDialog";
-import { AttendanceStatsPanel } from "./AttendanceStatsPanel";
+import { AttendanceSessionStatsTab } from "./AttendanceSessionStatsTab";
 import { AttendanceSessionDock, AttendanceSessionDockSpacer } from "./AttendanceSessionDock";
 import { AttendanceCancellationConfirmDialog } from "./AttendanceCancellationConfirmDialog";
 import { AttendanceRemoveFromSlotDialog } from "./AttendanceRemoveFromSlotDialog";
@@ -40,6 +40,8 @@ export function AttendanceSessionClient() {
   const { user } = useAuth();
   const date = readAttendanceDateParam(searchParams.get("date"), todayYmdInParis());
   const slotId = searchParams.get("slot")?.trim() || null;
+  const isCampSession = searchParams.get("source")?.trim() === "camp";
+  const source = isCampSession ? ("camp" as const) : ("training" as const);
   const [filter, setFilter] = useState("");
   const [tab, setTab] = useState(0);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -50,10 +52,10 @@ export function AttendanceSessionClient() {
   const [removeTarget, setRemoveTarget] = useState<AttendanceRosterPerson | null>(null);
   const [removeBusy, setRemoveBusy] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
-
   const { session, loading, error, busyKey, reload, togglePresent } = useAttendanceSession(
     date,
-    slotId
+    slotId,
+    source
   );
 
   const canManage = isAttendanceCancellationManager(resolveRole(user?.role));
@@ -334,22 +336,17 @@ export function AttendanceSessionClient() {
             onToggle={onToggle}
             emptyLabel="Aucun visiteur pour cette séance."
           />
-          {!cancelled ? <AttendanceSessionDockSpacer /> : null}
+          {!cancelled && !isCampSession ? <AttendanceSessionDockSpacer /> : null}
         </Stack>
       </TabPanel>
       <TabPanel value={tab} index={1} baseId="attendance">
-        <Stack spacing={2}>
-          <Button
-            variant="outlined"
-            href={`/api/club/attendance/export?date=${encodeURIComponent(date)}&slotId=${encodeURIComponent(slotId)}`}
-            sx={{ alignSelf: "flex-start", minHeight: 48 }}
-          >
-            Exporter CSV
-          </Button>
-          <AttendanceStatsPanel date={date} slotId={slotId} />
-        </Stack>
+        <AttendanceSessionStatsTab
+          date={date}
+          slotId={slotId}
+          isCampSession={isCampSession}
+        />
       </TabPanel>
-      {tab === 0 && !cancelled ? (
+      {tab === 0 && !cancelled && !isCampSession ? (
         <AttendanceSessionDock
           onSearch={() => setSearchOpen(true)}
           onGuest={() => setGuestOpen(true)}

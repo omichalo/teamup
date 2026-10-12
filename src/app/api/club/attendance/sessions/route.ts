@@ -12,8 +12,9 @@ import {
 } from "@/lib/attendance/store";
 import { getSessionNote } from "@/lib/attendance/session-notes";
 import { buildSessionPayload } from "@/lib/attendance/roster";
+import { buildCampAttendanceSession } from "@/lib/attendance/camp-session";
 
-/** GET /api/club/attendance/sessions?date=&slotId= */
+/** GET /api/club/attendance/sessions?date=&slotId=&source= */
 export async function GET(req: Request) {
   const auth = await requireAttendanceOperator();
   if (!auth.ok) {
@@ -23,12 +24,25 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const dateParam = url.searchParams.get("date");
   const slotId = url.searchParams.get("slotId")?.trim() ?? "";
+  const source = url.searchParams.get("source")?.trim() ?? "training";
   const date = dateParam && isYmd(dateParam) ? dateParam : todayYmdInParis();
   if (!slotId) {
     return jsonNoStore({ error: "Créneau requis" }, { status: 400 });
   }
 
   try {
+    if (source === "camp") {
+      const session = await buildCampAttendanceSession({
+        db: auth.session.db,
+        date,
+        slotId,
+      });
+      if (!session) {
+        return jsonNoStore({ error: "Créneau stage introuvable" }, { status: 404 });
+      }
+      return jsonNoStore({ session, seasonLabel: null, source: "camp" });
+    }
+
     const config = await getActiveRegistrationConfig();
     const cancellation = await getSlotCancellation(auth.session.db, date, slotId);
     const cancelled = cancellation !== null;

@@ -70,6 +70,7 @@ describe("buildMemberProfile", () => {
     expect(profile.identity.displayName).toContain("Ada");
     expect(profile.identity.ffttLicense).toBe("123456");
     expect(profile.slots).toHaveLength(1);
+    expect(profile.camps).toEqual([]);
     expect(profile.attendance).toHaveLength(1);
     expect(profile.attendance[0]?.slotLabel).not.toBe("Créneau inconnu");
     expect(profile.finance.totals.invoicedCents).toBe(20000);

@@ -11,6 +11,11 @@ import {
   listCatalogSlotsForDate,
 } from "@/lib/attendance/cancellations";
 import { listCancellationsForDate, listCancellationsForDates } from "@/lib/attendance/store";
+import {
+  campSlotToAttendanceOption,
+  mergeAttendanceSlotOptions,
+} from "@/lib/attendance/camp-slots";
+import { listSlotsForDate as listCampSlotsForDate } from "@/lib/camps/store";
 
 /** GET /api/club/attendance/slots?date=YYYY-MM-DD */
 export async function GET(req: Request) {
@@ -28,14 +33,23 @@ export async function GET(req: Request) {
   try {
     const config = await getActiveRegistrationConfig();
     const weekDates = isoWeekDates(date);
-    const [dayCancellations, weekCancellations] = await Promise.all([
+    const [dayCancellations, weekCancellations, campSlotsRaw] = await Promise.all([
       listCancellationsForDate(auth.session.db, date),
       listCancellationsForDates(auth.session.db, weekDates),
+      listCampSlotsForDate(auth.session.db, date),
     ]);
     const dayCancelledKeys = cancelledKeySet(dayCancellations);
     const weekCancelledKeys = cancelledKeySet(weekCancellations);
     const catalogSlots = listCatalogSlotsForDate(config, date, nowMinutes);
-    const slots = applyCancellationsToSlots(catalogSlots, dayCancelledKeys, date);
+    const trainingSlots = applyCancellationsToSlots(
+      catalogSlots,
+      dayCancelledKeys,
+      date
+    );
+    const campSlots = campSlotsRaw.map((slot) =>
+      campSlotToAttendanceOption(slot, nowMinutes)
+    );
+    const slots = mergeAttendanceSlotOptions(trainingSlots, campSlots);
     const week = buildWeekSummary({
       date,
       config,
