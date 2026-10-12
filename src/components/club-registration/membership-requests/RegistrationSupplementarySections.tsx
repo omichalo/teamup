@@ -60,15 +60,22 @@ const QUESTIONNAIRE_SUMMARY_LABELS = MEDICAL_QUESTIONNAIRE_SUMMARY_LABELS;
 
 type SubmissionContextProps = {
   submitterAccountEmail: string | undefined;
+  linkedAccountEmails?: string[] | undefined;
   submittedAt: string | null | undefined;
   updatedAt: string | null | undefined;
 };
 
 export function RegistrationSubmissionContext({
   submitterAccountEmail,
+  linkedAccountEmails,
   submittedAt,
   updatedAt,
 }: SubmissionContextProps) {
+  const linkedLabel =
+    linkedAccountEmails && linkedAccountEmails.length > 0
+      ? linkedAccountEmails.join(", ")
+      : "—";
+
   return (
     <>
       <SectionTitle>Contexte du dossier</SectionTitle>
@@ -77,6 +84,12 @@ export function RegistrationSubmissionContext({
           <ReadOnlyField
             label="Compte ayant envoyé le dossier"
             value={submitterAccountEmail?.trim() || "—"}
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6 }}>
+          <ReadOnlyField
+            label="Compte qui peut accéder en ligne"
+            value={linkedLabel}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 3 }}>

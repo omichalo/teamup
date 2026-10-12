@@ -44,6 +44,9 @@ export const LIST_FIELDS = [
   "status",
   "submitterUid",
   "submitterAccountEmail",
+  "submitterRole",
+  "linkedAccountUids",
+  "linkedAccountEmails",
   "paymentAmountCents",
   "paymentStatus",
   "paymentRequestedAt",
@@ -342,19 +345,39 @@ export type PersonalRegistrationsResult = {
   registrations: RegistrationListSummary[];
 };
 
-/** Liste des dossiers soumis par l'utilisateur connecté (tri récent en mémoire). */
+/**
+ * Liste des dossiers accessibles par le compte connecté (comptes liés).
+ * Dual-read : array-contains sur linkedAccountUids + legacy submitterUid
+ * (docs sans champ linkedAccountUids uniquement).
+ */
 export async function listPersonalRegistrations(
   db: Firestore,
-  submitterUid: string
+  accountUid: string
 ): Promise<PersonalRegistrationsResult> {
-  const snap = await db
-    .collection(COLLECTION)
-    .where("submitterUid", "==", submitterUid)
-    .limit(50)
-    .get();
+  const [linkedSnap, legacySnap] = await Promise.all([
+    db
+      .collection(COLLECTION)
+      .where("linkedAccountUids", "array-contains", accountUid)
+      .limit(50)
+      .get(),
+    db.collection(COLLECTION).where("submitterUid", "==", accountUid).limit(50).get(),
+  ]);
 
-  const registrations = snap.docs
-    .map((doc) => mapRegistrationDocToSummary(doc))
+  const byId = new Map<string, ReturnType<typeof mapRegistrationDocToSummary>>();
+
+  for (const doc of linkedSnap.docs) {
+    byId.set(doc.id, mapRegistrationDocToSummary(doc));
+  }
+
+  for (const doc of legacySnap.docs) {
+    if (byId.has(doc.id)) continue;
+    const data = doc.data() as Record<string, unknown>;
+    // Après association, le soumettant staff ne doit plus voir le dossier en « Mes dossiers ».
+    if (Array.isArray(data.linkedAccountUids)) continue;
+    byId.set(doc.id, mapRegistrationDocToSummary(doc));
+  }
+
+  const registrations = [...byId.values()]
     .sort((a, b) => b.submittedAtMs - a.submittedAtMs)
     .slice(0, 20)
     .map((entry) => entry.summary);
