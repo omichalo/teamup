@@ -22,17 +22,23 @@ import {
   readAttendanceDateParam,
 } from "@/lib/attendance/urls";
 import { formatMinutesAsLabel } from "@/lib/club-registration-config/slot-schedule";
-import type { AttendanceLeadSearchHit, AttendanceMemberSearchHit, AttendanceRosterPerson } from "@/lib/attendance/types";
+import type { AttendanceRosterPerson } from "@/lib/attendance/types";
 import { resolveRole } from "@/lib/auth/roles";
 import { useAttendanceSession } from "./useAttendanceSession";
 import { AttendanceRoster } from "./AttendanceRoster";
-import { AttendanceSearchDialog } from "./AttendanceSearchDialog";
-import { AttendanceGuestDialog } from "./AttendanceGuestDialog";
+import { AttendanceCampSessionExtras } from "./AttendanceCampSessionExtras";
+import { AttendanceTrainingSessionExtras } from "./AttendanceTrainingSessionExtras";
 import { AttendanceSessionStatsTab } from "./AttendanceSessionStatsTab";
-import { AttendanceSessionDock, AttendanceSessionDockSpacer } from "./AttendanceSessionDock";
 import { AttendanceCancellationConfirmDialog } from "./AttendanceCancellationConfirmDialog";
 import { AttendanceRemoveFromSlotDialog } from "./AttendanceRemoveFromSlotDialog";
 import { AttendanceSessionCoachMessage } from "./AttendanceSessionCoachMessage";
+
+function setErrorMessage(
+  setter: (value: string | null) => void,
+  message: string
+) {
+  setter(message.length > 0 ? message : null);
+}
 
 export function AttendanceSessionClient() {
   const router = useRouter();
@@ -44,8 +50,6 @@ export function AttendanceSessionClient() {
   const source = isCampSession ? ("camp" as const) : ("training" as const);
   const [filter, setFilter] = useState("");
   const [tab, setTab] = useState(0);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [guestOpen, setGuestOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [restoreOpen, setRestoreOpen] = useState(false);
   const [restoreBusy, setRestoreBusy] = useState(false);
@@ -70,99 +74,6 @@ export function AttendanceSessionClient() {
   const present = session?.roster.filter((person) => person.present) ?? [];
   const counts = session?.counts;
   const cancelled = session?.cancelled === true;
-
-  async function handleWalkIn(member: AttendanceMemberSearchHit, addSlot: boolean) {
-    if (!slotId || cancelled) return;
-    setActionError(null);
-    try {
-      const markRes = await fetch("/api/club/attendance/marks", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date,
-          slotId,
-          kind: "walkin",
-          registrationId: member.registrationId,
-        }),
-      });
-      const markJson = await readJsonResponse<{ error?: string }>(markRes);
-      if (!markRes.ok) {
-        throw new Error(markJson.error ?? "Impossible de pointer");
-      }
-      if (addSlot) {
-        const slotRes = await fetch("/api/club/attendance/add-slot", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            date,
-            slotId,
-            registrationId: member.registrationId,
-          }),
-        });
-        const slotJson = await readJsonResponse<{ error?: string }>(slotRes);
-        if (!slotRes.ok) {
-          throw new Error(slotJson.error ?? "Impossible d'ajouter le créneau");
-        }
-      }
-      await reload();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Impossible de pointer";
-      setActionError(message);
-      throw err;
-    }
-  }
-
-  async function handleGuestCreate(payload: {
-    firstName: string;
-    lastName: string;
-    phone: string;
-    email?: string;
-  }) {
-    if (!slotId || cancelled) return;
-    setActionError(null);
-    try {
-      const res = await fetch("/api/club/attendance/leads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, slotId, ...payload }),
-      });
-      const json = await readJsonResponse<{ error?: string }>(res);
-      if (!res.ok) {
-        throw new Error(json.error ?? "Impossible d'enregistrer l'essai");
-      }
-      await reload();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Impossible d'enregistrer l'essai";
-      setActionError(message);
-      throw err;
-    }
-  }
-
-  async function handleGuestReuse(lead: AttendanceLeadSearchHit) {
-    if (!slotId || cancelled) return;
-    setActionError(null);
-    try {
-      const res = await fetch("/api/club/attendance/marks", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date,
-          slotId,
-          kind: "guest",
-          leadId: lead.leadId,
-        }),
-      });
-      const json = await readJsonResponse<{ error?: string }>(res);
-      if (!res.ok) {
-        throw new Error(json.error ?? "Impossible de pointer l'essai");
-      }
-      await reload();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Impossible de pointer l'essai";
-      setActionError(message);
-      throw err;
-    }
-  }
 
   async function confirmRemoveFromSlot() {
     if (!slotId || !removeTarget?.registrationId || cancelled) return;
@@ -222,13 +133,11 @@ export function AttendanceSessionClient() {
       present: person.present,
       ...(person.registrationId ? { registrationId: person.registrationId } : {}),
       ...(person.leadId ? { leadId: person.leadId } : {}),
+      ...(person.markId ? { markId: person.markId } : {}),
+      ...(person.externalId ? { externalId: person.externalId } : {}),
     });
   }
 
-  function requestRemoveFromSlot(person: AttendanceRosterPerson) {
-    setRemoveError(null);
-    setRemoveTarget(person);
-  }
   if (!slotId) return null;
 
   const slotTitle = session
@@ -237,6 +146,13 @@ export function AttendanceSessionClient() {
   const slotSubtitle = session
     ? `${session.slot.siteLabel} · ${session.slot.label}`
     : "Chargement du créneau…";
+  const removeFromSlot =
+    cancelled || isCampSession
+      ? undefined
+      : (person: AttendanceRosterPerson) => {
+          setRemoveError(null);
+          setRemoveTarget(person);
+        };
 
   return (
     <Container maxWidth="md" sx={{ pt: { xs: 2, md: 3 }, pb: 2 }}>
@@ -256,6 +172,9 @@ export function AttendanceSessionClient() {
           counts ? (
             <Typography variant="body2" color="text.secondary">
               {counts.presentEnrolled}/{counts.enrolled} inscrits
+              {isCampSession
+                ? ` · ${counts.walkin} hors inscr. · ${counts.external ?? 0} ext.`
+                : null}
             </Typography>
           ) : undefined
         }
@@ -285,7 +204,7 @@ export function AttendanceSessionClient() {
           enregistrées sont conservées.
         </Alert>
       ) : null}
-      {session && slotId ? (
+      {session ? (
         <AttendanceSessionCoachMessage
           date={date}
           slotId={slotId}
@@ -314,7 +233,7 @@ export function AttendanceSessionClient() {
             busyKey={busyKey}
             disabled={cancelled}
             onToggle={onToggle}
-            onRemoveFromSlot={cancelled ? undefined : requestRemoveFromSlot}
+            onRemoveFromSlot={removeFromSlot}
             emptyLabel="Tout le monde est pointé, ou aucun inscrit."
           />
           <AttendanceRoster
@@ -324,19 +243,26 @@ export function AttendanceSessionClient() {
             busyKey={busyKey}
             disabled={cancelled}
             onToggle={onToggle}
-            onRemoveFromSlot={cancelled ? undefined : requestRemoveFromSlot}
+            onRemoveFromSlot={removeFromSlot}
             emptyLabel="Personne n'est encore pointé."
           />
           <AttendanceRoster
-            title="Hors créneau / essais"
+            title={
+              isCampSession
+                ? "Hors inscription / extérieurs"
+                : "Hors créneau / essais"
+            }
             people={session?.extras ?? []}
             filter=""
             busyKey={busyKey}
             disabled={cancelled}
             onToggle={onToggle}
-            emptyLabel="Aucun visiteur pour cette séance."
+            emptyLabel={
+              isCampSession
+                ? "Aucun adhérent hors inscription ni extérieur."
+                : "Aucun visiteur pour cette séance."
+            }
           />
-          {!cancelled && !isCampSession ? <AttendanceSessionDockSpacer /> : null}
         </Stack>
       </TabPanel>
       <TabPanel value={tab} index={1} baseId="attendance">
@@ -346,26 +272,24 @@ export function AttendanceSessionClient() {
           isCampSession={isCampSession}
         />
       </TabPanel>
-      {tab === 0 && !cancelled && !isCampSession ? (
-        <AttendanceSessionDock
-          onSearch={() => setSearchOpen(true)}
-          onGuest={() => setGuestOpen(true)}
+      {tab === 0 && isCampSession ? (
+        <AttendanceCampSessionExtras
+          date={date}
+          slotId={slotId}
+          cancelled={cancelled}
+          onReload={reload}
+          onError={(message) => setErrorMessage(setActionError, message)}
         />
       ) : null}
-      <AttendanceSearchDialog
-        open={searchOpen}
-        slotId={slotId}
-        onClose={() => setSearchOpen(false)}
-        onPick={handleWalkIn}
-      />
-      <AttendanceGuestDialog
-        open={guestOpen}
-        date={date}
-        slotId={slotId}
-        onClose={() => setGuestOpen(false)}
-        onCreate={handleGuestCreate}
-        onReuse={handleGuestReuse}
-      />
+      {tab === 0 && !isCampSession ? (
+        <AttendanceTrainingSessionExtras
+          date={date}
+          slotId={slotId}
+          cancelled={cancelled}
+          onReload={reload}
+          onError={(message) => setErrorMessage(setActionError, message)}
+        />
+      ) : null}
       <AttendanceRemoveFromSlotDialog
         open={Boolean(removeTarget)}
         playerName={removeTarget?.displayName ?? ""}

@@ -5,14 +5,22 @@ import { Box, Button, Paper, Stack } from "@mui/material";
 type Props = {
   onSearch?: (() => void) | undefined;
   onGuest?: (() => void) | undefined;
+  /** Stages : extérieur hors file essais (cas D). */
+  onExternal?: (() => void) | undefined;
+  searchLabel?: string | undefined;
 };
 
 /** Hauteur réservée au-dessus du dock (boutons + safe area). */
 export const ATTENDANCE_SESSION_DOCK_CLEARANCE =
   "calc(96px + env(safe-area-inset-bottom, 0px))";
 
-export function AttendanceSessionDock({ onSearch, onGuest }: Props) {
-  if (!onSearch && !onGuest) {
+export function AttendanceSessionDock({
+  onSearch,
+  onGuest,
+  onExternal,
+  searchLabel = "Chercher un adhérent",
+}: Props) {
+  if (!onSearch && !onGuest && !onExternal) {
     return null;
   }
   return (
@@ -35,10 +43,14 @@ export function AttendanceSessionDock({ onSearch, onGuest }: Props) {
       <Stack direction="row" spacing={1.5} sx={{ maxWidth: 900, mx: "auto" }}>
         {onSearch ? (
           <Button variant="contained" fullWidth onClick={onSearch} sx={{ minHeight: 52 }}>
-            Chercher un adhérent
+            {searchLabel}
           </Button>
         ) : null}
-        {onGuest ? (
+        {onExternal ? (
+          <Button variant="outlined" fullWidth onClick={onExternal} sx={{ minHeight: 52 }}>
+            Ajouter un extérieur
+          </Button>
+        ) : onGuest ? (
           <Button variant="outlined" fullWidth onClick={onGuest} sx={{ minHeight: 52 }}>
             Ajouter un essai
           </Button>

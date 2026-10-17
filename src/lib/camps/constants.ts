@@ -47,6 +47,14 @@ export const CAMP_COLLECTIONS = {
 
 export const CAMP_SCHEMA_VERSION = 1 as const;
 
+/** Pointage stage : inscrits (A/C), adhérent hors inscription (B), extérieur (D). */
+export const CAMP_ATTENDANCE_MARK_KINDS = [
+  "enrolled",
+  "member_walkin",
+  "external",
+] as const;
+export type CampAttendanceMarkKind = (typeof CAMP_ATTENDANCE_MARK_KINDS)[number];
+
 /** Anciens ids figés — migration lecture uniquement. */
 export const LEGACY_FORMULA_META: Record<
   string,

@@ -22,15 +22,19 @@ import {
   upsertAttendanceMark,
 } from "@/lib/attendance/store";
 import {
-  deleteCampMark,
-  getCampRegistration,
-  getSlotsByIds,
-  upsertCampMark,
-} from "@/lib/camps/store";
+  applyCampAttendanceMark,
+  deleteCampAttendanceMark,
+} from "@/lib/camps/apply-camp-attendance-mark";
+import { campAttendanceMarkBodySchema } from "@/lib/camps/camp-attendance-mark-schema";
+
 function readName(data: Record<string, unknown>): string {
   const firstName = typeof data.firstName === "string" ? data.firstName : "";
   const lastName = typeof data.lastName === "string" ? data.lastName : "";
   return displayNameFromParts(firstName, lastName);
+}
+
+function isCampSource(value: unknown): boolean {
+  return value === "camp";
 }
 
 /** PUT /api/club/attendance/marks — pointer présent. */
@@ -49,6 +53,40 @@ export async function PUT(req: Request) {
   } catch {
     return jsonNoStore({ error: "JSON invalide" }, { status: 400 });
   }
+
+  if (isCampSource((json as { source?: unknown } | null)?.source)) {
+    const parsed = campAttendanceMarkBodySchema.safeParse(json);
+    if (!parsed.success) {
+      return jsonNoStore({ error: "Données invalides" }, { status: 400 });
+    }
+    if (!isYmd(parsed.data.date)) {
+      return jsonNoStore({ error: "Date invalide" }, { status: 400 });
+    }
+    try {
+      const result = await applyCampAttendanceMark({
+        db: auth.session.db,
+        body: parsed.data,
+        actorUid: auth.session.uid,
+      });
+      if (!result.ok) {
+        return jsonNoStore({ error: result.error }, { status: result.status });
+      }
+      logAuditAction(AUDIT_ACTIONS.CLUB_CAMP_ATTENDANCE_MARKED, auth.session.uid, {
+        resource: "campAttendanceMark",
+        resourceId: result.mark.id,
+        details: { kind: result.mark.kind },
+        success: true,
+      });
+      return jsonNoStore({ mark: result.mark });
+    } catch (error) {
+      console.error("[api/club/attendance/marks PUT camp]", error);
+      return jsonNoStore(
+        { error: "Impossible d'enregistrer la présence" },
+        { status: 500 }
+      );
+    }
+  }
+
   const parsed = attendanceMarkBodySchema.safeParse(json);
   if (!parsed.success) {
     return jsonNoStore({ error: "Données invalides" }, { status: 400 });
@@ -59,48 +97,6 @@ export async function PUT(req: Request) {
   }
 
   try {
-    if (body.source === "camp") {
-      if (!body.registrationId) {
-        return jsonNoStore({ error: "Inscription stage requise" }, { status: 400 });
-      }
-      const slots = await getSlotsByIds(auth.session.db, [body.slotId]);
-      const slot = slots[0];
-      if (!slot || slot.date !== body.date) {
-        return jsonNoStore({ error: "Créneau stage introuvable" }, { status: 404 });
-      }
-      if (slot.cancelled) {
-        return jsonNoStore(
-          { error: "Séance annulée : pointage impossible" },
-          { status: 409 }
-        );
-      }
-      const registration = await getCampRegistration(
-        auth.session.db,
-        body.registrationId
-      );
-      if (!registration || registration.status === "cancelled") {
-        return jsonNoStore({ error: "Inscription stage introuvable" }, { status: 404 });
-      }
-      const displayName =
-        `${registration.firstName} ${registration.lastName}`.trim() ||
-        body.registrationId;
-      const mark = await upsertCampMark(auth.session.db, {
-        campId: slot.campId,
-        slotId: slot.id,
-        date: body.date,
-        campRegistrationId: body.registrationId,
-        displayName,
-        markedAt: new Date().toISOString(),
-        markedByUid: auth.session.uid,
-      });
-      logAuditAction(AUDIT_ACTIONS.CLUB_CAMP_ATTENDANCE_MARKED, auth.session.uid, {
-        resource: "campAttendanceMark",
-        resourceId: mark.id,
-        success: true,
-      });
-      return jsonNoStore({ mark });
-    }
-
     const config = await getActiveRegistrationConfig();
     const slot = findSlotOption(config, body.slotId, body.date);
     if (!slot) {
@@ -161,7 +157,7 @@ export async function PUT(req: Request) {
   }
 }
 
-/** DELETE /api/club/attendance/marks?date=&slotId=&kind=&registrationId=&leadId= */
+/** DELETE /api/club/attendance/marks?... */
 export async function DELETE(req: Request) {
   if (!validateOrigin(req)) {
     return invalidOriginResponse();
@@ -173,36 +169,61 @@ export async function DELETE(req: Request) {
 
   const url = new URL(req.url);
   const source = url.searchParams.get("source")?.trim() || "training";
+
+  if (source === "camp") {
+    const parsed = campAttendanceMarkBodySchema.safeParse({
+      source: "camp",
+      date: url.searchParams.get("date"),
+      slotId: url.searchParams.get("slotId"),
+      kind: url.searchParams.get("kind"),
+      campRegistrationId:
+        url.searchParams.get("campRegistrationId") || undefined,
+      registrationId: url.searchParams.get("registrationId") || undefined,
+      clubRegistrationId:
+        url.searchParams.get("clubRegistrationId") || undefined,
+      markId: url.searchParams.get("markId") || undefined,
+      externalId: url.searchParams.get("externalId") || undefined,
+    });
+    if (!parsed.success) {
+      return jsonNoStore({ error: "Données invalides" }, { status: 400 });
+    }
+    try {
+      const result = await deleteCampAttendanceMark({
+        db: auth.session.db,
+        body: parsed.data,
+      });
+      if (!result.ok) {
+        return jsonNoStore({ error: result.error }, { status: result.status });
+      }
+      logAuditAction(AUDIT_ACTIONS.CLUB_CAMP_ATTENDANCE_UNMARKED, auth.session.uid, {
+        resource: "campAttendanceMark",
+        resourceId: result.markId,
+        details: { kind: parsed.data.kind },
+        success: true,
+      });
+      return jsonNoStore({ ok: true });
+    } catch (error) {
+      console.error("[api/club/attendance/marks DELETE camp]", error);
+      return jsonNoStore(
+        { error: "Impossible de retirer la présence" },
+        { status: 500 }
+      );
+    }
+  }
+
   const parsed = attendanceMarkBodySchema.safeParse({
     date: url.searchParams.get("date"),
     slotId: url.searchParams.get("slotId"),
     kind: url.searchParams.get("kind"),
     registrationId: url.searchParams.get("registrationId") || undefined,
     leadId: url.searchParams.get("leadId") || undefined,
-    source: source === "camp" ? "camp" : "training",
+    source: "training",
   });
   if (!parsed.success) {
     return jsonNoStore({ error: "Données invalides" }, { status: 400 });
   }
 
   try {
-    if (parsed.data.source === "camp") {
-      if (!parsed.data.registrationId) {
-        return jsonNoStore({ error: "Inscription stage requise" }, { status: 400 });
-      }
-      await deleteCampMark(
-        auth.session.db,
-        parsed.data.slotId,
-        parsed.data.registrationId
-      );
-      logAuditAction(AUDIT_ACTIONS.CLUB_CAMP_ATTENDANCE_UNMARKED, auth.session.uid, {
-        resource: "campAttendanceMark",
-        resourceId: `${parsed.data.slotId}__${parsed.data.registrationId}`,
-        success: true,
-      });
-      return jsonNoStore({ ok: true });
-    }
-
     const markId = buildAttendanceMarkId(parsed.data);
     if (!markId) {
       return jsonNoStore({ error: "Identifiant invalide" }, { status: 400 });

@@ -1,5 +1,11 @@
 import type { AttendanceAlert, AttendanceLeadStatus, AttendanceMarkKind } from "./constants";
 
+/** Kinds affichés sur une séance (entraînement + stages). */
+export type AttendanceRosterKind =
+  | AttendanceMarkKind
+  | "member_walkin"
+  | "external";
+
 export type AttendanceMark = {
   id: string;
   date: string;
@@ -80,9 +86,12 @@ export type AttendanceWeekSummary = {
 
 export type AttendanceRosterPerson = {
   personKey: string;
-  kind: AttendanceMarkKind;
+  kind: AttendanceRosterKind;
   registrationId?: string | undefined;
   leadId?: string | undefined;
+  /** Id document mark (stages : externe / walk-in). */
+  markId?: string | undefined;
+  externalId?: string | undefined;
   firstName: string;
   lastName: string;
   displayName: string;
@@ -90,6 +99,8 @@ export type AttendanceRosterPerson = {
   alerts: AttendanceAlert[];
   present: boolean;
   addSlotRequested: boolean;
+  /** Stages : distinction adhérent / non-adhérent sur le roster. */
+  isClubMember?: boolean | undefined;
 };
 
 export type AttendanceSessionPayload = {
@@ -105,6 +116,8 @@ export type AttendanceSessionPayload = {
     presentEnrolled: number;
     walkin: number;
     guest: number;
+    /** Stages : non-adhérents hors inscription (cas D). */
+    external?: number;
   };
 };
 

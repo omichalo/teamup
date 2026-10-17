@@ -4,6 +4,7 @@ import type {
   Firestore,
 } from "firebase-admin/firestore";
 import { FieldValue } from "firebase-admin/firestore";
+import { normalizeCampAttendanceMark } from "./attendance-mark";
 import { CAMP_COLLECTIONS } from "./constants";
 import type { CampCreateInput } from "./schema";
 import { LEGACY_FORMULA_META } from "./constants";
@@ -395,20 +396,32 @@ export async function listMarksForSlot(
     .collection(CAMP_COLLECTIONS.marks)
     .where("slotId", "==", slotId)
     .get();
-  return snap.docs.map((doc) => ({
-    id: doc.id,
-    ...(doc.data() as Omit<CampAttendanceMark, "id">),
-  }));
+  return snap.docs.map((doc) =>
+    normalizeCampAttendanceMark(doc.id, asRecord(doc.data()))
+  );
 }
 
 export async function upsertCampMark(
   db: Firestore,
-  mark: Omit<CampAttendanceMark, "id">
+  mark: CampAttendanceMark
 ): Promise<CampAttendanceMark> {
-  const id = `${mark.slotId}__${mark.campRegistrationId}`;
+  const { id, ...payload } = mark;
   const ref = db.collection(CAMP_COLLECTIONS.marks).doc(id);
-  await ref.set({ ...mark }, { merge: true });
-  return { id, ...mark };
+  await ref.set({ ...payload }, { merge: true });
+  return mark;
+}
+
+export async function deleteCampMarkById(
+  db: Firestore,
+  markId: string
+): Promise<boolean> {
+  const ref = db.collection(CAMP_COLLECTIONS.marks).doc(markId);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    return false;
+  }
+  await ref.delete();
+  return true;
 }
 
 export async function deleteCampMark(
@@ -416,8 +429,7 @@ export async function deleteCampMark(
   slotId: string,
   campRegistrationId: string
 ): Promise<void> {
-  const id = `${slotId}__${campRegistrationId}`;
-  await db.collection(CAMP_COLLECTIONS.marks).doc(id).delete();
+  await deleteCampMarkById(db, `${slotId}__${campRegistrationId}`);
 }
 
 /** Placeholder for FieldValue usage in payment array unions. */

@@ -1,4 +1,5 @@
 import type {
+  CampAttendanceMarkKind,
   CampPaymentMethodId,
   CampPricingMode,
   CampRegistrationStatus,
@@ -175,7 +176,17 @@ export type CampAttendanceMark = {
   campId: string;
   slotId: string;
   date: string;
-  campRegistrationId: string;
+  kind: CampAttendanceMarkKind;
+  /** Inscrit stage (A/C). */
+  campRegistrationId?: string | null;
+  /** Adhérent club hors inscription stage (B). */
+  clubRegistrationId?: string | null;
+  /** Identifiant local de l’extérieur (D). */
+  externalId?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  phone?: string | null;
+  note?: string | null;
   displayName: string;
   markedByUid: string;
   markedAt: string;

@@ -21,9 +21,18 @@ type Props = {
   slotId: string;
   onClose: () => void;
   onPick: (member: AttendanceMemberSearchHit, addSlot: boolean) => Promise<void>;
+  /** Stages : pas d’ajout de créneau d’entraînement. */
+  mode?: "training" | "camp";
 };
 
-export function AttendanceSearchDialog({ open, slotId, onClose, onPick }: Props) {
+export function AttendanceSearchDialog({
+  open,
+  slotId,
+  onClose,
+  onPick,
+  mode = "training",
+}: Props) {
+  const isCamp = mode === "camp";
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<AttendanceMemberSearchHit[]>([]);
   const [loading, setLoading] = useState(false);
@@ -52,6 +61,7 @@ export function AttendanceSearchDialog({ open, slotId, onClose, onPick }: Props)
       void (async () => {
         try {
           const params = new URLSearchParams({ q: query.trim(), slotId });
+          if (isCamp) params.set("source", "camp");
           const res = await fetch(`/api/club/attendance/members?${params.toString()}`);
           const json = await readJsonResponse<{
             members?: AttendanceMemberSearchHit[];
@@ -73,7 +83,7 @@ export function AttendanceSearchDialog({ open, slotId, onClose, onPick }: Props)
       cancelled = true;
       window.clearTimeout(handle);
     };
-  }, [open, query, slotId]);
+  }, [open, query, slotId, isCamp]);
 
   async function pick(member: AttendanceMemberSearchHit, addSlot: boolean) {
     setBusyId(member.registrationId);
@@ -119,21 +129,27 @@ export function AttendanceSearchDialog({ open, slotId, onClose, onPick }: Props)
                   onClick={() => void pick(hit, false)}
                   sx={{ minHeight: 48 }}
                 >
-                  Présent ce soir
+                  {isCamp ? "Présent (hors inscription)" : "Présent ce soir"}
                 </Button>
-                <Button
-                  variant="outlined"
-                  disabled={busyId === hit.registrationId}
-                  onClick={() => void pick(hit, true)}
-                  sx={{ minHeight: 48 }}
-                >
-                  Présent + ajouter le créneau
-                </Button>
+                {!isCamp ? (
+                  <Button
+                    variant="outlined"
+                    disabled={busyId === hit.registrationId}
+                    onClick={() => void pick(hit, true)}
+                    sx={{ minHeight: 48 }}
+                  >
+                    Présent + ajouter le créneau
+                  </Button>
+                ) : null}
               </Stack>
             </Stack>
           ))}
           {!loading && query.trim().length >= 2 && hits.length === 0 ? (
-            <Typography color="text.secondary">Aucun adhérent hors créneau.</Typography>
+            <Typography color="text.secondary">
+              {isCamp
+                ? "Aucun adhérent disponible (déjà inscrit ou déjà pointé)."
+                : "Aucun adhérent hors créneau."}
+            </Typography>
           ) : null}
         </Stack>
       </DialogContent>

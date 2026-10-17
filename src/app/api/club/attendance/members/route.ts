@@ -4,8 +4,9 @@ import { jsonNoStore } from "@/lib/http/cache-headers";
 import { checkRateLimit } from "@/lib/auth/rate-limit";
 import { requireAttendanceOperator } from "@/lib/attendance/api-auth";
 import { searchMembersNotOnSlot } from "@/lib/attendance/search-members";
+import { searchMembersForCampSlot } from "@/lib/camps/search-members-for-camp-slot";
 
-/** GET /api/club/attendance/members?q=&slotId= */
+/** GET /api/club/attendance/members?q=&slotId=&source= */
 export async function GET(req: Request) {
   const auth = await requireAttendanceOperator();
   if (!auth.ok) {
@@ -15,6 +16,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const query = url.searchParams.get("q")?.trim() ?? "";
   const slotId = url.searchParams.get("slotId")?.trim() ?? "";
+  const source = url.searchParams.get("source")?.trim() === "camp" ? "camp" : "training";
   if (query.length < 2) {
     return jsonNoStore({ members: [] });
   }
@@ -28,7 +30,10 @@ export async function GET(req: Request) {
   }
 
   try {
-    const members = await searchMembersNotOnSlot(auth.session.db, query, slotId);
+    const members =
+      source === "camp"
+        ? await searchMembersForCampSlot(auth.session.db, query, slotId)
+        : await searchMembersNotOnSlot(auth.session.db, query, slotId);
     return jsonNoStore({ members });
   } catch (error) {
     console.error("[api/club/attendance/members GET]", error);

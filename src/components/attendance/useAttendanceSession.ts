@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { readJsonResponse } from "@/lib/http/read-json-response";
-import type { AttendanceMarkKind } from "@/lib/attendance/constants";
-import type { AttendanceSessionPayload } from "@/lib/attendance/types";
+import type {
+  AttendanceRosterKind,
+  AttendanceSessionPayload,
+} from "@/lib/attendance/types";
 
 async function readError(res: Response, fallback: string): Promise<string> {
   const json = await readJsonResponse<{ error?: string }>(res);
@@ -54,9 +56,11 @@ export function useAttendanceSession(
   const togglePresent = useCallback(
     async (params: {
       personKey: string;
-      kind: AttendanceMarkKind;
+      kind: AttendanceRosterKind;
       registrationId?: string;
       leadId?: string;
+      markId?: string;
+      externalId?: string;
       present: boolean;
     }) => {
       if (!slotId) return;
@@ -70,23 +74,42 @@ export function useAttendanceSession(
           });
           if (params.registrationId) query.set("registrationId", params.registrationId);
           if (params.leadId) query.set("leadId", params.leadId);
-          if (source === "camp") query.set("source", "camp");
+          if (params.markId) query.set("markId", params.markId);
+          if (params.externalId) query.set("externalId", params.externalId);
+          if (source === "camp") {
+            query.set("source", "camp");
+            if (params.kind === "member_walkin" && params.registrationId) {
+              query.set("clubRegistrationId", params.registrationId);
+            }
+            if (params.kind === "enrolled" && params.registrationId) {
+              query.set("campRegistrationId", params.registrationId);
+            }
+          }
           const res = await fetch(`/api/club/attendance/marks?${query.toString()}`, {
             method: "DELETE",
           });
           if (!res.ok) throw new Error(await readError(res, "Impossible de dépointer"));
         } else {
+          const body: Record<string, unknown> = {
+            date,
+            slotId,
+            kind: params.kind,
+            source,
+          };
+          if (params.registrationId) {
+            body.registrationId = params.registrationId;
+            if (source === "camp" && params.kind === "member_walkin") {
+              body.clubRegistrationId = params.registrationId;
+            }
+            if (source === "camp" && params.kind === "enrolled") {
+              body.campRegistrationId = params.registrationId;
+            }
+          }
+          if (params.leadId) body.leadId = params.leadId;
           const res = await fetch("/api/club/attendance/marks", {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              date,
-              slotId,
-              kind: params.kind,
-              registrationId: params.registrationId,
-              leadId: params.leadId,
-              source,
-            }),
+            body: JSON.stringify(body),
           });
           if (!res.ok) throw new Error(await readError(res, "Impossible de pointer"));
         }

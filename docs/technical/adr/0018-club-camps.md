@@ -24,7 +24,9 @@ secrétariat. Le workflow d’adhésion (`clubRegistrations`) et le pointage ent
 5. **Export Sage** : pack unifié adhésions + stages ; produit stages sur
    `SAGE_ACCOUNTS.stages` (`706100` proposé, à confirmer trésorier) — jamais `756000`.
 6. **Pointage unifié** : `/club/presences` liste aussi les `campSlots` du jour
-   (`source: "training" | "camp"`) ; marks camp dans `campAttendanceMarks`.
+   (`source: "training" | "camp"`) ; marks camp dans `campAttendanceMarks` avec
+   `kind`: `enrolled` (inscrits A/C), `member_walkin` (adhérent hors inscription B),
+   `external` (non-adhérent hors inscription D, **sans** file essais / leads).
 7. **Rôles** : managers `ADMIN` + `SECRETARY` ; pointage = opérateurs présence existants.
 8. **Stripe webhook** : `metadata.domain === "camp"` ; aucun side-effect adhésion/championnat.
 

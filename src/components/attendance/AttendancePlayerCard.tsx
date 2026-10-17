@@ -45,6 +45,21 @@ export function AttendancePlayerCard({
               {person.age} ans
             </Typography>
           ) : null}
+          {person.kind === "member_walkin" ? (
+            <Typography component="span" color="text.secondary" sx={{ ml: 1, fontSize: "0.85rem" }}>
+              hors inscription
+            </Typography>
+          ) : null}
+          {person.kind === "external" ? (
+            <Typography component="span" color="text.secondary" sx={{ ml: 1, fontSize: "0.85rem" }}>
+              extérieur
+            </Typography>
+          ) : null}
+          {person.kind === "enrolled" && person.isClubMember === false ? (
+            <Typography component="span" color="text.secondary" sx={{ ml: 1, fontSize: "0.85rem" }}>
+              non-adhérent
+            </Typography>
+          ) : null}
         </Typography>
         <AttendanceAlertChips
           alerts={person.alerts}
