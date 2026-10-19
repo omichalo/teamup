@@ -1,9 +1,9 @@
-import * as admin from "firebase-admin";
 import {
   syncPlayers,
   syncTeams,
   syncTeamMatches,
 } from "../../src/lib/shared/sync-utils";
+import { adminDb, FieldValue } from "./admin-app";
 
 /**
  * Wrapper pour la synchronisation des joueurs
@@ -15,7 +15,7 @@ export async function syncPlayersWrapper(): Promise<{
   error?: string;
 }> {
   try {
-    const db = admin.firestore();
+    const db = adminDb();
 
     // Utiliser la fonction partagée
     const result = await syncPlayers(db);
@@ -23,7 +23,7 @@ export async function syncPlayersWrapper(): Promise<{
     // Mettre à jour la date de dernière synchronisation
     await db.collection("metadata").doc("lastSync").set(
       {
-        players: admin.firestore.FieldValue.serverTimestamp(),
+        players: FieldValue.serverTimestamp(),
       },
       { merge: true }
     );
@@ -50,7 +50,7 @@ export async function syncTeamsWrapper(): Promise<{
   error?: string;
 }> {
   try {
-    const db = admin.firestore();
+    const db = adminDb();
 
     // Utiliser la fonction partagée
     const result = await syncTeams(db);
@@ -58,7 +58,7 @@ export async function syncTeamsWrapper(): Promise<{
     // Mettre à jour la date de dernière synchronisation
     await db.collection("metadata").doc("lastSync").set(
       {
-        teams: admin.firestore.FieldValue.serverTimestamp(),
+        teams: FieldValue.serverTimestamp(),
       },
       { merge: true }
     );
@@ -85,7 +85,7 @@ export async function syncTeamMatchesWrapper(): Promise<{
   error?: string;
 }> {
   try {
-    const db = admin.firestore();
+    const db = adminDb();
 
     // Utiliser la fonction partagée
     const result = await syncTeamMatches(db);
@@ -93,7 +93,7 @@ export async function syncTeamMatchesWrapper(): Promise<{
     // Mettre à jour la date de dernière synchronisation
     await db.collection("metadata").doc("lastSync").set(
       {
-        teamMatches: admin.firestore.FieldValue.serverTimestamp(),
+        teamMatches: FieldValue.serverTimestamp(),
       },
       { merge: true }
     );

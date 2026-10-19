@@ -47,6 +47,10 @@ yarn-error.log*
 .env*
 !.env.example
 !.env.staging.example
+# Variantes sans point préfixe (ex. env.local historiquement commitée)
+env.local
+env.*.local
+*.env.local
 
 # vercel
 .vercel

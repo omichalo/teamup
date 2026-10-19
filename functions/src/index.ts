@@ -1,8 +1,8 @@
-import * as functions from "firebase-functions";
-import * as admin from "firebase-admin";
+import * as functions from "firebase-functions/v1";
+import type { Request, Response } from "firebase-functions/v1";
+import { adminAuth, adminDb, ensureAdminApp, FieldValue } from "./admin-app";
 
-// Initialiser Firebase Admin
-admin.initializeApp();
+ensureAdminApp();
 
 // Importer les wrappers de synchronisation
 import {
@@ -72,7 +72,7 @@ export const syncPlayersDaily = ffttSyncFunctions.pubsub
  * 🔄 Synchronisation manuelle des joueurs SQY Ping
  * Déclenchée via HTTP POST
  */
-export const syncPlayersManual = ffttSyncFunctions.https.onRequest(async (req, res) => {
+export const syncPlayersManual = ffttSyncFunctions.https.onRequest(async (req: Request, res: Response) => {
   // Configurer CORS
   res.set("Access-Control-Allow-Origin", "*");
   res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -95,7 +95,7 @@ export const syncPlayersManual = ffttSyncFunctions.https.onRequest(async (req, r
       return;
     }
 
-    const decodedToken = await admin.auth().verifyIdToken(
+    const decodedToken = await adminAuth().verifyIdToken(
       authHeader.split(" ")[1]
     );
     const role = resolveRole(decodedToken.role);
@@ -138,7 +138,7 @@ export const syncTeamsDaily = ffttSyncFunctions.pubsub
  * 🏆 Synchronisation manuelle des équipes SQY Ping
  * Déclenchée via HTTP POST
  */
-export const syncTeamsManual = ffttSyncFunctions.https.onRequest(async (req, res) => {
+export const syncTeamsManual = ffttSyncFunctions.https.onRequest(async (req: Request, res: Response) => {
   // Configurer CORS
   res.set("Access-Control-Allow-Origin", "*");
   res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -161,7 +161,7 @@ export const syncTeamsManual = ffttSyncFunctions.https.onRequest(async (req, res
       return;
     }
 
-    const decodedToken = await admin.auth().verifyIdToken(
+    const decodedToken = await adminAuth().verifyIdToken(
       authHeader.split(" ")[1]
     );
     const role = resolveRole(decodedToken.role);
@@ -207,7 +207,7 @@ export const syncTeamMatchesDaily = ffttSyncFunctions.pubsub
  * Déclenchée via HTTP POST
  */
 export const syncTeamMatchesManual = ffttSyncFunctions.https.onRequest(
-  async (req, res) => {
+  async (req: Request, res: Response) => {
     // Configurer CORS
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -230,7 +230,7 @@ export const syncTeamMatchesManual = ffttSyncFunctions.https.onRequest(
         return;
       }
 
-      const decodedToken = await admin.auth().verifyIdToken(
+      const decodedToken = await adminAuth().verifyIdToken(
         authHeader.split(" ")[1]
       );
       const role = resolveRole(decodedToken.role);
@@ -267,7 +267,7 @@ export const syncTeamMatchesManual = ffttSyncFunctions.https.onRequest(
  * 📊 Récupération du statut de synchronisation
  * Cloud Function HTTP pour récupérer les métadonnées
  */
-export const getSyncStatus = functions.https.onRequest(async (req, res) => {
+export const getSyncStatus = functions.https.onRequest(async (req: Request, res: Response) => {
   // Configurer CORS
   res.set("Access-Control-Allow-Origin", "*");
   res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -297,13 +297,13 @@ export const getSyncStatus = functions.https.onRequest(async (req, res) => {
     const token = authHeader.split(" ")[1];
 
     // Vérifier le token Firebase
-    const decodedToken = await admin.auth().verifyIdToken(token);
+    const decodedToken = await adminAuth().verifyIdToken(token);
     console.log("✅ Utilisateur authentifié:", decodedToken.email);
 
     console.log("🔄 Récupération du statut de synchronisation...");
 
     // Initialiser Firestore
-    const db = admin.firestore();
+    const db = adminDb();
 
     // Récupérer les métadonnées de synchronisation
     const metadataDoc = await db.collection("metadata").doc("lastSync").get();
@@ -356,7 +356,7 @@ export const getSyncStatus = functions.https.onRequest(async (req, res) => {
  * Cloud Function HTTP pour nettoyer les données
  */
 export const cleanupDuplicatePlayers = functions.https.onRequest(
-  async (req, res) => {
+  async (req: Request, res: Response) => {
     // Configurer CORS
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -379,7 +379,7 @@ export const cleanupDuplicatePlayers = functions.https.onRequest(
       return;
     }
 
-    const decodedToken = await admin.auth().verifyIdToken(
+    const decodedToken = await adminAuth().verifyIdToken(
       authHeader.split(" ")[1]
     );
     const role = resolveRole(decodedToken.role);
@@ -396,7 +396,7 @@ export const cleanupDuplicatePlayers = functions.https.onRequest(
     try {
       console.log("🧹 Nettoyage des doublons de joueurs...");
 
-      const db = admin.firestore();
+      const db = adminDb();
 
       // Récupérer tous les joueurs
       const playersSnapshot = await db.collection("players").get();
@@ -483,7 +483,7 @@ export const cleanupDuplicatePlayers = functions.https.onRequest(
   }
 );
 
-export const setUserRole = functions.https.onRequest(async (req, res) => {
+export const setUserRole = functions.https.onRequest(async (req: Request, res: Response) => {
   res.set("Access-Control-Allow-Origin", "*");
   res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -509,7 +509,7 @@ export const setUserRole = functions.https.onRequest(async (req, res) => {
     }
 
     const token = authHeader.split(" ")[1];
-    const decodedToken = await admin.auth().verifyIdToken(token);
+    const decodedToken = await adminAuth().verifyIdToken(token);
 
     if (decodedToken.role !== "admin") {
       res.status(403).json({
@@ -536,19 +536,19 @@ export const setUserRole = functions.https.onRequest(async (req, res) => {
       resolvedRole
     );
 
-    const userRecord = await admin.auth().getUser(userId);
+    const userRecord = await adminAuth().getUser(userId);
     const existingClaims = userRecord.customClaims ?? {};
 
-    await admin.auth().setCustomUserClaims(userId, {
+    await adminAuth().setCustomUserClaims(userId, {
       ...existingClaims,
       role: resolvedRole,
       coachRequestStatus: resolvedCoachStatus,
     });
 
-    await admin.auth().revokeRefreshTokens(userId);
+    await adminAuth().revokeRefreshTokens(userId);
 
-    const firestore = admin.firestore();
-    const now = admin.firestore.FieldValue.serverTimestamp();
+    const firestore = adminDb();
+    const now = FieldValue.serverTimestamp();
 
     await firestore.collection("users").doc(userId).set(
       {
@@ -557,14 +557,14 @@ export const setUserRole = functions.https.onRequest(async (req, res) => {
         coachRequestMessage:
           coachRequestMessage !== undefined
             ? coachRequestMessage
-            : admin.firestore.FieldValue.delete(),
+            : FieldValue.delete(),
         coachRequestHandledBy: decodedToken.uid,
         coachRequestHandledAt: now,
         coachRequestUpdatedAt: now,
         playerId:
           playerId !== undefined
             ? playerId
-            : admin.firestore.FieldValue.delete(),
+            : FieldValue.delete(),
         updatedAt: now,
       },
       { merge: true }
