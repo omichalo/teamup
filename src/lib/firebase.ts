@@ -36,7 +36,7 @@ function getFirebaseConfig() {
   };
 
   const measurementId = getEnvVar("NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID");
-  const config = {
+  return {
     apiKey: getEnvVar("NEXT_PUBLIC_FIREBASE_API_KEY"),
     authDomain: getEnvVar("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN"),
     projectId: getEnvVar("NEXT_PUBLIC_FIREBASE_PROJECT_ID"),
@@ -45,29 +45,6 @@ function getFirebaseConfig() {
     appId: getEnvVar("NEXT_PUBLIC_FIREBASE_APP_ID"),
     ...(measurementId ? { measurementId } : {}),
   };
-
-  // Si aucune variable d'environnement n'est disponible (undefined ou vide), utiliser les valeurs par défaut
-  // Ces valeurs sont publiques et peuvent être exposées côté client
-  if (
-    !config.apiKey ||
-    !config.projectId ||
-    config.apiKey.trim() === "" ||
-    config.projectId.trim() === ""
-  ) {
-    // Configuration Firebase pour sqyping-teamup (valeurs publiques)
-    const fallbackMeasurementId = getEnvVar("NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID");
-    return {
-      apiKey: "AIzaSyC9fsfuDqF0jjV8ocgCtqMpcPA-E6pZoNg",
-      authDomain: "sqyping-teamup.firebaseapp.com",
-      projectId: "sqyping-teamup",
-      storageBucket: "sqyping-teamup.firebasestorage.app",
-      messagingSenderId: "567392028186",
-      appId: "1:567392028186:web:0fa11cf39ce060931eb3a3",
-      ...(fallbackMeasurementId ? { measurementId: fallbackMeasurementId } : {}),
-    };
-  }
-
-  return config;
 }
 
 let app: FirebaseApp | undefined;

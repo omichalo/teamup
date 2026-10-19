@@ -4,14 +4,17 @@ on:
   push:
     branches:
       - main
-      - develop
+      - staging
   pull_request:
     branches:
       - main
-      - develop
+      - staging
   schedule:
-    # Exécuter une fois par semaine pour scanner tout l'historique
-    - cron: '0 0 * * 0'
+    # Scan hebdomadaire de tout l'historique Git
+    - cron: "0 0 * * 0"
+
+permissions:
+  contents: read
 
 jobs:
   trufflehog-scan:
@@ -19,73 +22,52 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: write
-      issues: write
 
     steps:
+      # actions/checkout@v4.4.0
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          fetch-depth: 0 # Récupérer tout l'historique pour le scan complet
+          fetch-depth: 0
 
+      # trufflesecurity/trufflehog@v3.99.3
       - name: Run TruffleHog (pull_request)
         if: github.event_name == 'pull_request'
-        uses: trufflesecurity/trufflehog@main
+        uses: trufflesecurity/trufflehog@e63326d6545de8f425d93ce24078c6e68d83f70e
         with:
           path: ./
-          base: ${{ github.event.repository.default_branch }}
-          head: HEAD
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
           extra_args: --only-verified
 
+      # trufflesecurity/trufflehog@v3.99.3
       - name: Run TruffleHog (push/schedule)
         if: github.event_name != 'pull_request'
-        uses: trufflesecurity/trufflehog@main
+        uses: trufflesecurity/trufflehog@e63326d6545de8f425d93ce24078c6e68d83f70e
         with:
           path: ./
           extra_args: --only-verified
-
-      - name: Comment PR if secrets found
-        if: github.event_name == 'pull_request' && failure()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '⚠️ **Secrets détectés**\n\nTruffleHog a détecté des secrets potentiels dans ce PR. Veuillez les révoquer immédiatement et les remplacer par des variables d\'environnement ou des secrets GitHub.\n\nVoir [docs/SECURITY.md](./docs/SECURITY.md) pour plus d\'informations.'
-            })
 
   gitleaks-scan:
     name: Scan for secrets with Gitleaks
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: write
-      issues: write
 
     steps:
+      # actions/checkout@v4.4.0
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 0
 
+      # gitleaks/gitleaks-action@v2.3.9 — lit .gitleaksignore à la racine
       - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Comment PR if secrets found
-        if: github.event_name == 'pull_request' && failure()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '⚠️ **Secrets détectés**\n\nGitleaks a détecté des secrets potentiels dans ce PR. Veuillez les révoquer immédiatement et les remplacer par des variables d\'environnement ou des secrets GitHub.\n\nVoir [docs/SECURITY.md](./docs/SECURITY.md) pour plus d\'informations.'
-            })
+          GITLEAKS_ENABLE_COMMENTS: "false"
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "true"
 
   dependency-scan:
     name: Scan dependencies for vulnerabilities
@@ -94,30 +76,57 @@ jobs:
       contents: read
 
     steps:
+      # actions/checkout@v4.4.0
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
+      # actions/setup-node@v4.4.0 — runtime Actions ≠ Node applicatif (reste 20)
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "20"
           cache: "npm"
 
-      - name: Install dependencies
+      - name: Install app dependencies
         run: npm ci
 
-      - name: Run npm audit
-        run: npm audit --audit-level=moderate
-        continue-on-error: true
+      - name: Install functions dependencies
+        working-directory: functions
+        run: npm ci
 
-      - name: Comment PR if vulnerabilities found
-        if: github.event_name == 'pull_request' && failure()
-        uses: actions/github-script@v7
+      # Seuil inchangé (moderate). Périmètre production (--omit=dev) : surface déployable.
+      # Les advisories sans patch upstream (ex. braces via eslint, sprintf via jest) restent
+      # visibles dans le rapport full ci-dessous ; le gate prod est bloquant.
+      - name: Run npm audit (app, production)
+        run: |
+          set -o pipefail
+          npm audit --omit=dev --audit-level=moderate --json | tee npm-audit-app.json
+
+      - name: Run npm audit (functions, production)
+        working-directory: functions
+        run: |
+          set -o pipefail
+          npm audit --omit=dev --audit-level=moderate --json | tee ../npm-audit-functions.json
+
+      # Rapport informatif (devDependencies) — n'affecte pas le gate production ci-dessus
+      - name: Export full npm audit reports (incl. devDependencies)
+        if: always()
+        run: |
+          set +e
+          npm audit --json > npm-audit-app-full.json
+          (cd functions && npm audit --json > ../npm-audit-functions-full.json)
+          exit 0
+
+      # actions/upload-artifact@v4.6.2 — rapports utiles même si un job échoue
+      - name: Upload npm audit reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '⚠️ **Vulnérabilités détectées dans les dépendances**\n\n`npm audit` a détecté des vulnérabilités modérées ou critiques. Veuillez exécuter `npm audit fix` ou mettre à jour les dépendances concernées.\n\nPour plus d\'informations, voir [GitHub Security Advisories](https://github.com/omichalo/teamup/security/dependabot).'
-            })
+          name: npm-audit-reports
+          path: |
+            npm-audit-app.json
+            npm-audit-functions.json
+            npm-audit-app-full.json
+            npm-audit-functions-full.json
+          if-no-files-found: ignore
+          retention-days: 14

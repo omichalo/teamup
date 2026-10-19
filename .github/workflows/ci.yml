@@ -87,9 +87,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run npm audit
-        run: npm audit --audit-level=moderate
-        continue-on-error: true
+      - name: Run npm audit (production dependencies)
+        run: npm audit --omit=dev --audit-level=moderate
 
       - name: Security scan note
         run: |

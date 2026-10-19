@@ -49,30 +49,29 @@
     "@omichalo/ffttapi-node": "^0.0.9",
     "@omichalo/sqyping-mui-theme": "^0.2.8",
     "@tanstack/react-virtual": "^3.14.10",
-    "@tiptap/extension-image": "^3.27.1",
-    "@tiptap/extension-link": "^3.27.1",
-    "@tiptap/extension-placeholder": "^3.27.1",
-    "@tiptap/extension-text-align": "^3.27.1",
-    "@tiptap/extension-underline": "^3.27.1",
-    "@tiptap/react": "^3.27.1",
-    "@tiptap/starter-kit": "^3.27.1",
+    "@tiptap/extension-image": "^3.32.0",
+    "@tiptap/extension-link": "^3.32.0",
+    "@tiptap/extension-placeholder": "^3.32.0",
+    "@tiptap/extension-text-align": "^3.32.0",
+    "@tiptap/extension-underline": "^3.32.0",
+    "@tiptap/react": "^3.32.0",
+    "@tiptap/starter-kit": "^3.32.0",
     "@types/react-beautiful-dnd": "^13.1.8",
     "dayjs": "^1.11.20",
-    "discord.js": "^14.25.0",
+    "discord.js": "^14.27.0",
     "emoji-picker-react": "^4.19.1",
     "firebase": "^12.2.1",
-    "firebase-admin": "^12.0.0",
-    "next": "^15.5.15",
+    "firebase-admin": "^14.5.0",
+    "next": "^15.5.28",
     "node-cron": "^3.0.3",
-    "nodemailer": "^8.0.5",
+    "nodemailer": "^10.1.7",
     "pdfkit": "^0.20.2",
     "react": "19.1.0",
     "react-beautiful-dnd": "^13.1.1",
     "react-dom": "19.1.0",
     "react-hook-form": "^7.62.0",
-    "sanitize-html": "^2.17.5",
-    "swagger-ui-dist": "^5.30.2",
-    "swagger-ui-react": "^5.32.5",
+    "sanitize-html": "^2.18.1",
+    "swagger-ui-dist": "^5.34.0",
     "tweetnacl": "^1.0.3",
     "yup": "^1.7.0",
     "zod": "^4.1.12"
@@ -90,26 +89,35 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/sanitize-html": "^2.16.1",
-    "@types/swagger-ui-react": "^5.18.0",
     "@types/xml2js": "^0.4.14",
     "dotenv": "^17.2.3",
     "eslint": "^9",
-    "eslint-config-next": "15.5.3",
+    "eslint-config-next": "15.5.28",
     "husky": "^9.1.7",
-    "jest": "^30.1.3",
-    "jest-environment-jsdom": "^30.1.2",
+    "jest": "^30.5.2",
+    "jest-environment-jsdom": "^30.5.2",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
     "tsx": "^4.20.6",
     "typescript": "^5"
   },
   "overrides": {
-    "axios": "^0.31.1",
-    "undici": "^6.24.0",
-    "qs": "^6.14.2",
+    "axios": "^0.34.0",
+    "form-data": "^4.0.6",
+    "undici": "^6.29.1",
+    "uuid": "^11.1.1",
+    "qs": "^6.16.0",
     "xml2js": "^0.5.0",
     "postcss": "^8.5.10",
     "@tootallnate/once": "^3.0.1",
+    "websocket-driver": "^0.7.5",
+    "proxy-addr": "^2.0.8",
+    "@grpc/grpc-js": "^1.14.6",
+    "braces": "^3.0.3",
+    "tar": "^7.5.22",
+    "ws": "^8.22.0",
+    "protobufjs": "^7.6.6",
+    "node-forge": "^1.4.0",
     "micromatch": {
       "picomatch": "2.3.2"
     },
@@ -125,6 +133,15 @@
     "tinyglobby": {
       "picomatch": "4.0.4"
     },
-    "ajv": "^6.14.0"
+    "ajv": "^6.14.0",
+    "minimatch@3": {
+      "brace-expansion": "1.1.21"
+    },
+    "minimatch@9": {
+      "brace-expansion": "2.1.7"
+    },
+    "minimatch@10": {
+      "brace-expansion": "5.0.12"
+    }
   }
 }

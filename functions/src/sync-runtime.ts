@@ -1,4 +1,4 @@
-import * as functions from "firebase-functions";
+import * as functions from "firebase-functions/v1";
 
 /** Secrets FFTT (Secret Manager) — mêmes noms que sur App Hosting. */
 export const FFTT_SYNC_SECRETS = ["ID_FFTT", "PWD_FFTT"] as const;
