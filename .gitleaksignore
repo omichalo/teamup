@@ -1,10 +1,63 @@
-# Gitleaks ignore patterns
+# Gitleaks ignore — empreintes exactes uniquement (pas d'exclusion de règle/chemin).
 # Format: <commit-sha>:<file-path>:<rule-id>:<line-number>
+# Le CLI (et gitleaks-action) lit ce fichier par défaut (--gitleaks-ignore-path).
 
-# Ignore la clé privée fictive dans .env.example (ligne 37)
-# C'est une valeur d'exemple pour la documentation, pas un vrai secret
+# ---------------------------------------------------------------------------
+# Exemples / placeholders (faux positifs documentés)
+# ---------------------------------------------------------------------------
+
+# Clé privée fictive dans .env.example (documentation)
 eb060e5f5844f3ccd9789aa132ae5c6bd66dc6b6:.env.example:private-key:37
 
-# Ignore l'exemple DISCORD_APPLICATION_ID dans scripts/register-discord-command.ts
-# C'est un placeholder de documentation, pas un vrai secret
+# DISCORD_APPLICATION_ID placeholder dans scripts/register-discord-command.ts
 ebdea02acda725d0eaaf2806c298bc3fa3fa44d9:scripts/register-discord-command.ts:discord-client-id:79
+
+# ---------------------------------------------------------------------------
+# Firebase Web API keys (règle gcp-api-key) — configuration SDK client
+# ---------------------------------------------------------------------------
+# Qualification (scan historique, 26 détections, 2 valeurs distinctes) :
+# - Usage vérifié : NEXT_PUBLIC_FIREBASE_API_KEY / firebaseConfig.apiKey
+#   (SDK Web Firebase, App Hosting, docs/setup historiques). Destinées au
+#   bundle client ; ce ne sont pas des clés serveur Admin ni des service accounts.
+# - Pas d'exemples factices AIza* dans ces empreintes (placeholders .env.example
+#   non concernés).
+# - Répétitions historiques de la même valeur prod (docs, .history/, env.local,
+#   next.config, firebase.ts, apphosting) + une valeur staging (apphosting.staging).
+# - Restrictions GCP (HTTP referrer / API) : NON vérifiées ici — à contrôler
+#   manuellement dans Google Cloud Console / Firebase pour chaque projet
+#   (prod + staging). Ne pas interpréter cette ignore-list comme une validation
+#   des restrictions réseau.
+# - Les clés restent présentes volontairement dans apphosting*.yaml (config
+#   publique App Hosting). Le fallback hardcodé dans src/lib/firebase.ts a été
+#   retiré côté HEAD ; les empreintes historiques ci-dessous restent nécessaires
+#   pour le scan complet (schedule).
+
+# --- Valeur Firebase client PROD (répétitions historiques) ---
+46d5f2c85177884da76236a63197bdcb61bb7fac:env.local:gcp-api-key:2
+81e855fc794a253034a3539f5eb978fc490ef699:next.config.ts:gcp-api-key:38
+76b944928a43010f92a3473fded4d4c2a24aeba1:next.config.ts:gcp-api-key:29
+11b2a69ddf9b340ef24addb9d39ac0d8280e9eaf:src/lib/firebase.ts:gcp-api-key:31
+eb29bca7c0aa886ed6549f68e27afd31b27d0410:apphosting.yaml:gcp-api-key:15
+eb29bca7c0aa886ed6549f68e27afd31b27d0410:CONFIG_FIREBASE_APPHOSTING.md:gcp-api-key:13
+107668f084c53377de898503d11b8a023d760e27:DEPLOYMENT_SUMMARY.md:gcp-api-key:50
+107668f084c53377de898503d11b8a023d760e27:FFTT_SETUP.md:gcp-api-key:30
+107668f084c53377de898503d11b8a023d760e27:FIREBASE_SETUP.md:gcp-api-key:90
+107668f084c53377de898503d11b8a023d760e27:QUICK_FFTT_SETUP.md:gcp-api-key:11
+107668f084c53377de898503d11b8a023d760e27:.history/DEPLOYMENT_SUMMARY_20250917184928.md:gcp-api-key:45
+107668f084c53377de898503d11b8a023d760e27:.history/DEPLOYMENT_SUMMARY_20250917184937.md:gcp-api-key:50
+107668f084c53377de898503d11b8a023d760e27:.history/DEPLOYMENT_SUMMARY_20250917224335.md:gcp-api-key:50
+107668f084c53377de898503d11b8a023d760e27:.history/FFTT_SETUP_20250917162937.md:gcp-api-key:27
+107668f084c53377de898503d11b8a023d760e27:.history/FFTT_SETUP_20250917165628.md:gcp-api-key:30
+107668f084c53377de898503d11b8a023d760e27:.history/FFTT_SETUP_20250917224335.md:gcp-api-key:30
+107668f084c53377de898503d11b8a023d760e27:.history/FIREBASE_SETUP_20250917155559.md:gcp-api-key:79
+107668f084c53377de898503d11b8a023d760e27:.history/FIREBASE_SETUP_20250917155606.md:gcp-api-key:90
+107668f084c53377de898503d11b8a023d760e27:.history/FIREBASE_SETUP_20250917224335.md:gcp-api-key:90
+107668f084c53377de898503d11b8a023d760e27:.history/QUICK_FFTT_SETUP_20250917165740.md:gcp-api-key:11
+107668f084c53377de898503d11b8a023d760e27:.history/QUICK_FFTT_SETUP_20250917165747.md:gcp-api-key:11
+107668f084c53377de898503d11b8a023d760e27:.history/QUICK_FFTT_SETUP_20250917224335.md:gcp-api-key:11
+107668f084c53377de898503d11b8a023d760e27:.history/configure-sqyping-data_20250917171152.js:gcp-api-key:17
+107668f084c53377de898503d11b8a023d760e27:.history/update-env_20250918142303.js:gcp-api-key:6
+
+# --- Valeur Firebase client STAGING (apphosting.staging.yaml) ---
+fa147f144f83c9c48deb718d6ed2bee28a4bf04a:apphosting.staging.yaml:gcp-api-key:14
+b597979afbcaf6978173695cae934e8a60b43eb3:apphosting.staging.yaml:gcp-api-key:14

@@ -1,5 +1,5 @@
 import path from "path";
-import type { Attachment } from "nodemailer/lib/mailer";
+import type { Attachment } from "nodemailer";
 
 export const SQYPING_EMAIL_LOGO_CID = "logo-sqyping";
 

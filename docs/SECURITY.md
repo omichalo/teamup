@@ -181,9 +181,15 @@ Un workflow automatisé scanne chaque commit et pull request avec :
 - **npm audit** : Vérifie les vulnérabilités dans les dépendances
 
 Le workflow s'exécute :
-- Sur chaque push vers `main` ou `develop`
-- Sur chaque pull request
+- Sur chaque push vers `main` ou `staging`
+- Sur chaque pull request ciblant `main` ou `staging`
 - Une fois par semaine pour scanner tout l'historique
+
+Les faux positifs confirmés (empreintes exactes) sont listés dans `.gitleaksignore`.
+`npm audit --omit=dev --audit-level=moderate` est **bloquant** (dépendances de production,
+application et Cloud Functions). Un rapport JSON « full » (incl. devDependencies) est
+conservé en artifact CI pour suivre les advisories sans patch upstream (ex. `braces`
+via ESLint, `sprintf-js` via Jest).
 
 ### Scan local (recommandé avant de commiter)
 
