@@ -2,6 +2,9 @@
   "name": "teamup",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "check": "npm run lint && npm run check:file-sizes && npm run check:page-titles && npm run type-check && npm test -- --ci && npm run build",
     "check:dev": "npm run lint && npm run check:file-sizes && npm run check:page-titles && npm run type-check",
