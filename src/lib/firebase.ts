@@ -26,23 +26,23 @@ function getFirebaseConfig() {
     }
   }
 
-  // Fallback sur les variables d'environnement individuelles
-  // Note: Next.js remplace process.env.NEXT_PUBLIC_* au build, mais peut être undefined
-  const getEnvVar = (key: string): string | undefined => {
-    if (typeof process === "undefined") return undefined;
-    // Next.js injecte process.env même côté client, mais les valeurs peuvent être undefined ou vides
-    const value = process.env?.[key];
-    return value && value.trim() !== "" ? value : undefined;
+  // Accès STATIQUE obligatoire : Next.js n'inline les NEXT_PUBLIC_* dans le bundle
+  // client que pour process.env.NEXT_PUBLIC_FOO (pas process.env[key]).
+  // Un accès dynamique laissait apiKey/projectId vides côté navigateur ; l'ancien
+  // fallback hardcodé masquait le problème.
+  const trim = (value: string | undefined): string | undefined => {
+    const t = value?.trim();
+    return t ? t : undefined;
   };
 
-  const measurementId = getEnvVar("NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID");
+  const measurementId = trim(process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID);
   return {
-    apiKey: getEnvVar("NEXT_PUBLIC_FIREBASE_API_KEY"),
-    authDomain: getEnvVar("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN"),
-    projectId: getEnvVar("NEXT_PUBLIC_FIREBASE_PROJECT_ID"),
-    storageBucket: getEnvVar("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET"),
-    messagingSenderId: getEnvVar("NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID"),
-    appId: getEnvVar("NEXT_PUBLIC_FIREBASE_APP_ID"),
+    apiKey: trim(process.env.NEXT_PUBLIC_FIREBASE_API_KEY),
+    authDomain: trim(process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN),
+    projectId: trim(process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID),
+    storageBucket: trim(process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET),
+    messagingSenderId: trim(process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID),
+    appId: trim(process.env.NEXT_PUBLIC_FIREBASE_APP_ID),
     ...(measurementId ? { measurementId } : {}),
   };
 }
