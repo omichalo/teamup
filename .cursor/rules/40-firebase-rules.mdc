@@ -1,6 +1,7 @@
 ---
 description: Règles de sécurité Firestore et moindre privilège
-alwaysApply: true
+globs: firestore.rules,firestore.indexes.json
+alwaysApply: false
 ---
 
 # Firebase Firestore Rules

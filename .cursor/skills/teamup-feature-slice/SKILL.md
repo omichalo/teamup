@@ -26,8 +26,11 @@ description: >-
 
 ## Documents de référence du repo
 
+- Carte agents : `AGENTS.md`
+- Invariants métier : `docs/technical/invariants/`
 - Gates locaux et CI : `docs/QUALITY_GATES.md`
 - Sécurité API et exceptions CSRF : `docs/SECURITY.md`
+- MCP Cursor : `docs/technical/MCP_CURSOR.md`
 - Plan technique et backlog qualité : `docs/technical/AUDIT_NEXTJS_REACT_ACTION_PLAN.md`
 
 ## Sortie attendue

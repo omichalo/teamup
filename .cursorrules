@@ -1,8 +1,10 @@
 # TeamUp — règles pour l’agent
 
-La **source de vérité** des standards de code et de sécurité est le dossier **`.cursor/rules/`** : applique **tous** les fichiers `*.mdc` comme des consignes obligatoires (qualité, Next.js, UI, Firebase, API, auth, PR, extension club).
+La **source de vérité** des standards de code et de sécurité est le dossier **`.cursor/rules/`** : applique les fichiers `*.mdc` (toujours chargés : fondations, API, auth, club, PR, ops sensibles ; autres via globs).
 
-- **Cartographie** (anciennes sections → fichiers) : [`.cursor/rules/MIGRATION_MAP.md`](.cursor/rules/MIGRATION_MAP.md)
+- **Carte agents** : [`AGENTS.md`](AGENTS.md)
+- **Cartographie** : [`.cursor/rules/MIGRATION_MAP.md`](.cursor/rules/MIGRATION_MAP.md)
 - **Extension gestion de club** : [`.cursor/rules/80-club-platform-extension.mdc`](.cursor/rules/80-club-platform-extension.mdc)
+- **Invariants métier** : [`docs/technical/invariants/`](docs/technical/invariants/)
 
 Ne pas réintroduire ici de longues copies des règles : toute modification se fait dans le fichier `.mdc` concerné.
