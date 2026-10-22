@@ -1,60 +1,43 @@
-export const runtime = "nodejs";
-
 import { jsonNoStore } from "@/lib/http/cache-headers";
 import { NextRequest } from "next/server";
-import { cookies } from "next/headers";
-import {
-  initializeFirebaseAdmin,
-  getFirestoreAdmin,
-  adminAuth,
-} from "@/lib/firebase-admin";
-import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
+import { adminDb } from "@/lib/firebase-admin";
+import { withAuth } from "@/lib/auth/api-utils";
+import { USER_ROLES } from "@/lib/auth/roles";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
 import { logAuditAction, AUDIT_ACTIONS } from "@/lib/auth/audit-logger";
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ teamId: string }> }
-) {
+export const runtime = "nodejs";
+
+export const PATCH = withAuth(async (req, context) => {
+  const { teamId } = (context as { params: Promise<{ teamId: string }> }).params
+    ? await (context as { params: Promise<{ teamId: string }> }).params
+    : { teamId: undefined };
+
+  if (!teamId) {
+    return jsonNoStore(
+      { error: "L'identifiant de l'équipe est requis" },
+      { status: 400 }
+    );
+  }
+
+  const { decoded } = context as { decoded: { uid: string } };
+
   try {
     // CSRF Protection
-    if (!validateOrigin(request)) {
+    if (!validateOrigin(req as NextRequest)) {
       return jsonNoStore(
-        { success: false, error: "Invalid origin" },
+        { success: false, error: "Origine invalide" },
         { status: 403 }
       );
     }
 
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("__session")?.value;
-    if (!sessionCookie) {
-      return jsonNoStore(
-        {
-          error: "Token d'authentification requis",
-          message: "Cette API nécessite une authentification valide",
-        },
-        { status: 401 }
-      );
-    }
+    const { discordChannelId } = await (req as NextRequest).json();
 
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
-    const role = resolveRole(decoded.role as string | undefined);
-
-    if (!hasAnyRole(role, [USER_ROLES.ADMIN, USER_ROLES.COACH])) {
-      return jsonNoStore(
-        {
-          error: "Accès refusé",
-          message:
-            "Cette opération est réservée aux administrateurs et coachs",
-        },
-        { status: 403 }
-      );
-    }
-
-    const { teamId } = await params;
-    const { discordChannelId } = await request.json();
-
-    if (discordChannelId !== null && discordChannelId !== undefined && typeof discordChannelId !== "string") {
+    if (
+      discordChannelId !== null &&
+      discordChannelId !== undefined &&
+      typeof discordChannelId !== "string"
+    ) {
       return jsonNoStore(
         {
           error: "Le canal Discord doit être une chaîne de caractères ou null",
@@ -63,10 +46,7 @@ export async function PATCH(
       );
     }
 
-    await initializeFirebaseAdmin();
-    const db = getFirestoreAdmin();
-
-    const teamRef = db.collection("teams").doc(teamId);
+    const teamRef = adminDb.collection("teams").doc(teamId);
     const teamDoc = await teamRef.get();
 
     if (!teamDoc.exists) {
@@ -83,7 +63,11 @@ export async function PATCH(
       updatedAt: new Date(),
     };
 
-    if (discordChannelId === null || discordChannelId === undefined || discordChannelId.trim() === "") {
+    if (
+      discordChannelId === null ||
+      discordChannelId === undefined ||
+      discordChannelId.trim() === ""
+    ) {
       updateData.discordChannelId = null;
     } else {
       updateData.discordChannelId = discordChannelId.trim();
@@ -107,15 +91,16 @@ export async function PATCH(
       },
     });
   } catch (error) {
-    console.error("[app/api/teams/[teamId]/discord-channel] PATCH error", error);
+    console.error(
+      `[app/api/teams/${teamId}/discord-channel] PATCH error`,
+      error
+    );
     return jsonNoStore(
       {
         success: false,
         error: "Erreur lors de la mise à jour du canal Discord",
-        details: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 }
     );
   }
-}
-
+}, [USER_ROLES.ADMIN, USER_ROLES.COACH]);
