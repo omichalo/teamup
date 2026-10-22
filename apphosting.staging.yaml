@@ -72,7 +72,7 @@ env:
       - RUNTIME
 
   - variable: DEBUG
-    value: "true"
+    value: "false"
     availability:
       - RUNTIME
 
