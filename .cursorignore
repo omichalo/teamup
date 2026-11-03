@@ -1,0 +1,32 @@
+# Secrets and local credentials — keep out of agent context
+.env
+.env.*
+!.env.example
+!.env.staging.example
+*service-account*.json
+*serviceAccount*.json
+*-credentials.json
+*credentials*.json
+*-firebase-adminsdk*.json
+*.pem
+*.key
+
+# Security scan / debug noise
+gitleaks-report.json
+trufflehog-report.json
+*.sarif
+.dev-server.log
+.dev-server.pid
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Heavy / generated trees
+node_modules/
+.next/
+.history/
+coverage/
+emails/preview/
+functions/lib/
+dist/
+*.tsbuildinfo

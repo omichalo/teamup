@@ -1,6 +1,8 @@
 # Setup Git Worktrees pour workflow multi-agent parallèle
 
-> **⚠️ Option avancée** : Cette approche est recommandée uniquement pour des fonctionnalités **très complexes** avec des parties **vraiment indépendantes**. Pour 90% des cas, l'[approche séquentielle](./WORKFLOW.md#approche-séquentielle-recommandée---90-des-cas) est plus simple et efficace.
+> **Statut (Cursor 3.21+)** : option **rare**. Préférer Plan Mode + Agent + skills (`docs/WORKFLOW.md`). Les worktrees manuels multi-dossiers restent documentés ci-dessous pour cas exceptionnels ; Cursor propose aussi des isolations via subagents/worktrees natifs.
+
+> **⚠️ Option avancée** : Cette approche est recommandée uniquement pour des fonctionnalités **très complexes** avec des parties **vraiment indépendantes**. Pour 90% des cas, l'[approche séquentielle / Plan Mode](./WORKFLOW.md) est plus simple et efficace.
 
 Ce guide explique comment configurer et utiliser les worktrees Git pour paralléliser le travail avec plusieurs agents Cursor.
 

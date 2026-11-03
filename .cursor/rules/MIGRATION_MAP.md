@@ -128,6 +128,13 @@ Ce document mappe chaque section et règle de `.cursorrules` vers les fichiers `
 
 **Statut** : Ajouté pour compléter les règles historiques ; ne remplace pas la sécurité ou l’auth décrites dans `60`, `70`, `90`.
 
+### Évolution post-migration (contexte agents)
+
+- **`.cursor/rules/91-sensitive-ops.mdc`** : autonomie assistée, interdictions prod/secrets/git dangereux (`alwaysApply: true`).
+- **Scoping globs** : `10`, `20`, `30`, `40`, `50` passent en `alwaysApply: false` + globs (réduction du coût de contexte). Restent toujours appliquées : `00`, `60`, `70`, `80`, `90`, `91`.
+- **`AGENTS.md`** + **`docs/technical/invariants/`** : carte agents et invariants métier.
+- **`.cursorignore`** : exclut secrets et bruits du contexte agent.
+
 ---
 
 ## Confirmation finale
