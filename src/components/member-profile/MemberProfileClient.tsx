@@ -19,6 +19,7 @@ import { isClubRegistrationManager } from "@/lib/club-registration/registration-
 import { resolveRole } from "@/lib/auth/roles";
 import { LinkRegistrationAccountDialog } from "@/components/club-registration/membership-requests/LinkRegistrationAccountDialog";
 import { MemberProfileHeader } from "./MemberProfileHeader";
+import { MemberClubDocumentsSection } from "./MemberClubDocumentsSection";
 import { MemberSlotsSection } from "./MemberSlotsSection";
 import { MemberAttendanceSection } from "./MemberAttendanceSection";
 import { MemberFinanceSection } from "./MemberFinanceSection";
@@ -164,6 +165,8 @@ export function MemberProfileClient({ registrationId }: Props) {
       </Stack>
 
       <MemberProfileHeader profile={profile} />
+
+      <MemberClubDocumentsSection />
 
       <Box
         sx={{
