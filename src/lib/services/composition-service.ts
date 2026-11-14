@@ -9,11 +9,13 @@ import {
 import { getDbInstanceDirect } from "@/lib/firebase";
 import { ChampionshipType } from "@/types";
 import { getCompositionDocumentId } from "@/lib/compositions/document-id";
+import { seasonLabelFromDate } from "@/lib/championship/calendar-season-label";
 
 export interface DayComposition {
   journee: number;
   phase: "aller" | "retour";
   championshipType: ChampionshipType;
+  seasonLabel?: string;
   teams: {
     [teamId: string]: string[]; // teamId -> playerIds[]
   };
@@ -25,23 +27,37 @@ export interface DayComposition {
 export class CompositionService {
   private readonly collectionName = "compositions";
 
+  private resolveSeason(explicit?: string): string {
+    return explicit?.trim() || seasonLabelFromDate(new Date());
+  }
+
   private getDocumentId(
+    seasonLabel: string,
     journee: number,
     phase: "aller" | "retour",
     championshipType: ChampionshipType,
     idEpreuve?: number
   ): string {
-    return getCompositionDocumentId(journee, phase, championshipType, idEpreuve);
+    return getCompositionDocumentId(
+      seasonLabel,
+      journee,
+      phase,
+      championshipType,
+      idEpreuve
+    );
   }
 
   async getComposition(
     journee: number,
     phase: "aller" | "retour",
     championshipType: ChampionshipType,
-    idEpreuve?: number
+    idEpreuve?: number,
+    seasonLabel?: string
   ): Promise<DayComposition | null> {
     try {
+      const resolvedSeason = this.resolveSeason(seasonLabel);
       const docId = this.getDocumentId(
+        resolvedSeason,
         journee,
         phase,
         championshipType,
@@ -56,7 +72,9 @@ export class CompositionService {
           journee: data.journee,
           phase: data.phase || phase,
           championshipType: data.championshipType,
+          seasonLabel: data.seasonLabel ?? resolvedSeason,
           teams: data.teams || {},
+          ...(data.idEpreuve !== undefined ? { idEpreuve: data.idEpreuve } : {}),
           createdAt:
             data.createdAt instanceof Timestamp
               ? data.createdAt.toDate()
@@ -77,7 +95,9 @@ export class CompositionService {
 
   async saveComposition(composition: DayComposition): Promise<void> {
     try {
+      const resolvedSeason = this.resolveSeason(composition.seasonLabel);
       const docId = this.getDocumentId(
+        resolvedSeason,
         composition.journee,
         composition.phase,
         composition.championshipType,
@@ -89,6 +109,7 @@ export class CompositionService {
         journee: composition.journee,
         phase: composition.phase,
         championshipType: composition.championshipType,
+        seasonLabel: resolvedSeason,
         teams: composition.teams,
         updatedAt: Timestamp.fromDate(new Date()),
         createdAt: composition.createdAt
@@ -121,10 +142,13 @@ export class CompositionService {
     phase: "aller" | "retour",
     championshipType: ChampionshipType,
     callback: (composition: DayComposition | null) => void,
-    idEpreuve?: number
+    idEpreuve?: number,
+    seasonLabel?: string
   ): Unsubscribe {
     try {
+      const resolvedSeason = this.resolveSeason(seasonLabel);
       const docId = this.getDocumentId(
+        resolvedSeason,
         journee,
         phase,
         championshipType,
@@ -141,7 +165,11 @@ export class CompositionService {
               journee: data.journee,
               phase: data.phase || phase,
               championshipType: data.championshipType,
+              seasonLabel: data.seasonLabel ?? resolvedSeason,
               teams: data.teams || {},
+              ...(data.idEpreuve !== undefined
+                ? { idEpreuve: data.idEpreuve }
+                : {}),
               createdAt:
                 data.createdAt instanceof Timestamp
                   ? data.createdAt.toDate()
@@ -179,5 +207,3 @@ export class CompositionService {
     }
   }
 }
-
-

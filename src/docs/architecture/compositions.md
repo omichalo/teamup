@@ -9,7 +9,7 @@ Le store Zustand `useTeamManagementStore` centralise l'ensemble des données uti
 - `players`: tableau de `Player` issu de Firestore.
 - `equipesWithMatches`: liste d'objets `{ team, matches }` pour chaque équipe, déjà triée par numéro d'équipe.
 - `availabilityByKey`: dictionnaire des disponibilités par clé de journée (`<championshipType>:<phase>:<journee>[:<idEpreuve>]`).
-- `compositionsByKey`: dictionnaire des compositions par clé de journée (`<championshipType>:<phase>:<journee>`).
+- `compositionsByKey`: dictionnaire des compositions par clé de journée (`[<seasonLabel>:]<championshipType>:<phase>:<journee>`).
 - `defaultsByChampionship`: valeurs par défaut des compositions, indexées par `championshipType` et `phase`.
 - États de chargement/erreur associés (`playersLoading`, `equipesLoading`, `availabilityLoading`, `compositionsLoading`, `defaultsLoading`, etc.).
 - `availabilitySubscriptions` / `compositionSubscriptions`: map des callbacks de désinscription Firestore pour garantir un nettoyage propre.

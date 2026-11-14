@@ -81,6 +81,7 @@ interface TeamManagementState {
     phase: "aller" | "retour";
     championshipType: ChampionshipType;
     idEpreuve?: number;
+    seasonLabel?: string;
   }) => () => void;
   fetchCompositionDefaults: (params: {
     phase: "aller" | "retour";
@@ -280,11 +281,19 @@ export const useTeamManagementStore = create<TeamManagementState>((set, get) => 
     };
   },
 
-  subscribeToComposition: ({ journee, phase, championshipType, idEpreuve }) => {
+  subscribeToComposition: ({
+    journee,
+    phase,
+    championshipType,
+    idEpreuve,
+    seasonLabel,
+  }) => {
+    const resolvedSeason = seasonLabel ?? seasonLabelFromDate(new Date());
     const key = getDayKey({
       journee,
       phase,
       championshipType,
+      seasonLabel: resolvedSeason,
       ...(idEpreuve !== undefined ? { idEpreuve } : {}),
     });
     const existing = get().compositionSubscriptions[key];
@@ -309,7 +318,8 @@ export const useTeamManagementStore = create<TeamManagementState>((set, get) => 
           compositionsLoading: { ...state.compositionsLoading, [key]: false },
         }));
       },
-      idEpreuve
+      idEpreuve,
+      resolvedSeason
     );
 
     set((state) => ({
@@ -406,6 +416,18 @@ export const getAvailabilityByDay = (
 
 export const getCompositionByDay = (
   state: TeamManagementState,
-  params: { journee: number; phase: "aller" | "retour"; championshipType: ChampionshipType }
-) => state.compositionsByKey[getDayKey(params)];
+  params: {
+    journee: number;
+    phase: "aller" | "retour";
+    championshipType: ChampionshipType;
+    idEpreuve?: number;
+    seasonLabel?: string;
+  }
+) =>
+  state.compositionsByKey[
+    getDayKey({
+      ...params,
+      seasonLabel: params.seasonLabel ?? seasonLabelFromDate(new Date()),
+    })
+  ];
 
