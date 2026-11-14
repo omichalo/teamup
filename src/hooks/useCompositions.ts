@@ -6,12 +6,14 @@ import {
 } from "@/stores/teamManagementStore";
 import { ChampionshipType } from "@/types";
 import { DayComposition } from "@/lib/services/composition-service";
+import { seasonLabelFromDate } from "@/lib/championship/calendar-season-label";
 
 interface CompositionParams {
   journee: number | null;
   phase: "aller" | "retour" | null;
   championshipType: ChampionshipType;
   idEpreuve?: number;
+  seasonLabel?: string;
 }
 
 export const useCompositions = ({
@@ -19,6 +21,7 @@ export const useCompositions = ({
   phase,
   championshipType,
   idEpreuve,
+  seasonLabel,
 }: CompositionParams) => {
   const {
     subscribeToComposition,
@@ -30,32 +33,44 @@ export const useCompositions = ({
     compositionsError: state.compositionsError,
   }));
 
-  const composition = useTeamManagementStore((state) =>
-    journee && phase
-      ? getCompositionByDay(state, { journee, phase, championshipType, ...(idEpreuve !== undefined ? { idEpreuve } : {}) })
-      : null
-  );
-
-  const key = useMemo(
-    () =>
-      journee && phase
-        ? getDayKey({ journee, phase, championshipType, ...(idEpreuve !== undefined ? { idEpreuve } : {}) })
-        : null,
-    [championshipType, idEpreuve, journee, phase]
-  );
-
-  useEffect(() => {
+  const dayParams = useMemo(() => {
     if (!journee || !phase) {
-      return undefined;
+      return null;
     }
-
-    return subscribeToComposition({
+    const resolvedSeason = seasonLabel ?? seasonLabelFromDate(new Date());
+    const baseParams = {
       journee,
       phase,
       championshipType,
-      ...(idEpreuve !== undefined ? { idEpreuve } : {}),
-    });
-  }, [championshipType, idEpreuve, journee, phase, subscribeToComposition]);
+      seasonLabel: resolvedSeason,
+    } as const;
+    return (idEpreuve !== undefined
+      ? { ...baseParams, idEpreuve }
+      : baseParams) satisfies {
+      journee: number;
+      phase: "aller" | "retour";
+      championshipType: ChampionshipType;
+      seasonLabel: string;
+      idEpreuve?: number;
+    };
+  }, [championshipType, idEpreuve, journee, phase, seasonLabel]);
+
+  const composition = useTeamManagementStore((state) =>
+    dayParams ? getCompositionByDay(state, dayParams) : null
+  );
+
+  const key = useMemo(
+    () => (dayParams ? getDayKey(dayParams) : null),
+    [dayParams]
+  );
+
+  useEffect(() => {
+    if (!dayParams) {
+      return undefined;
+    }
+
+    return subscribeToComposition(dayParams);
+  }, [dayParams, subscribeToComposition]);
 
   return {
     composition: composition as DayComposition | null,
@@ -63,4 +78,3 @@ export const useCompositions = ({
     error: key ? compositionsError[key] ?? null : null,
   };
 };
-
