@@ -5,6 +5,7 @@ export type PatchAvailabilitiesRequest = {
   journee: number;
   phase: "aller" | "retour";
   championshipType: ChampionshipType;
+  seasonLabel?: string;
   idEpreuve?: number;
   date?: string;
   playerUpdates: Array<{

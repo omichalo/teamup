@@ -13,6 +13,7 @@ import { CompositionService, DayComposition } from "@/lib/services/composition-s
 import { FirestorePlayerService } from "@/lib/services/firestore-player-service";
 import { Player } from "@/types/team-management";
 import { ChampionshipType, Team } from "@/types";
+import { seasonLabelFromDate } from "@/lib/championship/calendar-season-label";
 
 const playerService = new FirestorePlayerService();
 const availabilityService = new AvailabilityService();
@@ -24,9 +25,11 @@ export const getDayKey = (params: {
   phase: "aller" | "retour";
   championshipType: ChampionshipType;
   idEpreuve?: number;
+  seasonLabel?: string;
 }) => {
-  const { journee, phase, championshipType, idEpreuve } = params;
-  return `${championshipType}:${phase}:${journee}${
+  const { journee, phase, championshipType, idEpreuve, seasonLabel } = params;
+  const seasonPrefix = seasonLabel ? `${seasonLabel}:` : "";
+  return `${seasonPrefix}${championshipType}:${phase}:${journee}${
     idEpreuve !== undefined ? `:${idEpreuve}` : ""
   }`;
 };
@@ -71,6 +74,7 @@ interface TeamManagementState {
     phase: "aller" | "retour";
     championshipType: ChampionshipType;
     idEpreuve?: number;
+    seasonLabel?: string;
   }) => () => void;
   subscribeToComposition: (params: {
     journee: number;
@@ -221,12 +225,21 @@ export const useTeamManagementStore = create<TeamManagementState>((set, get) => 
     });
   },
 
-  subscribeToAvailability: ({ journee, phase, championshipType, idEpreuve }) => {
-    const key = getDayKey(
-      idEpreuve !== undefined
-        ? { journee, phase, championshipType, idEpreuve }
-        : { journee, phase, championshipType }
-    );
+  subscribeToAvailability: ({
+    journee,
+    phase,
+    championshipType,
+    idEpreuve,
+    seasonLabel,
+  }) => {
+    const resolvedSeason = seasonLabel ?? seasonLabelFromDate(new Date());
+    const key = getDayKey({
+      journee,
+      phase,
+      championshipType,
+      seasonLabel: resolvedSeason,
+      ...(idEpreuve !== undefined ? { idEpreuve } : {}),
+    });
     const existing = get().availabilitySubscriptions[key];
     if (existing) {
       existing();
@@ -249,7 +262,8 @@ export const useTeamManagementStore = create<TeamManagementState>((set, get) => 
           availabilityLoading: { ...state.availabilityLoading, [key]: false },
         }));
       },
-      idEpreuve
+      idEpreuve,
+      resolvedSeason
     );
 
     set((state) => ({
@@ -375,8 +389,20 @@ export const useTeamManagementStore = create<TeamManagementState>((set, get) => 
 
 export const getAvailabilityByDay = (
   state: TeamManagementState,
-  params: { journee: number; phase: "aller" | "retour"; championshipType: ChampionshipType; idEpreuve?: number }
-) => state.availabilityByKey[getDayKey(params)];
+  params: {
+    journee: number;
+    phase: "aller" | "retour";
+    championshipType: ChampionshipType;
+    idEpreuve?: number;
+    seasonLabel?: string;
+  }
+) =>
+  state.availabilityByKey[
+    getDayKey({
+      ...params,
+      seasonLabel: params.seasonLabel ?? seasonLabelFromDate(new Date()),
+    })
+  ];
 
 export const getCompositionByDay = (
   state: TeamManagementState,

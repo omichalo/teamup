@@ -2,74 +2,118 @@ import { getFirestoreAdmin } from "@/lib/firebase-admin";
 import { DiscordAvailabilityPoll } from "@/types/discord-availability";
 import { ChampionshipType } from "@/types/championship";
 import { Timestamp } from "firebase-admin/firestore";
+import { getDiscordPollDocumentId } from "@/lib/discord/poll-document-id";
+import { seasonLabelFromDate } from "@/lib/championship/calendar-season-label";
+import { readPublishedSeasonLabel } from "@/lib/championship/season-label";
 
 const COLLECTION_NAME = "discordAvailabilityPolls";
 
+function mapPollDoc(
+  id: string,
+  data: Record<string, unknown>
+): DiscordAvailabilityPoll {
+  const closedAt = data.closedAt;
+  const createdAt = data.createdAt;
+  return {
+    id,
+    messageId: String(data.messageId ?? ""),
+    channelId: String(data.channelId ?? ""),
+    journee: Number(data.journee),
+    phase: data.phase as "aller" | "retour",
+    championshipType: data.championshipType as ChampionshipType,
+    ...(typeof data.seasonLabel === "string"
+      ? { seasonLabel: data.seasonLabel }
+      : {}),
+    ...(typeof data.idEpreuve === "number"
+      ? { idEpreuve: data.idEpreuve }
+      : {}),
+    ...(typeof data.date === "string" ? { date: data.date } : {}),
+    isActive: data.isActive !== false,
+    ...(closedAt instanceof Timestamp
+      ? { closedAt: closedAt.toDate() }
+      : {}),
+    createdAt:
+      createdAt instanceof Timestamp
+        ? createdAt.toDate()
+        : new Date(),
+    createdBy: typeof data.createdBy === "string" ? data.createdBy : "",
+  };
+}
+
 export class DiscordPollServiceAdmin {
-  /**
-   * Génère l'ID du document pour un sondage
-   */
   private getDocumentId(
     phase: "aller" | "retour",
     journee: number,
     championshipType: ChampionshipType,
-    idEpreuve?: number
+    idEpreuve?: number,
+    seasonLabel?: string | null
   ): string {
-    if (idEpreuve !== undefined) {
-      return `${phase}_${journee}_${championshipType}_${idEpreuve}`;
+    return getDiscordPollDocumentId({
+      phase,
+      journee,
+      championshipType,
+      ...(seasonLabel !== undefined ? { seasonLabel } : {}),
+      ...(idEpreuve !== undefined ? { idEpreuve } : {}),
+    });
+  }
+
+  async resolveSeasonLabel(explicit?: string | null): Promise<string> {
+    if (explicit?.trim()) {
+      return explicit.trim();
     }
-    return `${phase}_${journee}_${championshipType}`;
+    try {
+      const db = getFirestoreAdmin();
+      return await readPublishedSeasonLabel(db);
+    } catch {
+      return seasonLabelFromDate(new Date());
+    }
+  }
+
+  private async readById(docId: string): Promise<DiscordAvailabilityPoll | null> {
+    const db = getFirestoreAdmin();
+    const docSnap = await db.collection(COLLECTION_NAME).doc(docId).get();
+    if (!docSnap.exists) {
+      return null;
+    }
+    const data = docSnap.data();
+    if (!data) {
+      return null;
+    }
+    return mapPollDoc(docSnap.id, data as Record<string, unknown>);
   }
 
   /**
-   * Récupère un sondage par ses paramètres
+   * Récupère un sondage : ID saisonné d'abord, puis fallback legacy (sondage déjà lancé).
    */
   async getPoll(
     journee: number,
     phase: "aller" | "retour",
     championshipType: ChampionshipType,
-    idEpreuve?: number
+    idEpreuve?: number,
+    seasonLabel?: string | null
   ): Promise<DiscordAvailabilityPoll | null> {
     try {
-      const db = getFirestoreAdmin();
-      const docId = this.getDocumentId(
+      const resolvedSeason = await this.resolveSeasonLabel(seasonLabel);
+      const seasonalId = this.getDocumentId(
         phase,
         journee,
         championshipType,
-        idEpreuve
+        idEpreuve,
+        resolvedSeason
       );
-      const docRef = db.collection(COLLECTION_NAME).doc(docId);
-      const docSnap = await docRef.get();
-
-      if (!docSnap.exists) {
-        return null;
+      const seasonal = await this.readById(seasonalId);
+      if (seasonal) {
+        return seasonal;
       }
 
-      const data = docSnap.data();
-      if (!data) {
-        return null;
-      }
-
-      return {
-        id: docSnap.id,
-        messageId: data.messageId,
-        channelId: data.channelId,
-        journee: data.journee,
-        phase: data.phase,
-        championshipType: data.championshipType,
-        idEpreuve: data.idEpreuve,
-        date: data.date,
-        isActive: data.isActive ?? true,
-        closedAt:
-          data.closedAt instanceof Timestamp
-            ? data.closedAt.toDate()
-            : data.closedAt?.toDate?.() || undefined,
-        createdAt:
-          data.createdAt instanceof Timestamp
-            ? data.createdAt.toDate()
-            : data.createdAt?.toDate?.() || new Date(),
-        createdBy: data.createdBy || "",
-      };
+      const legacyId = this.getDocumentId(
+        phase,
+        journee,
+        championshipType,
+        idEpreuve,
+        null
+      );
+      return await this.readById(legacyId);
     } catch (error) {
       console.error(
         "[DiscordPollServiceAdmin] Erreur lors de la récupération:",
@@ -79,19 +123,32 @@ export class DiscordPollServiceAdmin {
     }
   }
 
-  /**
-   * Crée un nouveau sondage dans Firestore
-   */
+  async getPollByDocumentId(
+    pollId: string
+  ): Promise<DiscordAvailabilityPoll | null> {
+    try {
+      return await this.readById(pollId);
+    } catch (error) {
+      console.error(
+        "[DiscordPollServiceAdmin] Erreur getPollByDocumentId:",
+        error
+      );
+      throw error;
+    }
+  }
+
   async createPoll(
     poll: Omit<DiscordAvailabilityPoll, "id" | "createdAt">
   ): Promise<string> {
     try {
       const db = getFirestoreAdmin();
+      const seasonLabel = await this.resolveSeasonLabel(poll.seasonLabel);
       const docId = this.getDocumentId(
         poll.phase,
         poll.journee,
         poll.championshipType,
-        poll.idEpreuve
+        poll.idEpreuve,
+        seasonLabel
       );
       const docRef = db.collection(COLLECTION_NAME).doc(docId);
 
@@ -101,6 +158,7 @@ export class DiscordPollServiceAdmin {
         journee: poll.journee,
         phase: poll.phase,
         championshipType: poll.championshipType,
+        seasonLabel,
         isActive: poll.isActive ?? true,
         createdAt: Timestamp.now(),
         createdBy: poll.createdBy,
@@ -129,9 +187,6 @@ export class DiscordPollServiceAdmin {
     }
   }
 
-  /**
-   * Récupère tous les sondages actifs
-   */
   async getActivePolls(): Promise<DiscordAvailabilityPoll[]> {
     try {
       const db = getFirestoreAdmin();
@@ -141,28 +196,8 @@ export class DiscordPollServiceAdmin {
         .get();
 
       const polls: DiscordAvailabilityPoll[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        polls.push({
-          id: doc.id,
-          messageId: data.messageId,
-          channelId: data.channelId,
-          journee: data.journee,
-          phase: data.phase,
-          championshipType: data.championshipType,
-          idEpreuve: data.idEpreuve,
-          date: data.date,
-          isActive: data.isActive ?? true,
-          closedAt:
-            data.closedAt instanceof Timestamp
-              ? data.closedAt.toDate()
-              : data.closedAt?.toDate?.() || undefined,
-          createdAt:
-            data.createdAt instanceof Timestamp
-              ? data.createdAt.toDate()
-              : data.createdAt?.toDate?.() || new Date(),
-          createdBy: data.createdBy || "",
-        });
+      snapshot.forEach((docSnap) => {
+        polls.push(mapPollDoc(docSnap.id, docSnap.data() as Record<string, unknown>));
       });
 
       return polls;
@@ -175,26 +210,27 @@ export class DiscordPollServiceAdmin {
     }
   }
 
-  /**
-   * Ferme un sondage (désactive les boutons)
-   */
   async closePoll(
     journee: number,
     phase: "aller" | "retour",
     championshipType: ChampionshipType,
-    idEpreuve?: number
+    idEpreuve?: number,
+    seasonLabel?: string | null
   ): Promise<void> {
     try {
       const db = getFirestoreAdmin();
-      const docId = this.getDocumentId(
-        phase,
+      const poll = await this.getPoll(
         journee,
+        phase,
         championshipType,
-        idEpreuve
+        idEpreuve,
+        seasonLabel
       );
-      const docRef = db.collection(COLLECTION_NAME).doc(docId);
+      if (!poll) {
+        return;
+      }
 
-      await docRef.set(
+      await db.collection(COLLECTION_NAME).doc(poll.id).set(
         {
           isActive: false,
           closedAt: Timestamp.now(),

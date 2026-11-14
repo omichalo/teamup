@@ -6,9 +6,13 @@ import {
   DayAvailability,
 } from "@/lib/services/availability-service";
 import { getAvailabilityDocumentId } from "@/lib/availability/document-id";
-import { applyPlayerAvailabilityUpdates } from "@/lib/availability/firestore-persistence";
+import {
+  applyPlayerAvailabilityUpdates,
+  resolveAvailabilitySeasonLabel,
+} from "@/lib/availability/firestore-persistence";
 import { normalizePlayersMap } from "@/lib/availability/normalize-players-map";
 import { sanitizeAvailabilityResponse } from "@/lib/availability/sanitize-response";
+import { seasonLabelFromDate } from "@/lib/championship/calendar-season-label";
 
 const toDate = (value: unknown): Date => {
   if (value instanceof Timestamp) {
@@ -33,23 +37,50 @@ export class AvailabilityServiceAdmin {
   private readonly collectionName = "availabilities";
 
   private getDocumentId(
+    seasonLabel: string,
     journee: number,
     phase: "aller" | "retour",
     championshipType: ChampionshipType,
     idEpreuve?: number
   ): string {
-    return getAvailabilityDocumentId(journee, phase, championshipType, idEpreuve);
+    return getAvailabilityDocumentId(
+      seasonLabel,
+      journee,
+      phase,
+      championshipType,
+      idEpreuve
+    );
+  }
+
+  private async resolveSeason(explicit?: string): Promise<string> {
+    if (explicit?.trim()) {
+      return explicit.trim();
+    }
+    try {
+      const db = getFirestoreAdmin();
+      return await resolveAvailabilitySeasonLabel(db);
+    } catch {
+      return seasonLabelFromDate(new Date());
+    }
   }
 
   async getAvailability(
     journee: number,
     phase: "aller" | "retour",
     championshipType: ChampionshipType,
-    idEpreuve?: number
+    idEpreuve?: number,
+    seasonLabel?: string
   ): Promise<DayAvailability | null> {
     try {
       const db = getFirestoreAdmin();
-      const docId = this.getDocumentId(journee, phase, championshipType, idEpreuve);
+      const resolvedSeason = await this.resolveSeason(seasonLabel);
+      const docId = this.getDocumentId(
+        resolvedSeason,
+        journee,
+        phase,
+        championshipType,
+        idEpreuve
+      );
       const docSnap = await db.collection(this.collectionName).doc(docId).get();
 
       if (!docSnap.exists) {
@@ -65,6 +96,7 @@ export class AvailabilityServiceAdmin {
         journee: data.journee,
         phase: data.phase || phase,
         championshipType: data.championshipType,
+        seasonLabel: data.seasonLabel ?? resolvedSeason,
         idEpreuve: data.idEpreuve,
         date: data.date,
         players: normalizePlayersMap(data),
@@ -97,6 +129,9 @@ export class AvailabilityServiceAdmin {
       journee: availability.journee,
       phase: availability.phase,
       championshipType: availability.championshipType,
+      ...(availability.seasonLabel !== undefined
+        ? { seasonLabel: availability.seasonLabel }
+        : {}),
       ...(availability.idEpreuve !== undefined
         ? { idEpreuve: availability.idEpreuve }
         : {}),
@@ -111,7 +146,8 @@ export class AvailabilityServiceAdmin {
     championshipType: ChampionshipType,
     playerId: string,
     response: AvailabilityResponse,
-    idEpreuve?: number
+    idEpreuve?: number,
+    seasonLabel?: string
   ): Promise<void> {
     try {
       const db = getFirestoreAdmin();
@@ -121,6 +157,7 @@ export class AvailabilityServiceAdmin {
         journee,
         phase,
         championshipType,
+        ...(seasonLabel !== undefined ? { seasonLabel } : {}),
         ...(idEpreuve !== undefined ? { idEpreuve } : {}),
         playerUpdates: [
           {

@@ -5,6 +5,7 @@ import { getAvailabilityDocumentId } from "@/lib/availability/document-id";
 import { patchAvailabilities } from "@/lib/availability/api-client";
 import { normalizePlayersMap } from "@/lib/availability/normalize-players-map";
 import { sanitizeAvailabilityResponse } from "@/lib/availability/sanitize-response";
+import { seasonLabelFromDate } from "@/lib/championship/calendar-season-label";
 
 export interface AvailabilityResponse {
   available?: boolean;
@@ -22,6 +23,7 @@ export interface DayAvailability {
   journee: number;
   phase: "aller" | "retour";
   championshipType: ChampionshipType;
+  seasonLabel?: string;
   idEpreuve?: number; // ID de l'épreuve FFTT (15954, 15955, 15980, etc.) pour différencier les calendriers
   date?: string;
   players: PlayerAvailability;
@@ -32,23 +34,42 @@ export interface DayAvailability {
 export class AvailabilityService {
   private readonly collectionName = "availabilities";
 
+  private resolveSeason(explicit?: string): string {
+    return explicit?.trim() || seasonLabelFromDate(new Date());
+  }
+
   private getDocumentId(
+    seasonLabel: string,
     journee: number,
     phase: "aller" | "retour",
     championshipType: ChampionshipType,
     idEpreuve?: number
   ): string {
-    return getAvailabilityDocumentId(journee, phase, championshipType, idEpreuve);
+    return getAvailabilityDocumentId(
+      seasonLabel,
+      journee,
+      phase,
+      championshipType,
+      idEpreuve
+    );
   }
 
   async getAvailability(
     journee: number,
     phase: "aller" | "retour",
     championshipType: ChampionshipType,
-    idEpreuve?: number
+    idEpreuve?: number,
+    seasonLabel?: string
   ): Promise<DayAvailability | null> {
     try {
-      const docId = this.getDocumentId(journee, phase, championshipType, idEpreuve);
+      const resolvedSeason = this.resolveSeason(seasonLabel);
+      const docId = this.getDocumentId(
+        resolvedSeason,
+        journee,
+        phase,
+        championshipType,
+        idEpreuve
+      );
       const docRef = doc(getDbInstanceDirect(), this.collectionName, docId);
       const docSnap = await getDoc(docRef);
 
@@ -56,8 +77,9 @@ export class AvailabilityService {
         const data = docSnap.data();
         return {
           journee: data.journee,
-          phase: data.phase || phase, // Fallback sur la phase passée en paramètre si absente
+          phase: data.phase || phase,
           championshipType: data.championshipType,
+          seasonLabel: data.seasonLabel ?? resolvedSeason,
           idEpreuve: data.idEpreuve,
           date: data.date,
           players: normalizePlayersMap(data),
@@ -95,6 +117,9 @@ export class AvailabilityService {
       journee: availability.journee,
       phase: availability.phase,
       championshipType: availability.championshipType,
+      ...(availability.seasonLabel !== undefined
+        ? { seasonLabel: availability.seasonLabel }
+        : {}),
       ...(availability.idEpreuve !== undefined
         ? { idEpreuve: availability.idEpreuve }
         : {}),
@@ -109,7 +134,8 @@ export class AvailabilityService {
     championshipType: ChampionshipType,
     playerId: string,
     response: AvailabilityResponse,
-    idEpreuve?: number
+    idEpreuve?: number,
+    seasonLabel?: string
   ): Promise<void> {
     try {
       const sanitized = sanitizeAvailabilityResponse(response);
@@ -118,6 +144,7 @@ export class AvailabilityService {
         journee,
         phase,
         championshipType,
+        ...(seasonLabel !== undefined ? { seasonLabel } : {}),
         ...(idEpreuve !== undefined ? { idEpreuve } : {}),
         playerUpdates: [
           {
@@ -138,46 +165,37 @@ export class AvailabilityService {
     gender: ChampionshipType
   ): Promise<boolean> {
     try {
-      // Extraire journee et phase depuis la date
-      // Pour simplifier, on suppose que la date est au format YYYY-MM-DD
-      // et on récupère les disponibilités pour cette journée
-      // Note: Cette méthode nécessite une logique plus complexe pour déterminer
-      // la journée et la phase à partir de la date
-      const availability = await this.getAvailability(
-        1, // journee par défaut - à adapter selon la logique métier
-        "aller", // phase par défaut - à adapter selon la logique métier
-        gender
-      );
+      const availability = await this.getAvailability(1, "aller", gender);
 
       if (!availability) {
-        return true; // Par défaut, le joueur est disponible si aucune donnée
+        return true;
       }
 
       const playerAvailability = availability.players[playerId];
       return playerAvailability?.available ?? true;
     } catch (error) {
       console.error("Erreur lors de la vérification de disponibilité:", error);
-      return true; // Par défaut, on considère le joueur disponible en cas d'erreur
+      return true;
     }
   }
 
-  /**
-   * S'abonne aux changements de disponibilité en temps réel
-   * @param journee - Numéro de la journée
-   * @param phase - Phase du championnat (aller/retour)
-   * @param championshipType - Type de championnat (masculin/feminin)
-   * @param callback - Fonction appelée à chaque changement
-   * @returns Fonction pour se désabonner
-   */
   subscribeToAvailability(
     journee: number,
     phase: "aller" | "retour",
     championshipType: ChampionshipType,
     callback: (availability: DayAvailability | null) => void,
-    idEpreuve?: number
+    idEpreuve?: number,
+    seasonLabel?: string
   ): Unsubscribe {
     try {
-      const docId = this.getDocumentId(journee, phase, championshipType, idEpreuve);
+      const resolvedSeason = this.resolveSeason(seasonLabel);
+      const docId = this.getDocumentId(
+        resolvedSeason,
+        journee,
+        phase,
+        championshipType,
+        idEpreuve
+      );
       const docRef = doc(getDbInstanceDirect(), this.collectionName, docId);
 
       const unsubscribe = onSnapshot(
@@ -189,6 +207,7 @@ export class AvailabilityService {
               journee: data.journee,
               phase: data.phase || phase,
               championshipType: data.championshipType,
+              seasonLabel: data.seasonLabel ?? resolvedSeason,
               idEpreuve: data.idEpreuve,
               date: data.date,
               players: normalizePlayersMap(data),
@@ -211,7 +230,6 @@ export class AvailabilityService {
             `[AvailabilityService] Erreur lors de l'écoute de la disponibilité (${docId}):`,
             error
           );
-          // En cas d'erreur, on appelle le callback avec null pour indiquer qu'il n'y a pas de données
           callback(null);
         }
       );
@@ -222,7 +240,6 @@ export class AvailabilityService {
         "[AvailabilityService] Erreur lors de la création de l'abonnement:",
         error
       );
-      // Retourner une fonction no-op en cas d'erreur
       return () => {
         // No-op
       };

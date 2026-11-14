@@ -82,15 +82,28 @@ export async function loadWomenTeamAvailability(
   journee: number,
   phase: "aller" | "retour",
   playerId: string,
-  idEpreuve?: number
+  idEpreuve?: number,
+  seasonLabel?: string
 ): Promise<{
   merged: WomenTeamDayAvailability;
   masculinResponse?: AvailabilityResponse;
   femininResponse?: AvailabilityResponse;
 }> {
   const [masculinAvailability, femininAvailability] = await Promise.all([
-    availabilityService.getAvailability(journee, phase, "masculin", idEpreuve),
-    availabilityService.getAvailability(journee, phase, "feminin", idEpreuve),
+    availabilityService.getAvailability(
+      journee,
+      phase,
+      "masculin",
+      idEpreuve,
+      seasonLabel
+    ),
+    availabilityService.getAvailability(
+      journee,
+      phase,
+      "feminin",
+      idEpreuve,
+      seasonLabel
+    ),
   ]);
 
   const masculinResponse = masculinAvailability?.players[playerId];
@@ -115,9 +128,11 @@ export async function saveWomenTeamDaySelection(
     day: "ven" | "sat";
     isAvailable: boolean;
     idEpreuve?: number;
+    seasonLabel?: string;
   }
 ): Promise<WomenTeamDayAvailability> {
-  const { journee, phase, playerId, day, isAvailable, idEpreuve } = params;
+  const { journee, phase, playerId, day, isAvailable, idEpreuve, seasonLabel } =
+    params;
 
   const { merged, masculinResponse, femininResponse } =
     await loadWomenTeamAvailability(
@@ -125,7 +140,8 @@ export async function saveWomenTeamDaySelection(
       journee,
       phase,
       playerId,
-      idEpreuve
+      idEpreuve,
+      seasonLabel
     );
 
   const next = applyWomenDaySelection(merged, day, isAvailable);
@@ -144,7 +160,8 @@ export async function saveWomenTeamDaySelection(
       day === "ven" ? "masculin" : "feminin",
       playerId,
       payload,
-      idEpreuve
+      idEpreuve,
+      seasonLabel
     );
   }
 
