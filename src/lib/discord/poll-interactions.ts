@@ -67,19 +67,10 @@ export async function handleRespondButton(
       });
     }
 
-    // Extraire les infos du pollId
-    const parts = pollId.split("_");
-    const phase = parts[0] as "aller" | "retour";
-    const journee = parseInt(parts[1], 10);
-    const championshipType = parts[2] as ChampionshipType;
-    const idEpreuve = parts.length > 3 ? parseInt(parts[3], 10) : undefined;
-
-    // Détecter si c'est le championnat de Paris
+    const { phase, journee, championshipType, idEpreuve, seasonLabel } = poll;
     const isParisChampionship = idEpreuve === 15980;
-
     const availabilityService = new AvailabilityServiceAdmin();
 
-    // Détecter le genre uniquement pour le championnat par équipes
     let normalizedGender: "M" | "F" | undefined;
     if (!isParisChampionship) {
       const playerGender =
@@ -89,13 +80,13 @@ export async function handleRespondButton(
         playerGender === "F" || playerGender === "féminin" ? "F" : "M";
     }
 
-    // Championnat de Paris (hommes et femmes - même sondage)
     if (isParisChampionship) {
       const availability = await availabilityService.getAvailability(
         journee,
         phase,
         "masculin",
-        idEpreuve
+        idEpreuve,
+        seasonLabel
       );
       const isAvailable = availability?.players[player.playerId]?.available;
       const options = createSelectOptions(isAvailable === undefined, isAvailable);
@@ -128,7 +119,8 @@ export async function handleRespondButton(
         journee,
         phase,
         championshipType,
-        idEpreuve
+        idEpreuve,
+        seasonLabel
       );
       const isAvailable = availability?.players[player.playerId]?.available;
       const options = createSelectOptions(isAvailable === undefined, isAvailable);
@@ -161,7 +153,8 @@ export async function handleRespondButton(
       journee,
       phase,
       player.playerId,
-      idEpreuve
+      idEpreuve,
+      seasonLabel
     );
     const venOptions = createSelectOptions(
       merged.fridayAvailable === undefined,
@@ -261,11 +254,7 @@ export async function handleModifyButton(
       });
     }
 
-    const parts = pollId.split("_");
-    const phase = parts[0] as "aller" | "retour";
-    const journee = parseInt(parts[1], 10);
-    const championshipType = parts[2] as ChampionshipType;
-    const idEpreuve = parts.length > 3 ? parseInt(parts[3], 10) : undefined;
+    const { phase, journee, championshipType, idEpreuve, seasonLabel } = poll;
     const isParisChampionship = idEpreuve === 15980;
     const availabilityService = new AvailabilityServiceAdmin();
 
@@ -292,7 +281,8 @@ export async function handleModifyButton(
         journee,
         phase,
         isParisChampionship ? "masculin" : championshipType,
-        idEpreuve
+        idEpreuve,
+        seasonLabel
       );
       const currentResponse = availability?.players[player.playerId];
       const isAvailable = currentResponse?.available;
@@ -333,7 +323,8 @@ export async function handleModifyButton(
       journee,
       phase,
       player.playerId,
-      idEpreuve
+      idEpreuve,
+      seasonLabel
     );
     const commentText = merged.comment
       ? `\n💬 **Commentaire :** ${merged.comment}`
@@ -452,11 +443,7 @@ export async function handleParisSelect(
           return;
         }
 
-        // Extraire les infos du pollId
-        const parts = pollId.split("_");
-        const phase = parts[0] as "aller" | "retour";
-        const journee = parseInt(parts[1], 10);
-        const idEpreuve = parts.length > 3 ? parseInt(parts[3], 10) : undefined;
+        const { phase, journee, idEpreuve, seasonLabel } = poll;
 
         // Récupérer la valeur sélectionnée
         const selectedValue = interaction.data.values?.[0];
@@ -518,7 +505,8 @@ export async function handleParisSelect(
           targetChampionshipType,
           player.playerId,
           { available: isAvailable },
-          idEpreuve
+          idEpreuve,
+          seasonLabel
         );
 
         const playerName = `${player.playerData.prenom || ""} ${
@@ -634,12 +622,7 @@ export async function handleMenSelect(
           return;
         }
 
-        // Extraire les infos du pollId
-        const parts = pollId.split("_");
-        const phase = parts[0] as "aller" | "retour";
-        const journee = parseInt(parts[1], 10);
-        const championshipType = parts[2] as ChampionshipType;
-        const idEpreuve = parts.length > 3 ? parseInt(parts[3], 10) : undefined;
+        const { phase, journee, championshipType, idEpreuve, seasonLabel } = poll;
 
         // Récupérer la valeur sélectionnée
         const selectedValue = interaction.data.values?.[0];
@@ -664,7 +647,8 @@ export async function handleMenSelect(
           championshipType,
           player.playerId,
           { available: isAvailable },
-          idEpreuve
+          idEpreuve,
+          seasonLabel
         );
 
         const playerName = `${player.playerData.prenom || ""} ${
@@ -778,10 +762,7 @@ export async function handleWomenSelect(
           return;
         }
 
-        const parts = pollId.split("_");
-        const phase = parts[0] as "aller" | "retour";
-        const journee = parseInt(parts[1], 10);
-        const idEpreuve = parts.length > 3 ? parseInt(parts[3], 10) : undefined;
+        const { phase, journee, idEpreuve, seasonLabel } = poll;
 
         const selectedValue = interaction.data.values?.[0];
         if (
@@ -807,6 +788,7 @@ export async function handleWomenSelect(
           day,
           isAvailable,
           ...(idEpreuve !== undefined ? { idEpreuve } : {}),
+          ...(seasonLabel !== undefined ? { seasonLabel } : {}),
         });
 
         const playerName = `${player.playerData.prenom || ""} ${
@@ -1004,9 +986,8 @@ export async function handleModalSubmit(
         });
       }
 
-    // Vérifier que le poll est actif
-    const { active } = await checkPollActive(pollId);
-    if (!active) {
+    const { active, poll: pollDoc } = await checkPollActive(pollId);
+    if (!active || !pollDoc) {
       return NextResponse.json({
         type: 4,
         data: {
@@ -1032,14 +1013,7 @@ export async function handleModalSubmit(
         });
       }
 
-      // Récupérer les informations du pollId
-      const pollParts = pollId.split("_");
-      const phase = pollParts[0] as "aller" | "retour";
-      const journee = parseInt(pollParts[1], 10);
-      const idEpreuve =
-        pollParts.length > 3 ? parseInt(pollParts[3], 10) : undefined;
-
-      // Détecter si c'est le championnat de Paris
+      const { phase, journee, idEpreuve, seasonLabel } = pollDoc;
       const isParisChampionship = idEpreuve === 15980;
 
       const availabilityService = new AvailabilityServiceAdmin();
@@ -1050,7 +1024,8 @@ export async function handleModalSubmit(
           journee,
           phase,
           "masculin",
-          idEpreuve
+          idEpreuve,
+          seasonLabel
         );
 
         const masculinResponse = masculinAvailability?.players[player.playerId];
@@ -1075,7 +1050,8 @@ export async function handleModalSubmit(
           "masculin",
           player.playerId,
           masculinData,
-          idEpreuve
+          idEpreuve,
+          seasonLabel
         );
       } else {
         // Championnat par équipes : sauvegarder le commentaire pour les deux catégories (masculin et féminin)
@@ -1084,13 +1060,15 @@ export async function handleModalSubmit(
             journee,
             phase,
             "masculin",
-            idEpreuve
+            idEpreuve,
+            seasonLabel
           ),
           availabilityService.getAvailability(
             journee,
             phase,
             "feminin",
-            idEpreuve
+            idEpreuve,
+            seasonLabel
           ),
         ]);
 
@@ -1133,7 +1111,8 @@ export async function handleModalSubmit(
             "masculin",
             player.playerId,
             masculinData,
-            idEpreuve
+            idEpreuve,
+            seasonLabel
           ),
           availabilityService.updatePlayerAvailability(
             journee,
@@ -1141,7 +1120,8 @@ export async function handleModalSubmit(
             "feminin",
             player.playerId,
             femininData,
-            idEpreuve
+            idEpreuve,
+            seasonLabel
           ),
         ]);
       }

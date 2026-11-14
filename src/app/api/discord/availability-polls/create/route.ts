@@ -181,10 +181,12 @@ export async function POST(req: Request) {
       ? "masculin"
       : (championshipType as ChampionshipType);
 
-    // Générer l'ID du sondage
-    const pollId = existingPoll
-      ? existingPoll.id
-      : `${phase}_${journee}_${pollChampionshipType}${idEpreuve ? `_${idEpreuve}` : ""}`;
+    const seasonLabel = await pollService.resolveSeasonLabel();
+    // Toujours un ID saisonné pour les nouveaux sondages (les messages Discord déjà
+    // postés gardent leur custom_id legacy via getPollByDocumentId).
+    const pollId = `${seasonLabel}_${phase}_${journee}_${pollChampionshipType}${
+      idEpreuve ? `_${idEpreuve}` : ""
+    }`;
 
     // Construire le message Discord
     const message = buildAvailabilityPollMessage(
@@ -260,6 +262,7 @@ export async function POST(req: Request) {
       journee,
       phase,
       championshipType: pollChampionshipType,
+      seasonLabel,
       idEpreuve,
       date,
       isActive: true,

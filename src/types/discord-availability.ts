@@ -14,12 +14,14 @@ export interface DiscordAvailabilityConfig {
  * Sondage Discord de disponibilité
  */
 export interface DiscordAvailabilityPoll {
-  id: string; // Document ID: ${phase}_${journee}_${championshipType}_${idEpreuve || 'default'}
+  id: string; // Document ID: ${seasonLabel}_${phase}_${journee}_${championshipType}[_${idEpreuve}]
   messageId: string; // ID du message Discord
   channelId: string; // ID du channel Discord
   journee: number;
   phase: "aller" | "retour";
   championshipType: ChampionshipType;
+  /** Présent sur les sondages créés après la migration saisonnée. */
+  seasonLabel?: string;
   idEpreuve?: number;
   date?: string; // Date du match au format YYYY-MM-DD
   isActive: boolean; // true si le sondage est actif (boutons activés)

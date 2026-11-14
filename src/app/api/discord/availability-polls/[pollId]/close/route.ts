@@ -6,7 +6,7 @@ import { adminAuth } from "@/lib/firebase-admin";
 import { hasAnyRole, USER_ROLES, resolveRole } from "@/lib/auth/roles";
 import { initializeFirebaseAdmin } from "@/lib/firebase-admin";
 import { DiscordPollServiceAdmin } from "@/lib/services/discord-poll-service-admin";
-import { ChampionshipType } from "@/types/championship";
+import { parseAvailabilityPollId } from "@/lib/discord/availability-poll-id";
 import { validateOrigin } from "@/lib/auth/csrf-utils";
 import {
   enforceRateLimit,
@@ -77,26 +77,25 @@ export async function POST(
     await initializeFirebaseAdmin();
     const pollService = new DiscordPollServiceAdmin();
 
-    // Récupérer le sondage
-    const parts = params.pollId.split("_");
-    if (parts.length < 3) {
+    const parsed = parseAvailabilityPollId(params.pollId);
+    if (!parsed) {
       return jsonNoStore(
         { success: false, error: "Format de pollId invalide" },
         { status: 400 }
       );
     }
 
-    const phase = parts[0] as "aller" | "retour";
-    const journee = parseInt(parts[1], 10);
-    const championshipType = parts[2] as ChampionshipType;
-    const idEpreuve = parts.length > 3 ? parseInt(parts[3], 10) : undefined;
+    const { phase, journee, championshipType, idEpreuve, seasonLabel } = parsed;
 
-    const poll = await pollService.getPoll(
-      journee,
-      phase,
-      championshipType,
-      idEpreuve
-    );
+    const poll =
+      (await pollService.getPollByDocumentId(params.pollId)) ??
+      (await pollService.getPoll(
+        journee,
+        phase,
+        championshipType,
+        idEpreuve,
+        seasonLabel
+      ));
 
     if (!poll) {
       return jsonNoStore(
@@ -229,7 +228,13 @@ export async function POST(
     }
 
     // Fermer le sondage dans Firestore
-    await pollService.closePoll(journee, phase, championshipType, idEpreuve);
+    await pollService.closePoll(
+      journee,
+      phase,
+      championshipType,
+      idEpreuve,
+      seasonLabel ?? poll.seasonLabel
+    );
 
     return jsonNoStore({
       success: true,
