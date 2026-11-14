@@ -6,12 +6,14 @@ import {
 } from "@/stores/teamManagementStore";
 import { ChampionshipType } from "@/types";
 import { DayAvailability } from "@/lib/services/availability-service";
+import { seasonLabelFromDate } from "@/lib/championship/calendar-season-label";
 
 type AvailabilityParams = {
   journee: number | null;
   phase: "aller" | "retour" | null;
   championshipType: ChampionshipType;
   idEpreuve?: number;
+  seasonLabel?: string;
 };
 
 export const useAvailabilities = ({
@@ -19,6 +21,7 @@ export const useAvailabilities = ({
   phase,
   championshipType,
   idEpreuve,
+  seasonLabel,
 }: AvailabilityParams) => {
   const {
     subscribeToAvailability,
@@ -34,16 +37,23 @@ export const useAvailabilities = ({
     if (!journee || !phase) {
       return null;
     }
-    const baseParams = { journee, phase, championshipType } as const;
+    const resolvedSeason = seasonLabel ?? seasonLabelFromDate(new Date());
+    const baseParams = {
+      journee,
+      phase,
+      championshipType,
+      seasonLabel: resolvedSeason,
+    } as const;
     return (idEpreuve !== undefined
       ? { ...baseParams, idEpreuve }
       : baseParams) satisfies {
       journee: number;
       phase: "aller" | "retour";
       championshipType: ChampionshipType;
+      seasonLabel: string;
       idEpreuve?: number;
     };
-  }, [championshipType, idEpreuve, journee, phase]);
+  }, [championshipType, idEpreuve, journee, phase, seasonLabel]);
 
   const availability = useTeamManagementStore((state) =>
     dayParams ? getAvailabilityByDay(state, dayParams) : null

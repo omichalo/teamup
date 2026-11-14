@@ -1,6 +1,5 @@
 import { getFirestoreAdmin, initializeFirebaseAdmin } from "@/lib/firebase-admin";
 import { DiscordPollServiceAdmin } from "@/lib/services/discord-poll-service-admin";
-import { ChampionshipType } from "@/types/championship";
 import type { SelectMenuOption } from "./poll-interactions-types";
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
@@ -97,24 +96,8 @@ export async function checkPollActive(pollId: string): Promise<{
   poll: Awaited<ReturnType<DiscordPollServiceAdmin["getPoll"]>> | null;
 }> {
   await initializeFirebaseAdmin();
-  const parts = pollId.split("_");
-  if (parts.length < 3) return { active: false, poll: null };
-
-  const phase = parts[0] as "aller" | "retour";
-  const journee = parseInt(parts[1], 10);
-  if (isNaN(journee)) return { active: false, poll: null };
-
-  const championshipType = parts[2] as ChampionshipType;
-  const idEpreuve = parts.length > 3 ? parseInt(parts[3], 10) : undefined;
-
   const pollService = new DiscordPollServiceAdmin();
-  const poll = await pollService.getPoll(
-    journee,
-    phase,
-    championshipType,
-    idEpreuve
-  );
-
+  const poll = await pollService.getPollByDocumentId(pollId);
   return { active: poll?.isActive ?? false, poll };
 }
 

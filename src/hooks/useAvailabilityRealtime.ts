@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AvailabilityService, DayAvailability } from "@/lib/services/availability-service";
 import { ChampionshipType } from "@/types";
+import { seasonLabelFromDate } from "@/lib/championship/calendar-season-label";
 
 /**
  * Hook pour écouter les changements de disponibilité en temps réel
@@ -13,7 +14,8 @@ export const useAvailabilityRealtime = (
   journee: number | null,
   phase: "aller" | "retour" | null,
   championshipType: ChampionshipType,
-  idEpreuve?: number
+  idEpreuve?: number,
+  seasonLabel?: string
 ) => {
   const [availability, setAvailability] = useState<DayAvailability | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,7 +46,8 @@ export const useAvailabilityRealtime = (
           setLoading(false);
           setError(null);
         },
-        idEpreuve
+        idEpreuve,
+        seasonLabel ?? seasonLabelFromDate(new Date())
       );
     } catch (err) {
       const errorMessage =
@@ -60,7 +63,7 @@ export const useAvailabilityRealtime = (
         unsubscribe();
       }
     };
-  }, [journee, phase, championshipType, idEpreuve]);
+  }, [journee, phase, championshipType, idEpreuve, seasonLabel]);
 
   return { availability, loading, error };
 };

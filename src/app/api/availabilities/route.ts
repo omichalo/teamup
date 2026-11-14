@@ -50,8 +50,15 @@ export async function PATCH(req: Request) {
     );
   }
 
-  const { journee, phase, championshipType, idEpreuve, date, playerUpdates } =
-    parsed.data;
+  const {
+    journee,
+    phase,
+    championshipType,
+    seasonLabel,
+    idEpreuve,
+    date,
+    playerUpdates,
+  } = parsed.data;
 
   try {
     await initializeFirebaseAdmin();
@@ -61,6 +68,7 @@ export async function PATCH(req: Request) {
       journee,
       phase,
       championshipType,
+      ...(seasonLabel !== undefined ? { seasonLabel } : {}),
       ...(idEpreuve !== undefined ? { idEpreuve } : {}),
       ...(date !== undefined ? { date } : {}),
       playerUpdates: toPlayerAvailabilityUpdates(playerUpdates),

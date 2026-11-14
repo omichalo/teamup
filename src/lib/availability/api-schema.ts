@@ -23,6 +23,11 @@ export const patchAvailabilitiesSchema = z
     journee: z.number().int().positive(),
     phase: z.enum(["aller", "retour"]),
     championshipType: z.enum(["masculin", "feminin"]),
+    seasonLabel: z
+      .string()
+      .trim()
+      .regex(/^\d{4}-\d{4}$/)
+      .optional(),
     idEpreuve: z.number().int().positive().optional(),
     date: z.string().trim().min(1).optional(),
     playerUpdates: z.array(playerUpdateSchema).min(1).max(100),

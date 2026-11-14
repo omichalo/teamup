@@ -8,6 +8,8 @@ import { ChampionshipType } from "@/types";
 import { AvailabilityResponse } from "@/lib/services/availability-service";
 import { getAvailabilityDocumentId } from "@/lib/availability/document-id";
 import { sanitizeAvailabilityResponse } from "@/lib/availability/sanitize-response";
+import { seasonLabelFromDate } from "@/lib/championship/calendar-season-label";
+import { readPublishedSeasonLabel } from "@/lib/championship/season-label";
 
 export type PlayerAvailabilityUpdate = {
   playerId: string;
@@ -18,10 +20,25 @@ export type ApplyPlayerAvailabilityUpdatesParams = {
   journee: number;
   phase: "aller" | "retour";
   championshipType: ChampionshipType;
+  seasonLabel?: string;
   idEpreuve?: number;
   date?: string;
   playerUpdates: PlayerAvailabilityUpdate[];
 };
+
+export async function resolveAvailabilitySeasonLabel(
+  db: Firestore,
+  explicit?: string
+): Promise<string> {
+  if (explicit && explicit.trim()) {
+    return explicit.trim();
+  }
+  try {
+    return await readPublishedSeasonLabel(db);
+  } catch {
+    return seasonLabelFromDate(new Date());
+  }
+}
 
 /**
  * Écrit les disponibilités joueurs dans Firestore.
@@ -39,7 +56,9 @@ export async function applyPlayerAvailabilityUpdates(
     return;
   }
 
+  const seasonLabel = await resolveAvailabilitySeasonLabel(db, params.seasonLabel);
   const docId = getAvailabilityDocumentId(
+    seasonLabel,
     params.journee,
     params.phase,
     params.championshipType,
@@ -52,6 +71,7 @@ export async function applyPlayerAvailabilityUpdates(
     journee: params.journee,
     phase: params.phase,
     championshipType: params.championshipType,
+    seasonLabel,
     updatedAt: FieldValue.serverTimestamp(),
   };
 
