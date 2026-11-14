@@ -26,7 +26,7 @@ individuel, donc aucun filtrage fiable « frais vs ancien » dans un même docum
 4. **Migration** : script `scripts/migrate-availabilities-season-keys.ts` —
    J5 aller forcé en archive `2025-2026_*` + slate vide ; autres journées
    classées via date de sondage / `updatedAt`.
-5. **Compositions** : hors scope de cette ADR (même dette de clé, suivi séparé).
+5. **Compositions** : traité dans ADR-0019 (même préfixe `seasonLabel`).
 
 ## Conséquences
 
