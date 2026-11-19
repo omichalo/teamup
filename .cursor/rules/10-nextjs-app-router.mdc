@@ -1,6 +1,7 @@
 ---
 description: App Router Next.js, Server/Client Components, routes API, cache
-alwaysApply: true
+globs: src/app/**/*
+alwaysApply: false
 ---
 
 # Next.js App Router

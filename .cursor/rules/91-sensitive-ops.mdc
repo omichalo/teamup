@@ -1,0 +1,38 @@
+---
+description: Autonomie assistée — interdictions prod, secrets, git dangereux
+alwaysApply: true
+---
+
+# Opérations sensibles (autonomie assistée)
+
+## Mode d’autonomie
+
+- Les agents **proposent** des changements (diff, commandes, texte de commit/PR).
+- **Humain uniquement** : `git commit`, `git push`, merge de PR, déploiements Firebase/App Hosting, sync de secrets.
+
+## Interdictions absolues pour les agents
+
+- Push ou commit direct sur `main` ou `staging`
+- `git push --force` / `--force-with-lease` sur branches protégées
+- `--no-verify`, `--no-gpg-sign`, ou contournement des hooks Husky
+- `firebase deploy` (ou équivalent) ciblant le projet **production** `sqyping-teamup`
+- Modification / rotation / affichage de secrets (`.env*`, Secret Manager, clés Stripe live, service accounts)
+- Écriture volontaire sur données de production (Firestore prod, Storage prod)
+
+## Environnements
+
+| Branche / projet | Rôle |
+|------------------|------|
+| Local + `sqyping-teamup-dev` | Développement |
+| `staging` → App Hosting staging | Validation |
+| `main` → `sqyping-teamup` | Production — lecture seule pour agents |
+
+## Si une demande viole ces règles
+
+Refuser en peu de phrases, rappeler le mode assisté, et proposer l’équivalent sûr (branche `feature/*`/`fix/*`, PR vers `staging`, deploy staging seulement après validation humaine).
+
+## MCP
+
+- Stripe MCP : **compte / clés test uniquement** — jamais live.
+- Ne pas lire ni recopier `~/.cursor/mcp.json` (tokens).
+- GitHub : si MCP indisponible, utiliser la CLI `gh`.

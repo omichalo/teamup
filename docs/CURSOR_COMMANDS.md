@@ -1,258 +1,77 @@
-# Prompts Cursor - Guide d'utilisation
+# Prompts Cursor — TeamUp
 
-Ce document liste les prompts prêts à l'emploi pour utiliser Cursor efficacement dans ce projet.
+Liste **allégée**. Préférer les **skills** (`.cursor/skills/`) et le **Plan Mode**.  
+Les prompts ci-dessous restent utiles en copier-coller dans le chat.
 
-**Note importante**: Ces "commandes" ne sont pas des commandes slash intégrées à Cursor. Ce sont des prompts à copier-coller dans le chat Cursor. Cursor ne permet pas de créer des commandes slash personnalisées.
-
-## Comment utiliser ces prompts
-
-1. Ouvrir le chat Cursor (Cmd+L ou Ctrl+L)
-2. Copier-coller le prompt souhaité
-3. Adapter le prompt selon vos besoins
+> Historique : Cursor 3.21+ expose aussi skills, subagents Task, Bugbot / Security Review. Ce fichier ne documente plus un workflow « multi-agent parallèle » custom comme solution par défaut — voir [`WORKFLOW.md`](./WORKFLOW.md).
 
 ## Planification
 
-### Plan structuré
-
-Créer un plan structuré pour une nouvelle fonctionnalité ou modification.
-
-**Prompt à utiliser:**
-
 ```
-Crée un plan structuré pour: Ajouter une fonctionnalité de notification push
+Passe en Plan Mode et propose un plan pour: <objectif>
+Respecte AGENTS.md, les invariants du domaine, et 91-sensitive-ops.
 ```
 
-ou simplement:
+## Feature verticale
 
 ```
-Plan: Ajouter une fonctionnalité de notification push
+Utilise le skill teamup-feature-slice pour: <périmètre>
 ```
 
-## Exécution multi-agent
-
-### Workflow multi-agent
-
-Lancer plusieurs agents en parallèle pour travailler sur différentes parties du projet.
-
-**Prompt à utiliser:**
+## Invariants
 
 ```
-Utilise un workflow multi-agent pour implémenter la fonctionnalité de notifications:
-- RepoScout: explorer les patterns existants
-- Architect: définir la structure
-- NextJS: créer les composants UI
-- Firebase: configurer les Cloud Functions
-- Tester: écrire les tests
+Utilise le skill invariants-check avant de modifier <domaine>
 ```
 
-## Validation rapide
-
-### Validation rapide (check-fast)
-
-Validation rapide (lint + type-check sans build).
-
-**Prompt à utiliser:**
+## Validation
 
 ```
-Exécute npm run check:dev et corrige toutes les erreurs
+Exécute npm run check:dev et corrige les erreurs
 ```
 
-**Équivalent à:** `npm run check:dev`
-
-**Utilisation:** Pendant le développement, fréquemment
-
-## Validation complète
-
-### Validation complète (check-full)
-
-Validation complète (lint + type-check + build + tests).
-
-**Prompt à utiliser:**
-
 ```
-Exécute npm run check et corrige toutes les erreurs
+Exécute npm run check et corrige les erreurs
 ```
 
-**Équivalent à:** `npm run check`
-
-**Utilisation:** Avant chaque commit/push
-
-## Tests
-
-### Tests unitaires
-
-Lancer les tests unitaires.
-
-**Prompt à utiliser:**
+## PR staging
 
 ```
-Exécute npm test et affiche les résultats
+Utilise le skill pr-staging et prépare le texte de PR (sans push)
 ```
 
-**Équivalent à:** `npm test`
-
-### Tests en mode watch
-
-Lancer les tests en mode watch.
-
-**Prompt à utiliser:**
+## Smoke staging
 
 ```
-Exécute npm run test:watch
+Utilise le skill post-deploy-smoke / exécute npm run smoke:staging
 ```
 
-**Équivalent à:** `npm run test:watch`
-
-### Tests avec coverage
-
-Lancer les tests avec coverage.
-
-**Prompt à utiliser:**
+## Review sensible
 
 ```
-Exécute npm run test:coverage et affiche le rapport de couverture
+Sur ce diff, utilise le skill agent-review-sensitive
+(Bugbot et/ou Security Review — paiement, auth, firestore.rules)
 ```
 
-**Équivalent à:** `npm run test:coverage`
-
-## Smoke Tests
-
-### Smoke test web
-
-Exécuter le smoke test web (build + start + health check + stop).
-
-**Prompt à utiliser:**
+## Exploration
 
 ```
-Exécute npm run smoke:web
+Explore le code pour: <question>
+Cite fichiers et invariants Confirmé si le sujet est métier.
 ```
 
-**Équivalent à:** `npm run smoke:web`
+## Scripts npm de référence
 
-**Utilisation:** Avant de créer une PR importante
-
-### Smoke test emulators
-
-Exécuter le smoke test des emulators Firebase.
-
-**Prompt à utiliser:**
-
-```
-Exécute npm run emulators:smoke
-```
-
-**Équivalent à:** `npm run emulators:smoke`
-
-**Utilisation:** Avant de déployer des Functions
-
-## Préparation PR
-
-### Vérification PR (pr-ready)
-
-Vérifier que le code est prêt pour une Pull Request.
-
-**Prompt à utiliser:**
-
-```
-Vérifie que le code est prêt pour une PR:
-- Qualité du code (lint, type-check, build)
-- Sécurité (pas de secrets, validation inputs)
-- Cohérence avec les règles (.cursor/rules/)
-- Passage des quality gates (npm run check)
-- Documentation à jour
-- Tests passent
-```
-
-**Utilisation:** Avant de créer une PR
-
-## Discord (optionnel)
-
-### Enregistrer commandes Discord
-
-Enregistrer les commandes slash Discord.
-
-**Prompt à utiliser:**
-
-```
-Exécute npm run discord:register-command
-```
-
-**Équivalent à:** `npm run discord:register-command`
-
-**Utilisation:** Après avoir modifié les commandes Discord
-
-## Exemples de workflow
-
-### Workflow de développement typique
-
-1. **Planification**
-
-   ```
-   Plan: Ajouter une nouvelle page de statistiques
-   ```
-
-2. **Développement avec validation fréquente**
-
-   ```
-   Exécute npm run check:dev et corrige les erreurs
-   ```
-
-3. **Tests**
-
-   ```
-   Exécute npm test
-   ```
-
-4. **Validation complète avant commit**
-
-   ```
-   Exécute npm run check et corrige toutes les erreurs
-   ```
-
-5. **Smoke test avant PR**
-
-   ```
-   Exécute npm run smoke:web
-   ```
-
-6. **Vérification finale**
-   ```
-   Vérifie que le code est prêt pour une PR (qualité, sécurité, tests, docs)
-   ```
-
-### Workflow multi-agent
-
-1. **Lancer les agents**
-
-   ```
-   Utilise un workflow multi-agent pour implémenter la fonctionnalité X:
-   - RepoScout: explorer les patterns existants
-   - Architect: définir la structure
-   - NextJS: créer les composants UI
-   - Firebase: configurer les Cloud Functions
-   - Tester: écrire les tests
-   ```
-
-2. **Valider le résultat**
-   ```
-   Exécute npm run check
-   Vérifie que le code est prêt pour une PR
-   ```
-
-## Commandes slash Cursor intégrées
-
-Cursor dispose de quelques commandes slash intégrées que vous pouvez utiliser:
-
-- `/edit` - Modifier du code
-- `/fix` - Corriger des erreurs
-- `/explain` - Expliquer du code
-- `/generate` - Générer du code
-
-Pour voir toutes les commandes disponibles, tapez `/` dans le chat Cursor.
+| Intent | Commande |
+|--------|----------|
+| Check rapide | `npm run check:dev` |
+| Check complet | `npm run check` |
+| Tests | `npm test` |
+| Smoke local | `npm run smoke:web` |
+| Smoke staging | `npm run smoke:staging` |
+| Emulators | `npm run emulators:smoke` |
 
 ## Notes
 
-- Les prompts ci-dessus sont à copier-coller dans le chat Cursor (Cmd+L ou Ctrl+L)
-- Ces prompts déclenchent l'exécution des scripts npm correspondants
-- Consulter [WORKFLOW.md](./WORKFLOW.md) pour plus de détails sur le workflow multi-agent
-- Pour des commandes rapides, vous pouvez aussi utiliser directement les scripts npm dans le terminal
+- Ne pas demander à l’agent de pusher sur `main`/`staging` ni de déployer la prod.
+- MCP Stripe : test uniquement — `docs/technical/MCP_CURSOR.md`.
