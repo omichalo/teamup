@@ -13,6 +13,7 @@ import {
   enforceRateLimit,
   RATE_LIMIT_DISCORD_POLL_MUTATION_PER_UID,
 } from "@/lib/auth/rate-limit-http";
+import { isParisChampionshipIdEpreuve } from "@/lib/shared/epreuve-utils";
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 
@@ -122,11 +123,12 @@ export async function POST(req: Request) {
 
     // Déterminer si c'est le championnat par équipes
     // epreuveType === "championnat_equipes" = Championnat de France par Équipes
-    // epreuveType === "championnat_paris" ou idEpreuve === 15980 = Championnat de Paris IDF (Excellence)
-    // Fallback : idEpreuve === 15954 ou 15955 = Championnat de France par Équipes
+    // epreuveType === "championnat_paris" ou id Paris connu = Championnat de Paris IDF
     const isTeamChampionship =
       epreuveType === "championnat_equipes" ||
-      (idEpreuve !== undefined && idEpreuve !== 15980);
+      (idEpreuve !== undefined &&
+        epreuveType !== "championnat_paris" &&
+        !isParisChampionshipIdEpreuve(idEpreuve));
 
     // Récupérer la mention selon le type de championnat
     const mention = isTeamChampionship

@@ -1,6 +1,8 @@
 import {
   classifyClubChampionshipEpreuve,
   getMatchEpreuve,
+  ID_EPREUVE_PARIS,
+  isParisChampionshipIdEpreuve,
   isParisEpreuve,
   isTrackedClubChampionshipEpreuve,
   resolveIdEpreuveFromEquipes,
@@ -26,6 +28,12 @@ describe("classifyClubChampionshipEpreuve", () => {
     expect(classifyClubChampionshipEpreuve({ idEpreuve: 18369 })).toBe(
       "championnat_equipes"
     );
+    expect(classifyClubChampionshipEpreuve({ idEpreuve: 18394 })).toBe(
+      "championnat_paris"
+    );
+    expect(isParisChampionshipIdEpreuve(18394)).toBe(true);
+    expect(isParisChampionshipIdEpreuve(15980)).toBe(true);
+    expect(isParisChampionshipIdEpreuve(18368)).toBe(false);
     expect(
       isTrackedClubChampionshipEpreuve({
         idEpreuve: 19999,
@@ -93,7 +101,7 @@ describe("resolveIdEpreuveFromEquipes", () => {
     },
     {
       team: {
-        idEpreuve: 15980,
+        idEpreuve: 18394,
         epreuve: "L08_Championnat de Paris IDF",
         isFemale: false,
       },
@@ -114,9 +122,24 @@ describe("resolveIdEpreuveFromEquipes", () => {
     expect(resolveIdEpreuveFromEquipes(franceOnly, "masculin")).toBe(undefined);
   });
 
-  it("resolves Paris idEpreuve for Paris championship docs", () => {
+  it("resolves Paris to stable doc id (not live FFTT id)", () => {
     expect(resolveIdEpreuveFromEquipes(equipes, "masculin", "championnat_paris")).toBe(
-      15980
+      ID_EPREUVE_PARIS
     );
+    expect(resolveIdEpreuveFromEquipes(equipes, "masculin")).toBe(ID_EPREUVE_PARIS);
+    expect(
+      resolveIdEpreuveFromEquipes(
+        [
+          {
+            team: {
+              idEpreuve: 18394,
+              epreuve: "L08_Championnat de Paris IDF",
+            },
+          },
+        ],
+        "masculin",
+        "championnat_paris"
+      )
+    ).toBe(15980);
   });
 });

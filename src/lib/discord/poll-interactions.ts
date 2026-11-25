@@ -15,6 +15,7 @@ import {
   loadWomenTeamAvailability,
   saveWomenTeamDaySelection,
 } from "@/lib/discord/women-team-availability";
+import { isParisChampionshipIdEpreuve } from "@/lib/shared/epreuve-utils";
 export type {
   DiscordMessageComponentInteraction,
   DiscordModalSubmitInteraction,
@@ -68,7 +69,7 @@ export async function handleRespondButton(
     }
 
     const { phase, journee, championshipType, idEpreuve, seasonLabel } = poll;
-    const isParisChampionship = idEpreuve === 15980;
+    const isParisChampionship = isParisChampionshipIdEpreuve(idEpreuve);
     const availabilityService = new AvailabilityServiceAdmin();
 
     let normalizedGender: "M" | "F" | undefined;
@@ -255,7 +256,7 @@ export async function handleModifyButton(
     }
 
     const { phase, journee, championshipType, idEpreuve, seasonLabel } = poll;
-    const isParisChampionship = idEpreuve === 15980;
+    const isParisChampionship = isParisChampionshipIdEpreuve(idEpreuve);
     const availabilityService = new AvailabilityServiceAdmin();
 
     let normalizedGender: "M" | "F" | undefined;
@@ -1014,7 +1015,7 @@ export async function handleModalSubmit(
       }
 
       const { phase, journee, idEpreuve, seasonLabel } = pollDoc;
-      const isParisChampionship = idEpreuve === 15980;
+      const isParisChampionship = isParisChampionshipIdEpreuve(idEpreuve);
 
       const availabilityService = new AvailabilityServiceAdmin();
 
