@@ -10,9 +10,12 @@ describe("idEpreuveForCompositionDocs", () => {
     ).toBeUndefined();
   });
 
-  it("keeps Paris idEpreuve for Paris teams", () => {
+  it("keeps stable Paris doc id even when teams use current FFTT id", () => {
     expect(
       idEpreuveForCompositionDocs([{ team: { id: "p", idEpreuve: 15980 } }])
+    ).toBe(15980);
+    expect(
+      idEpreuveForCompositionDocs([{ team: { id: "p", idEpreuve: 18394 } }])
     ).toBe(15980);
   });
 });

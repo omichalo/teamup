@@ -1,5 +1,8 @@
 import { EquipeWithMatches } from "@/hooks/useTeamData";
-import { getMatchEpreuve, ID_EPREUVE_PARIS } from "@/lib/shared/epreuve-utils";
+import {
+  getMatchEpreuve,
+  isParisChampionshipIdEpreuve,
+} from "@/lib/shared/epreuve-utils";
 import { getTeamsByType } from "@/lib/compositions/championship-utils";
 import { Match } from "@/types";
 import { Player } from "@/types/team-management";
@@ -142,7 +145,12 @@ export const buildSimulatedPlayers = (
 
 export const isParisChampionship = (equipe: EquipeWithMatches): boolean => {
   const match = equipe.matches[0];
-  if (match?.idEpreuve === ID_EPREUVE_PARIS) return true;
+  if (
+    isParisChampionshipIdEpreuve(match?.idEpreuve) ||
+    isParisChampionshipIdEpreuve(equipe.team.idEpreuve)
+  ) {
+    return true;
+  }
 
   const epreuve = getMatchEpreuve(match || {}, equipe.team);
   if (epreuve === "championnat_paris") return true;

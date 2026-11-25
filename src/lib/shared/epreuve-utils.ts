@@ -12,6 +12,10 @@ export type FfttEpreuveRef = {
 // le libellé reste la source de vérité pour la synchro.
 export const ID_EPREUVE_MASCULIN = 15954;
 export const ID_EPREUVE_FEMININ = 15955;
+/**
+ * Marqueur stable des docs Firestore / sondages Discord pour Paris
+ * (`…_masculin_15980`). Ne suit PAS l’id FFTT de la saison courante.
+ */
 export const ID_EPREUVE_PARIS = 15980;
 
 const KNOWN_FRANCE_TEAM_EPREUVE_IDS: ReadonlySet<number> = new Set([
@@ -21,7 +25,20 @@ const KNOWN_FRANCE_TEAM_EPREUVE_IDS: ReadonlySet<number> = new Set([
   18369, // 2026-2027 féminin
 ]);
 
-const KNOWN_PARIS_EPREUVE_IDS: ReadonlySet<number> = new Set([ID_EPREUVE_PARIS]);
+/** IDs FFTT Paris connus (saisons passées + courante) — classification uniquement. */
+const KNOWN_PARIS_EPREUVE_IDS: ReadonlySet<number> = new Set([
+  ID_EPREUVE_PARIS, // 2025-2026 (+ clé doc stable)
+  18394, // 2026-2027
+]);
+
+/**
+ * True si l’id FFTT (ou le marqueur doc `_15980`) désigne le championnat de Paris.
+ */
+export function isParisChampionshipIdEpreuve(
+  idEpreuve: number | null | undefined
+): boolean {
+  return idEpreuve != null && KNOWN_PARIS_EPREUVE_IDS.has(idEpreuve);
+}
 
 function normalizeEpreuveLabel(value: string): string {
   return value
@@ -108,19 +125,20 @@ export function resolveIdEpreuveFromEquipes(
     });
 
     if (wantParis) {
-      if (classified === "championnat_paris" && equipe.team.idEpreuve != null) {
-        return equipe.team.idEpreuve;
+      if (classified === "championnat_paris") {
+        // Toujours le marqueur stable (pas l’id FFTT live, ex. 18394).
+        return ID_EPREUVE_PARIS;
       }
       continue;
     }
 
-    // epreuveType omis : n'utiliser l'id que pour Paris (clés doc avec _15980).
-    if (classified === "championnat_paris" && equipe.team.idEpreuve != null) {
+    // epreuveType omis : suffixe doc Paris uniquement (= getIdEpreuve / _15980).
+    if (classified === "championnat_paris") {
       const isFemale =
         equipe.team.isFemale === true ||
         equipe.matches?.some((match) => match.isFemale === true) === true;
       if (isFemale === wantFemale || !wantFemale) {
-        return equipe.team.idEpreuve;
+        return ID_EPREUVE_PARIS;
       }
     }
   }

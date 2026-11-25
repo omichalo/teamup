@@ -17,7 +17,10 @@ import {
   extractClubIdFromLien,
 } from "./team-matches-sync-enrichment";
 import { recalculateJourneesByDate } from "./team-matches-sync-journee";
-import { isTrackedClubChampionshipEpreuve } from "./epreuve-utils";
+import {
+  isParisChampionshipIdEpreuve,
+  isTrackedClubChampionshipEpreuve,
+} from "./epreuve-utils";
 import { saveMatchesToTeamSubcollections } from "./team-matches-sync-save";
 import { listLicensedSqyPlayersInMatch } from "./match-composition-utils";
 import { readPublishedSeasonLabel } from "@/lib/championship/season-label";
@@ -466,11 +469,12 @@ export class TeamMatchesSyncService {
           );
 
       // Séparer les matchs du championnat par équipes et du championnat de Paris
+      // (IDs FFTT Paris varient par saison ; ne pas hardcoder 15980 seul).
       const matchesChampionnatEquipes = enrichedMatches.filter(
-        (match) => match.idEpreuve !== 15980
+        (match) => !isParisChampionshipIdEpreuve(match.idEpreuve)
       );
-      const matchesChampionnatParis = enrichedMatches.filter(
-        (match) => match.idEpreuve === 15980
+      const matchesChampionnatParis = enrichedMatches.filter((match) =>
+        isParisChampionshipIdEpreuve(match.idEpreuve)
       );
 
       console.log(
