@@ -12,6 +12,7 @@ import {
   enforceRateLimit,
   RATE_LIMIT_DISCORD_POLL_MUTATION_PER_UID,
 } from "@/lib/auth/rate-limit-http";
+import { isParisChampionshipIdEpreuve } from "@/lib/shared/epreuve-utils";
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 
@@ -131,9 +132,8 @@ export async function POST(
     const config = configDoc.exists ? configDoc.data() : null;
 
     // Déterminer le type de championnat (par équipes ou Paris)
-    // idEpreuve === 15980 = Championnat de Paris IDF (Excellence)
-    // Sinon = Championnat de France par Équipes
-    const isTeamChampionship = idEpreuve === undefined || idEpreuve !== 15980;
+    const isTeamChampionship =
+      idEpreuve === undefined || !isParisChampionshipIdEpreuve(idEpreuve);
     const mention = isTeamChampionship
       ? config?.equipesMention || null
       : config?.parisMention || null;

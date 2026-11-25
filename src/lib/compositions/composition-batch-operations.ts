@@ -17,7 +17,8 @@ interface TeamListItem {
 
 /**
  * Clé doc compositions alignée sur disponibilités :
- * France équipes → pas de suffixe ; Paris → 15980.
+ * France équipes → pas de suffixe ; Paris → marqueur stable 15980
+ * (pas l’id FFTT de saison, ex. 18394).
  */
 export function idEpreuveForCompositionDocs(teams: TeamListItem[]): number | undefined {
   const hasParis = teams.some(
