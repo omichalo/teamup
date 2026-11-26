@@ -168,24 +168,33 @@ export const isParisChampionship = (equipe: EquipeWithMatches): boolean => {
 export const getParisTeamStructure = (division: string): ParisTeamStructure | null => {
   const divisionLower = division.toLowerCase();
 
-  if (divisionLower.includes("excellence") || divisionLower.includes("honneur")) {
-    return { groups: 3, playersPerGroup: 3, totalPlayers: 9 };
-  }
-
+  // Saison 2026/2027 (Ligue IDF) : Promo Honneur = 2 groupes de 3 (avant le match « honneur »)
   if (
-    divisionLower.includes("1ere division") ||
-    divisionLower.includes("1ère division") ||
-    divisionLower.includes("1ere div") ||
-    divisionLower.includes("1ère div")
+    divisionLower.includes("promo honneur") ||
+    divisionLower.includes("promo-honneur") ||
+    divisionLower.includes("promotion d'honneur") ||
+    divisionLower.includes("promotion d’honneur") ||
+    divisionLower.includes("promotion honneur")
   ) {
     return { groups: 2, playersPerGroup: 3, totalPlayers: 6 };
   }
 
+  if (divisionLower.includes("excellence") || divisionLower.includes("honneur")) {
+    return { groups: 3, playersPerGroup: 3, totalPlayers: 9 };
+  }
+
+  // Saison 2026/2027 (Ligue IDF) : D1 et D2 = 1 groupe de 3 joueurs
   if (
+    divisionLower.includes("1ere division") ||
+    divisionLower.includes("1ère division") ||
+    divisionLower.includes("1ere div") ||
+    divisionLower.includes("1ère div") ||
+    divisionLower.includes("division 1") ||
     divisionLower.includes("2eme division") ||
     divisionLower.includes("2ème division") ||
     divisionLower.includes("2eme div") ||
-    divisionLower.includes("2ème div")
+    divisionLower.includes("2ème div") ||
+    divisionLower.includes("division 2")
   ) {
     return { groups: 1, playersPerGroup: 3, totalPlayers: 3 };
   }
