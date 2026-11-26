@@ -172,7 +172,7 @@ export function CompositionsPageContainer() {
         {
           id: "paris-structure",
           label:
-            "Structure par groupes : 3 groupes de 3 joueurs (Excellence, Promo Excellence, Honneur), 2 groupes de 3 (Division 1), 1 groupe de 3 (Division 2)",
+            "Structure par groupes : 3×3 (Excellence, Promo Excellence, Honneur), 2×3 (Promo Honneur), 1×3 (Division 1 et Division 2)",
           scope: "both",
         },
         {

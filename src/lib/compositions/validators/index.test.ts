@@ -54,10 +54,35 @@ describe("compositions validators", () => {
       playersPerGroup: 3,
       totalPlayers: 9,
     });
-    expect(getParisTeamStructure("1ere Division")).toEqual({
+    expect(getParisTeamStructure("Promo Excellence")).toEqual({
+      groups: 3,
+      playersPerGroup: 3,
+      totalPlayers: 9,
+    });
+    expect(getParisTeamStructure("Honneur")).toEqual({
+      groups: 3,
+      playersPerGroup: 3,
+      totalPlayers: 9,
+    });
+    expect(getParisTeamStructure("Promo Honneur")).toEqual({
       groups: 2,
       playersPerGroup: 3,
       totalPlayers: 6,
+    });
+    expect(getParisTeamStructure("L08_Promo Honneur Poule 3")).toEqual({
+      groups: 2,
+      playersPerGroup: 3,
+      totalPlayers: 6,
+    });
+    expect(getParisTeamStructure("1ere Division")).toEqual({
+      groups: 1,
+      playersPerGroup: 3,
+      totalPlayers: 3,
+    });
+    expect(getParisTeamStructure("Division 1")).toEqual({
+      groups: 1,
+      playersPerGroup: 3,
+      totalPlayers: 3,
     });
     expect(getParisTeamStructure("2eme Division")).toEqual({
       groups: 1,
